@@ -1,22 +1,31 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Marvol Facility Cleaning Management API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: staff
+    description: Staff management
+  - name: areas
+    description: Cleaning areas
+  - name: tasks
+    description: Task management
+  - name: assignments
+    description: Task assignments
+  - name: issues
+    description: Issue reporting
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +33,321 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /staff:
+    get:
+      operationId: listStaff
+      tags: [staff]
+      summary: List all staff members
+      responses:
+        "200":
+          description: List of staff
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StaffMember"
+    post:
+      operationId: createStaffMember
+      tags: [staff]
+      summary: Create a staff member
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStaffMemberRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffMember"
+
+  /staff/{id}:
+    put:
+      operationId: updateStaffMember
+      tags: [staff]
+      summary: Update a staff member
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStaffMemberRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffMember"
+    delete:
+      operationId: deleteStaffMember
+      tags: [staff]
+      summary: Delete a staff member
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+
+  /areas:
+    get:
+      operationId: listAreas
+      tags: [areas]
+      summary: List all cleaning areas
+      responses:
+        "200":
+          description: List of areas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CleaningArea"
+
+  /tasks:
+    get:
+      operationId: listTasks
+      tags: [tasks]
+      summary: List all tasks with optional filters
+      parameters:
+        - name: areaId
+          in: query
+          schema:
+            type: integer
+        - name: date
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Task"
+
+  /tasks/{id}/complete:
+    post:
+      operationId: completeTask
+      tags: [tasks]
+      summary: Mark a task as complete
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompleteTaskRequest"
+      responses:
+        "200":
+          description: Task completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+
+  /tasks/{id}/uncomplete:
+    post:
+      operationId: uncompleteTask
+      tags: [tasks]
+      summary: Mark a task as incomplete
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Task uncompleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+
+  /tasks/complete-all:
+    post:
+      operationId: completeAllTasks
+      tags: [tasks]
+      summary: Complete all tasks for an area on a date
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompleteAllTasksRequest"
+      responses:
+        "200":
+          description: All tasks completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchCompleteResponse"
+
+  /assignments:
+    get:
+      operationId: listAssignments
+      tags: [assignments]
+      summary: List assignments
+      parameters:
+        - name: date
+          in: query
+          schema:
+            type: string
+        - name: staffId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of assignments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Assignment"
+    post:
+      operationId: createAssignment
+      tags: [assignments]
+      summary: Create a task assignment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAssignmentRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Assignment"
+
+  /assignments/{id}:
+    delete:
+      operationId: deleteAssignment
+      tags: [assignments]
+      summary: Delete an assignment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+
+  /issues:
+    get:
+      operationId: listIssues
+      tags: [issues]
+      summary: List all issues
+      parameters:
+        - name: date
+          in: query
+          schema:
+            type: string
+        - name: areaId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of issues
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Issue"
+    post:
+      operationId: createIssue
+      tags: [issues]
+      summary: Report an issue
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateIssueRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Issue"
+
+  /issues/{id}/resolve:
+    post:
+      operationId: resolveIssue
+      tags: [issues]
+      summary: Resolve an issue
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Resolved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Issue"
+
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [tasks]
+      summary: Get dashboard statistics
+      parameters:
+        - name: date
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Dashboard stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +358,340 @@ components:
       required:
         - status
 
+    StaffMember:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        role:
+          type: string
+          enum: [staff, supervisor]
+        phone:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        active:
+          type: boolean
+        createdAt:
+          type: string
+      required:
+        - id
+        - name
+        - role
+        - active
+        - createdAt
+
+    CreateStaffMemberRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        role:
+          type: string
+          enum: [staff, supervisor]
+        phone:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+      required:
+        - name
+        - role
+
+    UpdateStaffMemberRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        role:
+          type: string
+          enum: [staff, supervisor]
+        phone:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        active:
+          type: boolean
+
+    CleaningArea:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        terminal:
+          type: string
+        location:
+          type: string
+        sortOrder:
+          type: integer
+      required:
+        - id
+        - name
+        - terminal
+        - location
+        - sortOrder
+
+    Task:
+      type: object
+      properties:
+        id:
+          type: integer
+        areaId:
+          type: integer
+        taskDate:
+          type: string
+        taskName:
+          type: string
+        taskOrder:
+          type: integer
+        completed:
+          type: boolean
+        completedAt:
+          type: string
+          nullable: true
+        completedById:
+          type: integer
+          nullable: true
+        completedByName:
+          type: string
+          nullable: true
+        assignedToId:
+          type: integer
+          nullable: true
+        assignedToName:
+          type: string
+          nullable: true
+        isSpecial:
+          type: boolean
+        notes:
+          type: string
+          nullable: true
+      required:
+        - id
+        - areaId
+        - taskDate
+        - taskName
+        - taskOrder
+        - completed
+        - isSpecial
+
+    CompleteTaskRequest:
+      type: object
+      properties:
+        completedById:
+          type: integer
+      required:
+        - completedById
+
+    CompleteAllTasksRequest:
+      type: object
+      properties:
+        areaId:
+          type: integer
+        date:
+          type: string
+        completedById:
+          type: integer
+      required:
+        - areaId
+        - date
+        - completedById
+
+    BatchCompleteResponse:
+      type: object
+      properties:
+        updated:
+          type: integer
+      required:
+        - updated
+
+    Assignment:
+      type: object
+      properties:
+        id:
+          type: integer
+        staffId:
+          type: integer
+        staffName:
+          type: string
+        areaId:
+          type: integer
+        areaName:
+          type: string
+        assignmentDate:
+          type: string
+        assignedById:
+          type: integer
+        assignedByName:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        isSpecial:
+          type: boolean
+        createdAt:
+          type: string
+      required:
+        - id
+        - staffId
+        - staffName
+        - areaId
+        - areaName
+        - assignmentDate
+        - assignedById
+        - assignedByName
+        - isSpecial
+        - createdAt
+
+    CreateAssignmentRequest:
+      type: object
+      properties:
+        staffId:
+          type: integer
+        areaId:
+          type: integer
+        assignmentDate:
+          type: string
+        assignedById:
+          type: integer
+        notes:
+          type: string
+          nullable: true
+        isSpecial:
+          type: boolean
+      required:
+        - staffId
+        - areaId
+        - assignmentDate
+        - assignedById
+        - isSpecial
+
+    Issue:
+      type: object
+      properties:
+        id:
+          type: integer
+        areaId:
+          type: integer
+        areaName:
+          type: string
+        reportedById:
+          type: integer
+        reportedByName:
+          type: string
+        issueDate:
+          type: string
+        description:
+          type: string
+        severity:
+          type: string
+          enum: [low, medium, high]
+        resolved:
+          type: boolean
+        resolvedAt:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required:
+        - id
+        - areaId
+        - areaName
+        - reportedById
+        - reportedByName
+        - issueDate
+        - description
+        - severity
+        - resolved
+        - createdAt
+
+    CreateIssueRequest:
+      type: object
+      properties:
+        areaId:
+          type: integer
+        reportedById:
+          type: integer
+        description:
+          type: string
+        severity:
+          type: string
+          enum: [low, medium, high]
+      required:
+        - areaId
+        - reportedById
+        - description
+        - severity
+
+    DashboardStats:
+      type: object
+      properties:
+        date:
+          type: string
+        totalTasks:
+          type: integer
+        completedTasks:
+          type: integer
+        totalAreas:
+          type: integer
+        completedAreas:
+          type: integer
+        openIssues:
+          type: integer
+        areaProgress:
+          type: array
+          items:
+            $ref: "#/components/schemas/AreaProgress"
+      required:
+        - date
+        - totalTasks
+        - completedTasks
+        - totalAreas
+        - completedAreas
+        - openIssues
+        - areaProgress
+
+    AreaProgress:
+      type: object
+      properties:
+        areaId:
+          type: integer
+        areaName:
+          type: string
+        terminal:
+          type: string
+        totalTasks:
+          type: integer
+        completedTasks:
+          type: integer
+        percentage:
+          type: number
+        assignedStaff:
+          type: array
+          items:
+            type: string
+      required:
+        - areaId
+        - areaName
+        - terminal
+        - totalTasks
+        - completedTasks
+        - percentage
+        - assignedStaff
+
+    DeleteResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+      required:
+        - success

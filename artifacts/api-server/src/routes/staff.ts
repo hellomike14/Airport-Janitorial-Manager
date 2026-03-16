@@ -1,0 +1,69 @@
+import { Router, type IRouter } from "express";
+import { db } from "@workspace/db";
+import { staffTable } from "@workspace/db/schema";
+import { eq } from "drizzle-orm";
+import {
+  CreateStaffMemberBody,
+  UpdateStaffMemberBody,
+  UpdateStaffMemberParams,
+  DeleteStaffMemberParams,
+} from "@workspace/api-zod";
+
+const router: IRouter = Router();
+
+router.get("/", async (_req, res) => {
+  const staff = await db
+    .select()
+    .from(staffTable)
+    .orderBy(staffTable.role, staffTable.name);
+  res.json(
+    staff.map((s) => ({
+      ...s,
+      createdAt: s.createdAt.toISOString(),
+    }))
+  );
+});
+
+router.post("/", async (req, res) => {
+  const body = CreateStaffMemberBody.parse(req.body);
+  const [created] = await db
+    .insert(staffTable)
+    .values({
+      name: body.name,
+      role: body.role,
+      phone: body.phone ?? null,
+      email: body.email ?? null,
+    })
+    .returning();
+  res.status(201).json({ ...created, createdAt: created.createdAt.toISOString() });
+});
+
+router.put("/:id", async (req, res) => {
+  const { id } = UpdateStaffMemberParams.parse({ id: req.params.id });
+  const body = UpdateStaffMemberBody.parse(req.body);
+  const updateData: Partial<typeof staffTable.$inferInsert> = {};
+  if (body.name !== undefined) updateData.name = body.name;
+  if (body.role !== undefined) updateData.role = body.role;
+  if (body.phone !== undefined) updateData.phone = body.phone ?? null;
+  if (body.email !== undefined) updateData.email = body.email ?? null;
+  if (body.active !== undefined) updateData.active = body.active;
+
+  const [updated] = await db
+    .update(staffTable)
+    .set(updateData)
+    .where(eq(staffTable.id, id))
+    .returning();
+  if (!updated) {
+    res.status(404).json({ error: "Staff member not found" });
+    return;
+  }
+  res.json({ ...updated, createdAt: updated.createdAt.toISOString() });
+});
+
+router.delete("/:id", async (req, res) => {
+  const { id } = DeleteStaffMemberParams.parse({ id: req.params.id });
+  await db.delete(staffTable).where(eq(staffTable.id, id));
+  res.json({ success: true });
+});
+
+export default router;
