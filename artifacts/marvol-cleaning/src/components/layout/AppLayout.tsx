@@ -245,11 +245,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Logo */}
         <div className="h-20 flex items-center px-5 border-b border-sidebar-border/50 gap-3">
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            <img
-              src={`${import.meta.env.BASE_URL}logo-mark.png`}
-              alt="Marvol Facility Services"
-              className="w-10 h-10 object-contain shrink-0"
-            />
             <div className="bg-white/95 rounded-xl px-3 py-1.5 shadow-sm">
               <img
                 src={`${import.meta.env.BASE_URL}logo.png`}
@@ -257,6 +252,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 className="h-6 object-contain"
               />
             </div>
+            <img
+              src={`${import.meta.env.BASE_URL}logo-mark.png`}
+              alt="Marvol Facility Services"
+              className="w-10 h-10 object-contain shrink-0"
+            />
           </div>
           <button className="ml-auto lg:hidden text-sidebar-foreground/50 hover:text-white shrink-0" onClick={closeMobile}>
             <X className="w-6 h-6" />
