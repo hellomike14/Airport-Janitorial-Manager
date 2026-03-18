@@ -37,6 +37,14 @@ A comprehensive janitorial cleaning management web app for Marvol Facility at MC
 - 2 Supervisors (Maria Rodriguez, James Thompson)
 - 10 Cleaning Staff members
 
+**Inspector Report:**
+- Available to admin and supervisor roles via `/report`
+- Date range picker (from/to) with 7-day default
+- Summary stats: total, resolved, open, by severity (high/medium/low)
+- Per-area issue breakdown with severity badges, status, reporter/assignee, completion notes, before/after photos
+- Print / Save PDF button (browser print dialog) for sharing with airport inspectors
+- Issues API extended: `GET /api/issues?from=YYYY-MM-DD&to=YYYY-MM-DD` date range filter
+
 **Role-Based Access Control:**
 - **Admin**: Full access — can switch view mode between Admin/Supervisor/Staff views
 - **Supervisor**: Dashboard, areas, assignments, issue tracker (no staff management)

@@ -15,6 +15,7 @@ import Issues from "./pages/Issues";
 import MyTasks from "./pages/MyTasks";
 import TaskManagement from "./pages/TaskManagement";
 import TaskTypes from "./pages/TaskTypes";
+import InspectorReport from "./pages/InspectorReport";
 import Login from "./pages/Login";
 
 const queryClient = new QueryClient({
@@ -47,6 +48,7 @@ function ProtectedRoutes() {
             <Route path="/assignments" component={Assignments} />
             <Route path="/staff" component={Staff} />
             <Route path="/issues" component={Issues} />
+            <Route path="/report" component={InspectorReport} />
           </>
         )}
 
@@ -59,6 +61,7 @@ function ProtectedRoutes() {
             <Route path="/areas/:areaId" component={AreaTasks} />
             <Route path="/assignments" component={Assignments} />
             <Route path="/issues" component={Issues} />
+            <Route path="/report" component={InspectorReport} />
             <Route path="/staff"><Redirect to="/" /></Route>
           </>
         )}

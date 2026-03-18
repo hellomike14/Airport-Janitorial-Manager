@@ -290,6 +290,16 @@ paths:
           in: query
           schema:
             type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+          description: Start date for range filter (YYYY-MM-DD)
+        - name: to
+          in: query
+          schema:
+            type: string
+          description: End date for range filter (YYYY-MM-DD)
         - name: areaId
           in: query
           schema:

@@ -8,6 +8,14 @@
 
 export type ListIssuesParams = {
   date?: string;
+  /**
+   * Start date for range filter (YYYY-MM-DD)
+   */
+  from?: string;
+  /**
+   * End date for range filter (YYYY-MM-DD)
+   */
+  to?: string;
   areaId?: number;
   assignedToId?: number;
 };

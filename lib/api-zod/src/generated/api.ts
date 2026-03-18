@@ -226,6 +226,14 @@ export const DeleteAssignmentResponse = zod.object({
  */
 export const ListIssuesQueryParams = zod.object({
   date: zod.coerce.string().optional(),
+  from: zod.coerce
+    .string()
+    .optional()
+    .describe("Start date for range filter (YYYY-MM-DD)"),
+  to: zod.coerce
+    .string()
+    .optional()
+    .describe("End date for range filter (YYYY-MM-DD)"),
   areaId: zod.coerce.number().optional(),
   assignedToId: zod.coerce.number().optional(),
 });

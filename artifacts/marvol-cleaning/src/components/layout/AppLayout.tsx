@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   AlertOctagon,
   Layers,
+  FileText,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -70,6 +71,7 @@ const NAV_BY_ROLE: Record<ViewMode, { href: string; icon: React.ElementType; lab
     { href: "/assignments", icon: ClipboardList, label: "Assignments" },
     { href: "/staff", icon: Users, label: "Staff Directory" },
     { href: "/issues", icon: AlertTriangle, label: "Issue Tracker" },
+    { href: "/report", icon: FileText, label: "Inspector Report" },
   ],
   supervisor: [
     { href: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -77,6 +79,7 @@ const NAV_BY_ROLE: Record<ViewMode, { href: string; icon: React.ElementType; lab
     { href: "/areas", icon: Map, label: "Cleaning Areas" },
     { href: "/assignments", icon: ClipboardList, label: "Assignments" },
     { href: "/issues", icon: AlertTriangle, label: "Issue Tracker" },
+    { href: "/report", icon: FileText, label: "Inspector Report" },
   ],
   staff: [
     { href: "/my-tasks", icon: CheckSquare, label: "My Tasks" },

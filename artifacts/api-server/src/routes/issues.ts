@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db } from "@workspace/db";
 import { issuesTable, staffTable, areasTable, notificationsTable } from "@workspace/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, gte, lte } from "drizzle-orm";
 import {
   ListIssuesQueryParams,
   CreateIssueBody,
@@ -25,6 +25,8 @@ const CompleteIssueBody = z.object({
 });
 const ListIssuesWithAssignedQuery = z.object({
   date: z.string().optional(),
+  from: z.string().optional(),
+  to: z.string().optional(),
   areaId: z.coerce.number().optional(),
   assignedToId: z.coerce.number().optional(),
 });
@@ -121,6 +123,8 @@ async function notifySupervisors(message: string, issueId: number, excludeId?: n
 router.get("/", async (req: Request, res: Response) => {
   const query = ListIssuesWithAssignedQuery.parse({
     date: req.query.date,
+    from: req.query.from,
+    to: req.query.to,
     areaId: req.query.areaId,
     assignedToId: req.query.assignedToId,
   });
@@ -130,6 +134,7 @@ router.get("/", async (req: Request, res: Response) => {
       id: issuesTable.id,
       areaId: issuesTable.areaId,
       areaName: areasTable.name,
+      terminal: areasTable.terminal,
       reportedById: issuesTable.reportedById,
       reportedByName: staffTable.name,
       assignedToId: issuesTable.assignedToId,
@@ -149,6 +154,8 @@ router.get("/", async (req: Request, res: Response) => {
     .where(
       and(
         query.date ? eq(issuesTable.issueDate, query.date) : undefined,
+        query.from ? gte(issuesTable.issueDate, query.from) : undefined,
+        query.to ? lte(issuesTable.issueDate, query.to) : undefined,
         query.areaId ? eq(issuesTable.areaId, query.areaId) : undefined,
         query.assignedToId ? eq(issuesTable.assignedToId, query.assignedToId) : undefined
       )
