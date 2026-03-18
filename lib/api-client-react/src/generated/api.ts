@@ -27,6 +27,7 @@ import type {
   CreateAssignmentRequest,
   CreateIssueRequest,
   CreateStaffMemberRequest,
+  CreateTaskTypeRequest,
   DashboardStats,
   DeleteResponse,
   ErrorEnvelope,
@@ -39,10 +40,13 @@ import type {
   ListTasksParams,
   MarkAllReadRequest,
   Notification,
+  ReorderTaskTypesRequest,
   StaffMember,
   Task,
+  TaskType,
   UpdateIssueImagesRequest,
   UpdateStaffMemberRequest,
+  UpdateTaskTypeRequest,
   UploadUrlRequest,
   UploadUrlResponse,
 } from "./api.schemas";
@@ -1660,6 +1664,424 @@ export const useCompleteIssue = <
   TContext
 > => {
   return useMutation(getCompleteIssueMutationOptions(options));
+};
+
+/**
+ * @summary List all task type templates
+ */
+export const getListTaskTypesUrl = () => {
+  return `/api/task-types`;
+};
+
+export const listTaskTypes = async (
+  options?: RequestInit,
+): Promise<TaskType[]> => {
+  return customFetch<TaskType[]>(getListTaskTypesUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListTaskTypesQueryKey = () => {
+  return [`/api/task-types`] as const;
+};
+
+export const getListTaskTypesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listTaskTypes>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listTaskTypes>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListTaskTypesQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listTaskTypes>>> = ({
+    signal,
+  }) => listTaskTypes({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listTaskTypes>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListTaskTypesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listTaskTypes>>
+>;
+export type ListTaskTypesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all task type templates
+ */
+
+export function useListTaskTypes<
+  TData = Awaited<ReturnType<typeof listTaskTypes>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listTaskTypes>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListTaskTypesQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a new task type template
+ */
+export const getCreateTaskTypeUrl = () => {
+  return `/api/task-types`;
+};
+
+export const createTaskType = async (
+  createTaskTypeRequest: CreateTaskTypeRequest,
+  options?: RequestInit,
+): Promise<TaskType> => {
+  return customFetch<TaskType>(getCreateTaskTypeUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createTaskTypeRequest),
+  });
+};
+
+export const getCreateTaskTypeMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createTaskType>>,
+    TError,
+    { data: BodyType<CreateTaskTypeRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createTaskType>>,
+  TError,
+  { data: BodyType<CreateTaskTypeRequest> },
+  TContext
+> => {
+  const mutationKey = ["createTaskType"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createTaskType>>,
+    { data: BodyType<CreateTaskTypeRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createTaskType(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateTaskTypeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createTaskType>>
+>;
+export type CreateTaskTypeMutationBody = BodyType<CreateTaskTypeRequest>;
+export type CreateTaskTypeMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create a new task type template
+ */
+export const useCreateTaskType = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createTaskType>>,
+    TError,
+    { data: BodyType<CreateTaskTypeRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createTaskType>>,
+  TError,
+  { data: BodyType<CreateTaskTypeRequest> },
+  TContext
+> => {
+  return useMutation(getCreateTaskTypeMutationOptions(options));
+};
+
+/**
+ * @summary Update a task type template
+ */
+export const getUpdateTaskTypeUrl = (id: number) => {
+  return `/api/task-types/${id}`;
+};
+
+export const updateTaskType = async (
+  id: number,
+  updateTaskTypeRequest: UpdateTaskTypeRequest,
+  options?: RequestInit,
+): Promise<TaskType> => {
+  return customFetch<TaskType>(getUpdateTaskTypeUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateTaskTypeRequest),
+  });
+};
+
+export const getUpdateTaskTypeMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateTaskType>>,
+    TError,
+    { id: number; data: BodyType<UpdateTaskTypeRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateTaskType>>,
+  TError,
+  { id: number; data: BodyType<UpdateTaskTypeRequest> },
+  TContext
+> => {
+  const mutationKey = ["updateTaskType"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateTaskType>>,
+    { id: number; data: BodyType<UpdateTaskTypeRequest> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateTaskType(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateTaskTypeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateTaskType>>
+>;
+export type UpdateTaskTypeMutationBody = BodyType<UpdateTaskTypeRequest>;
+export type UpdateTaskTypeMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update a task type template
+ */
+export const useUpdateTaskType = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateTaskType>>,
+    TError,
+    { id: number; data: BodyType<UpdateTaskTypeRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateTaskType>>,
+  TError,
+  { id: number; data: BodyType<UpdateTaskTypeRequest> },
+  TContext
+> => {
+  return useMutation(getUpdateTaskTypeMutationOptions(options));
+};
+
+/**
+ * @summary Delete a task type template
+ */
+export const getDeleteTaskTypeUrl = (id: number) => {
+  return `/api/task-types/${id}`;
+};
+
+export const deleteTaskType = async (
+  id: number,
+  options?: RequestInit,
+): Promise<DeleteResponse> => {
+  return customFetch<DeleteResponse>(getDeleteTaskTypeUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteTaskTypeMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteTaskType>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteTaskType>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteTaskType"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteTaskType>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteTaskType(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteTaskTypeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteTaskType>>
+>;
+
+export type DeleteTaskTypeMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Delete a task type template
+ */
+export const useDeleteTaskType = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteTaskType>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteTaskType>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteTaskTypeMutationOptions(options));
+};
+
+/**
+ * @summary Reorder task type templates
+ */
+export const getReorderTaskTypesUrl = () => {
+  return `/api/task-types/reorder`;
+};
+
+export const reorderTaskTypes = async (
+  reorderTaskTypesRequest: ReorderTaskTypesRequest,
+  options?: RequestInit,
+): Promise<BatchCompleteResponse> => {
+  return customFetch<BatchCompleteResponse>(getReorderTaskTypesUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(reorderTaskTypesRequest),
+  });
+};
+
+export const getReorderTaskTypesMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reorderTaskTypes>>,
+    TError,
+    { data: BodyType<ReorderTaskTypesRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof reorderTaskTypes>>,
+  TError,
+  { data: BodyType<ReorderTaskTypesRequest> },
+  TContext
+> => {
+  const mutationKey = ["reorderTaskTypes"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof reorderTaskTypes>>,
+    { data: BodyType<ReorderTaskTypesRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return reorderTaskTypes(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReorderTaskTypesMutationResult = NonNullable<
+  Awaited<ReturnType<typeof reorderTaskTypes>>
+>;
+export type ReorderTaskTypesMutationBody = BodyType<ReorderTaskTypesRequest>;
+export type ReorderTaskTypesMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Reorder task type templates
+ */
+export const useReorderTaskTypes = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reorderTaskTypes>>,
+    TError,
+    { data: BodyType<ReorderTaskTypesRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof reorderTaskTypes>>,
+  TError,
+  { data: BodyType<ReorderTaskTypesRequest> },
+  TContext
+> => {
+  return useMutation(getReorderTaskTypesMutationOptions(options));
 };
 
 /**

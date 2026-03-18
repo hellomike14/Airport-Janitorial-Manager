@@ -6,6 +6,7 @@ import tasksRouter from "./tasks";
 import assignmentsRouter from "./assignments";
 import issuesRouter from "./issues";
 import notificationsRouter from "./notifications";
+import taskTypesRouter from "./taskTypes";
 import dashboardRouter from "./dashboard";
 import storageRouter from "./storage";
 
@@ -19,6 +20,7 @@ router.use("/tasks", tasksRouter);
 router.use("/assignments", assignmentsRouter);
 router.use("/issues", issuesRouter);
 router.use(notificationsRouter);
+router.use(taskTypesRouter);
 router.use(storageRouter);
 
 export default router;

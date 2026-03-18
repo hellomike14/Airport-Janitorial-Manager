@@ -4,6 +4,16 @@ import { z } from "zod/v4";
 import { areasTable } from "./areas";
 import { staffTable } from "./staff";
 
+export const taskTypesTable = pgTable("task_types", {
+  id: serial("id").primaryKey(),
+  taskName: text("task_name").notNull(),
+  taskOrder: integer("task_order").notNull().default(0),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type TaskType = typeof taskTypesTable.$inferSelect;
+
 export const tasksTable = pgTable("tasks", {
   id: serial("id").primaryKey(),
   areaId: integer("area_id").notNull().references(() => areasTable.id),

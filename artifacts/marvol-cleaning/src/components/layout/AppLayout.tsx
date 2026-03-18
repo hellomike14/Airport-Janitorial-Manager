@@ -17,6 +17,7 @@ import {
   ListChecks,
   CheckCircle2,
   AlertOctagon,
+  Layers,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -64,6 +65,7 @@ const NAV_BY_ROLE: Record<ViewMode, { href: string; icon: React.ElementType; lab
   admin: [
     { href: "/", icon: LayoutDashboard, label: "Dashboard" },
     { href: "/tasks", icon: ListChecks, label: "Task Management" },
+    { href: "/task-types", icon: Layers, label: "Task Type Inventory" },
     { href: "/areas", icon: Map, label: "Cleaning Areas" },
     { href: "/assignments", icon: ClipboardList, label: "Assignments" },
     { href: "/staff", icon: Users, label: "Staff Directory" },

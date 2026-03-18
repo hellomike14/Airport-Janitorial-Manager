@@ -21,6 +21,8 @@ tags:
     description: Issue reporting
   - name: notifications
     description: In-app notifications
+  - name: taskTypes
+    description: Task type templates
   - name: Storage
     description: Object storage upload and serving endpoints.
 
@@ -412,6 +414,99 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Issue"
+
+  /task-types:
+    get:
+      operationId: listTaskTypes
+      tags: [taskTypes]
+      summary: List all task type templates
+      responses:
+        "200":
+          description: List of task types
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TaskType"
+    post:
+      operationId: createTaskType
+      tags: [taskTypes]
+      summary: Create a new task type template
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTaskTypeRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskType"
+
+  /task-types/{id}:
+    put:
+      operationId: updateTaskType
+      tags: [taskTypes]
+      summary: Update a task type template
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTaskTypeRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskType"
+    delete:
+      operationId: deleteTaskType
+      tags: [taskTypes]
+      summary: Delete a task type template
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+
+  /task-types/reorder:
+    post:
+      operationId: reorderTaskTypes
+      tags: [taskTypes]
+      summary: Reorder task type templates
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderTaskTypesRequest"
+      responses:
+        "200":
+          description: Reordered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchCompleteResponse"
 
   /notifications:
     get:
@@ -1002,6 +1097,56 @@ components:
         - completedTasks
         - percentage
         - assignedStaff
+
+    TaskType:
+      type: object
+      properties:
+        id:
+          type: integer
+        taskName:
+          type: string
+        taskOrder:
+          type: integer
+        active:
+          type: boolean
+        createdAt:
+          type: string
+      required:
+        - id
+        - taskName
+        - taskOrder
+        - active
+        - createdAt
+
+    CreateTaskTypeRequest:
+      type: object
+      properties:
+        taskName:
+          type: string
+        taskOrder:
+          type: integer
+      required:
+        - taskName
+
+    UpdateTaskTypeRequest:
+      type: object
+      properties:
+        taskName:
+          type: string
+        taskOrder:
+          type: integer
+        active:
+          type: boolean
+
+    ReorderTaskTypesRequest:
+      type: object
+      properties:
+        orderedIds:
+          type: array
+          items:
+            type: integer
+      required:
+        - orderedIds
 
     DeleteResponse:
       type: object

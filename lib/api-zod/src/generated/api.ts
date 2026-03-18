@@ -380,6 +380,69 @@ export const CompleteIssueResponse = zod.object({
 });
 
 /**
+ * @summary List all task type templates
+ */
+export const ListTaskTypesResponseItem = zod.object({
+  id: zod.number(),
+  taskName: zod.string(),
+  taskOrder: zod.number(),
+  active: zod.boolean(),
+  createdAt: zod.string(),
+});
+export const ListTaskTypesResponse = zod.array(ListTaskTypesResponseItem);
+
+/**
+ * @summary Create a new task type template
+ */
+export const CreateTaskTypeBody = zod.object({
+  taskName: zod.string(),
+  taskOrder: zod.number().optional(),
+});
+
+/**
+ * @summary Update a task type template
+ */
+export const UpdateTaskTypeParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateTaskTypeBody = zod.object({
+  taskName: zod.string().optional(),
+  taskOrder: zod.number().optional(),
+  active: zod.boolean().optional(),
+});
+
+export const UpdateTaskTypeResponse = zod.object({
+  id: zod.number(),
+  taskName: zod.string(),
+  taskOrder: zod.number(),
+  active: zod.boolean(),
+  createdAt: zod.string(),
+});
+
+/**
+ * @summary Delete a task type template
+ */
+export const DeleteTaskTypeParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const DeleteTaskTypeResponse = zod.object({
+  success: zod.boolean(),
+});
+
+/**
+ * @summary Reorder task type templates
+ */
+export const ReorderTaskTypesBody = zod.object({
+  orderedIds: zod.array(zod.number()),
+});
+
+export const ReorderTaskTypesResponse = zod.object({
+  updated: zod.number(),
+});
+
+/**
  * @summary List notifications for a staff member
  */
 export const ListNotificationsQueryParams = zod.object({

@@ -242,6 +242,29 @@ export interface DashboardStats {
   areaProgress: AreaProgress[];
 }
 
+export interface TaskType {
+  id: number;
+  taskName: string;
+  taskOrder: number;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface CreateTaskTypeRequest {
+  taskName: string;
+  taskOrder?: number;
+}
+
+export interface UpdateTaskTypeRequest {
+  taskName?: string;
+  taskOrder?: number;
+  active?: boolean;
+}
+
+export interface ReorderTaskTypesRequest {
+  orderedIds: number[];
+}
+
 export interface DeleteResponse {
   success: boolean;
 }

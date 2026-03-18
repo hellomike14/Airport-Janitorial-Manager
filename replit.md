@@ -71,6 +71,11 @@ A comprehensive janitorial cleaning management web app for Marvol Facility at MC
 - `PATCH /api/issues/:id/complete` - Staff marks issue done with notes (notifies supervisors)
 - `PATCH /api/issues/:id/images` - Attach before/after photos to issue
 - `POST /api/issues/:id/resolve` - Supervisor resolves issue
+- `GET /api/task-types` - List all task type templates (auto-seeded with 14 defaults)
+- `POST /api/task-types` - Create a new task type template
+- `PUT /api/task-types/:id` - Update a task type (name, order, active)
+- `DELETE /api/task-types/:id` - Delete a task type template
+- `POST /api/task-types/reorder` - Reorder task types by dragging
 - `GET /api/notifications?staffId=X` - List notifications for a user
 - `PATCH /api/notifications/:id/read` - Mark single notification read
 - `POST /api/notifications/mark-all-read` - Mark all read for a user
@@ -101,7 +106,8 @@ artifacts-monorepo/
 
 - `staff` - Staff members (name, role, phone, email, active)
 - `areas` - Cleaning areas (name, terminal, location, sort_order)
-- `tasks` - Daily tasks per area (auto-generated 14/area/day)
+- `task_types` - Task type templates (name, order, active); auto-seeded with 14 standard tasks on first GET
+- `tasks` - Daily tasks per area (auto-generated from active task_types on first area access per day)
 - `assignments` - Staff assignments to areas by date
 - `issues` - Issue reports (area, severity, assigned_to_id, completion_notes, before/after image paths)
 - `notifications` - In-app notifications (staffId, issueId, type, message, isRead)

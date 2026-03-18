@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { tasksTable, staffTable, areasTable, issuesTable } from "@workspace/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { tasksTable, staffTable, areasTable, issuesTable, taskTypesTable } from "@workspace/db/schema";
+import { eq, and, sql, asc } from "drizzle-orm";
 import {
   ListTasksQueryParams,
   CompleteTaskParams,
@@ -11,7 +11,7 @@ import {
   GetDashboardQueryParams,
 } from "@workspace/api-zod";
 
-const DAILY_TASKS = [
+const FALLBACK_TASKS = [
   "Routine sweep of all levels — remove debris, trash, and litter",
   "Mop and sanitize all floor surfaces — extra attention to high-traffic zones",
   "Deep clean stairwells — scrub landings, steps, and corners",
@@ -30,6 +30,19 @@ const DAILY_TASKS = [
 
 const router: IRouter = Router();
 
+async function getActiveTaskTypes(): Promise<{ taskName: string; taskOrder: number }[]> {
+  const types = await db
+    .select({ taskName: taskTypesTable.taskName, taskOrder: taskTypesTable.taskOrder })
+    .from(taskTypesTable)
+    .where(eq(taskTypesTable.active, true))
+    .orderBy(asc(taskTypesTable.taskOrder));
+
+  if (types.length === 0) {
+    return FALLBACK_TASKS.map((name, idx) => ({ taskName: name, taskOrder: idx + 1 }));
+  }
+  return types;
+}
+
 async function ensureTasksForDate(areaId: number, date: string) {
   const existing = await db
     .select({ id: tasksTable.id })
@@ -38,12 +51,13 @@ async function ensureTasksForDate(areaId: number, date: string) {
     .limit(1);
 
   if (existing.length === 0) {
+    const activeTypes = await getActiveTaskTypes();
     await db.insert(tasksTable).values(
-      DAILY_TASKS.map((name, idx) => ({
+      activeTypes.map((t) => ({
         areaId,
         taskDate: date,
-        taskName: name,
-        taskOrder: idx + 1,
+        taskName: t.taskName,
+        taskOrder: t.taskOrder,
         completed: false,
         isSpecial: false,
       }))
