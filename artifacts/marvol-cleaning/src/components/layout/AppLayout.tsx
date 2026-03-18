@@ -14,6 +14,7 @@ import {
   ChevronDown,
   User,
   CheckSquare,
+  ListChecks,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -54,6 +55,7 @@ const VIEW_MODES: { value: ViewMode; label: string; icon: React.ElementType; col
 const NAV_BY_ROLE: Record<ViewMode, { href: string; icon: React.ElementType; label: string }[]> = {
   admin: [
     { href: "/", icon: LayoutDashboard, label: "Dashboard" },
+    { href: "/tasks", icon: ListChecks, label: "Task Management" },
     { href: "/areas", icon: Map, label: "Cleaning Areas" },
     { href: "/assignments", icon: ClipboardList, label: "Assignments" },
     { href: "/staff", icon: Users, label: "Staff Directory" },
@@ -61,6 +63,7 @@ const NAV_BY_ROLE: Record<ViewMode, { href: string; icon: React.ElementType; lab
   ],
   supervisor: [
     { href: "/", icon: LayoutDashboard, label: "Dashboard" },
+    { href: "/tasks", icon: ListChecks, label: "Task Management" },
     { href: "/areas", icon: Map, label: "Cleaning Areas" },
     { href: "/assignments", icon: ClipboardList, label: "Assignments" },
     { href: "/issues", icon: AlertTriangle, label: "Issue Tracker" },

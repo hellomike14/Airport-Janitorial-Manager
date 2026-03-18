@@ -13,6 +13,7 @@ import Staff from "./pages/Staff";
 import Assignments from "./pages/Assignments";
 import Issues from "./pages/Issues";
 import MyTasks from "./pages/MyTasks";
+import TaskManagement from "./pages/TaskManagement";
 import Login from "./pages/Login";
 
 const queryClient = new QueryClient({
@@ -38,6 +39,7 @@ function ProtectedRoutes() {
         {effectiveRole === "admin" && (
           <>
             <Route path="/" component={Dashboard} />
+            <Route path="/tasks" component={TaskManagement} />
             <Route path="/areas" component={AreasList} />
             <Route path="/areas/:areaId" component={AreaTasks} />
             <Route path="/assignments" component={Assignments} />
@@ -50,6 +52,7 @@ function ProtectedRoutes() {
         {effectiveRole === "supervisor" && (
           <>
             <Route path="/" component={Dashboard} />
+            <Route path="/tasks" component={TaskManagement} />
             <Route path="/areas" component={AreasList} />
             <Route path="/areas/:areaId" component={AreaTasks} />
             <Route path="/assignments" component={Assignments} />
