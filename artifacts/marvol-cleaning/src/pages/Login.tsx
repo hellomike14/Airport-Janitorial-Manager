@@ -15,9 +15,9 @@ const ROLE_CONFIG = {
   supervisor: {
     label: "Supervisor",
     icon: Users,
-    color: "from-blue-600 to-cyan-500",
-    bg: "bg-blue-50 border-blue-200",
-    badge: "bg-blue-100 text-blue-700",
+    color: "from-emerald-600 to-teal-500",
+    bg: "bg-emerald-50 border-emerald-200",
+    badge: "bg-emerald-100 text-emerald-800",
     description: "Dashboard, assignments, areas, and issue tracking",
   },
   staff: {
@@ -53,11 +53,11 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-green-900 to-emerald-950 flex flex-col items-center justify-center p-4 relative overflow-hidden">
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-violet-500/10 rounded-full blur-3xl" />
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl" />
       </div>
 
       {/* Header */}
@@ -76,13 +76,13 @@ export default function Login() {
             />
           </div>
         </div>
-        <p className="text-blue-300 mt-1 text-sm font-medium tracking-wide uppercase">MCO International Airport</p>
+        <p className="text-emerald-300 mt-1 text-sm font-medium tracking-wide uppercase">MCO International Airport</p>
         <p className="text-slate-400 mt-3 text-sm">Select your profile to continue</p>
       </div>
 
       {/* Role sections */}
       {isLoading ? (
-        <div className="text-blue-300 text-sm">Loading staff...</div>
+        <div className="text-emerald-300 text-sm">Loading staff...</div>
       ) : (
         <div className="w-full max-w-3xl space-y-5 relative z-10">
           {(["admin", "supervisor", "staff"] as const).map((role) => {

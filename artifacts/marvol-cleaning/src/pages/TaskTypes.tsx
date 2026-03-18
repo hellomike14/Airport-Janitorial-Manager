@@ -122,7 +122,7 @@ export default function TaskTypes() {
         </div>
         <Button
           onClick={() => { setIsAdding(true); setNewName(""); }}
-          className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md shadow-blue-600/20 font-bold"
+          className="bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl shadow-md shadow-emerald-700/20 font-bold"
         >
           <Plus className="w-4 h-4 mr-2" /> Add Task Type
         </Button>
@@ -165,12 +165,12 @@ export default function TaskTypes() {
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="e.g. Clean and sanitize restrooms"
-              className="flex-1 bg-white border border-blue-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/30"
+              className="flex-1 bg-white border border-blue-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/30"
             />
             <Button
               type="submit"
               disabled={createMutation.isPending || !newName.trim()}
-              className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold px-5"
+              className="bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl font-bold px-5"
             >
               {createMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
             </Button>
@@ -242,7 +242,7 @@ export default function TaskTypes() {
                             if (e.key === "Enter") handleSaveEdit(task.id);
                             if (e.key === "Escape") { setEditingId(null); setEditName(""); }
                           }}
-                          className="flex-1 border border-blue-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/30"
+                          className="flex-1 border border-blue-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/30"
                         />
                         <button
                           onClick={() => handleSaveEdit(task.id)}

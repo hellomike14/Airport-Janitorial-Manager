@@ -109,7 +109,7 @@ function buildIssuePDF(issue: any): string {
 <body>
   <div class="page">
     <!-- Header -->
-    <div style="background:linear-gradient(135deg,#1e293b,#0f172a);padding:28px 32px;display:flex;align-items:center;justify-content:space-between;gap:20px;">
+    <div style="background:linear-gradient(135deg,#064e3b,#022c22);padding:28px 32px;display:flex;align-items:center;justify-content:space-between;gap:20px;">
       <div style="display:flex;align-items:center;gap:16px;">
         <img src="${logoMarkUrl}" style="width:52px;height:52px;object-fit:contain;" onerror="this.style.display='none'" />
         <div>
@@ -287,7 +287,7 @@ export default function InspectorReport() {
           </div>
           <Button
             onClick={handlePrint}
-            className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md shadow-blue-600/20 font-bold gap-2"
+            className="bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl shadow-md shadow-emerald-700/20 font-bold gap-2"
           >
             <Printer className="w-4 h-4" /> Print Full Summary
           </Button>
@@ -304,13 +304,13 @@ export default function InspectorReport() {
               <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">From</label>
               <input type="date" value={from} max={to}
                 onChange={(e) => setFrom(e.target.value)}
-                className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/30" />
+                className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/30" />
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">To</label>
               <input type="date" value={to} min={from} max={today}
                 onChange={(e) => setTo(e.target.value)}
-                className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/30" />
+                className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/30" />
             </div>
             <Button onClick={handleApplyFilter} variant="outline"
               className="rounded-xl border-slate-200 text-sm font-semibold mt-5">
@@ -325,7 +325,7 @@ export default function InspectorReport() {
 
           {/* Report header */}
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="bg-gradient-to-r from-slate-800 to-slate-900 px-8 py-6 flex items-center justify-between gap-6">
+            <div className="bg-gradient-to-r from-emerald-900 to-emerald-950 px-8 py-6 flex items-center justify-between gap-6">
               <div className="flex items-center gap-5">
                 <img src={`${BASE_URL}/logo-mark.png`} alt="Marvol" className="w-14 h-14 object-contain" />
                 <div>
@@ -388,7 +388,7 @@ export default function InspectorReport() {
                 {/* Area header */}
                 <div className="bg-slate-50 border-b border-slate-100 px-6 py-4 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center shrink-0">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-700 flex items-center justify-center shrink-0">
                       <MapPin className="w-4 h-4 text-white" />
                     </div>
                     <div>

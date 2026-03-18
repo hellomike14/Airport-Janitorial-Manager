@@ -45,16 +45,16 @@
   --popover: 0 0% 100%;
   --popover-foreground: 222 47% 11%;
   
-  --primary: 215 100% 20%;        /* Dark Navy #002266 */
+  --primary: 152 72% 20%;         /* Marvol Forest Green #0f5c33 */
   --primary-foreground: 210 40% 98%;
   
-  --secondary: 214 32% 91%;       /* Slate 200 */
-  --secondary-foreground: 222 47% 11%;
+  --secondary: 152 20% 91%;       /* Light green-tinted slate */
+  --secondary-foreground: 152 30% 15%;
   
-  --muted: 214 32% 91%;
+  --muted: 152 15% 91%;
   --muted-foreground: 215 16% 47%;
   
-  --accent: 200 90% 40%;          /* Bright Sky Blue for pops */
+  --accent: 152 68% 32%;          /* Marvol Medium Green #167a42 */
   --accent-foreground: 0 0% 100%;
   
   --destructive: 0 84% 60%;
@@ -62,15 +62,15 @@
   
   --border: 214 32% 91%;
   --input: 214 32% 91%;
-  --ring: 215 100% 20%;
+  --ring: 152 65% 35%;
   
-  /* Sidebar specific */
-  --sidebar: 215 100% 15%;        /* Even darker navy for sidebar #001540 */
+  /* Sidebar specific — deep Marvol forest green */
+  --sidebar: 152 80% 9%;          /* Very dark green #032b18 */
   --sidebar-foreground: 210 40% 98%;
-  --sidebar-border: 215 100% 20%;
-  --sidebar-primary: 200 90% 40%; /* Accent blue */
+  --sidebar-border: 152 72% 15%;
+  --sidebar-primary: 152 65% 35%; /* Medium Marvol green */
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 215 100% 25%; /* Hover state in sidebar */
+  --sidebar-accent: 152 72% 16%; /* Hover in sidebar */
   --sidebar-accent-foreground: 210 40% 98%;
 
   --radius: 0.75rem;
