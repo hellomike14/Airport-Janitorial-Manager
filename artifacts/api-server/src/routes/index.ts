@@ -5,6 +5,7 @@ import areasRouter from "./areas";
 import tasksRouter from "./tasks";
 import assignmentsRouter from "./assignments";
 import issuesRouter from "./issues";
+import notificationsRouter from "./notifications";
 import dashboardRouter from "./dashboard";
 import storageRouter from "./storage";
 
@@ -17,6 +18,7 @@ router.use("/areas", areasRouter);
 router.use("/tasks", tasksRouter);
 router.use("/assignments", assignmentsRouter);
 router.use("/issues", issuesRouter);
+router.use(notificationsRouter);
 router.use(storageRouter);
 
 export default router;

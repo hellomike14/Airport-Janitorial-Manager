@@ -40,7 +40,7 @@ A comprehensive janitorial cleaning management web app for Marvol Facility at MC
 **Role-Based Access Control:**
 - **Admin**: Full access — can switch view mode between Admin/Supervisor/Staff views
 - **Supervisor**: Dashboard, areas, assignments, issue tracker (no staff management)
-- **Staff**: My Tasks page + Report Issue only
+- **Staff**: My Tasks page + My Issues (assigned issues with completion flow)
 
 **Auth:** No passwords — click-to-login from grouped staff list; stored in localStorage.
 
@@ -51,8 +51,9 @@ A comprehensive janitorial cleaning management web app for Marvol Facility at MC
 - Area Tasks - 15 daily tasks per area with checkbox completion + timestamps
 - Staff Directory - Add/edit/delete staff including admin role (admin only)
 - Assignments - Supervisors assign staff to areas daily + special inspector assignments
-- Issue Tracker - Report and resolve facility issues by area/severity
+- Issue Tracker - Report, assign, and resolve facility issues; supervisor assigns to staff
 - My Tasks - Staff-only page showing today's assigned area tasks with completion
+- My Issues - Staff-only page showing issues assigned to them with completion flow (notes + photos)
 
 **API Routes:**
 - `GET /api/dashboard` - Dashboard stats
@@ -65,8 +66,16 @@ A comprehensive janitorial cleaning management web app for Marvol Facility at MC
 - `POST /api/tasks/complete-all` - Complete all tasks for an area
 - `GET/POST /api/assignments` - Assignments management
 - `DELETE /api/assignments/:id` - Remove assignment
-- `GET/POST /api/issues` - Issue reporting
-- `POST /api/issues/:id/resolve` - Resolve an issue
+- `GET/POST /api/issues` - Issue reporting (GET supports ?assignedToId filter)
+- `PATCH /api/issues/:id/assign` - Assign issue to staff member (notifies assignee)
+- `PATCH /api/issues/:id/complete` - Staff marks issue done with notes (notifies supervisors)
+- `PATCH /api/issues/:id/images` - Attach before/after photos to issue
+- `POST /api/issues/:id/resolve` - Supervisor resolves issue
+- `GET /api/notifications?staffId=X` - List notifications for a user
+- `PATCH /api/notifications/:id/read` - Mark single notification read
+- `POST /api/notifications/mark-all-read` - Mark all read for a user
+- `POST /api/storage/uploads/request-url` - Request presigned GCS upload URL
+- `GET /api/storage/objects/*` - Serve uploaded objects
 
 ## Structure
 
@@ -92,9 +101,10 @@ artifacts-monorepo/
 
 - `staff` - Staff members (name, role, phone, email, active)
 - `areas` - Cleaning areas (name, terminal, location, sort_order)
-- `tasks` - Daily tasks per area (auto-generated 15/area/day)
+- `tasks` - Daily tasks per area (auto-generated 14/area/day)
 - `assignments` - Staff assignments to areas by date
-- `issues` - Issue reports by area (severity: low/medium/high)
+- `issues` - Issue reports (area, severity, assigned_to_id, completion_notes, before/after image paths)
+- `notifications` - In-app notifications (staffId, issueId, type, message, isRead)
 
 ## TypeScript & Composite Projects
 

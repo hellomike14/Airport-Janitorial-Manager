@@ -136,11 +136,14 @@ export interface Issue {
   areaName: string;
   reportedById: number;
   reportedByName: string;
+  assignedToId?: number | null;
+  assignedToName?: string | null;
   issueDate: string;
   description: string;
   severity: IssueSeverity;
   resolved: boolean;
   resolvedAt?: string | null;
+  completionNotes?: string | null;
   beforeImagePath?: string | null;
   afterImagePath?: string | null;
   createdAt: string;
@@ -163,9 +166,42 @@ export interface CreateIssueRequest {
   beforeImagePath?: string | null;
 }
 
+export interface AssignIssueRequest {
+  assignedToId?: number | null;
+  assignedById: number;
+}
+
+export interface CompleteIssueRequest {
+  completionNotes?: string | null;
+  completedById: number;
+}
+
 export interface UpdateIssueImagesRequest {
   beforeImagePath?: string | null;
   afterImagePath?: string | null;
+}
+
+export type NotificationType =
+  (typeof NotificationType)[keyof typeof NotificationType];
+
+export const NotificationType = {
+  new_issue: "new_issue",
+  issue_assigned: "issue_assigned",
+  issue_completed: "issue_completed",
+} as const;
+
+export interface Notification {
+  id: number;
+  staffId: number;
+  issueId?: number | null;
+  type: NotificationType;
+  message: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface MarkAllReadRequest {
+  staffId: number;
 }
 
 export interface UploadUrlRequest {
@@ -223,6 +259,11 @@ export type ListAssignmentsParams = {
 export type ListIssuesParams = {
   date?: string;
   areaId?: number;
+  assignedToId?: number;
+};
+
+export type ListNotificationsParams = {
+  staffId: number;
 };
 
 export type GetDashboardParams = {

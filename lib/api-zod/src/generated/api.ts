@@ -226,6 +226,7 @@ export const DeleteAssignmentResponse = zod.object({
 export const ListIssuesQueryParams = zod.object({
   date: zod.coerce.string().optional(),
   areaId: zod.coerce.number().optional(),
+  assignedToId: zod.coerce.number().optional(),
 });
 
 export const ListIssuesResponseItem = zod.object({
@@ -234,11 +235,14 @@ export const ListIssuesResponseItem = zod.object({
   areaName: zod.string(),
   reportedById: zod.number(),
   reportedByName: zod.string(),
+  assignedToId: zod.number().nullish(),
+  assignedToName: zod.string().nullish(),
   issueDate: zod.string(),
   description: zod.string(),
   severity: zod.enum(["low", "medium", "high"]),
   resolved: zod.boolean(),
   resolvedAt: zod.string().nullish(),
+  completionNotes: zod.string().nullish(),
   beforeImagePath: zod.string().nullish(),
   afterImagePath: zod.string().nullish(),
   createdAt: zod.string(),
@@ -269,11 +273,14 @@ export const ResolveIssueResponse = zod.object({
   areaName: zod.string(),
   reportedById: zod.number(),
   reportedByName: zod.string(),
+  assignedToId: zod.number().nullish(),
+  assignedToName: zod.string().nullish(),
   issueDate: zod.string(),
   description: zod.string(),
   severity: zod.enum(["low", "medium", "high"]),
   resolved: zod.boolean(),
   resolvedAt: zod.string().nullish(),
+  completionNotes: zod.string().nullish(),
   beforeImagePath: zod.string().nullish(),
   afterImagePath: zod.string().nullish(),
   createdAt: zod.string(),
@@ -297,14 +304,127 @@ export const UpdateIssueImagesResponse = zod.object({
   areaName: zod.string(),
   reportedById: zod.number(),
   reportedByName: zod.string(),
+  assignedToId: zod.number().nullish(),
+  assignedToName: zod.string().nullish(),
   issueDate: zod.string(),
   description: zod.string(),
   severity: zod.enum(["low", "medium", "high"]),
   resolved: zod.boolean(),
   resolvedAt: zod.string().nullish(),
+  completionNotes: zod.string().nullish(),
   beforeImagePath: zod.string().nullish(),
   afterImagePath: zod.string().nullish(),
   createdAt: zod.string(),
+});
+
+/**
+ * @summary Assign an issue to a staff member
+ */
+export const AssignIssueParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AssignIssueBody = zod.object({
+  assignedToId: zod.number().nullish(),
+  assignedById: zod.number(),
+});
+
+export const AssignIssueResponse = zod.object({
+  id: zod.number(),
+  areaId: zod.number(),
+  areaName: zod.string(),
+  reportedById: zod.number(),
+  reportedByName: zod.string(),
+  assignedToId: zod.number().nullish(),
+  assignedToName: zod.string().nullish(),
+  issueDate: zod.string(),
+  description: zod.string(),
+  severity: zod.enum(["low", "medium", "high"]),
+  resolved: zod.boolean(),
+  resolvedAt: zod.string().nullish(),
+  completionNotes: zod.string().nullish(),
+  beforeImagePath: zod.string().nullish(),
+  afterImagePath: zod.string().nullish(),
+  createdAt: zod.string(),
+});
+
+/**
+ * @summary Mark an issue complete with notes (staff)
+ */
+export const CompleteIssueParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const CompleteIssueBody = zod.object({
+  completionNotes: zod.string().nullish(),
+  completedById: zod.number(),
+});
+
+export const CompleteIssueResponse = zod.object({
+  id: zod.number(),
+  areaId: zod.number(),
+  areaName: zod.string(),
+  reportedById: zod.number(),
+  reportedByName: zod.string(),
+  assignedToId: zod.number().nullish(),
+  assignedToName: zod.string().nullish(),
+  issueDate: zod.string(),
+  description: zod.string(),
+  severity: zod.enum(["low", "medium", "high"]),
+  resolved: zod.boolean(),
+  resolvedAt: zod.string().nullish(),
+  completionNotes: zod.string().nullish(),
+  beforeImagePath: zod.string().nullish(),
+  afterImagePath: zod.string().nullish(),
+  createdAt: zod.string(),
+});
+
+/**
+ * @summary List notifications for a staff member
+ */
+export const ListNotificationsQueryParams = zod.object({
+  staffId: zod.coerce.number(),
+});
+
+export const ListNotificationsResponseItem = zod.object({
+  id: zod.number(),
+  staffId: zod.number(),
+  issueId: zod.number().nullish(),
+  type: zod.enum(["new_issue", "issue_assigned", "issue_completed"]),
+  message: zod.string(),
+  isRead: zod.boolean(),
+  createdAt: zod.string(),
+});
+export const ListNotificationsResponse = zod.array(
+  ListNotificationsResponseItem,
+);
+
+/**
+ * @summary Mark a notification as read
+ */
+export const MarkNotificationReadParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const MarkNotificationReadResponse = zod.object({
+  id: zod.number(),
+  staffId: zod.number(),
+  issueId: zod.number().nullish(),
+  type: zod.enum(["new_issue", "issue_assigned", "issue_completed"]),
+  message: zod.string(),
+  isRead: zod.boolean(),
+  createdAt: zod.string(),
+});
+
+/**
+ * @summary Mark all notifications read for a staff member
+ */
+export const MarkAllNotificationsReadBody = zod.object({
+  staffId: zod.number(),
+});
+
+export const MarkAllNotificationsReadResponse = zod.object({
+  updated: zod.number(),
 });
 
 /**

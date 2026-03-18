@@ -7,10 +7,12 @@
  */
 
 export * from "./areaProgress";
+export * from "./assignIssueRequest";
 export * from "./assignment";
 export * from "./batchCompleteResponse";
 export * from "./cleaningArea";
 export * from "./completeAllTasksRequest";
+export * from "./completeIssueRequest";
 export * from "./completeTaskRequest";
 export * from "./createAssignmentRequest";
 export * from "./createIssueRequest";
@@ -26,7 +28,11 @@ export * from "./issue";
 export * from "./issueSeverity";
 export * from "./listAssignmentsParams";
 export * from "./listIssuesParams";
+export * from "./listNotificationsParams";
 export * from "./listTasksParams";
+export * from "./markAllReadRequest";
+export * from "./notification";
+export * from "./notificationType";
 export * from "./staffMember";
 export * from "./staffMemberRole";
 export * from "./task";

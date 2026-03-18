@@ -6,8 +6,6 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ListIssuesParams = {
-  date?: string;
-  areaId?: number;
-  assignedToId?: number;
+export type ListNotificationsParams = {
+  staffId: number;
 };

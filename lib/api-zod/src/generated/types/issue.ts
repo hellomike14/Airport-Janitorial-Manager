@@ -13,11 +13,14 @@ export interface Issue {
   areaName: string;
   reportedById: number;
   reportedByName: string;
+  assignedToId?: number | null;
+  assignedToName?: string | null;
   issueDate: string;
   description: string;
   severity: IssueSeverity;
   resolved: boolean;
   resolvedAt?: string | null;
+  completionNotes?: string | null;
   beforeImagePath?: string | null;
   afterImagePath?: string | null;
   createdAt: string;

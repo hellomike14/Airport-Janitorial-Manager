@@ -19,6 +19,8 @@ tags:
     description: Task assignments
   - name: issues
     description: Issue reporting
+  - name: notifications
+    description: In-app notifications
   - name: Storage
     description: Object storage upload and serving endpoints.
 
@@ -286,6 +288,10 @@ paths:
           in: query
           schema:
             type: integer
+        - name: assignedToId
+          in: query
+          schema:
+            type: integer
       responses:
         "200":
           description: List of issues
@@ -356,6 +362,115 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Issue"
+
+  /issues/{id}/assign:
+    patch:
+      operationId: assignIssue
+      tags: [issues]
+      summary: Assign an issue to a staff member
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignIssueRequest"
+      responses:
+        "200":
+          description: Assigned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Issue"
+
+  /issues/{id}/complete:
+    patch:
+      operationId: completeIssue
+      tags: [issues]
+      summary: Mark an issue complete with notes (staff)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompleteIssueRequest"
+      responses:
+        "200":
+          description: Completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Issue"
+
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: List notifications for a staff member
+      parameters:
+        - name: staffId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notification"
+
+  /notifications/{id}/read:
+    patch:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark a notification as read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Marked read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notification"
+
+  /notifications/mark-all-read:
+    post:
+      operationId: markAllNotificationsRead
+      tags: [notifications]
+      summary: Mark all notifications read for a staff member
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MarkAllReadRequest"
+      responses:
+        "200":
+          description: All marked read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchCompleteResponse"
 
   /storage/uploads/request-url:
     post:
@@ -672,6 +787,12 @@ components:
           type: integer
         reportedByName:
           type: string
+        assignedToId:
+          type: integer
+          nullable: true
+        assignedToName:
+          type: string
+          nullable: true
         issueDate:
           type: string
         description:
@@ -682,6 +803,9 @@ components:
         resolved:
           type: boolean
         resolvedAt:
+          type: string
+          nullable: true
+        completionNotes:
           type: string
           nullable: true
         beforeImagePath:
@@ -725,6 +849,28 @@ components:
         - description
         - severity
 
+    AssignIssueRequest:
+      type: object
+      properties:
+        assignedToId:
+          type: integer
+          nullable: true
+        assignedById:
+          type: integer
+      required:
+        - assignedById
+
+    CompleteIssueRequest:
+      type: object
+      properties:
+        completionNotes:
+          type: string
+          nullable: true
+        completedById:
+          type: integer
+      required:
+        - completedById
+
     UpdateIssueImagesRequest:
       type: object
       properties:
@@ -734,6 +880,41 @@ components:
         afterImagePath:
           type: string
           nullable: true
+
+    Notification:
+      type: object
+      properties:
+        id:
+          type: integer
+        staffId:
+          type: integer
+        issueId:
+          type: integer
+          nullable: true
+        type:
+          type: string
+          enum: [new_issue, issue_assigned, issue_completed]
+        message:
+          type: string
+        isRead:
+          type: boolean
+        createdAt:
+          type: string
+      required:
+        - id
+        - staffId
+        - type
+        - message
+        - isRead
+        - createdAt
+
+    MarkAllReadRequest:
+      type: object
+      properties:
+        staffId:
+          type: integer
+      required:
+        - staffId
 
     UploadUrlRequest:
       type: object
