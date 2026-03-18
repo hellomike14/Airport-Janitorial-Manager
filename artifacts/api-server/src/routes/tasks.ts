@@ -18,7 +18,6 @@ const DAILY_TASKS = [
   "Clean and sanitize elevator cabs — floors, walls, buttons, and tracks",
   "Sanitize all handrails, elevator buttons, and high-touch surfaces",
   "Empty all trash receptacles and replace liners",
-  "Clean and sanitize restroom facilities — restock soap, paper, and supplies",
   "Spot clean walls, pillars, signs, and partitions",
   "Remove gum, stains, and debris from floor surfaces",
   "Clean entry/exit areas, doors, and glass partitions",
