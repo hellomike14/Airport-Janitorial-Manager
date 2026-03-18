@@ -327,13 +327,13 @@ export default function InspectorReport() {
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="bg-gradient-to-r from-emerald-900 to-emerald-950 px-8 py-6 flex items-center justify-between gap-6">
               <div className="flex items-center gap-5">
-                <img src={`${BASE_URL}/logo-mark.png`} alt="Marvol" className="w-14 h-14 object-contain" />
                 <div>
                   <div className="bg-white/95 rounded-xl px-4 py-1.5 inline-block mb-1">
                     <img src={`${BASE_URL}/logo.png`} alt="Marvol Enterprises" className="h-7 object-contain" />
                   </div>
                   <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Facility Services · MCO International Airport</p>
                 </div>
+                <img src={`${BASE_URL}/logo-mark.png`} alt="Marvol" className="w-14 h-14 object-contain" />
               </div>
               <div className="text-right">
                 <p className="text-white font-bold text-lg">Issue Summary Report</p>
