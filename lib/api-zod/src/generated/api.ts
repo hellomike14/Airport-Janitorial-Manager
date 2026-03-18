@@ -20,7 +20,7 @@ export const HealthCheckResponse = zod.object({
 export const ListStaffResponseItem = zod.object({
   id: zod.number(),
   name: zod.string(),
-  role: zod.enum(["staff", "supervisor"]),
+  role: zod.enum(["staff", "supervisor", "admin"]),
   phone: zod.string().nullish(),
   email: zod.string().nullish(),
   active: zod.boolean(),
@@ -33,7 +33,7 @@ export const ListStaffResponse = zod.array(ListStaffResponseItem);
  */
 export const CreateStaffMemberBody = zod.object({
   name: zod.string(),
-  role: zod.enum(["staff", "supervisor"]),
+  role: zod.enum(["staff", "supervisor", "admin"]),
   phone: zod.string().nullish(),
   email: zod.string().nullish(),
 });
@@ -47,7 +47,7 @@ export const UpdateStaffMemberParams = zod.object({
 
 export const UpdateStaffMemberBody = zod.object({
   name: zod.string().optional(),
-  role: zod.enum(["staff", "supervisor"]).optional(),
+  role: zod.enum(["staff", "supervisor", "admin"]).optional(),
   phone: zod.string().nullish(),
   email: zod.string().nullish(),
   active: zod.boolean().optional(),
@@ -56,7 +56,7 @@ export const UpdateStaffMemberBody = zod.object({
 export const UpdateStaffMemberResponse = zod.object({
   id: zod.number(),
   name: zod.string(),
-  role: zod.enum(["staff", "supervisor"]),
+  role: zod.enum(["staff", "supervisor", "admin"]),
   phone: zod.string().nullish(),
   email: zod.string().nullish(),
   active: zod.boolean(),

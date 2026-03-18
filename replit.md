@@ -32,17 +32,27 @@ A comprehensive janitorial cleaning management web app for Marvol Facility at MC
 6. Terminal C - Levels 2, 4, 6
 7. Top Terminal - Levels 4-11
 
-**Team:**
+**Team (13 total):**
+- 1 Admin (System Administrator)
 - 2 Supervisors (Maria Rodriguez, James Thompson)
 - 10 Cleaning Staff members
 
+**Role-Based Access Control:**
+- **Admin**: Full access — can switch view mode between Admin/Supervisor/Staff views
+- **Supervisor**: Dashboard, areas, assignments, issue tracker (no staff management)
+- **Staff**: My Tasks page + Report Issue only
+
+**Auth:** No passwords — click-to-login from grouped staff list; stored in localStorage.
+
 **Pages:**
-- Dashboard - Real-time overview, stats cards, area progress
-- Cleaning Areas - List of all areas with progress
+- Login - Click-to-login with role-grouped staff list
+- Dashboard - Real-time overview, stats cards, area progress (admin/supervisor)
+- Cleaning Areas - List of all areas with progress (admin/supervisor)
 - Area Tasks - 15 daily tasks per area with checkbox completion + timestamps
-- Staff Directory - Add/edit/delete staff (supervisors and staff)
+- Staff Directory - Add/edit/delete staff including admin role (admin only)
 - Assignments - Supervisors assign staff to areas daily + special inspector assignments
 - Issue Tracker - Report and resolve facility issues by area/severity
+- My Tasks - Staff-only page showing today's assigned area tasks with completion
 
 **API Routes:**
 - `GET /api/dashboard` - Dashboard stats
@@ -103,5 +113,5 @@ Every package extends `tsconfig.base.json` which sets `composite: true`. The roo
 ## Seeding
 
 Run `pnpm --filter @workspace/scripts run seed` to populate:
-- 12 staff members (2 supervisors + 10 cleaning staff)
+- 13 staff members (1 admin + 2 supervisors + 10 cleaning staff)
 - 7 cleaning areas at MCO Airport

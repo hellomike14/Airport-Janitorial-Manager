@@ -367,7 +367,7 @@ components:
           type: string
         role:
           type: string
-          enum: [staff, supervisor]
+          enum: [staff, supervisor, admin]
         phone:
           type: string
           nullable: true
@@ -392,7 +392,7 @@ components:
           type: string
         role:
           type: string
-          enum: [staff, supervisor]
+          enum: [staff, supervisor, admin]
         phone:
           type: string
           nullable: true
@@ -410,7 +410,7 @@ components:
           type: string
         role:
           type: string
-          enum: [staff, supervisor]
+          enum: [staff, supervisor, admin]
         phone:
           type: string
           nullable: true

@@ -15,6 +15,7 @@ export type StaffMemberRole =
 export const StaffMemberRole = {
   staff: "staff",
   supervisor: "supervisor",
+  admin: "admin",
 } as const;
 
 export interface StaffMember {
@@ -33,6 +34,7 @@ export type CreateStaffMemberRequestRole =
 export const CreateStaffMemberRequestRole = {
   staff: "staff",
   supervisor: "supervisor",
+  admin: "admin",
 } as const;
 
 export interface CreateStaffMemberRequest {
@@ -48,6 +50,7 @@ export type UpdateStaffMemberRequestRole =
 export const UpdateStaffMemberRequestRole = {
   staff: "staff",
   supervisor: "supervisor",
+  admin: "admin",
 } as const;
 
 export interface UpdateStaffMemberRequest {

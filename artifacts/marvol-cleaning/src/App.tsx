@@ -1,37 +1,76 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import { AppLayout } from "./components/layout/AppLayout";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
 
-// Pages
 import Dashboard from "./pages/Dashboard";
 import AreasList from "./pages/AreasList";
 import AreaTasks from "./pages/AreaTasks";
 import Staff from "./pages/Staff";
 import Assignments from "./pages/Assignments";
 import Issues from "./pages/Issues";
+import MyTasks from "./pages/MyTasks";
+import Login from "./pages/Login";
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
-      staleTime: 1000 * 60 * 5, // 5 minutes
+      staleTime: 1000 * 30,
     },
   },
 });
 
-function Router() {
+function ProtectedRoutes() {
+  const { currentUser, effectiveRole } = useAuth();
+
+  if (!currentUser) {
+    return <Login />;
+  }
+
   return (
     <AppLayout>
       <Switch>
-        <Route path="/" component={Dashboard} />
-        <Route path="/areas" component={AreasList} />
-        <Route path="/areas/:areaId" component={AreaTasks} />
-        <Route path="/staff" component={Staff} />
-        <Route path="/assignments" component={Assignments} />
-        <Route path="/issues" component={Issues} />
+        {/* Admin-only routes */}
+        {effectiveRole === "admin" && (
+          <>
+            <Route path="/" component={Dashboard} />
+            <Route path="/areas" component={AreasList} />
+            <Route path="/areas/:areaId" component={AreaTasks} />
+            <Route path="/assignments" component={Assignments} />
+            <Route path="/staff" component={Staff} />
+            <Route path="/issues" component={Issues} />
+          </>
+        )}
+
+        {/* Supervisor routes */}
+        {effectiveRole === "supervisor" && (
+          <>
+            <Route path="/" component={Dashboard} />
+            <Route path="/areas" component={AreasList} />
+            <Route path="/areas/:areaId" component={AreaTasks} />
+            <Route path="/assignments" component={Assignments} />
+            <Route path="/issues" component={Issues} />
+            <Route path="/staff"><Redirect to="/" /></Route>
+          </>
+        )}
+
+        {/* Staff routes */}
+        {effectiveRole === "staff" && (
+          <>
+            <Route path="/my-tasks" component={MyTasks} />
+            <Route path="/issues" component={Issues} />
+            <Route path="/"><Redirect to="/my-tasks" /></Route>
+            <Route path="/areas"><Redirect to="/my-tasks" /></Route>
+            <Route path="/areas/:areaId"><Redirect to="/my-tasks" /></Route>
+            <Route path="/assignments"><Redirect to="/my-tasks" /></Route>
+            <Route path="/staff"><Redirect to="/my-tasks" /></Route>
+          </>
+        )}
+
         <Route component={NotFound} />
       </Switch>
     </AppLayout>
@@ -42,9 +81,11 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
-        </WouterRouter>
+        <AuthProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <ProtectedRoutes />
+          </WouterRouter>
+        </AuthProvider>
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>
