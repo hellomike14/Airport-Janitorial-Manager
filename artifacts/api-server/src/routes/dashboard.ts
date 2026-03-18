@@ -5,21 +5,21 @@ import { eq, sql } from "drizzle-orm";
 import { GetDashboardQueryParams } from "@workspace/api-zod";
 
 const DAILY_TASKS = [
-  "Sweep and mop all floors",
-  "Clean and sanitize all restrooms",
-  "Empty and replace all trash bins",
-  "Wipe down counters and surfaces",
-  "Clean glass doors and windows",
-  "Sanitize handrails and touch points",
-  "Check and restock supplies (soap, paper)",
-  "Clean elevators and escalator treads",
-  "Spot clean walls and partitions",
-  "Clean food court and seating areas",
-  "Vacuum all carpeted areas",
-  "Clean gates and passenger waiting areas",
-  "Inspect and clean baggage claim area",
-  "Report and tag any maintenance issues",
-  "Final supervisor inspection walk-through",
+  "Routine sweep of all levels — remove debris, trash, and litter",
+  "Mop and sanitize all floor surfaces — extra attention to high-traffic zones",
+  "Deep clean stairwells — scrub landings, steps, and corners",
+  "Clean and sanitize elevator cabs — floors, walls, buttons, and tracks",
+  "Sanitize all handrails, elevator buttons, and high-touch surfaces",
+  "Empty all trash receptacles and replace liners",
+  "Clean and sanitize restroom facilities — restock soap, paper, and supplies",
+  "Spot clean walls, pillars, signs, and partitions",
+  "Remove gum, stains, and debris from floor surfaces",
+  "Clean entry/exit areas, doors, and glass partitions",
+  "Inspect and clean drainage grates and floor drains",
+  "Clean gate/seating areas — wipe seats, armrests, and surfaces",
+  "Sweep and clean ticketing kiosks, counters, and service areas",
+  "Inspect and report any maintenance issues or safety hazards",
+  "Final supervisor inspection walk-through and sign-off",
 ];
 
 async function ensureTasksForDate(areaId: number, date: string) {
