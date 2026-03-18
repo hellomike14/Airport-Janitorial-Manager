@@ -4,31 +4,26 @@ import { useListIssues } from "@workspace/api-client-react";
 import {
   Printer,
   Calendar,
-  AlertTriangle,
   CheckCircle2,
-  Clock,
   MapPin,
   User,
   FileText,
-  BarChart3,
-  ChevronDown,
   Filter,
+  Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+
 const SEVERITY_STYLE = {
-  high: { badge: "bg-red-100 text-red-700 border border-red-200", dot: "bg-red-500", label: "High" },
-  medium: { badge: "bg-amber-100 text-amber-700 border border-amber-200", dot: "bg-amber-500", label: "Medium" },
-  low: { badge: "bg-slate-100 text-slate-600 border border-slate-200", dot: "bg-slate-400", label: "Low" },
+  high: { badge: "bg-red-100 text-red-700 border border-red-200", dot: "bg-red-500", label: "High", color: "#dc2626" },
+  medium: { badge: "bg-amber-100 text-amber-700 border border-amber-200", dot: "bg-amber-500", label: "Medium", color: "#d97706" },
+  low: { badge: "bg-slate-100 text-slate-600 border border-slate-200", dot: "bg-slate-400", label: "Low", color: "#64748b" },
 };
 
 function SeverityBadge({ severity }: { severity: string }) {
   const s = SEVERITY_STYLE[severity as keyof typeof SEVERITY_STYLE] ?? SEVERITY_STYLE.low;
-  return (
-    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${s.badge}`}>
-      {s.label}
-    </span>
-  );
+  return <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${s.badge}`}>{s.label}</span>;
 }
 
 function StatusBadge({ resolved }: { resolved: boolean }) {
@@ -41,17 +36,186 @@ function StatusBadge({ resolved }: { resolved: boolean }) {
 
 function IssueImage({ path, label }: { path: string | null; label: string }) {
   if (!path) return null;
-  const url = `${import.meta.env.BASE_URL}api/storage${path}`;
+  const url = `${BASE_URL}/api/storage${path}`;
   return (
     <div className="flex flex-col gap-1">
       <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{label}</span>
-      <img
-        src={url}
-        alt={label}
-        className="w-28 h-20 object-cover rounded-xl border border-slate-200 shadow-sm"
-        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-      />
+      <img src={url} alt={label} className="w-28 h-20 object-cover rounded-xl border border-slate-200 shadow-sm"
+        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
     </div>
+  );
+}
+
+function buildIssuePDF(issue: any): string {
+  const origin = window.location.origin;
+  const logoUrl = `${origin}${BASE_URL}/logo.png`;
+  const logoMarkUrl = `${origin}${BASE_URL}/logo-mark.png`;
+  const beforeUrl = issue.beforeImagePath ? `${origin}${BASE_URL}/api/storage${issue.beforeImagePath}` : null;
+  const afterUrl = issue.afterImagePath ? `${origin}${BASE_URL}/api/storage${issue.afterImagePath}` : null;
+
+  const sev = SEVERITY_STYLE[issue.severity as keyof typeof SEVERITY_STYLE] ?? SEVERITY_STYLE.low;
+  const generatedAt = format(new Date(), "MMMM d, yyyy 'at' h:mm a");
+  const reportedDate = format(parseISO(issue.issueDate), "MMMM d, yyyy");
+  const resolvedDate = issue.resolvedAt ? format(parseISO(issue.resolvedAt), "MMMM d, yyyy 'at' h:mm a") : null;
+
+  const photosSection = (beforeUrl || afterUrl) ? `
+    <div style="margin-top:24px;">
+      <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px;">Photos</div>
+      <div style="display:flex;gap:20px;flex-wrap:wrap;">
+        ${beforeUrl ? `<div>
+          <div style="font-size:10px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Before</div>
+          <img src="${beforeUrl}" style="width:220px;height:155px;object-fit:cover;border-radius:10px;border:1px solid #e2e8f0;" onerror="this.style.display='none'" />
+        </div>` : ''}
+        ${afterUrl ? `<div>
+          <div style="font-size:10px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">After</div>
+          <img src="${afterUrl}" style="width:220px;height:155px;object-fit:cover;border-radius:10px;border:1px solid #e2e8f0;" onerror="this.style.display='none'" />
+        </div>` : ''}
+      </div>
+    </div>` : '';
+
+  const completionSection = issue.completionNotes ? `
+    <div style="margin-top:20px;background:#f8fafc;border-radius:10px;padding:14px 16px;border-left:3px solid #10b981;">
+      <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Completion Notes</div>
+      <div style="font-size:13px;color:#334155;line-height:1.6;">${issue.completionNotes}</div>
+    </div>` : '';
+
+  const resolvedSection = resolvedDate ? `
+    <div style="margin-top:12px;display:flex;align-items:center;gap:8px;color:#059669;font-size:12px;font-weight:600;">
+      <span style="width:8px;height:8px;background:#10b981;border-radius:50%;display:inline-block;"></span>
+      Resolved on ${resolvedDate}
+    </div>` : `
+    <div style="margin-top:12px;display:flex;align-items:center;gap:8px;color:#2563eb;font-size:12px;font-weight:600;">
+      <span style="width:8px;height:8px;background:#3b82f6;border-radius:50%;display:inline-block;"></span>
+      Status: Open — Awaiting Resolution
+    </div>`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Issue Report #${issue.id} — Marvol Facility Services</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f1f5f9; color: #1e293b; }
+    .page { max-width: 720px; margin: 32px auto; background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.10); }
+    @media print {
+      body { background: #fff; }
+      .page { margin: 0; max-width: 100%; border-radius: 0; box-shadow: none; }
+      .no-print { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#1e293b,#0f172a);padding:28px 32px;display:flex;align-items:center;justify-content:space-between;gap:20px;">
+      <div style="display:flex;align-items:center;gap:16px;">
+        <img src="${logoMarkUrl}" style="width:52px;height:52px;object-fit:contain;" onerror="this.style.display='none'" />
+        <div>
+          <div style="background:rgba(255,255,255,0.95);border-radius:8px;padding:5px 12px;display:inline-block;margin-bottom:5px;">
+            <img src="${logoUrl}" style="height:22px;object-fit:contain;" onerror="this.style.display='none'" />
+          </div>
+          <div style="color:#94a3b8;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;">Facility Services · MCO International Airport</div>
+        </div>
+      </div>
+      <div style="text-align:right;">
+        <div style="color:#fff;font-weight:700;font-size:15px;letter-spacing:0.01em;">Issue Report</div>
+        <div style="color:#64748b;font-size:11px;margin-top:3px;">Issue #${issue.id}</div>
+        <div style="color:#475569;font-size:10px;margin-top:2px;">Generated ${generatedAt}</div>
+      </div>
+    </div>
+
+    <!-- Severity banner -->
+    <div style="background:${sev.color}15;border-bottom:3px solid ${sev.color};padding:12px 32px;display:flex;align-items:center;justify-content:space-between;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="background:${sev.color};color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;padding:3px 10px;border-radius:20px;">${sev.label} Priority</span>
+        <span style="font-size:12px;font-weight:600;color:${sev.color};">${issue.severity === 'high' ? 'Urgent — Requires Immediate Attention' : issue.severity === 'medium' ? 'Needs Attention Soon' : 'Routine Cleaning Issue'}</span>
+      </div>
+      <span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:${issue.resolved ? '#d1fae5' : '#dbeafe'};color:${issue.resolved ? '#065f46' : '#1d4ed8'};">${issue.resolved ? '✓ Resolved' : 'Open'}</span>
+    </div>
+
+    <!-- Body -->
+    <div style="padding:28px 32px;">
+
+      <!-- Location -->
+      <div style="margin-bottom:20px;">
+        <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Location</div>
+        ${issue.terminal ? `<div style="font-size:10px;font-weight:700;color:#2563eb;text-transform:uppercase;letter-spacing:0.06em;">${issue.terminal}</div>` : ''}
+        <div style="font-size:16px;font-weight:700;color:#1e293b;">${issue.areaName ?? 'Unknown Area'}</div>
+      </div>
+
+      <!-- Divider -->
+      <div style="height:1px;background:#f1f5f9;margin-bottom:20px;"></div>
+
+      <!-- Description -->
+      <div style="margin-bottom:20px;">
+        <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Issue Description</div>
+        <div style="font-size:15px;color:#1e293b;line-height:1.6;font-weight:500;">${issue.description}</div>
+      </div>
+
+      <!-- Meta grid -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+        <div style="background:#f8fafc;border-radius:10px;padding:12px 14px;">
+          <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Date Reported</div>
+          <div style="font-size:13px;color:#334155;font-weight:600;">${reportedDate}</div>
+        </div>
+        <div style="background:#f8fafc;border-radius:10px;padding:12px 14px;">
+          <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Reported By</div>
+          <div style="font-size:13px;color:#334155;font-weight:600;">${issue.reportedByName ?? 'Unknown'}</div>
+        </div>
+        ${issue.assignedToName ? `
+        <div style="background:#eff6ff;border-radius:10px;padding:12px 14px;">
+          <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Assigned To</div>
+          <div style="font-size:13px;color:#1d4ed8;font-weight:600;">${issue.assignedToName}</div>
+        </div>` : ''}
+      </div>
+
+      ${resolvedSection}
+      ${completionSection}
+      ${photosSection}
+
+      <!-- Footer divider -->
+      <div style="height:1px;background:#f1f5f9;margin-top:28px;margin-bottom:16px;"></div>
+
+      <!-- Footer -->
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <img src="${logoMarkUrl}" style="width:24px;height:24px;object-fit:contain;opacity:0.5;" onerror="this.style.display='none'" />
+          <span style="font-size:10px;color:#94a3b8;">Marvol Facility Services · MCO International Airport · Confidential Operations Record</span>
+        </div>
+        <span style="font-size:10px;color:#cbd5e1;white-space:nowrap;">Issue #${issue.id}</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.addEventListener('load', function() {
+      setTimeout(function() { window.print(); }, 600);
+    });
+  </script>
+</body>
+</html>`;
+}
+
+function DownloadIssueButton({ issue }: { issue: any }) {
+  const handleDownload = () => {
+    const html = buildIssuePDF(issue);
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.write(html);
+    win.document.close();
+  };
+
+  return (
+    <button
+      onClick={handleDownload}
+      title="Download PDF for this issue"
+      className="no-print flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-colors shrink-0"
+    >
+      <Download className="w-3.5 h-3.5" />
+      PDF
+    </button>
   );
 }
 
@@ -91,13 +255,8 @@ export default function InspectorReport() {
     return Array.from(map.values()).sort((a, b) => a.areaName.localeCompare(b.areaName));
   }, [issues]);
 
-  const handleApplyFilter = () => {
-    setFetchParams({ from, to });
-  };
-
-  const handlePrint = () => {
-    window.print();
-  };
+  const handleApplyFilter = () => setFetchParams({ from, to });
+  const handlePrint = () => window.print();
 
   const generatedAt = format(new Date(), "MMMM d, yyyy 'at' h:mm a");
   const fromLabel = format(parseISO(fetchParams.from), "MMMM d, yyyy");
@@ -105,7 +264,6 @@ export default function InspectorReport() {
 
   return (
     <>
-      {/* Print-only global styles */}
       <style>{`
         @media print {
           body * { visibility: hidden; }
@@ -118,24 +276,24 @@ export default function InspectorReport() {
 
       <div className="max-w-5xl mx-auto pb-16 space-y-8">
 
-        {/* Page header — screen only */}
+        {/* Page header */}
         <div className="no-print flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
           <div>
             <h1 className="text-3xl font-display font-bold text-slate-900 flex items-center gap-3">
               <FileText className="w-8 h-8 text-blue-600" />
               Inspector Report
             </h1>
-            <p className="text-slate-500 mt-1">Generate a summary report for airport inspection authorities.</p>
+            <p className="text-slate-500 mt-1">Each issue has its own <strong>PDF</strong> download. Use the full report button to print the summary.</p>
           </div>
           <Button
             onClick={handlePrint}
             className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md shadow-blue-600/20 font-bold gap-2"
           >
-            <Printer className="w-4 h-4" /> Print / Save PDF
+            <Printer className="w-4 h-4" /> Print Full Summary
           </Button>
         </div>
 
-        {/* Date range filter — screen only */}
+        {/* Date range filter */}
         <div className="no-print bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-wrap items-end gap-4">
           <div className="flex items-center gap-2 text-slate-500 font-medium">
             <Filter className="w-4 h-4" />
@@ -144,53 +302,35 @@ export default function InspectorReport() {
           <div className="flex items-center gap-3 flex-1 flex-wrap">
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">From</label>
-              <input
-                type="date"
-                value={from}
-                max={to}
+              <input type="date" value={from} max={to}
                 onChange={(e) => setFrom(e.target.value)}
-                className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/30"
-              />
+                className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/30" />
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">To</label>
-              <input
-                type="date"
-                value={to}
-                min={from}
-                max={today}
+              <input type="date" value={to} min={from} max={today}
                 onChange={(e) => setTo(e.target.value)}
-                className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/30"
-              />
+                className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/30" />
             </div>
-            <Button
-              onClick={handleApplyFilter}
-              variant="outline"
-              className="rounded-xl border-slate-200 text-sm font-semibold mt-5"
-            >
+            <Button onClick={handleApplyFilter} variant="outline"
+              className="rounded-xl border-slate-200 text-sm font-semibold mt-5">
               <Calendar className="w-4 h-4 mr-2" />
               Apply
             </Button>
           </div>
         </div>
 
-        {/* ======================================================= */}
-        {/* PRINTABLE REPORT AREA                                    */}
-        {/* ======================================================= */}
+        {/* Printable report area */}
         <div id="inspector-report-print" ref={printRef} className="space-y-8">
 
           {/* Report header */}
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="bg-gradient-to-r from-slate-800 to-slate-900 px-8 py-6 flex items-center justify-between gap-6">
               <div className="flex items-center gap-5">
-                <img
-                  src={`${import.meta.env.BASE_URL}logo-mark.png`}
-                  alt="Marvol"
-                  className="w-14 h-14 object-contain"
-                />
+                <img src={`${BASE_URL}/logo-mark.png`} alt="Marvol" className="w-14 h-14 object-contain" />
                 <div>
                   <div className="bg-white/95 rounded-xl px-4 py-1.5 inline-block mb-1">
-                    <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Marvol Enterprises" className="h-7 object-contain" />
+                    <img src={`${BASE_URL}/logo.png`} alt="Marvol Enterprises" className="h-7 object-contain" />
                   </div>
                   <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Facility Services · MCO International Airport</p>
                 </div>
@@ -220,7 +360,7 @@ export default function InspectorReport() {
             </div>
           </div>
 
-          {/* Loading state */}
+          {/* Loading */}
           {isLoading && (
             <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center text-slate-400 animate-pulse">
               Loading issues for report...
@@ -242,10 +382,9 @@ export default function InspectorReport() {
             const open = areaIssues.length - resolved;
 
             return (
-              <div
-                key={areaName}
-                className={`bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden ${areaIdx > 0 ? "print-break" : ""}`}
-              >
+              <div key={areaName}
+                className={`bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden ${areaIdx > 0 ? "print-break" : ""}`}>
+
                 {/* Area header */}
                 <div className="bg-slate-50 border-b border-slate-100 px-6 py-4 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
@@ -253,9 +392,7 @@ export default function InspectorReport() {
                       <MapPin className="w-4 h-4 text-white" />
                     </div>
                     <div>
-                      {terminal && (
-                        <p className="text-xs font-bold text-blue-600 uppercase tracking-wider">{terminal}</p>
-                      )}
+                      {terminal && <p className="text-xs font-bold text-blue-600 uppercase tracking-wider">{terminal}</p>}
                       <h2 className="font-bold text-slate-900 text-base">{areaName}</h2>
                     </div>
                   </div>
@@ -270,9 +407,8 @@ export default function InspectorReport() {
 
                 {/* Issues list */}
                 <div className="divide-y divide-slate-50">
-                  {areaIssues.map((issue, idx) => (
+                  {areaIssues.map((issue) => (
                     <div key={issue.id} className="px-6 py-5">
-                      {/* Issue row top */}
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex items-start gap-3 flex-1 min-w-0">
                           <div className={`mt-1 w-2 h-2 rounded-full shrink-0 ${SEVERITY_STYLE[issue.severity as keyof typeof SEVERITY_STYLE]?.dot ?? "bg-slate-400"}`} />
@@ -285,9 +421,12 @@ export default function InspectorReport() {
                             <p className="text-sm font-semibold text-slate-800 leading-snug">{issue.description}</p>
                           </div>
                         </div>
+
+                        {/* Download PDF per issue */}
+                        <DownloadIssueButton issue={issue} />
                       </div>
 
-                      {/* Issue metadata */}
+                      {/* Metadata */}
                       <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-slate-500">
                         <span className="flex items-center gap-1">
                           <Calendar className="w-3 h-3" />
@@ -313,8 +452,8 @@ export default function InspectorReport() {
 
                       {/* Completion notes */}
                       {issue.completionNotes && (
-                        <div className="mt-3 bg-slate-50 rounded-xl px-4 py-2.5 text-sm text-slate-700">
-                          <span className="font-semibold text-slate-500 text-xs uppercase tracking-wide">Completion Notes: </span>
+                        <div className="mt-3 bg-slate-50 rounded-xl px-4 py-2.5 text-sm text-slate-700 border-l-2 border-emerald-400">
+                          <span className="font-semibold text-slate-500 text-xs uppercase tracking-wide">What was done: </span>
                           {issue.completionNotes}
                         </div>
                       )}
@@ -337,14 +476,8 @@ export default function InspectorReport() {
           {!isLoading && issues.length > 0 && (
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm px-8 py-5 flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <img
-                  src={`${import.meta.env.BASE_URL}logo-mark.png`}
-                  alt="Marvol"
-                  className="w-8 h-8 object-contain opacity-60"
-                />
-                <p className="text-xs text-slate-400">
-                  Marvol Facility Services · MCO International Airport · Internal Operations Report
-                </p>
+                <img src={`${BASE_URL}/logo-mark.png`} alt="Marvol" className="w-8 h-8 object-contain opacity-60" />
+                <p className="text-xs text-slate-400">Marvol Facility Services · MCO International Airport · Internal Operations Report</p>
               </div>
               <p className="text-xs text-slate-400 shrink-0">
                 {issues.length} issue{issues.length !== 1 ? "s" : ""} · {fromLabel} – {toLabel}
