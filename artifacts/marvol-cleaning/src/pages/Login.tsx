@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useListStaff } from "@workspace/api-client-react";
 import { useAuth, UserRole } from "@/contexts/AuthContext";
-import { Shield, Users, User, LogIn, Building2 } from "lucide-react";
+import { Shield, Users, User, LogIn } from "lucide-react";
 
 const ROLE_CONFIG = {
   admin: {
@@ -62,10 +62,20 @@ export default function Login() {
 
       {/* Header */}
       <div className="text-center mb-10 relative z-10">
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mx-auto mb-4 shadow-2xl shadow-blue-500/30">
-          <Building2 className="w-8 h-8 text-white" />
+        <div className="flex flex-col items-center gap-4 mb-5">
+          <img
+            src={`${import.meta.env.BASE_URL}logo-mark.png`}
+            alt="Marvol Facility Services"
+            className="w-24 h-24 object-contain drop-shadow-2xl"
+          />
+          <div className="bg-white/95 backdrop-blur rounded-2xl px-6 py-2.5 shadow-2xl shadow-black/30">
+            <img
+              src={`${import.meta.env.BASE_URL}logo.png`}
+              alt="Marvol Enterprises"
+              className="h-10 object-contain"
+            />
+          </div>
         </div>
-        <h1 className="text-3xl font-bold text-white tracking-tight">Marvol Facility</h1>
         <p className="text-blue-300 mt-1 text-sm font-medium tracking-wide uppercase">MCO International Airport</p>
         <p className="text-slate-400 mt-3 text-sm">Select your profile to continue</p>
       </div>

@@ -240,17 +240,22 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         ${mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
       `}>
         {/* Logo */}
-        <div className="h-20 flex items-center px-6 border-b border-sidebar-border/50">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent to-blue-400 flex items-center justify-center shadow-lg shadow-accent/20">
-              <span className="text-white font-display font-bold text-xl">M</span>
-            </div>
-            <div>
-              <h1 className="font-display font-bold text-lg leading-tight tracking-tight">Marvol Facility</h1>
-              <p className="text-xs text-sidebar-foreground/60 uppercase tracking-wider font-semibold">MCO Operations</p>
+        <div className="h-20 flex items-center px-5 border-b border-sidebar-border/50 gap-3">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <img
+              src={`${import.meta.env.BASE_URL}logo-mark.png`}
+              alt="Marvol Facility Services"
+              className="w-10 h-10 object-contain shrink-0"
+            />
+            <div className="bg-white/95 rounded-xl px-3 py-1.5 shadow-sm">
+              <img
+                src={`${import.meta.env.BASE_URL}logo.png`}
+                alt="Marvol Enterprises"
+                className="h-6 object-contain"
+              />
             </div>
           </div>
-          <button className="ml-auto lg:hidden text-sidebar-foreground/50 hover:text-white" onClick={closeMobile}>
+          <button className="ml-auto lg:hidden text-sidebar-foreground/50 hover:text-white shrink-0" onClick={closeMobile}>
             <X className="w-6 h-6" />
           </button>
         </div>
