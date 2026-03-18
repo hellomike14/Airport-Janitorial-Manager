@@ -182,9 +182,9 @@ function buildIssuePDF(issue: any): string {
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
         <div style="display:flex;align-items:center;gap:8px;">
           <img src="${logoMarkUrl}" style="width:24px;height:24px;object-fit:contain;opacity:0.5;" onerror="this.style.display='none'" />
-          <span style="font-size:10px;color:#94a3b8;">Marvol Facility Services · MCO International Airport · Confidential Operations Record</span>
+          <span style="font-size:10px;color:#475569;">Marvol Facility Services · MCO International Airport · Confidential Operations Record</span>
         </div>
-        <span style="font-size:10px;color:#cbd5e1;white-space:nowrap;">Issue #${issue.id}</span>
+        <span style="font-size:10px;color:#64748b;white-space:nowrap;">Issue #${issue.id}</span>
       </div>
     </div>
   </div>
@@ -331,14 +331,14 @@ export default function InspectorReport() {
                   <div className="bg-white/95 rounded-xl px-4 py-1.5 inline-block mb-1">
                     <img src={`${BASE_URL}/logo.png`} alt="Marvol Enterprises" className="h-7 object-contain" />
                   </div>
-                  <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Facility Services · MCO International Airport</p>
+                  <p className="text-emerald-200 text-xs font-semibold uppercase tracking-wider">Facility Services · MCO International Airport</p>
                 </div>
                 <img src={`${BASE_URL}/logo-mark.png`} alt="Marvol" className="w-14 h-14 object-contain" />
               </div>
               <div className="text-right">
                 <p className="text-white font-bold text-lg">Issue Summary Report</p>
-                <p className="text-slate-400 text-sm mt-0.5">{fromLabel} — {toLabel}</p>
-                <p className="text-slate-500 text-xs mt-1">Generated {generatedAt}</p>
+                <p className="text-emerald-200 text-sm mt-0.5">{fromLabel} — {toLabel}</p>
+                <p className="text-emerald-300/70 text-xs mt-1">Generated {generatedAt}</p>
               </div>
             </div>
 
