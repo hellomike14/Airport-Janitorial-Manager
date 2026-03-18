@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db } from "@workspace/db";
-import { issuesTable, staffTable, areasTable, notificationsTable } from "@workspace/db/schema";
+import { issuesTable, staffTable, areasTable, notificationsTable, assignmentsTable } from "@workspace/db/schema";
 import { eq, and, gte, lte } from "drizzle-orm";
 import {
   ListIssuesQueryParams,
@@ -243,6 +243,55 @@ router.patch("/:id/assign", async (req: Request, res: Response) => {
   }
 
   res.json(issue);
+});
+
+router.patch("/:id/assign-area", async (req: Request, res: Response) => {
+  const params = AssignIssueParams.safeParse({ id: req.params.id });
+  const body = z.object({ assignedById: z.number() }).safeParse(req.body);
+  if (!params.success || !body.success) {
+    res.status(400).json({ error: "Invalid input" });
+    return;
+  }
+
+  const [issue] = await db.select().from(issuesTable).where(eq(issuesTable.id, params.data.id));
+  if (!issue) {
+    res.status(404).json({ error: "Issue not found" });
+    return;
+  }
+
+  const today = new Date().toISOString().split("T")[0];
+
+  const rawAreaAssignments = await db
+    .select({ staffId: assignmentsTable.staffId, staffName: staffTable.name })
+    .from(assignmentsTable)
+    .innerJoin(staffTable, eq(assignmentsTable.staffId, staffTable.id))
+    .where(and(eq(assignmentsTable.areaId, issue.areaId), eq(assignmentsTable.assignmentDate, today)));
+
+  const seen = new Set<number>();
+  const areaAssignments = rawAreaAssignments.filter((a) => {
+    if (seen.has(a.staffId)) return false;
+    seen.add(a.staffId);
+    return true;
+  });
+
+  const [area] = await db.select({ name: areasTable.name }).from(areasTable).where(eq(areasTable.id, issue.areaId));
+  const [assigner] = await db.select({ name: staffTable.name }).from(staffTable).where(eq(staffTable.id, body.data.assignedById));
+
+  await db.update(issuesTable).set({ assignedToId: null }).where(eq(issuesTable.id, params.data.id));
+
+  if (areaAssignments.length > 0) {
+    await db.insert(notificationsTable).values(
+      areaAssignments.map((a) => ({
+        staffId: a.staffId,
+        issueId: params.data.id,
+        type: "issue_assigned" as const,
+        message: `${assigner?.name ?? "Supervisor"} assigned an issue in ${area?.name ?? "your area"} to your team: "${issue.description.slice(0, 60)}${issue.description.length > 60 ? "…" : ""}"`,
+      }))
+    );
+  }
+
+  const fullIssue = await fetchFullIssue(params.data.id);
+  res.json({ ...fullIssue, areaStaff: areaAssignments.map((a) => a.staffName) });
 });
 
 router.patch("/:id/complete", async (req: Request, res: Response) => {

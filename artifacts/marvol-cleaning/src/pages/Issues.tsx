@@ -9,6 +9,7 @@ import {
   useListStaff,
   useAssignIssue,
   useCompleteIssue,
+  useListAssignments,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
@@ -186,66 +187,65 @@ function IssueImageUploader({
   );
 }
 
-function AssignDropdown({ issue, staffList, assignedById }: { issue: any; staffList: any[]; assignedById: number }) {
-  const qc = useQueryClient();
-  const [open, setOpen] = useState(false);
-  const assignMutation = useAssignIssue({
-    mutation: { onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/issues"] }) },
-  });
+function AssignAreaButton({
+  issue,
+  todayAssignments,
+  assignedById,
+  onAssigned,
+}: {
+  issue: any;
+  todayAssignments: any[];
+  assignedById: number;
+  onAssigned: () => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [justAssigned, setJustAssigned] = useState(false);
 
-  const staffOnly = staffList.filter((s) => s.role === "staff" && s.active);
-  const current = staffOnly.find((s) => s.id === issue.assignedToId);
+  const areaStaff = todayAssignments.filter((a) => a.areaId === issue.areaId);
+  const staffNames = areaStaff.map((a) => a.staffName);
+
+  const handleAssign = async () => {
+    setLoading(true);
+    try {
+      const base = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+      await fetch(`${base}/api/issues/${issue.id}/assign-area`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assignedById }),
+      });
+      setJustAssigned(true);
+      onAssigned();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (staffNames.length === 0) {
+    return (
+      <span className="text-xs text-slate-400 italic px-2">No staff on shift</span>
+    );
+  }
+
+  if (justAssigned) {
+    return (
+      <span className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 font-semibold">
+        <UserCheck className="w-3.5 h-3.5" />
+        Notified: {staffNames.join(", ")}
+      </span>
+    );
+  }
 
   return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors ${
-          issue.assignedToId
-            ? "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
-            : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
-        }`}
-      >
-        <UserCheck className="w-3.5 h-3.5" />
-        <span>{current ? current.name : "Assign to..."}</span>
-        <ChevronDown className="w-3 h-3" />
-      </button>
-
-      {open && (
-        <>
-          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-1.5 w-48 bg-white rounded-xl border border-slate-200 shadow-lg z-40 overflow-hidden">
-            <div className="px-3 py-2 border-b border-slate-100 text-xs text-slate-500 font-medium">Assign to staff</div>
-            {issue.assignedToId && (
-              <button
-                onClick={() => {
-                  assignMutation.mutate({ id: issue.id, data: { assignedToId: null, assignedById } });
-                  setOpen(false);
-                }}
-                className="w-full text-left px-3 py-2 text-xs text-rose-600 hover:bg-rose-50 transition-colors"
-              >
-                Remove assignment
-              </button>
-            )}
-            {staffOnly.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => {
-                  assignMutation.mutate({ id: issue.id, data: { assignedToId: s.id, assignedById } });
-                  setOpen(false);
-                }}
-                className={`w-full text-left px-3 py-2.5 text-sm transition-colors hover:bg-slate-50 ${issue.assignedToId === s.id ? "bg-blue-50 text-blue-700 font-semibold" : "text-slate-700"}`}
-              >
-                {s.name}
-              </button>
-            ))}
-            {staffOnly.length === 0 && (
-              <div className="px-3 py-3 text-xs text-slate-400">No active staff members</div>
-            )}
-          </div>
-        </>
-      )}
-    </div>
+    <button
+      onClick={handleAssign}
+      disabled={loading}
+      className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-colors disabled:opacity-50"
+    >
+      {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserCheck className="w-3.5 h-3.5" />}
+      <span>Assign → {staffNames.join(", ")}</span>
+    </button>
   );
 }
 
@@ -343,8 +343,18 @@ export default function Issues() {
 
   const isStaff = viewMode === "staff";
 
+  const today = format(new Date(), "yyyy-MM-dd");
+  const { data: todayAssignments = [] } = useListAssignments({ date: today });
+
+  const staffAreaId = isStaff
+    ? todayAssignments.find((a) => a.staffId === currentUser?.id)?.areaId ?? null
+    : null;
+
   const { data: issues, isLoading } = useListIssues(
-    isStaff ? { assignedToId: currentUser?.id } : {}
+    isStaff
+      ? staffAreaId != null ? { areaId: staffAreaId } : {}
+      : {},
+    { query: { enabled: !isStaff || staffAreaId != null } }
   );
   const { data: areas } = useListAreas();
   const { data: staffList = [] } = useListStaff();
@@ -400,11 +410,11 @@ export default function Issues() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h1 className="text-3xl font-display font-bold text-slate-900">
-            {isStaff ? "My Assigned Issues" : "Issue Tracker"}
+            {isStaff ? "My Area Issues" : "Issue Tracker"}
           </h1>
           <p className="text-slate-500 mt-1 font-medium">
             {isStaff
-              ? "Issues assigned to you — complete them with notes and an after photo."
+              ? "Open issues in your assigned area — complete them with notes and an after photo."
               : "Report and monitor maintenance or cleaning issues across all areas."}
           </p>
         </div>
@@ -516,12 +526,21 @@ export default function Issues() {
         </div>
       )}
 
-      {/* Empty state for staff with no assigned issues */}
-      {isStaff && !isLoading && filteredIssues?.length === 0 && filterResolved === false && (
+      {/* Empty state for staff with no shift assignment today */}
+      {isStaff && staffAreaId == null && !isLoading && (
+        <div className="p-12 text-center bg-slate-50 rounded-3xl border border-slate-200 border-dashed">
+          <AlertTriangle className="w-12 h-12 text-amber-400 mx-auto mb-3 opacity-60" />
+          <h3 className="text-lg font-bold text-slate-700">No area assigned today</h3>
+          <p className="text-slate-500 mt-1 text-sm">You don't have a shift assignment for today. Contact your supervisor.</p>
+        </div>
+      )}
+
+      {/* Empty state for staff with area but no issues */}
+      {isStaff && staffAreaId != null && !isLoading && filteredIssues?.length === 0 && filterResolved === false && (
         <div className="p-12 text-center bg-emerald-50 rounded-3xl border border-emerald-100 border-dashed">
           <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto mb-3 opacity-60" />
-          <h3 className="text-lg font-bold text-emerald-700">No open issues assigned to you</h3>
-          <p className="text-emerald-600 mt-1 text-sm">Your supervisor will assign issues here when action is needed.</p>
+          <h3 className="text-lg font-bold text-emerald-700">No open issues in your area</h3>
+          <p className="text-emerald-600 mt-1 text-sm">Your area is clear. A supervisor will notify you if any issues come up.</p>
         </div>
       )}
 
@@ -534,7 +553,7 @@ export default function Issues() {
         {filteredIssues?.map((issue) => {
           const isExpanded = expandedId === issue.id;
           const hasImages = issue.beforeImagePath || issue.afterImagePath;
-          const isMyAssignedIssue = isStaff && issue.assignedToId === currentUser?.id && !issue.resolved;
+          const isMyAssignedIssue = isStaff && !issue.resolved;
 
           return (
             <div
@@ -605,12 +624,13 @@ export default function Issues() {
                   </StatusBadge>
 
                   <div className="flex items-center gap-2 flex-wrap justify-end">
-                    {/* Assign dropdown — supervisors/admin only */}
+                    {/* Assign to area staff — supervisors/admin only */}
                     {!isStaff && !issue.resolved && (
-                      <AssignDropdown
+                      <AssignAreaButton
                         issue={issue}
-                        staffList={staffList}
+                        todayAssignments={todayAssignments}
                         assignedById={userId}
+                        onAssigned={() => queryClient.invalidateQueries({ queryKey: ["/api/issues"] })}
                       />
                     )}
 
