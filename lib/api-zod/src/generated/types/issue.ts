@@ -18,5 +18,7 @@ export interface Issue {
   severity: IssueSeverity;
   resolved: boolean;
   resolvedAt?: string | null;
+  beforeImagePath?: string | null;
+  afterImagePath?: string | null;
   createdAt: string;
 }

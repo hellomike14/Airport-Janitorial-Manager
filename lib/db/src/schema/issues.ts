@@ -13,6 +13,8 @@ export const issuesTable = pgTable("issues", {
   severity: text("severity", { enum: ["low", "medium", "high"] }).notNull().default("low"),
   resolved: boolean("resolved").notNull().default(false),
   resolvedAt: timestamp("resolved_at"),
+  beforeImagePath: text("before_image_path"),
+  afterImagePath: text("after_image_path"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

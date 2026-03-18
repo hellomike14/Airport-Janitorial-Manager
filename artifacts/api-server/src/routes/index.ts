@@ -6,6 +6,7 @@ import tasksRouter from "./tasks";
 import assignmentsRouter from "./assignments";
 import issuesRouter from "./issues";
 import dashboardRouter from "./dashboard";
+import storageRouter from "./storage";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use("/areas", areasRouter);
 router.use("/tasks", tasksRouter);
 router.use("/assignments", assignmentsRouter);
 router.use("/issues", issuesRouter);
+router.use(storageRouter);
 
 export default router;

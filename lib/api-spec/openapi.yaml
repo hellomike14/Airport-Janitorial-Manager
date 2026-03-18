@@ -19,6 +19,8 @@ tags:
     description: Task assignments
   - name: issues
     description: Issue reporting
+  - name: Storage
+    description: Object storage upload and serving endpoints.
 
 paths:
   /healthz:
@@ -330,6 +332,88 @@ paths:
               schema:
                 $ref: "#/components/schemas/Issue"
 
+  /issues/{id}/images:
+    patch:
+      operationId: updateIssueImages
+      tags: [issues]
+      summary: Attach before/after image paths to an issue
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateIssueImagesRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Issue"
+
+  /storage/uploads/request-url:
+    post:
+      tags: [Storage]
+      operationId: requestUploadUrl
+      summary: Request a presigned URL for file upload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UploadUrlRequest'
+      responses:
+        '200':
+          description: Presigned upload URL generated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadUrlResponse'
+        '400':
+          description: Missing or invalid required fields.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Failed to generate upload URL.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /storage/objects/{objectPath}:
+    get:
+      tags: [Storage]
+      operationId: getStorageObject
+      summary: Serve an object entity from PRIVATE_OBJECT_DIR
+      parameters:
+        - name: objectPath
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Object content.
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Object not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
   /dashboard:
     get:
       operationId: getDashboard
@@ -600,6 +684,12 @@ components:
         resolvedAt:
           type: string
           nullable: true
+        beforeImagePath:
+          type: string
+          nullable: true
+        afterImagePath:
+          type: string
+          nullable: true
         createdAt:
           type: string
       required:
@@ -626,11 +716,55 @@ components:
         severity:
           type: string
           enum: [low, medium, high]
+        beforeImagePath:
+          type: string
+          nullable: true
       required:
         - areaId
         - reportedById
         - description
         - severity
+
+    UpdateIssueImagesRequest:
+      type: object
+      properties:
+        beforeImagePath:
+          type: string
+          nullable: true
+        afterImagePath:
+          type: string
+          nullable: true
+
+    UploadUrlRequest:
+      type: object
+      required: [name, size, contentType]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        size:
+          type: integer
+          minimum: 1
+        contentType:
+          type: string
+          minLength: 1
+
+    UploadUrlResponse:
+      type: object
+      required: [uploadURL, objectPath]
+      properties:
+        uploadURL:
+          type: string
+          format: uri
+        objectPath:
+          type: string
+
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
 
     DashboardStats:
       type: object

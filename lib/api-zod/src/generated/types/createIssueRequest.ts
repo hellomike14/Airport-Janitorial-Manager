@@ -12,4 +12,5 @@ export interface CreateIssueRequest {
   reportedById: number;
   description: string;
   severity: CreateIssueRequestSeverity;
+  beforeImagePath?: string | null;
 }

@@ -239,6 +239,8 @@ export const ListIssuesResponseItem = zod.object({
   severity: zod.enum(["low", "medium", "high"]),
   resolved: zod.boolean(),
   resolvedAt: zod.string().nullish(),
+  beforeImagePath: zod.string().nullish(),
+  afterImagePath: zod.string().nullish(),
   createdAt: zod.string(),
 });
 export const ListIssuesResponse = zod.array(ListIssuesResponseItem);
@@ -251,6 +253,7 @@ export const CreateIssueBody = zod.object({
   reportedById: zod.number(),
   description: zod.string(),
   severity: zod.enum(["low", "medium", "high"]),
+  beforeImagePath: zod.string().nullish(),
 });
 
 /**
@@ -271,7 +274,59 @@ export const ResolveIssueResponse = zod.object({
   severity: zod.enum(["low", "medium", "high"]),
   resolved: zod.boolean(),
   resolvedAt: zod.string().nullish(),
+  beforeImagePath: zod.string().nullish(),
+  afterImagePath: zod.string().nullish(),
   createdAt: zod.string(),
+});
+
+/**
+ * @summary Attach before/after image paths to an issue
+ */
+export const UpdateIssueImagesParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateIssueImagesBody = zod.object({
+  beforeImagePath: zod.string().nullish(),
+  afterImagePath: zod.string().nullish(),
+});
+
+export const UpdateIssueImagesResponse = zod.object({
+  id: zod.number(),
+  areaId: zod.number(),
+  areaName: zod.string(),
+  reportedById: zod.number(),
+  reportedByName: zod.string(),
+  issueDate: zod.string(),
+  description: zod.string(),
+  severity: zod.enum(["low", "medium", "high"]),
+  resolved: zod.boolean(),
+  resolvedAt: zod.string().nullish(),
+  beforeImagePath: zod.string().nullish(),
+  afterImagePath: zod.string().nullish(),
+  createdAt: zod.string(),
+});
+
+/**
+ * @summary Request a presigned URL for file upload
+ */
+
+export const RequestUploadUrlBody = zod.object({
+  name: zod.string().min(1),
+  size: zod.number().min(1),
+  contentType: zod.string().min(1),
+});
+
+export const RequestUploadUrlResponse = zod.object({
+  uploadURL: zod.string().url(),
+  objectPath: zod.string(),
+});
+
+/**
+ * @summary Serve an object entity from PRIVATE_OBJECT_DIR
+ */
+export const GetStorageObjectParams = zod.object({
+  objectPath: zod.coerce.string(),
 });
 
 /**

@@ -6,9 +6,21 @@ import {
   ListIssuesQueryParams,
   CreateIssueBody,
   ResolveIssueParams,
+  UpdateIssueImagesParams,
+  UpdateIssueImagesBody,
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
+
+function formatIssue(i: any) {
+  return {
+    ...i,
+    resolvedAt: i.resolvedAt?.toISOString() ?? null,
+    createdAt: i.createdAt.toISOString(),
+    beforeImagePath: i.beforeImagePath ?? null,
+    afterImagePath: i.afterImagePath ?? null,
+  };
+}
 
 router.get("/", async (req, res) => {
   const query = ListIssuesQueryParams.parse({
@@ -28,6 +40,8 @@ router.get("/", async (req, res) => {
       severity: issuesTable.severity,
       resolved: issuesTable.resolved,
       resolvedAt: issuesTable.resolvedAt,
+      beforeImagePath: issuesTable.beforeImagePath,
+      afterImagePath: issuesTable.afterImagePath,
       createdAt: issuesTable.createdAt,
     })
     .from(issuesTable)
@@ -41,13 +55,7 @@ router.get("/", async (req, res) => {
     )
     .orderBy(issuesTable.createdAt);
 
-  res.json(
-    issues.map((i) => ({
-      ...i,
-      resolvedAt: i.resolvedAt?.toISOString() ?? null,
-      createdAt: i.createdAt.toISOString(),
-    }))
-  );
+  res.json(issues.map(formatIssue));
 });
 
 router.post("/", async (req, res) => {
@@ -63,6 +71,7 @@ router.post("/", async (req, res) => {
       description: body.description,
       severity: body.severity,
       resolved: false,
+      beforeImagePath: (body as any).beforeImagePath ?? null,
     })
     .returning();
 
@@ -82,6 +91,41 @@ router.post("/", async (req, res) => {
     reportedByName: reporter?.name ?? "",
     resolvedAt: null,
     createdAt: created.createdAt.toISOString(),
+    beforeImagePath: created.beforeImagePath ?? null,
+    afterImagePath: created.afterImagePath ?? null,
+  });
+});
+
+router.patch("/:id/images", async (req, res) => {
+  const { id } = UpdateIssueImagesParams.parse({ id: req.params.id });
+  const body = UpdateIssueImagesBody.parse(req.body);
+
+  const updateValues: Record<string, any> = {};
+  if (body.beforeImagePath !== undefined) updateValues.beforeImagePath = body.beforeImagePath;
+  if (body.afterImagePath !== undefined) updateValues.afterImagePath = body.afterImagePath;
+
+  const [updated] = await db
+    .update(issuesTable)
+    .set(updateValues)
+    .where(eq(issuesTable.id, id))
+    .returning();
+
+  if (!updated) {
+    res.status(404).json({ error: "Issue not found" });
+    return;
+  }
+
+  const [area] = await db.select({ name: areasTable.name }).from(areasTable).where(eq(areasTable.id, updated.areaId));
+  const [reporter] = await db.select({ name: staffTable.name }).from(staffTable).where(eq(staffTable.id, updated.reportedById));
+
+  res.json({
+    ...updated,
+    areaName: area?.name ?? "",
+    reportedByName: reporter?.name ?? "",
+    resolvedAt: updated.resolvedAt?.toISOString() ?? null,
+    createdAt: updated.createdAt.toISOString(),
+    beforeImagePath: updated.beforeImagePath ?? null,
+    afterImagePath: updated.afterImagePath ?? null,
   });
 });
 
@@ -99,15 +143,8 @@ router.post("/:id/resolve", async (req, res) => {
     return;
   }
 
-  const [area] = await db
-    .select({ name: areasTable.name })
-    .from(areasTable)
-    .where(eq(areasTable.id, updated.areaId));
-
-  const [reporter] = await db
-    .select({ name: staffTable.name })
-    .from(staffTable)
-    .where(eq(staffTable.id, updated.reportedById));
+  const [area] = await db.select({ name: areasTable.name }).from(areasTable).where(eq(areasTable.id, updated.areaId));
+  const [reporter] = await db.select({ name: staffTable.name }).from(staffTable).where(eq(staffTable.id, updated.reportedById));
 
   res.json({
     ...updated,
@@ -115,6 +152,8 @@ router.post("/:id/resolve", async (req, res) => {
     reportedByName: reporter?.name ?? "",
     resolvedAt: updated.resolvedAt?.toISOString() ?? null,
     createdAt: updated.createdAt.toISOString(),
+    beforeImagePath: updated.beforeImagePath ?? null,
+    afterImagePath: updated.afterImagePath ?? null,
   });
 });
 
