@@ -92,6 +92,7 @@ export const ListAreasResponse = zod.array(ListAreasResponseItem);
 export const ListTasksQueryParams = zod.object({
   areaId: zod.coerce.number().optional(),
   date: zod.coerce.string().optional(),
+  assignedToId: zod.coerce.number().optional(),
 });
 
 export const ListTasksResponseItem = zod.object({

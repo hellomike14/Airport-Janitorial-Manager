@@ -26,6 +26,7 @@ router.get("/", async (req, res) => {
       staffName: staffTable.name,
       areaId: assignmentsTable.areaId,
       areaName: areasTable.name,
+      terminal: areasTable.terminal,
       assignmentDate: assignmentsTable.assignmentDate,
       assignedById: assignmentsTable.assignedById,
       notes: assignmentsTable.notes,

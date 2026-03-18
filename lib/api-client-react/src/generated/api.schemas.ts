@@ -272,6 +272,7 @@ export interface DeleteResponse {
 export type ListTasksParams = {
   areaId?: number;
   date?: string;
+  assignedToId?: number;
 };
 
 export type ListAssignmentsParams = {

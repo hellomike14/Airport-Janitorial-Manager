@@ -126,11 +126,13 @@ router.get("/", async (req, res) => {
   const query = ListTasksQueryParams.parse({
     areaId: req.query.areaId,
     date: req.query.date,
+    assignedToId: req.query.assignedToId,
   });
 
   const today = new Date().toISOString().split("T")[0];
   const date = query.date ?? today;
   const areaId = query.areaId;
+  const assignedToId = (query as any).assignedToId ? Number((query as any).assignedToId) : undefined;
 
   if (areaId) {
     await ensureTasksForDate(areaId, date);
@@ -156,7 +158,8 @@ router.get("/", async (req, res) => {
     .where(
       and(
         eq(tasksTable.taskDate, date),
-        areaId ? eq(tasksTable.areaId, areaId) : undefined
+        areaId ? eq(tasksTable.areaId, areaId) : undefined,
+        assignedToId ? eq(tasksTable.assignedToId, assignedToId) : undefined
       )
     )
     .orderBy(tasksTable.areaId, tasksTable.taskOrder);
