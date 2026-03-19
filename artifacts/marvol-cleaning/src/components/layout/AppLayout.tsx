@@ -307,8 +307,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <header className="h-16 bg-white/80 backdrop-blur-xl border-b border-border flex items-center justify-between px-4 sm:px-8 shrink-0 z-30 sticky top-0 shadow-sm shadow-slate-200/20">
           <div className="flex items-center gap-4">
             <button
-              className="lg:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors"
+              className="lg:hidden min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 active:bg-slate-200 transition-colors touch-manipulation"
               onClick={() => setMobileOpen(true)}
+              aria-label="Open menu"
             >
               <Menu className="w-6 h-6" />
             </button>

@@ -325,17 +325,17 @@ export default function InspectorReport() {
 
           {/* Report header */}
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="bg-gradient-to-r from-emerald-900 to-emerald-950 px-8 py-6 flex items-center justify-between gap-6">
-              <div className="flex items-center gap-5">
+            <div className="bg-gradient-to-r from-emerald-900 to-emerald-950 px-6 py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
                 <div>
-                  <div className="bg-white/95 rounded-xl px-4 py-1.5 inline-block mb-1">
-                    <img src={`${BASE_URL}/logo.png`} alt="Marvol Enterprises" className="h-7 object-contain" />
+                  <div className="bg-white/95 rounded-xl px-3 py-1.5 inline-block mb-1">
+                    <img src={`${BASE_URL}/logo.png`} alt="Marvol Enterprises" className="h-6 object-contain" />
                   </div>
                   <p className="text-emerald-200 text-xs font-semibold uppercase tracking-wider">Facility Services · MCO International Airport</p>
                 </div>
-                <img src={`${BASE_URL}/logo-mark.png`} alt="Marvol" className="w-14 h-14 object-contain" />
+                <img src={`${BASE_URL}/logo-mark.png`} alt="Marvol" className="w-12 h-12 object-contain" />
               </div>
-              <div className="text-right">
+              <div className="sm:text-right">
                 <p className="text-white font-bold text-lg">Issue Summary Report</p>
                 <p className="text-emerald-200 text-sm mt-0.5">{fromLabel} — {toLabel}</p>
                 <p className="text-emerald-300/70 text-xs mt-1">Generated {generatedAt}</p>
@@ -396,11 +396,11 @@ export default function InspectorReport() {
                       <h2 className="font-bold text-slate-900 text-base">{areaName}</h2>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 text-sm font-medium">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-medium">
                     <span className="text-emerald-600">{resolved} resolved</span>
-                    <span className="text-slate-300">·</span>
+                    <span className="text-slate-300 hidden sm:inline">·</span>
                     <span className="text-blue-600">{open} open</span>
-                    <span className="text-slate-300">·</span>
+                    <span className="text-slate-300 hidden sm:inline">·</span>
                     <span className="text-slate-600">{areaIssues.length} total</span>
                   </div>
                 </div>

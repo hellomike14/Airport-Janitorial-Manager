@@ -241,10 +241,10 @@ function AssignAreaButton({
     <button
       onClick={handleAssign}
       disabled={loading}
-      className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-colors disabled:opacity-50"
+      className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-colors disabled:opacity-50 max-w-[180px] sm:max-w-none"
     >
-      {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserCheck className="w-3.5 h-3.5" />}
-      <span>Assign → {staffNames.join(", ")}</span>
+      {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /> : <UserCheck className="w-3.5 h-3.5 shrink-0" />}
+      <span className="truncate">Assign → {staffNames.join(", ")}</span>
     </button>
   );
 }
@@ -514,7 +514,7 @@ export default function Issues() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-2">
+            <div className="flex flex-wrap justify-end gap-3 pt-2">
               <Button type="button" variant="ghost" onClick={() => { setIsReporting(false); setBeforePath(null); }} className="rounded-xl text-rose-700 hover:bg-rose-100">
                 Cancel
               </Button>

@@ -116,18 +116,20 @@ export default function Assignments() {
               <input value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} placeholder="e.g. Focus on deep cleaning carpets today" className="w-full bg-white border border-indigo-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
               <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-indigo-800 bg-white px-4 py-2 rounded-xl border border-indigo-200">
                 <input type="checkbox" checked={formData.isSpecial} onChange={e => setFormData({...formData, isSpecial: e.target.checked})} className="w-4 h-4 text-indigo-600 rounded" />
                 <Star className="w-4 h-4 text-amber-500" />
                 Mark as Special Inspector Request
               </label>
               
-              <div className="flex-1" />
-              <Button type="button" variant="ghost" onClick={() => setIsAdding(false)} className="rounded-xl text-indigo-700 hover:bg-indigo-100">Cancel</Button>
-              <Button type="submit" disabled={createMutation.isPending} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md shadow-indigo-600/20 px-6 font-bold">
-                {createMutation.isPending ? "Assigning..." : "Confirm Assignment"}
-              </Button>
+              <div className="sm:flex-1" />
+              <div className="flex gap-3 justify-end">
+                <Button type="button" variant="ghost" onClick={() => setIsAdding(false)} className="rounded-xl text-indigo-700 hover:bg-indigo-100">Cancel</Button>
+                <Button type="submit" disabled={createMutation.isPending} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md shadow-indigo-600/20 px-6 font-bold">
+                  {createMutation.isPending ? "Assigning..." : "Confirm Assignment"}
+                </Button>
+              </div>
             </div>
           </form>
         </div>
@@ -136,53 +138,82 @@ export default function Assignments() {
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
         {isLoading ? (
           <div className="p-8 text-center text-slate-500 animate-pulse">Loading assignments...</div>
+        ) : (!assignments || assignments.length === 0) ? (
+          <div className="px-6 py-12 text-center text-slate-500 font-medium">
+            No staff assigned for {format(new Date(selectedDate), "MMM do")}.
+          </div>
         ) : (
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider text-xs font-bold">
-              <tr>
-                <th className="px-6 py-4">Staff Member</th>
-                <th className="px-6 py-4">Assigned Area</th>
-                <th className="px-6 py-4">Notes</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {assignments?.map((assignment) => (
-                <tr key={assignment.id} className="hover:bg-slate-50/50 transition-colors group">
-                  <td className="px-6 py-4 font-bold text-slate-800">
-                    {assignment.staffName}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="font-medium text-slate-700">{assignment.areaName}</span>
-                  </td>
-                  <td className="px-6 py-4 text-slate-500 max-w-xs truncate">
-                    {assignment.isSpecial && <Star className="inline w-3 h-3 text-amber-500 mr-1" />}
-                    {assignment.notes || '-'}
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <button 
-                      onClick={() => {
-                        if(confirm("Remove this assignment? Tasks generated for it will remain but become unassigned.")) {
-                          deleteMutation.mutate({ id: assignment.id });
-                        }
-                      }}
-                      className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                      title="Remove Assignment"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </td>
-                </tr>
+          <>
+            {/* Mobile card list */}
+            <div className="sm:hidden divide-y divide-slate-100">
+              {assignments.map((assignment) => (
+                <div key={assignment.id} className="p-4 flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-slate-800 text-sm">{assignment.staffName}</p>
+                    <p className="text-sm text-slate-600 mt-0.5 font-medium">{assignment.areaName}</p>
+                    {(assignment.notes || assignment.isSpecial) && (
+                      <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
+                        {assignment.isSpecial && <Star className="w-3 h-3 text-amber-500 shrink-0" />}
+                        {assignment.notes || ''}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (confirm("Remove this assignment? Tasks generated for it will remain but become unassigned.")) {
+                        deleteMutation.mutate({ id: assignment.id });
+                      }
+                    }}
+                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 active:bg-rose-100 rounded-lg transition-colors touch-manipulation"
+                    title="Remove Assignment"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               ))}
-              {(!assignments || assignments.length === 0) && (
+            </div>
+
+            {/* Desktop table */}
+            <table className="hidden sm:table w-full text-left text-sm">
+              <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider text-xs font-bold">
                 <tr>
-                  <td colSpan={4} className="px-6 py-12 text-center text-slate-500 font-medium">
-                    No staff assigned for {format(new Date(selectedDate), "MMM do")}.
-                  </td>
+                  <th className="px-6 py-4">Staff Member</th>
+                  <th className="px-6 py-4">Assigned Area</th>
+                  <th className="px-6 py-4">Notes</th>
+                  <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {assignments.map((assignment) => (
+                  <tr key={assignment.id} className="hover:bg-slate-50/50 transition-colors group">
+                    <td className="px-6 py-4 font-bold text-slate-800">
+                      {assignment.staffName}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="font-medium text-slate-700">{assignment.areaName}</span>
+                    </td>
+                    <td className="px-6 py-4 text-slate-500 max-w-xs truncate">
+                      {assignment.isSpecial && <Star className="inline w-3 h-3 text-amber-500 mr-1" />}
+                      {assignment.notes || '-'}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <button
+                        onClick={() => {
+                          if (confirm("Remove this assignment? Tasks generated for it will remain but become unassigned.")) {
+                            deleteMutation.mutate({ id: assignment.id });
+                          }
+                        }}
+                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                        title="Remove Assignment"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
         )}
       </div>
     </div>
