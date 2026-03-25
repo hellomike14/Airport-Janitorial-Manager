@@ -5,7 +5,7 @@ import { z } from "zod/v4";
 export const staffTable = pgTable("staff", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
-  role: text("role", { enum: ["staff", "supervisor", "admin"] }).notNull().default("staff"),
+  role: text("role", { enum: ["staff", "supervisor", "admin", "inspector"] }).notNull().default("staff"),
   phone: text("phone"),
   email: text("email"),
   active: boolean("active").notNull().default(true),

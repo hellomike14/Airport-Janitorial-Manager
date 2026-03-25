@@ -16,6 +16,8 @@ import MyTasks from "./pages/MyTasks";
 import TaskManagement from "./pages/TaskManagement";
 import TaskTypes from "./pages/TaskTypes";
 import InspectorReport from "./pages/InspectorReport";
+import SpecialRequests from "./pages/SpecialRequests";
+import CompletedJobs from "./pages/CompletedJobs";
 import Login from "./pages/Login";
 
 const queryClient = new QueryClient({
@@ -63,6 +65,18 @@ function ProtectedRoutes() {
             <Route path="/issues" component={Issues} />
             <Route path="/report" component={InspectorReport} />
             <Route path="/staff"><Redirect to="/" /></Route>
+          </>
+        )}
+
+        {/* Inspector routes */}
+        {effectiveRole === "inspector" && (
+          <>
+            <Route path="/" component={Dashboard} />
+            <Route path="/special-requests" component={SpecialRequests} />
+            <Route path="/completed-jobs" component={CompletedJobs} />
+            <Route path="/report" component={InspectorReport} />
+            <Route path="/staff"><Redirect to="/" /></Route>
+            <Route path="/assignments"><Redirect to="/" /></Route>
           </>
         )}
 

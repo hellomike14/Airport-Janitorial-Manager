@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useListStaff } from "@workspace/api-client-react";
 import { useAuth, UserRole } from "@/contexts/AuthContext";
-import { Shield, Users, User, LogIn } from "lucide-react";
+import { Shield, Users, User, LogIn, ClipboardCheck } from "lucide-react";
 
 const ROLE_CONFIG = {
   admin: {
@@ -11,6 +11,14 @@ const ROLE_CONFIG = {
     bg: "bg-violet-50 border-violet-200",
     badge: "bg-violet-100 text-violet-700",
     description: "Full access — staff management, all areas, reports",
+  },
+  inspector: {
+    label: "Inspector",
+    icon: ClipboardCheck,
+    color: "from-blue-600 to-cyan-500",
+    bg: "bg-blue-50 border-blue-200",
+    badge: "bg-blue-100 text-blue-700",
+    description: "Add special requests and view completed job reports",
   },
   supervisor: {
     label: "Supervisor",
@@ -48,6 +56,7 @@ export default function Login() {
 
   const byRole = {
     admin: (staffList ?? []).filter((s) => s.role === "admin" && s.active),
+    inspector: (staffList ?? []).filter((s) => s.role === "inspector" && s.active),
     supervisor: (staffList ?? []).filter((s) => s.role === "supervisor" && s.active),
     staff: (staffList ?? []).filter((s) => s.role === "staff" && s.active),
   };
@@ -85,7 +94,7 @@ export default function Login() {
         <div className="text-emerald-300 text-sm">Loading staff...</div>
       ) : (
         <div className="w-full max-w-3xl space-y-5 relative z-10">
-          {(["admin", "supervisor", "staff"] as const).map((role) => {
+          {(["admin", "inspector", "supervisor", "staff"] as const).map((role) => {
             const cfg = ROLE_CONFIG[role];
             const Icon = cfg.icon;
             const members = byRole[role];

@@ -32,8 +32,9 @@ A comprehensive janitorial cleaning management web app for Marvol Facility at MC
 6. Terminal C - Levels 2, 4, 6
 7. Top Terminal - Levels 4-11
 
-**Team (13 total):**
+**Team (14 total):**
 - 1 Admin (System Administrator)
+- 1 Inspector (MCO Inspector)
 - 2 Supervisors (Maria Rodriguez, James Thompson)
 - 10 Cleaning Staff members
 
@@ -46,7 +47,8 @@ A comprehensive janitorial cleaning management web app for Marvol Facility at MC
 - Issues API extended: `GET /api/issues?from=YYYY-MM-DD&to=YYYY-MM-DD` date range filter
 
 **Role-Based Access Control:**
-- **Admin**: Full access — can switch view mode between Admin/Supervisor/Staff views
+- **Admin**: Full access — can switch view mode between Admin/Inspector/Supervisor/Staff views
+- **Inspector**: Dashboard, special requests (create special cleaning tasks for any area), completed jobs (view all completed tasks across areas), inspector report
 - **Supervisor**: Dashboard, areas, assignments, issue tracker (no staff management)
 - **Staff**: My Tasks page + My Issues (assigned issues with completion flow)
 
@@ -62,6 +64,8 @@ A comprehensive janitorial cleaning management web app for Marvol Facility at MC
 - Issue Tracker - Report, assign, and resolve facility issues; supervisor assigns to staff
 - My Tasks - Staff-only page showing today's assigned area tasks with completion
 - My Issues - Staff-only page showing issues assigned to them with completion flow (notes + photos)
+- Special Requests - Inspector page to create special cleaning tasks for any area
+- Completed Jobs - Inspector page showing all completed tasks grouped by area with progress stats
 
 **API Routes:**
 - `GET /api/dashboard` - Dashboard stats
@@ -71,6 +75,7 @@ A comprehensive janitorial cleaning management web app for Marvol Facility at MC
 - `GET /api/tasks` - Task list (filterable by area + date)
 - `POST /api/tasks/:id/complete` - Mark task complete
 - `POST /api/tasks/:id/uncomplete` - Mark task incomplete
+- `POST /api/tasks/special` - Create a special task for an area (inspector use)
 - `POST /api/tasks/complete-all` - Complete all tasks for an area
 - `GET/POST /api/assignments` - Assignments management
 - `DELETE /api/assignments/:id` - Remove assignment

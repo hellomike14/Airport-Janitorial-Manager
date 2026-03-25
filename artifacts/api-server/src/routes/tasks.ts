@@ -173,6 +173,50 @@ router.get("/", async (req, res) => {
   );
 });
 
+router.post("/special", async (req, res) => {
+  const { areaId, date, notes, createdById } = req.body;
+  if (!areaId || !date || !notes || typeof areaId !== "number" || typeof notes !== "string" || notes.trim().length === 0) {
+    return res.status(400).json({ error: "areaId (number), date (string), and notes (non-empty string) are required" });
+  }
+
+  const [area] = await db.select({ id: areasTable.id }).from(areasTable).where(eq(areasTable.id, areaId));
+  if (!area) {
+    return res.status(400).json({ error: "Invalid areaId" });
+  }
+
+  if (createdById) {
+    const [staff] = await db.select({ id: staffTable.id }).from(staffTable).where(eq(staffTable.id, createdById));
+    if (!staff) {
+      return res.status(400).json({ error: "Invalid createdById" });
+    }
+  }
+
+  const maxOrder = await db
+    .select({ maxO: sql<number>`coalesce(max(${tasksTable.taskOrder}), 0)::int` })
+    .from(tasksTable)
+    .where(and(eq(tasksTable.areaId, areaId), eq(tasksTable.taskDate, date)));
+
+  const [created] = await db
+    .insert(tasksTable)
+    .values({
+      areaId,
+      taskDate: date,
+      taskName: notes.trim(),
+      taskOrder: (maxOrder[0]?.maxO ?? 0) + 1,
+      completed: false,
+      isSpecial: true,
+      notes: notes.trim(),
+    })
+    .returning();
+
+  res.status(201).json({
+    ...created,
+    completedAt: null,
+    completedByName: null,
+    assignedToName: null,
+  });
+});
+
 router.post("/complete-all", async (req, res) => {
   const body = CompleteAllTasksBody.parse(req.body);
   await ensureTasksForDate(body.areaId, body.date);

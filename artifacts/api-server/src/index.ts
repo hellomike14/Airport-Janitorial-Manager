@@ -57,6 +57,18 @@ async function seed() {
     console.log("Seeded: admin user");
   }
 
+  const inspectors = await db.select().from(staffTable).where(eq(staffTable.role, "inspector"));
+  if (inspectors.length === 0) {
+    await db.insert(staffTable).values({
+      name: "MCO Inspector",
+      role: "inspector",
+      phone: "407-555-0099",
+      email: "inspector@mco.airport",
+      active: true,
+    });
+    console.log("Seeded: inspector user");
+  }
+
   // Seed areas if missing
   const [{ value: areaCount }] = await db.select({ value: count() }).from(areasTable);
   if (areaCount === 0) {

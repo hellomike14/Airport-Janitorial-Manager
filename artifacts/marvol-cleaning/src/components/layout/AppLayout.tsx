@@ -19,6 +19,8 @@ import {
   AlertOctagon,
   Layers,
   FileText,
+  ClipboardCheck,
+  Star,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -58,6 +60,7 @@ const NavItem = ({ href, icon: Icon, label, isActive, onClick }: NavItemProps) =
 
 const VIEW_MODES: { value: ViewMode; label: string; icon: React.ElementType; color: string }[] = [
   { value: "admin", label: "Admin", icon: Shield, color: "text-violet-400" },
+  { value: "inspector", label: "Inspector", icon: ClipboardCheck, color: "text-blue-400" },
   { value: "supervisor", label: "Supervisor", icon: Users, color: "text-emerald-400" },
   { value: "staff", label: "Staff", icon: User, color: "text-emerald-400" },
 ];
@@ -81,6 +84,12 @@ const NAV_BY_ROLE: Record<ViewMode, { href: string; icon: React.ElementType; lab
     { href: "/issues", icon: AlertTriangle, label: "Issue Tracker" },
     { href: "/report", icon: FileText, label: "Inspector Report" },
   ],
+  inspector: [
+    { href: "/", icon: LayoutDashboard, label: "Dashboard" },
+    { href: "/special-requests", icon: Star, label: "Special Requests" },
+    { href: "/completed-jobs", icon: CheckCircle2, label: "Completed Jobs" },
+    { href: "/report", icon: FileText, label: "Inspector Report" },
+  ],
   staff: [
     { href: "/my-tasks", icon: CheckSquare, label: "My Tasks" },
     { href: "/issues", icon: AlertTriangle, label: "My Issues" },
@@ -89,6 +98,7 @@ const NAV_BY_ROLE: Record<ViewMode, { href: string; icon: React.ElementType; lab
 
 const ROLE_BADGE: Record<ViewMode, { label: string; cls: string }> = {
   admin: { label: "Admin", cls: "bg-violet-500/20 text-violet-300 border border-violet-500/30" },
+  inspector: { label: "Inspector", cls: "bg-blue-500/20 text-blue-300 border border-blue-500/30" },
   supervisor: { label: "Supervisor", cls: "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" },
   staff: { label: "Staff", cls: "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" },
 };

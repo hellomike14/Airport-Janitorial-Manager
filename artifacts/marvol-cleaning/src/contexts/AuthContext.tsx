@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 
-export type UserRole = "admin" | "supervisor" | "staff";
-export type ViewMode = "admin" | "supervisor" | "staff";
+export type UserRole = "admin" | "supervisor" | "staff" | "inspector";
+export type ViewMode = "admin" | "supervisor" | "staff" | "inspector";
 
 export interface CurrentUser {
   id: number;
