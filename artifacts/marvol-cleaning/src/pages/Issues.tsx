@@ -339,6 +339,7 @@ export default function Issues() {
   const queryClient = useQueryClient();
   const [isReporting, setIsReporting] = useState(false);
   const [filterResolved, setFilterResolved] = useState<boolean | null>(false);
+  const [filterTerminal, setFilterTerminal] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
   const isStaff = viewMode === "staff";
@@ -386,9 +387,14 @@ export default function Issues() {
     },
   });
 
+  const areaTerminalMap = new Map<number, string>();
+  areas?.forEach((a: any) => { if (a.id && a.terminal) areaTerminalMap.set(a.id, a.terminal); });
+  const terminals = [...new Set(areas?.map((a: any) => a.terminal).filter(Boolean) ?? [])];
+
   const filteredIssues = issues?.filter((i) => {
-    if (filterResolved === null) return true;
-    return i.resolved === filterResolved;
+    if (filterResolved !== null && i.resolved !== filterResolved) return false;
+    if (filterTerminal && areaTerminalMap.get(i.areaId) !== filterTerminal) return false;
+    return true;
   });
 
   const toggleExpand = (id: number) => setExpandedId(expandedId === id ? null : id);
@@ -452,6 +458,34 @@ export default function Issues() {
           </Button>
         </div>
       </div>
+
+      {!isStaff && terminals.length > 0 && (
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={() => setFilterTerminal(null)}
+            className={`px-4 py-1.5 rounded-xl text-sm font-semibold transition-colors ${
+              filterTerminal === null
+                ? "bg-emerald-700 text-white shadow-sm"
+                : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+            }`}
+          >
+            All Terminals
+          </button>
+          {terminals.map((t) => (
+            <button
+              key={t}
+              onClick={() => setFilterTerminal(t)}
+              className={`px-4 py-1.5 rounded-xl text-sm font-semibold transition-colors ${
+                filterTerminal === t
+                  ? "bg-emerald-700 text-white shadow-sm"
+                  : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Report Form */}
       {isReporting && (
