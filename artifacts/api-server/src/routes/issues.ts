@@ -369,4 +369,96 @@ router.post("/:id/resolve", async (req: Request, res: Response) => {
   res.json(issue);
 });
 
+const SendToSupervisorBody = z.object({
+  issueId: z.number(),
+  senderId: z.number(),
+  message: z.string().optional(),
+});
+
+router.post("/send-to-supervisor", async (req: Request, res: Response) => {
+  const body = SendToSupervisorBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: "Invalid request" });
+    return;
+  }
+
+  const issue = await fetchFullIssue(body.data.issueId);
+  if (!issue) {
+    res.status(404).json({ error: "Issue not found" });
+    return;
+  }
+
+  const sender = await db.select().from(staffTable).where(eq(staffTable.id, body.data.senderId)).then(r => r[0]);
+  const senderName = sender?.name ?? "Inspector";
+
+  const supervisors = await db
+    .select()
+    .from(staffTable)
+    .where(eq(staffTable.active, true));
+  const targets = supervisors.filter(s => s.role === "supervisor" || s.role === "admin");
+
+  const photoNote = issue.beforeImagePath ? " (includes before photo)" : "";
+  const customMsg = body.data.message ? ` — "${body.data.message}"` : "";
+  const msg = `${senderName} flagged issue in ${issue.areaName}: "${issue.description}"${customMsg}${photoNote}`;
+
+  const notifs = targets.map(s => ({
+    staffId: s.id,
+    issueId: issue.id,
+    type: "inspector_to_supervisor" as const,
+    message: msg,
+  }));
+
+  if (notifs.length > 0) {
+    await db.insert(notificationsTable).values(notifs);
+  }
+
+  res.json({ sent: notifs.length });
+});
+
+const SendToInspectorBody = z.object({
+  issueId: z.number(),
+  senderId: z.number(),
+  message: z.string().optional(),
+});
+
+router.post("/send-to-inspector", async (req: Request, res: Response) => {
+  const body = SendToInspectorBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: "Invalid request" });
+    return;
+  }
+
+  const issue = await fetchFullIssue(body.data.issueId);
+  if (!issue) {
+    res.status(404).json({ error: "Issue not found" });
+    return;
+  }
+
+  const sender = await db.select().from(staffTable).where(eq(staffTable.id, body.data.senderId)).then(r => r[0]);
+  const senderName = sender?.name ?? "Supervisor";
+
+  const inspectors = await db
+    .select()
+    .from(staffTable)
+    .where(and(eq(staffTable.role, "inspector"), eq(staffTable.active, true)));
+
+  const photoNote = issue.afterImagePath ? " (includes after photo)" : "";
+  const customMsg = body.data.message ? ` — "${body.data.message}"` : "";
+  const status = issue.resolved ? "Resolved" : "Completed";
+  const msg = `${senderName} updated issue in ${issue.areaName}: "${issue.description}" — ${status}${customMsg}${photoNote}`;
+
+  const notifs = inspectors.map(s => ({
+    staffId: s.id,
+    issueId: issue.id,
+    type: "supervisor_to_inspector" as const,
+    message: msg,
+  }));
+
+  if (notifs.length > 0) {
+    await db.insert(notificationsTable).values(notifs);
+  }
+
+  res.json({ sent: notifs.length });
+});
+
 export default router;

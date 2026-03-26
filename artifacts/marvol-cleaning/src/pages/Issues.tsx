@@ -29,6 +29,7 @@ import {
   ChevronDown,
   ChevronUp,
   MessageSquare,
+  Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -331,6 +332,59 @@ function StaffCompletionPanel({ issue }: { issue: any }) {
         </div>
       )}
     </div>
+  );
+}
+
+function SendNotificationButton({
+  issueId,
+  senderId,
+  endpoint,
+  label,
+  sentLabel,
+}: {
+  issueId: number;
+  senderId: number;
+  endpoint: "send-to-supervisor" | "send-to-inspector";
+  label: string;
+  sentLabel: string;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  const handleSend = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${BASE_URL}/api/issues/${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ issueId, senderId }),
+      });
+      if (res.ok) setSent(true);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (sent) {
+    return (
+      <span className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 font-semibold">
+        <CheckCircle2 className="w-3.5 h-3.5" />
+        {sentLabel}
+      </span>
+    );
+  }
+
+  return (
+    <button
+      onClick={handleSend}
+      disabled={loading}
+      className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-blue-200 bg-white text-blue-600 hover:bg-blue-50 hover:border-blue-300 transition-colors disabled:opacity-50 font-semibold"
+    >
+      {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+      {label}
+    </button>
   );
 }
 
@@ -668,6 +722,26 @@ export default function Issues() {
                         todayAssignments={todayAssignments}
                         assignedById={userId}
                         onAssigned={() => queryClient.invalidateQueries({ queryKey: ["/api/issues"] })}
+                      />
+                    )}
+
+                    {isInspector && !issue.resolved && (
+                      <SendNotificationButton
+                        issueId={issue.id}
+                        senderId={userId}
+                        endpoint="send-to-supervisor"
+                        label="Send to Supervisor"
+                        sentLabel="Sent"
+                      />
+                    )}
+
+                    {!isStaff && !isInspector && issue.resolved && (
+                      <SendNotificationButton
+                        issueId={issue.id}
+                        senderId={userId}
+                        endpoint="send-to-inspector"
+                        label="Notify Inspector"
+                        sentLabel="Sent"
                       />
                     )}
 

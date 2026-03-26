@@ -139,6 +139,8 @@ function NotificationBell({ staffId }: { staffId: number }) {
   const typeIcon = (type: string) => {
     if (type === "issue_assigned") return <User className="w-3.5 h-3.5 text-blue-500 shrink-0" />;
     if (type === "issue_completed") return <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />;
+    if (type === "inspector_to_supervisor") return <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />;
+    if (type === "supervisor_to_inspector") return <CheckCircle2 className="w-3.5 h-3.5 text-blue-500 shrink-0" />;
     return <AlertOctagon className="w-3.5 h-3.5 text-rose-500 shrink-0" />;
   };
 
