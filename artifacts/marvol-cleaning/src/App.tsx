@@ -16,7 +16,6 @@ import MyTasks from "./pages/MyTasks";
 import TaskManagement from "./pages/TaskManagement";
 import TaskTypes from "./pages/TaskTypes";
 import InspectorReport from "./pages/InspectorReport";
-import SpecialRequests from "./pages/SpecialRequests";
 import CompletedJobs from "./pages/CompletedJobs";
 import Login from "./pages/Login";
 
@@ -71,12 +70,11 @@ function ProtectedRoutes() {
         {/* Inspector routes */}
         {effectiveRole === "inspector" && (
           <>
-            <Route path="/" component={Dashboard} />
-            <Route path="/special-requests" component={SpecialRequests} />
+            <Route path="/issues" component={Issues} />
             <Route path="/completed-jobs" component={CompletedJobs} />
-            <Route path="/report" component={InspectorReport} />
-            <Route path="/staff"><Redirect to="/" /></Route>
-            <Route path="/assignments"><Redirect to="/" /></Route>
+            <Route path="/"><Redirect to="/issues" /></Route>
+            <Route path="/staff"><Redirect to="/issues" /></Route>
+            <Route path="/assignments"><Redirect to="/issues" /></Route>
           </>
         )}
 

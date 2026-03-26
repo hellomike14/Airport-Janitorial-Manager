@@ -20,7 +20,6 @@ import {
   Layers,
   FileText,
   ClipboardCheck,
-  Star,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -85,10 +84,8 @@ const NAV_BY_ROLE: Record<ViewMode, { href: string; icon: React.ElementType; lab
     { href: "/report", icon: FileText, label: "Inspector Report" },
   ],
   inspector: [
-    { href: "/", icon: LayoutDashboard, label: "Dashboard" },
-    { href: "/special-requests", icon: Star, label: "Special Requests" },
-    { href: "/completed-jobs", icon: CheckCircle2, label: "Completed Jobs" },
-    { href: "/report", icon: FileText, label: "Inspector Report" },
+    { href: "/issues", icon: AlertTriangle, label: "Open Issues" },
+    { href: "/completed-jobs", icon: CheckCircle2, label: "Completed Tasks" },
   ],
   staff: [
     { href: "/my-tasks", icon: CheckSquare, label: "My Tasks" },

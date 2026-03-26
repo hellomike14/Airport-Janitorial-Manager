@@ -18,7 +18,7 @@ const ROLE_CONFIG = {
     color: "from-blue-600 to-cyan-500",
     bg: "bg-blue-50 border-blue-200",
     badge: "bg-blue-100 text-blue-700",
-    description: "Add special requests and view completed job reports",
+    description: "Enter information on open issues and view completed tasks",
   },
   supervisor: {
     label: "Supervisor",

@@ -342,6 +342,7 @@ export default function Issues() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
   const isStaff = viewMode === "staff";
+  const isInspector = viewMode === "inspector";
 
   const today = format(new Date(), "yyyy-MM-dd");
   const { data: todayAssignments = [] } = useListAssignments({ date: today });
@@ -410,11 +411,13 @@ export default function Issues() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h1 className="text-3xl font-display font-bold text-slate-900">
-            {isStaff ? "My Area Issues" : "Issue Tracker"}
+            {isStaff ? "My Area Issues" : isInspector ? "Open Issues" : "Issue Tracker"}
           </h1>
           <p className="text-slate-500 mt-1 font-medium">
             {isStaff
               ? "Open issues in your assigned area — complete them with notes and an after photo."
+              : isInspector
+              ? "Report issues and add information to open items across all areas."
               : "Report and monitor maintenance or cleaning issues across all areas."}
           </p>
         </div>
@@ -625,7 +628,7 @@ export default function Issues() {
 
                   <div className="flex items-center gap-2 flex-wrap justify-end">
                     {/* Assign to area staff — supervisors/admin only */}
-                    {!isStaff && !issue.resolved && (
+                    {!isStaff && !isInspector && !issue.resolved && (
                       <AssignAreaButton
                         issue={issue}
                         todayAssignments={todayAssignments}
@@ -642,7 +645,7 @@ export default function Issues() {
                       Photos
                     </button>
 
-                    {!isStaff && !issue.resolved && (
+                    {!isStaff && !isInspector && !issue.resolved && (
                       <Button
                         onClick={() => {
                           if (confirm("Mark this issue as resolved?")) {

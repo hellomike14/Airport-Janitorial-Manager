@@ -48,7 +48,7 @@ A comprehensive janitorial cleaning management web app for Marvol Facility at MC
 
 **Role-Based Access Control:**
 - **Admin**: Full access — can switch view mode between Admin/Inspector/Supervisor/Staff views
-- **Inspector**: Dashboard, special requests (create special cleaning tasks for any area), completed jobs (view all completed tasks across areas), inspector report
+- **Inspector**: Open Issues (report and add information to issues, no assign/resolve), Completed Tasks (view all completed tasks across areas)
 - **Supervisor**: Dashboard, areas, assignments, issue tracker (no staff management)
 - **Staff**: My Tasks page + My Issues (assigned issues with completion flow)
 
@@ -64,8 +64,8 @@ A comprehensive janitorial cleaning management web app for Marvol Facility at MC
 - Issue Tracker - Report, assign, and resolve facility issues; supervisor assigns to staff
 - My Tasks - Staff-only page showing today's assigned area tasks with completion
 - My Issues - Staff-only page showing issues assigned to them with completion flow (notes + photos)
-- Special Requests - Inspector page to create special cleaning tasks for any area
-- Completed Jobs - Inspector page showing all completed tasks grouped by area with progress stats
+- Open Issues - Inspector page to report issues and add information (no assign/resolve)
+- Completed Tasks - Inspector page showing all completed tasks grouped by area with progress stats
 
 **API Routes:**
 - `GET /api/dashboard` - Dashboard stats
