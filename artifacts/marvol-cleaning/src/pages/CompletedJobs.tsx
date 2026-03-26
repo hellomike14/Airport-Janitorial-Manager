@@ -13,8 +13,10 @@ import {
   BarChart3,
   User,
   Star,
+  Camera,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { TaskPhotoThumbnails, TaskPhotoToggle } from "@/components/TaskPhotos";
 
 export default function CompletedJobs() {
   const today = format(new Date(), "yyyy-MM-dd");
@@ -214,37 +216,51 @@ export default function CompletedJobs() {
                   {areaTasks.map((task) => (
                     <div
                       key={task.id}
-                      className="flex items-start gap-4 px-5 py-3"
+                      className="px-5 py-3"
                     >
-                      <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-slate-600 line-through">
-                          {task.taskName}
-                        </p>
-                        {task.isSpecial && (
-                          <span className="inline-flex items-center gap-1 mt-0.5 text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                            <Star className="w-2.5 h-2.5" /> Special Request
-                          </span>
-                        )}
-                        {task.notes && (
-                          <p className="text-xs text-slate-400 italic mt-0.5">
-                            "{task.notes}"
+                      <div className="flex items-start gap-4">
+                        <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-slate-600 line-through">
+                            {task.taskName}
                           </p>
-                        )}
-                      </div>
-                      <div className="shrink-0 text-right">
-                        {task.completedAt && (
-                          <p className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            {format(new Date(task.completedAt), "h:mm a")}
-                          </p>
-                        )}
-                        {task.completedByName && (
-                          <p className="text-[10px] text-slate-400 flex items-center gap-1 justify-end mt-0.5">
-                            <User className="w-2.5 h-2.5" />
-                            {task.completedByName}
-                          </p>
-                        )}
+                          {task.isSpecial && (
+                            <span className="inline-flex items-center gap-1 mt-0.5 text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                              <Star className="w-2.5 h-2.5" /> Special Request
+                            </span>
+                          )}
+                          {task.notes && (
+                            <p className="text-xs text-slate-400 italic mt-0.5">
+                              "{task.notes}"
+                            </p>
+                          )}
+                          <TaskPhotoThumbnails
+                            beforeImagePath={(task as any).beforeImagePath ?? null}
+                            afterImagePath={(task as any).afterImagePath ?? null}
+                          />
+                        </div>
+                        <div className="shrink-0 flex flex-col items-end gap-2">
+                          <div className="text-right">
+                            {task.completedAt && (
+                              <p className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                {format(new Date(task.completedAt), "h:mm a")}
+                              </p>
+                            )}
+                            {task.completedByName && (
+                              <p className="text-[10px] text-slate-400 flex items-center gap-1 justify-end mt-0.5">
+                                <User className="w-2.5 h-2.5" />
+                                {task.completedByName}
+                              </p>
+                            )}
+                          </div>
+                          <TaskPhotoToggle
+                            taskId={task.id}
+                            beforeImagePath={(task as any).beforeImagePath ?? null}
+                            afterImagePath={(task as any).afterImagePath ?? null}
+                            compact
+                          />
+                        </div>
                       </div>
                     </div>
                   ))}

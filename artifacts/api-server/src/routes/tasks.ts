@@ -152,6 +152,8 @@ router.get("/", async (req, res) => {
       assignedToId: tasksTable.assignedToId,
       isSpecial: tasksTable.isSpecial,
       notes: tasksTable.notes,
+      beforeImagePath: tasksTable.beforeImagePath,
+      afterImagePath: tasksTable.afterImagePath,
     })
     .from(tasksTable)
     .leftJoin(staffTable, eq(tasksTable.completedById, staffTable.id))
@@ -299,6 +301,37 @@ router.post("/:id/uncomplete", async (req, res) => {
     completedAt: null,
     completedByName: null,
     assignedToName: null,
+  });
+});
+
+router.patch("/:id/images", async (req, res) => {
+  const id = Number(req.params.id);
+  if (isNaN(id)) {
+    return res.status(400).json({ error: "Invalid task id" });
+  }
+
+  const { beforeImagePath, afterImagePath } = req.body;
+  const updates: Record<string, string | null> = {};
+  if (beforeImagePath !== undefined) updates.beforeImagePath = beforeImagePath;
+  if (afterImagePath !== undefined) updates.afterImagePath = afterImagePath;
+
+  if (Object.keys(updates).length === 0) {
+    return res.status(400).json({ error: "No image fields provided" });
+  }
+
+  const [updated] = await db
+    .update(tasksTable)
+    .set(updates)
+    .where(eq(tasksTable.id, id))
+    .returning();
+
+  if (!updated) {
+    return res.status(404).json({ error: "Task not found" });
+  }
+
+  res.json({
+    ...updated,
+    completedAt: updated.completedAt?.toISOString() ?? null,
   });
 });
 

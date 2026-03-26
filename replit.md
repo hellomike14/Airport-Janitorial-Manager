@@ -76,6 +76,7 @@ A comprehensive janitorial cleaning management web app for Marvol Facility at MC
 - `POST /api/tasks/:id/complete` - Mark task complete
 - `POST /api/tasks/:id/uncomplete` - Mark task incomplete
 - `POST /api/tasks/special` - Create a special task for an area (inspector use)
+- `PATCH /api/tasks/:id/images` - Update before/after photos on a task
 - `POST /api/tasks/complete-all` - Complete all tasks for an area
 - `GET/POST /api/assignments` - Assignments management
 - `DELETE /api/assignments/:id` - Remove assignment
@@ -120,7 +121,7 @@ artifacts-monorepo/
 - `staff` - Staff members (name, role, phone, email, active)
 - `areas` - Cleaning areas (name, terminal, location, sort_order)
 - `task_types` - Task type templates (name, order, active); auto-seeded with 14 standard tasks on first GET
-- `tasks` - Daily tasks per area (auto-generated from active task_types on first area access per day)
+- `tasks` - Daily tasks per area (auto-generated from active task_types on first area access per day; includes before/after image paths)
 - `assignments` - Staff assignments to areas by date
 - `issues` - Issue reports (area, severity, assigned_to_id, completion_notes, before/after image paths)
 - `notifications` - In-app notifications (staffId, issueId, type, message, isRead)

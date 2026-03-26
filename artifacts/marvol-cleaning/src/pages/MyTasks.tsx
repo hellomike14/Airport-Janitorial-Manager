@@ -19,7 +19,9 @@ import {
   User,
   ClipboardList,
   ChevronRight,
+  Camera,
 } from "lucide-react";
+import { TaskPhotoToggle } from "@/components/TaskPhotos";
 
 const TERMINAL_STYLES: Record<string, { bg: string; text: string; dot: string; bar: string; border: string }> = {
   "Terminal A": { bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500", bar: "bg-blue-500", border: "border-blue-200" },
@@ -242,48 +244,56 @@ export default function MyTasks() {
             {/* Task checklist */}
             <div className="divide-y divide-slate-50">
               {tasks.map((task, idx) => (
-                <button
-                  key={task.id}
-                  onClick={() => toggleTask(task)}
-                  className={`w-full flex items-start gap-4 px-5 py-4 text-left transition-colors active:bg-slate-50 ${
-                    task.completed ? "bg-slate-50/50" : "hover:bg-slate-50/60"
-                  }`}
-                >
-                  {/* Checkbox */}
-                  <div className={`mt-0.5 shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-colors ${
-                    task.completed
-                      ? "text-emerald-500"
-                      : "text-slate-300 hover:text-blue-400"
-                  }`}>
-                    {task.completed
-                      ? <CheckCircle2 className="w-6 h-6" />
-                      : <Circle className="w-6 h-6" />
-                    }
-                  </div>
-
-                  {/* Task content */}
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium leading-snug ${
-                      task.completed ? "line-through text-slate-400" : "text-slate-800"
+                <div key={task.id}>
+                  <button
+                    onClick={() => toggleTask(task)}
+                    className={`w-full flex items-start gap-4 px-5 py-4 text-left transition-colors active:bg-slate-50 ${
+                      task.completed ? "bg-slate-50/50" : "hover:bg-slate-50/60"
+                    }`}
+                  >
+                    <div className={`mt-0.5 shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-colors ${
+                      task.completed
+                        ? "text-emerald-500"
+                        : "text-slate-300 hover:text-blue-400"
                     }`}>
-                      {task.taskName}
-                    </p>
-                    {task.completed && task.completedAt && (
-                      <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        Done at {format(new Date(task.completedAt), "h:mm a")}
-                        {task.completedByName && ` · ${task.completedByName}`}
-                      </p>
-                    )}
-                  </div>
+                      {task.completed
+                        ? <CheckCircle2 className="w-6 h-6" />
+                        : <Circle className="w-6 h-6" />
+                      }
+                    </div>
 
-                  {/* Task number */}
-                  <span className={`text-xs font-bold shrink-0 tabular-nums pt-0.5 ${
-                    task.completed ? "text-slate-300" : "text-slate-400"
-                  }`}>
-                    #{task.taskOrder}
-                  </span>
-                </button>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-medium leading-snug ${
+                        task.completed ? "line-through text-slate-400" : "text-slate-800"
+                      }`}>
+                        {task.taskName}
+                      </p>
+                      {task.completed && task.completedAt && (
+                        <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          Done at {format(new Date(task.completedAt), "h:mm a")}
+                          {task.completedByName && ` · ${task.completedByName}`}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="shrink-0 flex flex-col items-end gap-1">
+                      <span className={`text-xs font-bold tabular-nums pt-0.5 ${
+                        task.completed ? "text-slate-300" : "text-slate-400"
+                      }`}>
+                        #{task.taskOrder}
+                      </span>
+                    </div>
+                  </button>
+                  <div className="px-5 pb-2 -mt-1">
+                    <TaskPhotoToggle
+                      taskId={task.id}
+                      beforeImagePath={(task as any).beforeImagePath ?? null}
+                      afterImagePath={(task as any).afterImagePath ?? null}
+                      compact
+                    />
+                  </div>
+                </div>
               ))}
             </div>
           </div>
@@ -306,32 +316,41 @@ export default function MyTasks() {
           </div>
           <div className="divide-y divide-slate-50">
             {myExtraTasks.map((task) => (
-              <button
-                key={task.id}
-                onClick={() => toggleTask(task)}
-                className={`w-full flex items-start gap-4 px-5 py-4 text-left transition-colors ${
-                  task.completed ? "bg-slate-50/50" : "hover:bg-amber-50/30"
-                }`}
-              >
-                <div className={`mt-0.5 shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-colors ${
-                  task.completed ? "text-emerald-500" : "text-amber-400"
-                }`}>
-                  {task.completed ? <CheckCircle2 className="w-6 h-6" /> : <Circle className="w-6 h-6" />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-medium leading-snug ${task.completed ? "line-through text-slate-400" : "text-slate-800"}`}>
-                    {task.taskName}
-                  </p>
-                  {task.notes && (
-                    <p className="text-xs text-slate-500 mt-0.5">{task.notes}</p>
-                  )}
-                  {task.completed && task.completedAt && (
-                    <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
-                      <Clock className="w-3 h-3" /> Done at {format(new Date(task.completedAt), "h:mm a")}
+              <div key={task.id}>
+                <button
+                  onClick={() => toggleTask(task)}
+                  className={`w-full flex items-start gap-4 px-5 py-4 text-left transition-colors ${
+                    task.completed ? "bg-slate-50/50" : "hover:bg-amber-50/30"
+                  }`}
+                >
+                  <div className={`mt-0.5 shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-colors ${
+                    task.completed ? "text-emerald-500" : "text-amber-400"
+                  }`}>
+                    {task.completed ? <CheckCircle2 className="w-6 h-6" /> : <Circle className="w-6 h-6" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-medium leading-snug ${task.completed ? "line-through text-slate-400" : "text-slate-800"}`}>
+                      {task.taskName}
                     </p>
-                  )}
+                    {task.notes && (
+                      <p className="text-xs text-slate-500 mt-0.5">{task.notes}</p>
+                    )}
+                    {task.completed && task.completedAt && (
+                      <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
+                        <Clock className="w-3 h-3" /> Done at {format(new Date(task.completedAt), "h:mm a")}
+                      </p>
+                    )}
+                  </div>
+                </button>
+                <div className="px-5 pb-2 -mt-1">
+                  <TaskPhotoToggle
+                    taskId={task.id}
+                    beforeImagePath={(task as any).beforeImagePath ?? null}
+                    afterImagePath={(task as any).afterImagePath ?? null}
+                    compact
+                  />
                 </div>
-              </button>
+              </div>
             ))}
           </div>
         </div>

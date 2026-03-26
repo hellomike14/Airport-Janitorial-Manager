@@ -9,10 +9,11 @@ import {
   useListAreas
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Check, Clock, User, AlertCircle, ArrowLeft } from "lucide-react";
+import { Check, Clock, User, AlertCircle, ArrowLeft, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { TaskPhotoToggle } from "@/components/TaskPhotos";
 
 export default function AreaTasks() {
   const [, params] = useRoute("/areas/:areaId");
@@ -158,7 +159,7 @@ export default function AreaTasks() {
                 )}
               </div>
 
-              <div className="shrink-0 text-right">
+              <div className="shrink-0 text-right flex flex-col items-end gap-2">
                 {task.completed ? (
                   <div className="flex flex-col items-end">
                     <span className="text-xs font-bold text-emerald-600 flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-md">
@@ -171,6 +172,12 @@ export default function AreaTasks() {
                 ) : (
                   <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Pending</span>
                 )}
+                <TaskPhotoToggle
+                  taskId={task.id}
+                  beforeImagePath={(task as any).beforeImagePath ?? null}
+                  afterImagePath={(task as any).afterImagePath ?? null}
+                  compact
+                />
               </div>
             </li>
           ))}
