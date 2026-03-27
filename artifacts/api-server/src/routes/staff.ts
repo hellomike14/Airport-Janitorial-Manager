@@ -109,7 +109,7 @@ router.post("/set-password", async (req, res) => {
 router.post("/", async (req, res) => {
   const body = CreateStaffMemberBody.parse(req.body);
   let password: string | null = null;
-  if (body.role === "inspector" && body.email) {
+  if ((body.role === "inspector" || body.role === "supervisor") && body.email) {
     password = await hashPassword(body.email);
   }
   const [created] = await db
