@@ -44,7 +44,7 @@ const SEED_TASK_TYPES = [
 ];
 
 const SEED_STAFF: { name: string; role: "admin" | "inspector" | "supervisor" | "staff"; phone?: string; email?: string; password?: string }[] = [
-  { name: "System Administrator", role: "admin", phone: "407-555-0001", email: "admin@marvolfacility.com", password: "$2b$10$hTe4/CeWiDj8SQAgvvkkNuSbxGjs.0eIvRgXsYiPNZTFa9mNaRv8y" },
+  { name: "Marcell Sutherland", role: "admin", phone: "407-555-0001", email: "msutherland@marvolenterprises.com", password: "$2b$10$BOd6Ky/dYvLZoHuQqmJ5S.McC.dZsWACX.hXDAWYtSU9rcRd/EFJO" },
   { name: "MCO Inspector", role: "inspector", phone: "407-555-0099", email: "raquel.santana@goaa.org", password: "$2b$10$MGwP2M8DkjmpZ5lcv9ycZutXOjLsUlki9JKSXTkIEMZco7WojVUVm" },
   { name: "Priscila Rosero", role: "supervisor", email: "Priscilarosero27@gmail.com", password: "$2b$10$0fG/ZSs6RG3I5eBS1koCqur7vR2NEIcVRd/lT0k3MgAE.FmJpPnIy" },
   { name: "Reynaldo Hernandez Suarez", role: "supervisor", email: "Cnuevo986@gmail.co", password: "$2b$10$v.9YDrn2LhvD/r2HO5Q4M.jzao46QZZugZMLImfOpLrVym7k3tH8a" },
@@ -81,7 +81,14 @@ async function seed() {
   }
 
   for (const existing of existingStaff) {
-    const seedEntry = SEED_STAFF.find((s) => s.name === existing.name);
+    let seedEntry = SEED_STAFF.find((s) => s.name === existing.name);
+    if (!seedEntry && (existing.role === "admin" || existing.role === "inspector")) {
+      seedEntry = SEED_STAFF.find((s) => s.role === existing.role);
+    }
+    if (seedEntry && seedEntry.name !== existing.name) {
+      await db.update(staffTable).set({ name: seedEntry.name }).where(eq(staffTable.id, existing.id));
+      console.log(`Renamed ${existing.name} → ${seedEntry.name}`);
+    }
     if (seedEntry && seedEntry.role !== existing.role) {
       await db.update(staffTable).set({ role: seedEntry.role }).where(eq(staffTable.id, existing.id));
       console.log(`Updated role for ${existing.name}: ${existing.role} → ${seedEntry.role}`);
@@ -91,7 +98,7 @@ async function seed() {
       if (seedEntry.email !== existing.email) {
         updates.email = seedEntry.email;
       }
-      if ((seedEntry.role === "inspector" || seedEntry.role === "supervisor") && seedEntry.password) {
+      if ((seedEntry.role === "admin" || seedEntry.role === "inspector" || seedEntry.role === "supervisor") && seedEntry.password) {
         updates.password = seedEntry.password;
       } else if (seedEntry.password && !existing.password) {
         updates.password = seedEntry.password;
