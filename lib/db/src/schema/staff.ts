@@ -8,6 +8,7 @@ export const staffTable = pgTable("staff", {
   role: text("role", { enum: ["staff", "supervisor", "admin", "inspector"] }).notNull().default("staff"),
   phone: text("phone"),
   email: text("email"),
+  password: text("password"),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
