@@ -44,7 +44,7 @@ const SEED_TASK_TYPES = [
 ];
 
 const SEED_STAFF: { name: string; role: "admin" | "inspector" | "supervisor" | "staff"; phone?: string; email?: string; password?: string }[] = [
-  { name: "Marcell Sutherland", role: "admin", phone: "407-555-0001", email: "msutherland@marvolenterprises.com", password: "$2b$10$63NHF115lpM7GSVGwhFsZ.5SK8PrL1UTKTmK4tFfZVKWBPa7TCC9e" },
+  { name: "Marcell Sutherland", role: "admin", phone: "407-555-0001", email: "msutherland@marvolenterprises.com", password: "$2b$10$BOd6Ky/dYvLZoHuQqmJ5S.McC.dZsWACX.hXDAWYtSU9rcRd/EFJO" },
   { name: "MCO Inspector", role: "inspector", phone: "407-555-0099", email: "raquel.santana@goaa.org", password: "$2b$10$MGwP2M8DkjmpZ5lcv9ycZutXOjLsUlki9JKSXTkIEMZco7WojVUVm" },
   { name: "Priscila Rosero", role: "supervisor", email: "Priscilarosero27@gmail.com", password: "$2b$10$0fG/ZSs6RG3I5eBS1koCqur7vR2NEIcVRd/lT0k3MgAE.FmJpPnIy" },
   { name: "Reynaldo Hernandez Suarez", role: "supervisor", email: "Cnuevo986@gmail.co", password: "$2b$10$v.9YDrn2LhvD/r2HO5Q4M.jzao46QZZugZMLImfOpLrVym7k3tH8a" },
