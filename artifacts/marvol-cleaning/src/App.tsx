@@ -65,7 +65,6 @@ function ProtectedRoutes() {
             <Route path="/assignments" component={Assignments} />
             <Route path="/issues" component={Issues} />
             <Route path="/report" component={InspectorReport} />
-            <Route path="/gps-tracking" component={GPSTracking} />
             <Route path="/staff"><Redirect to="/" /></Route>
           </>
         )}

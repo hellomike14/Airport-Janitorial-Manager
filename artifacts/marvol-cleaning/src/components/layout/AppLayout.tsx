@@ -85,7 +85,6 @@ const NAV_BY_ROLE: Record<ViewMode, { href: string; icon: React.ElementType; lab
     { href: "/assignments", icon: ClipboardList, label: "Assignments" },
     { href: "/issues", icon: AlertTriangle, label: "Issue Tracker" },
     { href: "/report", icon: FileText, label: "Inspector Report" },
-    { href: "/gps-tracking", icon: Navigation, label: "GPS Tracking" },
   ],
   inspector: [
     { href: "/issues", icon: AlertTriangle, label: "Open Issues" },
