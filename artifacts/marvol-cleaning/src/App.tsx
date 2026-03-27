@@ -17,6 +17,7 @@ import TaskManagement from "./pages/TaskManagement";
 import TaskTypes from "./pages/TaskTypes";
 import InspectorReport from "./pages/InspectorReport";
 import CompletedJobs from "./pages/CompletedJobs";
+import GPSTracking from "./pages/GPSTracking";
 import Login from "./pages/Login";
 
 const queryClient = new QueryClient({
@@ -50,6 +51,7 @@ function ProtectedRoutes() {
             <Route path="/staff" component={Staff} />
             <Route path="/issues" component={Issues} />
             <Route path="/report" component={InspectorReport} />
+            <Route path="/gps-tracking" component={GPSTracking} />
           </>
         )}
 
@@ -63,6 +65,7 @@ function ProtectedRoutes() {
             <Route path="/assignments" component={Assignments} />
             <Route path="/issues" component={Issues} />
             <Route path="/report" component={InspectorReport} />
+            <Route path="/gps-tracking" component={GPSTracking} />
             <Route path="/staff"><Redirect to="/" /></Route>
           </>
         )}

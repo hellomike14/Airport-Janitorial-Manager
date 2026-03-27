@@ -20,8 +20,10 @@ import {
   Layers,
   FileText,
   ClipboardCheck,
+  Navigation,
 } from "lucide-react";
 import { format } from "date-fns";
+import { useLocationTracker } from "@/hooks/useLocationTracker";
 import { Button } from "@/components/ui/button";
 import { useAuth, ViewMode } from "@/contexts/AuthContext";
 import {
@@ -74,6 +76,7 @@ const NAV_BY_ROLE: Record<ViewMode, { href: string; icon: React.ElementType; lab
     { href: "/staff", icon: Users, label: "Staff Directory" },
     { href: "/issues", icon: AlertTriangle, label: "Issue Tracker" },
     { href: "/report", icon: FileText, label: "Inspector Report" },
+    { href: "/gps-tracking", icon: Navigation, label: "GPS Tracking" },
   ],
   supervisor: [
     { href: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -82,6 +85,7 @@ const NAV_BY_ROLE: Record<ViewMode, { href: string; icon: React.ElementType; lab
     { href: "/assignments", icon: ClipboardList, label: "Assignments" },
     { href: "/issues", icon: AlertTriangle, label: "Issue Tracker" },
     { href: "/report", icon: FileText, label: "Inspector Report" },
+    { href: "/gps-tracking", icon: Navigation, label: "GPS Tracking" },
   ],
   inspector: [
     { href: "/issues", icon: AlertTriangle, label: "Open Issues" },
@@ -216,6 +220,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [viewDropdownOpen, setViewDropdownOpen] = useState(false);
   const { currentUser, viewMode, setViewMode, logout } = useAuth();
+
+  useLocationTracker();
 
   const navItems = NAV_BY_ROLE[viewMode];
   const badge = ROLE_BADGE[viewMode];

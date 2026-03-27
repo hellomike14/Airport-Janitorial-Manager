@@ -4,3 +4,4 @@ export * from "./tasks";
 export * from "./assignments";
 export * from "./issues";
 export * from "./notifications";
+export * from "./locations";

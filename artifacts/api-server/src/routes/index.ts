@@ -9,6 +9,7 @@ import notificationsRouter from "./notifications";
 import taskTypesRouter from "./taskTypes";
 import dashboardRouter from "./dashboard";
 import storageRouter from "./storage";
+import locationsRouter from "./locations";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use("/issues", issuesRouter);
 router.use(notificationsRouter);
 router.use(taskTypesRouter);
 router.use(storageRouter);
+router.use(locationsRouter);
 
 export default router;

@@ -95,6 +95,10 @@ A comprehensive janitorial cleaning management web app for Marvol Facility at MC
 - `POST /api/notifications/mark-all-read` - Mark all read for a user
 - `POST /api/storage/uploads/request-url` - Request presigned GCS upload URL
 - `GET /api/storage/objects/*` - Serve uploaded objects
+- `POST /api/locations/update` - Update staff GPS location (staffId, lat, lng, accuracy)
+- `GET /api/locations` - List all staff locations with names and roles
+- `POST /api/issues/send-to-supervisor` - Inspector sends issue notification to supervisors
+- `POST /api/issues/send-to-inspector` - Supervisor sends completion notification to inspector
 
 ## Structure
 
@@ -125,6 +129,7 @@ artifacts-monorepo/
 - `assignments` - Staff assignments to areas by date
 - `issues` - Issue reports (area, severity, assigned_to_id, completion_notes, before/after image paths)
 - `notifications` - In-app notifications (staffId, issueId, type, message, isRead)
+- `staff_locations` - Real-time GPS positions (staffId, latitude, longitude, accuracy, updatedAt)
 
 ## TypeScript & Composite Projects
 
