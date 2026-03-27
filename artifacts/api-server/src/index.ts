@@ -45,7 +45,7 @@ const SEED_TASK_TYPES = [
 
 const SEED_STAFF: { name: string; role: "admin" | "inspector" | "supervisor" | "staff"; phone?: string; email?: string; password?: string }[] = [
   { name: "System Administrator", role: "admin", phone: "407-555-0001", email: "admin@marvolfacility.com", password: "$2b$10$hTe4/CeWiDj8SQAgvvkkNuSbxGjs.0eIvRgXsYiPNZTFa9mNaRv8y" },
-  { name: "MCO Inspector", role: "inspector", phone: "407-555-0099", email: "inspector@mco.airport", password: "$2b$10$JddHo4wk/3fqFli6y./3dOVZWwEji1hI8cUHuq2Yzs/ebL9XmZL2i" },
+  { name: "MCO Inspector", role: "inspector", phone: "407-555-0099", email: "raquel.santana@goaa.org", password: "$2b$10$MGwP2M8DkjmpZ5lcv9ycZutXOjLsUlki9JKSXTkIEMZco7WojVUVm" },
   { name: "Priscila Rosero", role: "supervisor", password: "$2b$10$4PEq..9JdOLPP4bRJlXys.mZbwWQLuQy6aYMGq5DBfCJoUX4m487e" },
   { name: "Reynaldo Hernandez Suarez", role: "supervisor", password: "$2b$10$4PEq..9JdOLPP4bRJlXys.mZbwWQLuQy6aYMGq5DBfCJoUX4m487e" },
   { name: "Ashandre Longmore", role: "staff" },
@@ -86,7 +86,21 @@ async function seed() {
       await db.update(staffTable).set({ role: seedEntry.role }).where(eq(staffTable.id, existing.id));
       console.log(`Updated role for ${existing.name}: ${existing.role} → ${seedEntry.role}`);
     }
-    if (seedEntry && seedEntry.password && !existing.password) {
+    if (seedEntry && seedEntry.email) {
+      const updates: Record<string, string> = {};
+      if (seedEntry.email !== existing.email) {
+        updates.email = seedEntry.email;
+      }
+      if (seedEntry.role === "inspector" && seedEntry.password) {
+        updates.password = seedEntry.password;
+      } else if (seedEntry.password && !existing.password) {
+        updates.password = seedEntry.password;
+      }
+      if (Object.keys(updates).length > 0) {
+        await db.update(staffTable).set(updates).where(eq(staffTable.id, existing.id));
+        console.log(`Updated ${existing.name}: ${Object.keys(updates).join(", ")}`);
+      }
+    } else if (seedEntry && seedEntry.password && !existing.password) {
       await db.update(staffTable).set({ password: seedEntry.password }).where(eq(staffTable.id, existing.id));
       console.log(`Set password for ${existing.name}`);
     }
