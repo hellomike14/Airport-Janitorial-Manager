@@ -1,7 +1,7 @@
 import app from "./app";
 import { db } from "@workspace/db";
 import { staffTable, areasTable, taskTypesTable } from "@workspace/db/schema";
-import { eq, count } from "drizzle-orm";
+import { eq, count, inArray } from "drizzle-orm";
 
 const rawPort = process.env["PORT"];
 
@@ -43,40 +43,61 @@ const SEED_TASK_TYPES = [
   { taskName: "Clean/remove cigarette butts in terminal", taskOrder: 13 },
 ];
 
+const SEED_STAFF: { name: string; role: "admin" | "inspector" | "supervisor" | "staff"; phone?: string; email?: string; password?: string }[] = [
+  { name: "System Administrator", role: "admin", phone: "407-555-0001", email: "admin@marvolfacility.com", password: "$2b$10$hTe4/CeWiDj8SQAgvvkkNuSbxGjs.0eIvRgXsYiPNZTFa9mNaRv8y" },
+  { name: "MCO Inspector", role: "inspector", phone: "407-555-0099", email: "inspector@mco.airport", password: "$2b$10$S0o82sfpaXAhZNoyRHbTRuG.2mIVh3My5fN3XFDCcWJdFZFeoFb7O" },
+  { name: "Priscila Rosero", role: "supervisor", password: "$2b$10$4PEq..9JdOLPP4bRJlXys.mZbwWQLuQy6aYMGq5DBfCJoUX4m487e" },
+  { name: "Reynaldo Hernandez Suarez", role: "supervisor", password: "$2b$10$4PEq..9JdOLPP4bRJlXys.mZbwWQLuQy6aYMGq5DBfCJoUX4m487e" },
+  { name: "Ashandre Longmore", role: "staff" },
+  { name: "Edner Jules", role: "staff" },
+  { name: "Ivan Serrano", role: "staff" },
+  { name: "Jason Delgado", role: "staff" },
+  { name: "Jean Gardy Rigueur", role: "staff" },
+  { name: "Jose Camargo", role: "staff" },
+  { name: "Juan Carlos Zurita Blacio", role: "staff" },
+  { name: "Kevin Gonzalez Fernandez", role: "staff" },
+  { name: "Marie Ingrid Daniel", role: "staff" },
+  { name: "Steeve Alphonse", role: "staff" },
+];
+
 async function seed() {
-  // Seed admin user if missing
-  const admins = await db.select().from(staffTable).where(eq(staffTable.role, "admin"));
-  if (admins.length === 0) {
-    await db.insert(staffTable).values({
-      name: "System Administrator",
-      role: "admin",
-      phone: "407-555-0001",
-      email: "admin@marvolfacility.com",
-      active: true,
-    });
-    console.log("Seeded: admin user");
+  const seedNames = new Set(SEED_STAFF.map((s) => s.name));
+  const existingStaff = await db.select().from(staffTable);
+  const existingNames = new Set(existingStaff.map((s) => s.name));
+
+  const toInsert = SEED_STAFF.filter((s) => !existingNames.has(s.name));
+  if (toInsert.length > 0) {
+    await db.insert(staffTable).values(
+      toInsert.map((s) => ({
+        name: s.name,
+        role: s.role,
+        phone: s.phone ?? null,
+        email: s.email ?? null,
+        password: s.password ?? null,
+        active: true,
+      }))
+    );
+    console.log(`Seeded: ${toInsert.length} staff members (${toInsert.map((s) => s.name).join(", ")})`);
   }
 
-  const inspectors = await db.select().from(staffTable).where(eq(staffTable.role, "inspector"));
-  if (inspectors.length === 0) {
-    await db.insert(staffTable).values({
-      name: "MCO Inspector",
-      role: "inspector",
-      phone: "407-555-0099",
-      email: "inspector@mco.airport",
-      active: true,
-    });
-    console.log("Seeded: inspector user");
+  for (const existing of existingStaff) {
+    const seedEntry = SEED_STAFF.find((s) => s.name === existing.name);
+    if (seedEntry && seedEntry.role !== existing.role) {
+      await db.update(staffTable).set({ role: seedEntry.role }).where(eq(staffTable.id, existing.id));
+      console.log(`Updated role for ${existing.name}: ${existing.role} → ${seedEntry.role}`);
+    }
+    if (seedEntry && seedEntry.password && !existing.password) {
+      await db.update(staffTable).set({ password: seedEntry.password }).where(eq(staffTable.id, existing.id));
+      console.log(`Set password for ${existing.name}`);
+    }
   }
 
-  // Seed areas if missing
   const [{ value: areaCount }] = await db.select({ value: count() }).from(areasTable);
   if (areaCount === 0) {
     await db.insert(areasTable).values(SEED_AREAS);
     console.log(`Seeded: ${SEED_AREAS.length} areas`);
   }
 
-  // Seed task types if missing
   const [{ value: ttCount }] = await db.select({ value: count() }).from(taskTypesTable);
   if (ttCount === 0) {
     await db.insert(taskTypesTable).values(
