@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { tasksTable, staffTable, areasTable, issuesTable, taskTypesTable, notificationsTable } from "@workspace/db/schema";
-import { eq, and, sql, asc } from "drizzle-orm";
+import { eq, and, sql, asc, inArray } from "drizzle-orm";
 import {
   ListTasksQueryParams,
   CompleteTaskParams,
@@ -269,12 +269,12 @@ router.post("/:id/complete", async (req, res) => {
     : null;
 
   const area = await db.select({ name: areasTable.name }).from(areasTable).where(eq(areasTable.id, updated.areaId)).then((r) => r[0]);
-  const inspectors = await db.select({ id: staffTable.id }).from(staffTable).where(eq(staffTable.role, "inspector"));
-  if (inspectors.length > 0 && area) {
+  const recipients = await db.select({ id: staffTable.id }).from(staffTable).where(inArray(staffTable.role, ["inspector", "supervisor"]));
+  if (recipients.length > 0 && area) {
     const completedBy = staffMember?.name ?? "Staff";
     await db.insert(notificationsTable).values(
-      inspectors.map((insp) => ({
-        staffId: insp.id,
+      recipients.map((r) => ({
+        staffId: r.id,
         type: "task_completed" as const,
         message: `${completedBy} completed "${updated.taskName}" in ${area.name}`,
       }))
