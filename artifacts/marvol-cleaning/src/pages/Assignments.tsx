@@ -10,18 +10,19 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { Calendar, Trash2, Plus, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Assignments() {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const queryClient = useQueryClient();
   const [isAdding, setIsAdding] = useState(false);
+  const { currentUser } = useAuth();
   
   const { data: assignments, isLoading } = useListAssignments({ date: selectedDate });
   const { data: staff } = useListStaff();
   const { data: areas } = useListAreas();
 
-  // Mock super ID
-  const currentUserId = 11; // Assuming supervisor ID
+  const currentUserId = currentUser?.id ?? 0;
 
   const [formData, setFormData] = useState({
     staffId: '', areaId: '', notes: '', isSpecial: false
