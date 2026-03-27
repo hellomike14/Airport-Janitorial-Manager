@@ -52,7 +52,14 @@ A comprehensive janitorial cleaning management web app for Marvol Facility at MC
 - **Supervisor**: Dashboard, areas, assignments, issue tracker (no staff management)
 - **Staff**: My Tasks page + My Issues (assigned issues with completion flow)
 
-**Auth:** No passwords — click-to-login from grouped staff list; stored in localStorage.
+**Auth:**
+- Admin, Inspector, Supervisors require password login (bcrypt-hashed)
+- Default passwords: Admin → `Admin2026`, Inspector → `Inspector2026`, Supervisors (shared) → `Supervisors2026`
+- Staff login is tap-to-login (no password by default), but staff can set their own password via "Set Password" button in sidebar
+- Once a staff member sets a password, they must use it to log in going forward
+- Passwords stored as bcrypt hashes; legacy plaintext passwords auto-verified and should be migrated
+- API: `POST /api/staff/verify-password`, `POST /api/staff/set-password`
+- Auth state stored in localStorage
 
 **Pages:**
 - Login - Click-to-login with role-grouped staff list

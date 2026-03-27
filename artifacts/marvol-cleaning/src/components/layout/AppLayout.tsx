@@ -21,6 +21,9 @@ import {
   FileText,
   ClipboardCheck,
   Navigation,
+  Lock,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useLocationTracker } from "@/hooks/useLocationTracker";
@@ -30,6 +33,7 @@ import {
   useListNotifications,
   useMarkNotificationRead,
   useMarkAllNotificationsRead,
+  useListStaff,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -214,11 +218,146 @@ function NotificationBell({ staffId }: { staffId: number }) {
   );
 }
 
+const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+
+function SetPasswordModal({ staffId, hasExistingPassword, onClose }: { staffId: number; hasExistingPassword: boolean; onClose: () => void }) {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showNew, setShowNew] = useState(false);
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    if (newPassword.length < 4) {
+      setError("Password must be at least 4 characters");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch(`${BASE_URL}/api/staff/set-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          staffId,
+          password: newPassword,
+          ...(hasExistingPassword ? { currentPassword } : {}),
+        }),
+      });
+      if (res.ok) {
+        setSuccess(true);
+        setTimeout(onClose, 1500);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || "Failed to set password");
+      }
+    } catch {
+      setError("Network error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-emerald-700 flex items-center justify-center">
+              <Lock className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <p className="font-semibold text-slate-800">{hasExistingPassword ? "Change Password" : "Set Password"}</p>
+              <p className="text-xs text-slate-500">{hasExistingPassword ? "Update your login password" : "Create a password for secure login"}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {success ? (
+          <div className="text-center py-6">
+            <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
+            <p className="font-semibold text-slate-800">Password {hasExistingPassword ? "updated" : "set"} successfully!</p>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {hasExistingPassword && (
+              <div>
+                <label className="text-sm font-medium text-slate-700 mb-1.5 block">Current Password</label>
+                <div className="relative">
+                  <input
+                    type={showCurrent ? "text" : "password"}
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 pr-10"
+                    placeholder="Enter current password"
+                  />
+                  <button type="button" onClick={() => setShowCurrent(!showCurrent)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+                    {showCurrent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            )}
+            <div>
+              <label className="text-sm font-medium text-slate-700 mb-1.5 block">New Password</label>
+              <div className="relative">
+                <input
+                  type={showNew ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => { setNewPassword(e.target.value); setError(""); }}
+                  autoFocus
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 pr-10"
+                  placeholder="Create a password"
+                />
+                <button type="button" onClick={() => setShowNew(!showNew)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+                  {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-slate-700 mb-1.5 block">Confirm Password</label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => { setConfirmPassword(e.target.value); setError(""); }}
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                placeholder="Re-enter password"
+              />
+            </div>
+            {error && <p className="text-red-500 text-xs font-medium">{error}</p>}
+            <button
+              type="submit"
+              disabled={saving || !newPassword || !confirmPassword}
+              className="w-full py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {saving ? <span className="animate-spin">&#8635;</span> : <><Lock className="w-4 h-4" /> {hasExistingPassword ? "Update Password" : "Set Password"}</>}
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [viewDropdownOpen, setViewDropdownOpen] = useState(false);
+  const [showSetPassword, setShowSetPassword] = useState(false);
   const { currentUser, viewMode, setViewMode, logout } = useAuth();
+  const { data: staffList } = useListStaff();
+  const currentStaffData = staffList?.find((s) => s.id === currentUser?.id);
+  const hasExistingPassword = !!(currentStaffData as any)?.hasPassword;
 
   useLocationTracker();
 
@@ -312,8 +451,25 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               <LogOut className="w-4 h-4" />
             </button>
           </div>
+          {currentUser?.role === "staff" && (
+            <button
+              onClick={() => setShowSetPassword(true)}
+              className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-medium bg-sidebar-accent/80 hover:bg-sidebar-accent text-sidebar-foreground/70 hover:text-sidebar-foreground transition-colors"
+            >
+              <Lock className="w-3.5 h-3.5" />
+              {hasExistingPassword ? "Change Password" : "Set Password"}
+            </button>
+          )}
         </div>
       </aside>
+
+      {showSetPassword && currentUser && (
+        <SetPasswordModal
+          staffId={currentUser.id}
+          hasExistingPassword={hasExistingPassword}
+          onClose={() => setShowSetPassword(false)}
+        />
+      )}
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
