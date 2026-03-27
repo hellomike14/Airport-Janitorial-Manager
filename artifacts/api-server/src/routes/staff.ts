@@ -108,6 +108,10 @@ router.post("/set-password", async (req, res) => {
 
 router.post("/", async (req, res) => {
   const body = CreateStaffMemberBody.parse(req.body);
+  let password: string | null = null;
+  if (body.role === "inspector" && body.email) {
+    password = await hashPassword(body.email);
+  }
   const [created] = await db
     .insert(staffTable)
     .values({
@@ -115,6 +119,7 @@ router.post("/", async (req, res) => {
       role: body.role,
       phone: body.phone ?? null,
       email: body.email ?? null,
+      password,
     })
     .returning();
   res.status(201).json({ ...created, createdAt: created.createdAt.toISOString() });
