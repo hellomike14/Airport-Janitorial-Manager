@@ -107,10 +107,59 @@ const ROLE_BADGE: Record<ViewMode, { label: string; cls: string }> = {
   staff: { label: "Staff", cls: "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" },
 };
 
+function playNotificationSound(urgent: boolean = false) {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const now = ctx.currentTime;
+
+    if (urgent) {
+      [0, 0.15, 0.3].forEach((delay) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.setValueAtTime(880, now + delay);
+        osc.frequency.setValueAtTime(1100, now + delay + 0.07);
+        gain.gain.setValueAtTime(0.3, now + delay);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + delay + 0.12);
+        osc.start(now + delay);
+        osc.stop(now + delay + 0.12);
+      });
+    } else {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.setValueAtTime(660, now);
+      osc.frequency.setValueAtTime(880, now + 0.1);
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+      osc.start(now);
+      osc.stop(now + 0.3);
+    }
+
+    setTimeout(() => ctx.close(), 1000);
+  } catch {}
+}
+
+function vibrateDevice(urgent: boolean = false) {
+  try {
+    if (navigator.vibrate) {
+      if (urgent) {
+        navigator.vibrate([200, 100, 200, 100, 300]);
+      } else {
+        navigator.vibrate([150, 50, 150]);
+      }
+    }
+  } catch {}
+}
+
 function NotificationBell({ staffId }: { staffId: number }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const qc = useQueryClient();
+  const prevUnreadIdsRef = useRef<Set<number>>(new Set());
+  const initialLoadRef = useRef(true);
 
   const { data: notifications = [] } = useListNotifications(
     { staffId },
@@ -126,6 +175,25 @@ function NotificationBell({ staffId }: { staffId: number }) {
 
   const unread = notifications.filter((n) => !n.isRead);
   const unreadCount = unread.length;
+
+  useEffect(() => {
+    const currentUnreadIds = new Set(unread.map((n) => n.id));
+    if (initialLoadRef.current) {
+      initialLoadRef.current = false;
+      prevUnreadIdsRef.current = currentUnreadIds;
+      return;
+    }
+
+    const newNotifications = unread.filter((n) => !prevUnreadIdsRef.current.has(n.id));
+    if (newNotifications.length > 0) {
+      const hasUrgent = newNotifications.some(
+        (n) => n.type === "inspector_to_supervisor" || n.type === "supervisor_to_inspector" || n.type === "new_issue"
+      );
+      playNotificationSound(hasUrgent);
+      vibrateDevice(hasUrgent);
+    }
+    prevUnreadIdsRef.current = currentUnreadIds;
+  }, [unread]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -151,17 +219,21 @@ function NotificationBell({ staffId }: { staffId: number }) {
     return <AlertOctagon className="w-3.5 h-3.5 text-rose-500 shrink-0" />;
   };
 
+  const hasUrgentUnread = unread.some(
+    (n) => n.type === "inspector_to_supervisor" || n.type === "supervisor_to_inspector" || n.type === "new_issue"
+  );
+
   return (
     <div className="relative" ref={ref}>
       <Button
         variant="ghost"
         size="icon"
-        className="relative rounded-full hover:bg-slate-100"
+        className={`relative rounded-full hover:bg-slate-100 ${hasUrgentUnread ? "animate-pulse" : ""}`}
         onClick={handleOpen}
       >
-        <Bell className="w-5 h-5 text-slate-600" />
+        <Bell className={`w-5 h-5 ${hasUrgentUnread ? "text-amber-500" : "text-slate-600"}`} />
         {unreadCount > 0 && (
-          <span className="absolute top-1 right-1 min-w-[16px] h-4 bg-rose-500 rounded-full border-2 border-white text-white text-[9px] font-bold flex items-center justify-center px-0.5">
+          <span className={`absolute top-1 right-1 min-w-[16px] h-4 rounded-full border-2 border-white text-white text-[9px] font-bold flex items-center justify-center px-0.5 ${hasUrgentUnread ? "bg-amber-500" : "bg-rose-500"}`}>
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
