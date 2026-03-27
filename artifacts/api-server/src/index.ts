@@ -45,7 +45,7 @@ const SEED_TASK_TYPES = [
 
 const SEED_STAFF: { name: string; role: "admin" | "inspector" | "supervisor" | "staff"; phone?: string; email?: string; password?: string }[] = [
   { name: "System Administrator", role: "admin", phone: "407-555-0001", email: "admin@marvolfacility.com", password: "$2b$10$hTe4/CeWiDj8SQAgvvkkNuSbxGjs.0eIvRgXsYiPNZTFa9mNaRv8y" },
-  { name: "MCO Inspector", role: "inspector", phone: "407-555-0099", email: "inspector@mco.airport", password: "$2b$10$S0o82sfpaXAhZNoyRHbTRuG.2mIVh3My5fN3XFDCcWJdFZFeoFb7O" },
+  { name: "MCO Inspector", role: "inspector", phone: "407-555-0099", email: "inspector@mco.airport", password: "$2b$10$JddHo4wk/3fqFli6y./3dOVZWwEji1hI8cUHuq2Yzs/ebL9XmZL2i" },
   { name: "Priscila Rosero", role: "supervisor", password: "$2b$10$4PEq..9JdOLPP4bRJlXys.mZbwWQLuQy6aYMGq5DBfCJoUX4m487e" },
   { name: "Reynaldo Hernandez Suarez", role: "supervisor", password: "$2b$10$4PEq..9JdOLPP4bRJlXys.mZbwWQLuQy6aYMGq5DBfCJoUX4m487e" },
   { name: "Ashandre Longmore", role: "staff" },
