@@ -17,11 +17,37 @@ router.get("/", async (_req, res) => {
     .from(staffTable)
     .orderBy(staffTable.role, staffTable.name);
   res.json(
-    staff.map((s) => ({
-      ...s,
-      createdAt: s.createdAt.toISOString(),
-    }))
+    staff.map((s) => {
+      const { password, ...rest } = s;
+      return {
+        ...rest,
+        hasPassword: !!password,
+        createdAt: s.createdAt.toISOString(),
+      };
+    })
   );
+});
+
+router.post("/verify-password", async (req, res) => {
+  const { staffId, password } = req.body;
+  if (!staffId || !password) {
+    res.status(400).json({ error: "staffId and password required" });
+    return;
+  }
+  const [staff] = await db
+    .select()
+    .from(staffTable)
+    .where(eq(staffTable.id, staffId));
+  if (!staff) {
+    res.status(404).json({ error: "Staff not found" });
+    return;
+  }
+  if (staff.password !== password) {
+    res.status(401).json({ error: "Incorrect password" });
+    return;
+  }
+  const { password: _, ...rest } = staff;
+  res.json({ ...rest, createdAt: staff.createdAt.toISOString() });
 });
 
 router.post("/", async (req, res) => {
