@@ -107,38 +107,17 @@ const ROLE_BADGE: Record<ViewMode, { label: string; cls: string }> = {
   staff: { label: "Staff", cls: "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" },
 };
 
+const BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+const regularSound = new Audio(`${BASE}/sounds/notification.wav`);
+const urgentSound = new Audio(`${BASE}/sounds/notification-urgent.wav`);
+regularSound.preload = "auto";
+urgentSound.preload = "auto";
+
 function playNotificationSound(urgent: boolean = false) {
   try {
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const now = ctx.currentTime;
-
-    if (urgent) {
-      [0, 0.15, 0.3].forEach((delay) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.frequency.setValueAtTime(880, now + delay);
-        osc.frequency.setValueAtTime(1100, now + delay + 0.07);
-        gain.gain.setValueAtTime(0.3, now + delay);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + delay + 0.12);
-        osc.start(now + delay);
-        osc.stop(now + delay + 0.12);
-      });
-    } else {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.frequency.setValueAtTime(660, now);
-      osc.frequency.setValueAtTime(880, now + 0.1);
-      gain.gain.setValueAtTime(0.2, now);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
-      osc.start(now);
-      osc.stop(now + 0.3);
-    }
-
-    setTimeout(() => ctx.close(), 1000);
+    const sound = urgent ? urgentSound : regularSound;
+    sound.currentTime = 0;
+    sound.play().catch(() => {});
   } catch {}
 }
 
