@@ -25,6 +25,8 @@ const SEED_AREAS = [
   { name: "Terminal C - Levels 1, 3, 5", terminal: "Terminal C", location: "Levels 1, 3, 5", sortOrder: 5 },
   { name: "Terminal C - Levels 2, 4, 6", terminal: "Terminal C", location: "Levels 2, 4, 6", sortOrder: 6 },
   { name: "Top Terminal - Levels 4-11",  terminal: "Top Terminal", location: "Levels 4-11", sortOrder: 7 },
+  { name: "Level P1 - East",             terminal: "Level P1",    location: "East",         sortOrder: 8 },
+  { name: "Level P1 - West",             terminal: "Level P1",    location: "West",         sortOrder: 9 },
 ];
 
 const SEED_TASK_TYPES = [
@@ -113,10 +115,15 @@ async function seed() {
     }
   }
 
-  const [{ value: areaCount }] = await db.select({ value: count() }).from(areasTable);
-  if (areaCount === 0) {
+  const existingAreas = await db.select({ name: areasTable.name }).from(areasTable);
+  const existingAreaNames = new Set(existingAreas.map((a) => a.name));
+  const newAreas = SEED_AREAS.filter((a) => !existingAreaNames.has(a.name));
+  if (existingAreas.length === 0) {
     await db.insert(areasTable).values(SEED_AREAS);
     console.log(`Seeded: ${SEED_AREAS.length} areas`);
+  } else if (newAreas.length > 0) {
+    await db.insert(areasTable).values(newAreas);
+    console.log(`Added areas: ${newAreas.map((a) => a.name).join(", ")}`);
   }
 
   const [{ value: ttCount }] = await db.select({ value: count() }).from(taskTypesTable);
