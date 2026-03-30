@@ -471,7 +471,7 @@ export default function Issues() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h1 className="text-3xl font-display font-bold text-slate-900">
-            {isStaff ? "My Area Issues" : isInspector ? "Open Issues" : "Issue Tracker"}
+            {isStaff ? "My Area Issues" : isInspector ? "Open Issues" : "Inspector Special Assignments"}
           </h1>
           <p className="text-slate-500 mt-1 font-medium">
             {isStaff

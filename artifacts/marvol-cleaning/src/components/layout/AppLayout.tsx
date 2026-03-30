@@ -78,7 +78,7 @@ const NAV_BY_ROLE: Record<ViewMode, { href: string; icon: React.ElementType; lab
     { href: "/areas", icon: Map, label: "Cleaning Areas" },
     { href: "/assignments", icon: ClipboardList, label: "Assignments" },
     { href: "/staff", icon: Users, label: "Staff Directory" },
-    { href: "/issues", icon: AlertTriangle, label: "Issue Tracker" },
+    { href: "/issues", icon: AlertTriangle, label: "Inspector Special Assignments" },
     { href: "/report", icon: FileText, label: "Inspector Report" },
     { href: "/gps-tracking", icon: Navigation, label: "GPS Tracking" },
   ],
@@ -87,7 +87,7 @@ const NAV_BY_ROLE: Record<ViewMode, { href: string; icon: React.ElementType; lab
     { href: "/tasks", icon: ListChecks, label: "Task Management" },
     { href: "/areas", icon: Map, label: "Cleaning Areas" },
     { href: "/assignments", icon: ClipboardList, label: "Assignments" },
-    { href: "/issues", icon: AlertTriangle, label: "Issue Tracker" },
+    { href: "/issues", icon: AlertTriangle, label: "Inspector Special Assignments" },
     { href: "/report", icon: FileText, label: "Inspector Report" },
   ],
   inspector: [
