@@ -39,4 +39,10 @@ export const AREA_SPECIFIC_TASKS: Record<string, { taskName: string; taskOrder: 
     { taskName: "Clean trash bin #2", taskOrder: 17 },
     { taskName: "Clean trash bin #3", taskOrder: 18 },
   ],
+  "Level P4 - East": [
+    { taskName: "Clean trash bin #1", taskOrder: 16 },
+  ],
+  "Level P4 - West": [
+    { taskName: "Clean trash bin #1", taskOrder: 16 },
+  ],
 };
