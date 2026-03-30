@@ -27,6 +27,8 @@ const SEED_AREAS = [
   { name: "Top Terminal - Levels 4-11",  terminal: "Top Terminal", location: "Levels 4-11", sortOrder: 7 },
   { name: "Level P1 - East",             terminal: "Terminal A",  location: "East",         sortOrder: 8 },
   { name: "Level P1 - West",             terminal: "Terminal A",  location: "West",         sortOrder: 9 },
+  { name: "Level P2 - East",             terminal: "Terminal A",  location: "East",         sortOrder: 10 },
+  { name: "Level P2 - West",             terminal: "Terminal A",  location: "West",         sortOrder: 11 },
 ];
 
 const SEED_TASK_TYPES = [
