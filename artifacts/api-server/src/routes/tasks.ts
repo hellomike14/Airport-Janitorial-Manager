@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { tasksTable, staffTable, areasTable, issuesTable, taskTypesTable, notificationsTable } from "@workspace/db/schema";
 import { eq, and, sql, asc, inArray } from "drizzle-orm";
+import { AREA_SPECIFIC_TASKS } from "../area-tasks";
 import {
   ListTasksQueryParams,
   CompleteTaskParams,
@@ -52,8 +53,13 @@ async function ensureTasksForDate(areaId: number, date: string) {
 
   if (existing.length === 0) {
     const activeTypes = await getActiveTaskTypes();
+
+    const [area] = await db.select({ name: areasTable.name }).from(areasTable).where(eq(areasTable.id, areaId));
+    const extraTasks = area ? (AREA_SPECIFIC_TASKS[area.name] ?? []) : [];
+    const allTasks = [...activeTypes, ...extraTasks];
+
     await db.insert(tasksTable).values(
-      activeTypes.map((t) => ({
+      allTasks.map((t) => ({
         areaId,
         taskDate: date,
         taskName: t.taskName,

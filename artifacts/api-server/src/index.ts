@@ -45,6 +45,7 @@ const SEED_TASK_TYPES = [
   { taskName: "Clean/remove cigarette butts in terminal", taskOrder: 13 },
 ];
 
+
 const SEED_STAFF: { name: string; role: "admin" | "inspector" | "supervisor" | "staff"; phone?: string; email?: string; password?: string }[] = [
   { name: "Marcell Sutherland", role: "admin", phone: "407-555-0001", email: "msutherland@marvolenterprises.com", password: "$2b$10$BOd6Ky/dYvLZoHuQqmJ5S.McC.dZsWACX.hXDAWYtSU9rcRd/EFJO" },
   { name: "MCO Inspector", role: "inspector", phone: "407-555-0099", email: "raquel.santana@goaa.org", password: "$2b$10$MGwP2M8DkjmpZ5lcv9ycZutXOjLsUlki9JKSXTkIEMZco7WojVUVm" },
