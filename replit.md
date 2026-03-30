@@ -23,14 +23,13 @@ pnpm workspace monorepo using TypeScript. This is the **Marvol Facility Cleaning
 
 A comprehensive janitorial cleaning management web app for Marvol Facility at MCO International Airport.
 
-**Coverage Areas (7 total):**
-1. Terminal A - East Garage
-2. Terminal A - West Garage
-3. Terminal B - East Garage
-4. Terminal B - West Garage
-5. Terminal C - Levels 1, 3, 5
-6. Terminal C - Levels 2, 4, 6
-7. Top Terminal - Levels 4-11
+**Coverage Areas (31 total, grouped by terminal side):**
+- Terminal A - East: East Garage, P1-P4, R1-R2
+- Terminal A - West: West Garage, P1-P4, R1-R2
+- Terminal B - East: East Garage, P1-P4, R1-R2
+- Terminal B - West: West Garage, P1-P4, R1-R2
+- Terminal C: Levels 1,3,5 / Levels 2,4,6
+- Top Terminal: Levels 4-11
 
 **Team (14 total):**
 - 1 Admin (System Administrator)

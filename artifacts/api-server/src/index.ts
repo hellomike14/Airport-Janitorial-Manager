@@ -18,25 +18,37 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 const SEED_AREAS = [
-  { name: "Terminal A - East Garage",    terminal: "Terminal A", location: "East",         sortOrder: 1 },
-  { name: "Terminal A - West Garage",    terminal: "Terminal A", location: "West",         sortOrder: 2 },
-  { name: "Terminal B - East Garage",    terminal: "Terminal B", location: "East",         sortOrder: 3 },
-  { name: "Terminal B - West Garage",    terminal: "Terminal B", location: "West",         sortOrder: 4 },
-  { name: "Terminal C - Levels 1, 3, 5", terminal: "Terminal C", location: "Levels 1, 3, 5", sortOrder: 5 },
-  { name: "Terminal C - Levels 2, 4, 6", terminal: "Terminal C", location: "Levels 2, 4, 6", sortOrder: 6 },
-  { name: "Top Terminal - Levels 4-11",  terminal: "Top Terminal", location: "Levels 4-11", sortOrder: 7 },
-  { name: "Level P1 - East",             terminal: "Terminal A",  location: "East",         sortOrder: 8 },
-  { name: "Level P1 - West",             terminal: "Terminal A",  location: "West",         sortOrder: 9 },
-  { name: "Level P2 - East",             terminal: "Terminal A",  location: "East",         sortOrder: 10 },
-  { name: "Level P2 - West",             terminal: "Terminal A",  location: "West",         sortOrder: 11 },
-  { name: "Level P3 - East",             terminal: "Terminal A",  location: "East",         sortOrder: 12 },
-  { name: "Level P3 - West",             terminal: "Terminal A",  location: "West",         sortOrder: 13 },
-  { name: "Level P4 - East",             terminal: "Terminal A",  location: "East",         sortOrder: 14 },
-  { name: "Level P4 - West",             terminal: "Terminal A",  location: "West",         sortOrder: 15 },
-  { name: "Level R1 - East",             terminal: "Terminal A",  location: "East",         sortOrder: 16 },
-  { name: "Level R1 - West",             terminal: "Terminal A",  location: "West",         sortOrder: 17 },
-  { name: "Level R2 - East",             terminal: "Terminal A",  location: "East",         sortOrder: 18 },
-  { name: "Level R2 - West",             terminal: "Terminal A",  location: "West",         sortOrder: 19 },
+  { name: "Terminal A - East Garage",    terminal: "Terminal A - East", location: "East",         sortOrder: 1 },
+  { name: "Level P1 - East",             terminal: "Terminal A - East", location: "East",         sortOrder: 2 },
+  { name: "Level P2 - East",             terminal: "Terminal A - East", location: "East",         sortOrder: 3 },
+  { name: "Level P3 - East",             terminal: "Terminal A - East", location: "East",         sortOrder: 4 },
+  { name: "Level P4 - East",             terminal: "Terminal A - East", location: "East",         sortOrder: 5 },
+  { name: "Level R1 - East",             terminal: "Terminal A - East", location: "East",         sortOrder: 6 },
+  { name: "Level R2 - East",             terminal: "Terminal A - East", location: "East",         sortOrder: 7 },
+  { name: "Terminal A - West Garage",    terminal: "Terminal A - West", location: "West",         sortOrder: 8 },
+  { name: "Level P1 - West",             terminal: "Terminal A - West", location: "West",         sortOrder: 9 },
+  { name: "Level P2 - West",             terminal: "Terminal A - West", location: "West",         sortOrder: 10 },
+  { name: "Level P3 - West",             terminal: "Terminal A - West", location: "West",         sortOrder: 11 },
+  { name: "Level P4 - West",             terminal: "Terminal A - West", location: "West",         sortOrder: 12 },
+  { name: "Level R1 - West",             terminal: "Terminal A - West", location: "West",         sortOrder: 13 },
+  { name: "Level R2 - West",             terminal: "Terminal A - West", location: "West",         sortOrder: 14 },
+  { name: "Terminal B - East Garage",    terminal: "Terminal B - East", location: "East",         sortOrder: 15 },
+  { name: "Level P1 - East",             terminal: "Terminal B - East", location: "East",         sortOrder: 16 },
+  { name: "Level P2 - East",             terminal: "Terminal B - East", location: "East",         sortOrder: 17 },
+  { name: "Level P3 - East",             terminal: "Terminal B - East", location: "East",         sortOrder: 18 },
+  { name: "Level P4 - East",             terminal: "Terminal B - East", location: "East",         sortOrder: 19 },
+  { name: "Level R1 - East",             terminal: "Terminal B - East", location: "East",         sortOrder: 20 },
+  { name: "Level R2 - East",             terminal: "Terminal B - East", location: "East",         sortOrder: 21 },
+  { name: "Terminal B - West Garage",    terminal: "Terminal B - West", location: "West",         sortOrder: 22 },
+  { name: "Level P1 - West",             terminal: "Terminal B - West", location: "West",         sortOrder: 23 },
+  { name: "Level P2 - West",             terminal: "Terminal B - West", location: "West",         sortOrder: 24 },
+  { name: "Level P3 - West",             terminal: "Terminal B - West", location: "West",         sortOrder: 25 },
+  { name: "Level P4 - West",             terminal: "Terminal B - West", location: "West",         sortOrder: 26 },
+  { name: "Level R1 - West",             terminal: "Terminal B - West", location: "West",         sortOrder: 27 },
+  { name: "Level R2 - West",             terminal: "Terminal B - West", location: "West",         sortOrder: 28 },
+  { name: "Terminal C - Levels 1, 3, 5", terminal: "Terminal C", location: "Levels 1, 3, 5", sortOrder: 29 },
+  { name: "Terminal C - Levels 2, 4, 6", terminal: "Terminal C", location: "Levels 2, 4, 6", sortOrder: 30 },
+  { name: "Top Terminal - Levels 4-11",  terminal: "Top Terminal", location: "Levels 4-11", sortOrder: 31 },
 ];
 
 const SEED_TASK_TYPES = [
@@ -126,22 +138,38 @@ async function seed() {
     }
   }
 
-  const existingAreas = await db.select({ id: areasTable.id, name: areasTable.name, terminal: areasTable.terminal }).from(areasTable);
+  const existingAreas = await db.select({ id: areasTable.id, name: areasTable.name, terminal: areasTable.terminal, sortOrder: areasTable.sortOrder }).from(areasTable);
+  const areaKey = (name: string, terminal: string) => `${name}||${terminal}`;
+  const existingAreaKeys = new Map(existingAreas.map((a) => [areaKey(a.name, a.terminal), a]));
+
   for (const area of existingAreas) {
-    const seedArea = SEED_AREAS.find((a) => a.name === area.name);
-    if (seedArea && seedArea.terminal !== area.terminal) {
-      await db.update(areasTable).set({ terminal: seedArea.terminal }).where(eq(areasTable.id, area.id));
-      console.log(`Updated area ${area.name}: terminal ${area.terminal} → ${seedArea.terminal}`);
+    const seedArea = SEED_AREAS.find((a) => a.name === area.name && a.terminal === area.terminal);
+    if (seedArea && seedArea.sortOrder !== area.sortOrder) {
+      await db.update(areasTable).set({ sortOrder: seedArea.sortOrder }).where(eq(areasTable.id, area.id));
+      console.log(`Updated area ${area.name} (${area.terminal}): sortOrder → ${seedArea.sortOrder}`);
     }
   }
-  const existingAreaNames = new Set(existingAreas.map((a) => a.name));
-  const newAreas = SEED_AREAS.filter((a) => !existingAreaNames.has(a.name));
+
+  for (const area of existingAreas) {
+    const matchByName = SEED_AREAS.find((a) => a.name === area.name);
+    if (matchByName && matchByName.terminal !== area.terminal) {
+      const newKey = areaKey(area.name, matchByName.terminal);
+      if (!existingAreaKeys.has(newKey)) {
+        await db.update(areasTable).set({ terminal: matchByName.terminal, sortOrder: matchByName.sortOrder }).where(eq(areasTable.id, area.id));
+        existingAreaKeys.set(newKey, area);
+        existingAreaKeys.delete(areaKey(area.name, area.terminal));
+        console.log(`Updated area ${area.name}: terminal ${area.terminal} → ${matchByName.terminal}`);
+      }
+    }
+  }
+
+  const newAreas = SEED_AREAS.filter((a) => !existingAreaKeys.has(areaKey(a.name, a.terminal)));
   if (existingAreas.length === 0) {
     await db.insert(areasTable).values(SEED_AREAS);
     console.log(`Seeded: ${SEED_AREAS.length} areas`);
   } else if (newAreas.length > 0) {
     await db.insert(areasTable).values(newAreas);
-    console.log(`Added areas: ${newAreas.map((a) => a.name).join(", ")}`);
+    console.log(`Added areas: ${newAreas.map((a) => `${a.name} (${a.terminal})`).join(", ")}`);
   }
 
   const [{ value: ttCount }] = await db.select({ value: count() }).from(taskTypesTable);
