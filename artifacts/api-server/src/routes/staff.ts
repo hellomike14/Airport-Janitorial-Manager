@@ -29,6 +29,7 @@ router.get("/", async (_req, res) => {
   const staff = await db
     .select()
     .from(staffTable)
+    .where(eq(staffTable.active, true))
     .orderBy(staffTable.role, staffTable.name);
   res.json(
     staff.map((s) => {
