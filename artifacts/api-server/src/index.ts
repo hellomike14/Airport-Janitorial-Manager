@@ -25,8 +25,8 @@ const SEED_AREAS = [
   { name: "Terminal C - Levels 1, 3, 5", terminal: "Terminal C", location: "Levels 1, 3, 5", sortOrder: 5 },
   { name: "Terminal C - Levels 2, 4, 6", terminal: "Terminal C", location: "Levels 2, 4, 6", sortOrder: 6 },
   { name: "Top Terminal - Levels 4-11",  terminal: "Top Terminal", location: "Levels 4-11", sortOrder: 7 },
-  { name: "Level P1 - East",             terminal: "Level P1",    location: "East",         sortOrder: 8 },
-  { name: "Level P1 - West",             terminal: "Level P1",    location: "West",         sortOrder: 9 },
+  { name: "Level P1 - East",             terminal: "Terminal A",  location: "East",         sortOrder: 8 },
+  { name: "Level P1 - West",             terminal: "Terminal A",  location: "West",         sortOrder: 9 },
 ];
 
 const SEED_TASK_TYPES = [
@@ -116,7 +116,14 @@ async function seed() {
     }
   }
 
-  const existingAreas = await db.select({ name: areasTable.name }).from(areasTable);
+  const existingAreas = await db.select({ id: areasTable.id, name: areasTable.name, terminal: areasTable.terminal }).from(areasTable);
+  for (const area of existingAreas) {
+    const seedArea = SEED_AREAS.find((a) => a.name === area.name);
+    if (seedArea && seedArea.terminal !== area.terminal) {
+      await db.update(areasTable).set({ terminal: seedArea.terminal }).where(eq(areasTable.id, area.id));
+      console.log(`Updated area ${area.name}: terminal ${area.terminal} → ${seedArea.terminal}`);
+    }
+  }
   const existingAreaNames = new Set(existingAreas.map((a) => a.name));
   const newAreas = SEED_AREAS.filter((a) => !existingAreaNames.has(a.name));
   if (existingAreas.length === 0) {
