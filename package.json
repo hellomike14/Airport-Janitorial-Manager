@@ -15,5 +15,12 @@
   },
   "dependencies": {
     "adm-zip": "^0.5.16"
+  },
+  "pnpm": {
+    "overrides": {
+      "path-to-regexp": "8.4.0",
+      "picomatch@^2": "2.3.2",
+      "picomatch@^4": "4.0.4"
+    }
   }
 }
