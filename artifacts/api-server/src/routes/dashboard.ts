@@ -15,7 +15,6 @@ const DAILY_TASKS = [
   "Remove gum, stains, and debris from floor surfaces",
   "Clean entry/exit areas, doors, and glass partitions",
   "Inspect and clean drainage grates and floor drains",
-  "Clean gate/seating areas — wipe seats, armrests, and surfaces",
   "Sweep and clean ticketing kiosks, counters, and service areas",
   "Inspect and report any maintenance issues or safety hazards",
   "Final supervisor inspection walk-through and sign-off",
