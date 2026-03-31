@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   useListTaskTypes,
   useCreateTaskType,
@@ -24,6 +25,7 @@ import {
 import { Button } from "@/components/ui/button";
 
 export default function TaskTypes() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const { data: taskTypes = [], isLoading } = useListTaskTypes();
   const [isAdding, setIsAdding] = useState(false);
@@ -114,49 +116,46 @@ export default function TaskTypes() {
         <div>
           <h1 className="text-3xl font-display font-bold text-slate-900 flex items-center gap-3">
             <ListChecks className="w-8 h-8 text-blue-600" />
-            Task Type Inventory
+            {t("taskTypes.title")}
           </h1>
           <p className="text-slate-500 mt-1 font-medium">
-            Manage the daily task templates applied to every cleaning area.
+            {t("taskTypes.subtitle")}
           </p>
         </div>
         <Button
           onClick={() => { setIsAdding(true); setNewName(""); }}
           className="bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl shadow-md shadow-emerald-700/20 font-bold"
         >
-          <Plus className="w-4 h-4 mr-2" /> Add Task Type
+          <Plus className="w-4 h-4 mr-2" /> {t("taskTypes.addTaskType")}
         </Button>
       </div>
 
-      {/* Stats row */}
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Total Types</p>
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">{t("taskTypes.totalTypes")}</p>
           <p className="text-3xl font-bold text-slate-900">{sorted.length}</p>
         </div>
         <div className="bg-white rounded-2xl border border-emerald-200 p-5 shadow-sm">
-          <p className="text-xs font-semibold text-emerald-500 uppercase tracking-wider mb-1">Active</p>
+          <p className="text-xs font-semibold text-emerald-500 uppercase tracking-wider mb-1">{t("taskTypes.active")}</p>
           <p className="text-3xl font-bold text-emerald-700">{activeCount}</p>
         </div>
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Inactive</p>
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">{t("taskTypes.inactive")}</p>
           <p className="text-3xl font-bold text-slate-500">{sorted.length - activeCount}</p>
         </div>
       </div>
 
-      {/* Info banner */}
       <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-2xl px-5 py-4 text-sm text-blue-800">
         <AlertCircle className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
         <div>
-          <strong className="font-semibold">About task types:</strong> These templates define the daily checklist for every cleaning area. Changes take effect for <em>new days</em> — tasks already created for today are not affected. Drag rows to reorder. Toggle active/inactive to include or exclude from daily generation.
+          <strong className="font-semibold">{t("taskTypes.aboutTaskTypes")}</strong> {t("taskTypes.aboutDescription")}
         </div>
       </div>
 
-      {/* Add form */}
       {isAdding && (
         <div className="bg-blue-50 rounded-2xl border border-blue-100 p-5">
           <h3 className="text-sm font-bold text-blue-900 mb-3 flex items-center gap-2">
-            <Plus className="w-4 h-4" /> New Task Type
+            <Plus className="w-4 h-4" /> {t("taskTypes.newTaskType")}
           </h3>
           <form onSubmit={handleAdd} className="flex gap-3">
             <input
@@ -164,7 +163,7 @@ export default function TaskTypes() {
               type="text"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              placeholder="e.g. Clean and sanitize restrooms"
+              placeholder={t("taskTypes.taskNamePlaceholder")}
               className="flex-1 bg-white border border-blue-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/30"
             />
             <Button
@@ -186,19 +185,17 @@ export default function TaskTypes() {
         </div>
       )}
 
-      {/* Task list */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
         {isLoading ? (
-          <div className="p-12 text-center text-slate-400 animate-pulse">Loading task types...</div>
+          <div className="p-12 text-center text-slate-400 animate-pulse">{t("taskTypes.loadingTaskTypes")}</div>
         ) : (
           <div className="divide-y divide-slate-100">
-            {/* Header */}
             <div className="grid grid-cols-[32px_40px_1fr_120px_80px] gap-3 px-5 py-3 bg-slate-50 text-xs font-semibold text-slate-400 uppercase tracking-wider">
               <div />
               <div>#</div>
-              <div>Task Name</div>
-              <div className="text-center">Status</div>
-              <div className="text-right">Actions</div>
+              <div>{t("taskTypes.taskName")}</div>
+              <div className="text-center">{t("taskTypes.status")}</div>
+              <div className="text-right">{t("common.actions")}</div>
             </div>
 
             {sorted.map((task) => {
@@ -221,15 +218,12 @@ export default function TaskTypes() {
                     !task.active ? "bg-slate-50/60" : ""
                   } hover:bg-slate-50/80`}
                 >
-                  {/* Drag handle */}
                   <div className="cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-400">
                     <GripVertical className="w-4 h-4" />
                   </div>
 
-                  {/* Order */}
                   <div className="text-sm font-bold text-slate-400 tabular-nums">{task.taskOrder}</div>
 
-                  {/* Name */}
                   <div className="min-w-0">
                     {isEditing ? (
                       <div className="flex gap-2 items-center">
@@ -260,19 +254,19 @@ export default function TaskTypes() {
                       </div>
                     ) : isDeleting ? (
                       <div className="flex items-center gap-3">
-                        <span className="text-sm text-rose-700 font-medium">Delete "{task.taskName.slice(0, 40)}…"?</span>
+                        <span className="text-sm text-rose-700 font-medium">{t("taskTypes.confirmDelete", { name: task.taskName.slice(0, 40) })}</span>
                         <button
                           onClick={() => confirmDelete(task.id)}
                           disabled={deleteMutation.isPending}
                           className="px-3 py-1 rounded-lg bg-rose-100 text-rose-700 hover:bg-rose-200 text-xs font-bold transition-colors"
                         >
-                          {deleteMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin inline" /> : "Yes, Delete"}
+                          {deleteMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin inline" /> : t("taskTypes.yesDelete")}
                         </button>
                         <button
                           onClick={() => setDeletingId(null)}
                           className="px-3 py-1 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 text-xs font-medium transition-colors"
                         >
-                          Cancel
+                          {t("common.cancel")}
                         </button>
                       </div>
                     ) : (
@@ -282,23 +276,21 @@ export default function TaskTypes() {
                     )}
                   </div>
 
-                  {/* Status badge */}
                   <div className="flex justify-center">
                     <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
                       task.active
                         ? "bg-emerald-100 text-emerald-700"
                         : "bg-slate-100 text-slate-500"
                     }`}>
-                      {task.active ? "Active" : "Inactive"}
+                      {task.active ? t("common.active") : t("common.inactive")}
                     </span>
                   </div>
 
-                  {/* Actions */}
                   {!isEditing && !isDeleting && (
                     <div className="flex justify-end items-center gap-1">
                       <button
                         onClick={() => handleToggleActive(task.id, task.active)}
-                        title={task.active ? "Deactivate" : "Activate"}
+                        title={task.active ? t("taskTypes.deactivate") : t("taskTypes.activate")}
                         className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 transition-colors"
                       >
                         {task.active
@@ -308,14 +300,14 @@ export default function TaskTypes() {
                       <button
                         onClick={() => handleStartEdit(task.id, task.taskName)}
                         className="p-1.5 rounded-lg text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
-                        title="Edit"
+                        title={t("taskTypes.edit")}
                       >
                         <Pencil className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleDelete(task.id)}
                         className="p-1.5 rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
-                        title="Delete"
+                        title={t("common.delete")}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -328,8 +320,8 @@ export default function TaskTypes() {
             {sorted.length === 0 && !isLoading && (
               <div className="p-12 text-center text-slate-400">
                 <ClipboardList className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                <p className="font-medium">No task types yet</p>
-                <p className="text-sm mt-1">Add your first task type using the button above.</p>
+                <p className="font-medium">{t("taskTypes.noTaskTypes")}</p>
+                <p className="text-sm mt-1">{t("taskTypes.addFirstTaskType")}</p>
               </div>
             )}
           </div>

@@ -7,6 +7,7 @@ import { AppLayout } from "./components/layout/AppLayout";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { OfflineProvider } from "./contexts/OfflineContext";
 import { OfflineBanner } from "./components/OfflineBanner";
+import "./i18n";
 
 import Dashboard from "./pages/Dashboard";
 import AreasList from "./pages/AreasList";

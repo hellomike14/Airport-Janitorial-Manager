@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { useRoute } from "wouter";
 import { format } from "date-fns";
+import { useTranslation } from "react-i18next";
+import { getDateLocale } from "@/i18n/dateLocale";
 import { 
   useListTasks, 
   useCompleteTask, 
@@ -16,6 +18,8 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { TaskPhotoToggle } from "@/components/TaskPhotos";
 
 export default function AreaTasks() {
+  const { t, i18n } = useTranslation();
+  const dateLocale = getDateLocale(i18n.language);
   const [, params] = useRoute("/areas/:areaId");
   const areaId = params?.areaId ? parseInt(params.areaId) : 0;
   const [selectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
@@ -28,7 +32,6 @@ export default function AreaTasks() {
     query: { enabled: !!areaId } 
   });
 
-  // MOCK USER ID FOR DEMO (In real app, get from auth context)
   const currentUserId = 1; 
 
   const completeMutation = useCompleteTask({
@@ -64,7 +67,7 @@ export default function AreaTasks() {
   };
 
   if (isLoading) {
-    return <div className="p-8 text-center text-slate-500 font-medium animate-pulse">Loading task sheet...</div>;
+    return <div className="p-8 text-center text-slate-500 font-medium animate-pulse">{t("areaTasks.loadingTaskSheet")}</div>;
   }
 
   const completedCount = tasks?.filter(t => t.completed).length || 0;
@@ -74,31 +77,30 @@ export default function AreaTasks() {
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-12">
       <Link href="/areas" className="inline-flex items-center text-sm font-medium text-slate-500 hover:text-accent transition-colors">
-        <ArrowLeft className="w-4 h-4 mr-1" /> Back to Area List
+        <ArrowLeft className="w-4 h-4 mr-1" /> {t("areaTasks.backToAreaList")}
       </Link>
 
-      {/* Header Area */}
       <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-200 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-accent/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
         
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 relative z-10">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <StatusBadge status="info">{areaInfo?.terminal || 'Terminal'}</StatusBadge>
-              <span className="text-sm font-semibold text-slate-400 uppercase tracking-wider">{format(new Date(selectedDate), "MMM do, yyyy")}</span>
+              <StatusBadge status="info">{areaInfo?.terminal || t("areaTasks.terminal")}</StatusBadge>
+              <span className="text-sm font-semibold text-slate-400 uppercase tracking-wider">{format(new Date(selectedDate), "MMM do, yyyy", { locale: dateLocale })}</span>
             </div>
-            <h1 className="text-4xl font-display font-bold text-slate-900">{areaInfo?.name || `Area ${areaId}`}</h1>
+            <h1 className="text-4xl font-display font-bold text-slate-900">{areaInfo?.name || t("areaTasks.area", { id: areaId })}</h1>
             <p className="text-slate-500 mt-2 font-medium flex items-center gap-2">
               <User className="w-4 h-4" /> 
-              Assigned: <span className="text-slate-800">
-                {tasks?.[0]?.assignedToName || 'No specific assignment'}
+              {t("areaTasks.assigned")} <span className="text-slate-800">
+                {tasks?.[0]?.assignedToName || t("areaTasks.noSpecificAssignment")}
               </span>
             </p>
           </div>
 
           <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 min-w-[200px]">
             <div className="flex justify-between items-end mb-2">
-              <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">Progress</span>
+              <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">{t("areaTasks.progress")}</span>
               <span className="text-2xl font-display font-bold text-accent">{completedCount}/{totalCount}</span>
             </div>
             <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden">
@@ -111,19 +113,17 @@ export default function AreaTasks() {
         </div>
       </div>
 
-      {/* Actions */}
       <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-        <p className="text-sm font-medium text-slate-600 ml-2">Daily Required Tasks (15)</p>
+        <p className="text-sm font-medium text-slate-600 ml-2">{t("areaTasks.dailyRequiredTasks")}</p>
         <Button 
           onClick={handleCompleteAll}
           disabled={completedCount === totalCount || completeAllMutation.isPending}
           className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-lg shadow-emerald-600/20 font-bold px-6"
         >
-          {completeAllMutation.isPending ? "Updating..." : "Complete All Remaining"}
+          {completeAllMutation.isPending ? t("areaTasks.updating") : t("areaTasks.completeAllRemaining")}
         </Button>
       </div>
 
-      {/* Task List */}
       <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
         <ul className="divide-y divide-slate-100">
           {tasks?.map((task) => (
@@ -151,7 +151,7 @@ export default function AreaTasks() {
                 </p>
                 {task.isSpecial && (
                   <span className="inline-flex items-center gap-1 mt-1 text-xs font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                    <AlertCircle className="w-3 h-3" /> Special Inspector Request
+                    <AlertCircle className="w-3 h-3" /> {t("areaTasks.specialInspectorRequest")}
                   </span>
                 )}
                 {task.notes && (
@@ -163,14 +163,14 @@ export default function AreaTasks() {
                 {task.completed ? (
                   <div className="flex flex-col items-end">
                     <span className="text-xs font-bold text-emerald-600 flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-md">
-                      <Clock className="w-3 h-3" /> {task.completedAt ? format(new Date(task.completedAt), "h:mm a") : 'Done'}
+                      <Clock className="w-3 h-3" /> {task.completedAt ? format(new Date(task.completedAt), "h:mm a", { locale: dateLocale }) : t("common.done")}
                     </span>
                     {task.completedByName && (
-                      <span className="text-[10px] font-medium text-slate-400 mt-1">by {task.completedByName}</span>
+                      <span className="text-[10px] font-medium text-slate-400 mt-1">{t("common.by")} {task.completedByName}</span>
                     )}
                   </div>
                 ) : (
-                  <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Pending</span>
+                  <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">{t("common.pending")}</span>
                 )}
                 <TaskPhotoToggle
                   taskId={task.id}
@@ -182,7 +182,7 @@ export default function AreaTasks() {
             </li>
           ))}
           {(!tasks || tasks.length === 0) && (
-            <li className="p-8 text-center text-slate-500 font-medium">No tasks found for this area today.</li>
+            <li className="p-8 text-center text-slate-500 font-medium">{t("areaTasks.noTasksFound")}</li>
           )}
         </ul>
       </div>

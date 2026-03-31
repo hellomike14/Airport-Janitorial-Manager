@@ -1,5 +1,7 @@
 import React, { useMemo, useEffect } from "react";
 import { format, getHours } from "date-fns";
+import { useTranslation } from "react-i18next";
+import { getDateLocale } from "@/i18n/dateLocale";
 import {
   useListTasks,
   useListAssignments,
@@ -38,13 +40,9 @@ function termStyle(terminal: string) {
   return TERMINAL_STYLES[terminal] ?? { bg: "bg-slate-50", text: "text-slate-700", dot: "bg-slate-500", bar: "bg-slate-500", border: "border-slate-200" };
 }
 
-function getGreeting(name: string) {
-  const h = getHours(new Date());
-  const part = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
-  return `${part}, ${name.split(" ")[0]}`;
-}
-
 export default function MyTasks() {
+  const { t, i18n } = useTranslation();
+  const dateLocale = getDateLocale(i18n.language);
   const { currentUser } = useAuth();
   const today = format(new Date(), "yyyy-MM-dd");
   const qc = useQueryClient();
@@ -75,6 +73,12 @@ export default function MyTasks() {
   const isLoading = loadingAssignments || loadingTasks;
 
   if (!currentUser) return null;
+
+  const getGreeting = (name: string) => {
+    const h = getHours(new Date());
+    const part = h < 12 ? t("myTasks.goodMorning") : h < 17 ? t("myTasks.goodAfternoon") : t("myTasks.goodEvening");
+    return `${part}, ${name.split(" ")[0]}`;
+  };
 
   const myTerminals = useMemo(() => {
     const terminals = new Set<string>();
@@ -165,27 +169,26 @@ export default function MyTasks() {
   return (
     <div className="space-y-6 max-w-2xl mx-auto pb-16">
 
-      {/* === Shift Header === */}
       <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-3xl p-6 text-white shadow-xl shadow-slate-900/20">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-slate-400 text-sm font-medium uppercase tracking-wider mb-1">Your Shift</p>
+            <p className="text-slate-400 text-sm font-medium uppercase tracking-wider mb-1">{t("myTasks.yourShift")}</p>
             <h1 className="text-2xl font-bold">{getGreeting(currentUser.name)}</h1>
             <p className="text-slate-400 text-sm mt-1.5 flex items-center gap-1.5">
               <Clock className="w-3.5 h-3.5" />
-              {format(new Date(), "EEEE, MMMM d, yyyy")}
+              {format(new Date(), "EEEE, MMMM d, yyyy", { locale: dateLocale })}
             </p>
           </div>
           <div className="text-right shrink-0">
             <div className="text-3xl font-bold tabular-nums">{totalCompleted}<span className="text-slate-500 text-lg">/{totalTasks}</span></div>
-            <p className="text-slate-400 text-xs mt-0.5">tasks done</p>
+            <p className="text-slate-400 text-xs mt-0.5">{t("myTasks.tasksDone")}</p>
           </div>
         </div>
 
         {totalTasks > 0 && (
           <div className="mt-5">
             <div className="flex justify-between text-xs font-medium mb-2">
-              <span className="text-slate-400">Overall progress</span>
+              <span className="text-slate-400">{t("myTasks.overallProgress")}</span>
               <span className={allDone ? "text-emerald-400" : "text-white"}>
                 {Math.round((totalCompleted / totalTasks) * 100)}%
               </span>
@@ -200,33 +203,30 @@ export default function MyTasks() {
         )}
       </div>
 
-      {/* === All Done Celebration === */}
       {allDone && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-3xl px-6 py-5 flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-emerald-500 flex items-center justify-center shrink-0">
             <PartyPopper className="w-6 h-6 text-white" />
           </div>
           <div>
-            <p className="font-bold text-emerald-800 text-lg">All tasks complete!</p>
-            <p className="text-emerald-600 text-sm">Great work today. Let your supervisor know you're finished.</p>
+            <p className="font-bold text-emerald-800 text-lg">{t("myTasks.allTasksComplete")}</p>
+            <p className="text-emerald-600 text-sm">{t("myTasks.greatWork")}</p>
           </div>
         </div>
       )}
 
-      {/* === No Assignment State === */}
       {myAreaIds.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <div className="w-20 h-20 rounded-3xl bg-slate-100 flex items-center justify-center mb-5">
             <AlertCircle className="w-9 h-9 text-slate-400" />
           </div>
-          <h2 className="text-xl font-bold text-slate-700 mb-2">No Area Assignment Yet</h2>
+          <h2 className="text-xl font-bold text-slate-700 mb-2">{t("myTasks.noAreaAssignment")}</h2>
           <p className="text-slate-500 text-sm max-w-xs leading-relaxed">
-            You haven't been assigned to an area for {format(new Date(), "MMMM d")} yet. Check with your supervisor to get your assignment.
+            {t("myTasks.noAssignmentMessage", { date: format(new Date(), "MMMM d", { locale: dateLocale }) })}
           </p>
         </div>
       )}
 
-      {/* === Area Assignments === */}
       {areaGroups.map(({ areaId, areaName, terminal, assignedByName, notes, tasks, completed, total, pct }) => {
         const style = termStyle(terminal);
         const done = completed === total && total > 0;
@@ -234,7 +234,6 @@ export default function MyTasks() {
         return (
           <div key={areaId} className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
 
-            {/* Area header */}
             <div className={`px-5 py-4 ${done ? "bg-emerald-50 border-b border-emerald-100" : `${style.bg} border-b ${style.border}`}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3">
@@ -251,7 +250,7 @@ export default function MyTasks() {
                     {assignedByName && (
                       <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
                         <User className="w-3 h-3" />
-                        Assigned by {assignedByName}
+                        {t("myTasks.assignedBy", { name: assignedByName })}
                       </p>
                     )}
                   </div>
@@ -259,7 +258,7 @@ export default function MyTasks() {
                 <div className="text-right shrink-0">
                   {done ? (
                     <div className="flex items-center gap-1.5 text-emerald-600 text-sm font-bold">
-                      <CheckCircle2 className="w-4 h-4" /> Done
+                      <CheckCircle2 className="w-4 h-4" /> {t("common.done")}
                     </div>
                   ) : (
                     <div>
@@ -272,11 +271,10 @@ export default function MyTasks() {
 
               {notes && (
                 <div className="mt-3 bg-white/60 rounded-xl px-3 py-2 text-xs text-slate-600 border border-white/80">
-                  <span className="font-semibold text-slate-700">Note: </span>{notes}
+                  <span className="font-semibold text-slate-700">{t("common.note")}: </span>{notes}
                 </div>
               )}
 
-              {/* Progress bar */}
               <div className="mt-3 h-1.5 bg-white/50 rounded-full overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all duration-500 ${done ? "bg-emerald-500" : style.bar}`}
@@ -285,7 +283,6 @@ export default function MyTasks() {
               </div>
             </div>
 
-            {/* Task checklist */}
             <div className="divide-y divide-slate-50">
               {tasks.map((task, idx) => (
                 <div key={task.id}>
@@ -315,7 +312,7 @@ export default function MyTasks() {
                       {task.completed && task.completedAt && (
                         <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
                           <Clock className="w-3 h-3" />
-                          Done at {format(new Date(task.completedAt), "h:mm a")}
+                          {t("myTasks.doneAt", { time: format(new Date(task.completedAt), "h:mm a", { locale: dateLocale }) })}
                           {task.completedByName && ` · ${task.completedByName}`}
                         </p>
                       )}
@@ -344,7 +341,6 @@ export default function MyTasks() {
         );
       })}
 
-      {/* === Extra Tasks from Supervisor === */}
       {myExtraTasks.length > 0 && (
         <div className="bg-white rounded-3xl border border-amber-200 shadow-sm overflow-hidden">
           <div className="px-5 py-4 bg-amber-50 border-b border-amber-100 flex items-center gap-3">
@@ -352,9 +348,9 @@ export default function MyTasks() {
               <Star className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="font-bold text-slate-900">Extra Tasks from Supervisor</h2>
+              <h2 className="font-bold text-slate-900">{t("myTasks.extraTasks")}</h2>
               <p className="text-xs text-amber-700 font-medium">
-                {myExtraTasks.filter((t) => t.completed).length}/{myExtraTasks.length} completed
+                {t("myTasks.completedCount", { completed: myExtraTasks.filter((t) => t.completed).length, total: myExtraTasks.length })}
               </p>
             </div>
           </div>
@@ -381,7 +377,7 @@ export default function MyTasks() {
                     )}
                     {task.completed && task.completedAt && (
                       <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
-                        <Clock className="w-3 h-3" /> Done at {format(new Date(task.completedAt), "h:mm a")}
+                        <Clock className="w-3 h-3" /> {t("myTasks.doneAt", { time: format(new Date(task.completedAt), "h:mm a", { locale: dateLocale }) })}
                       </p>
                     )}
                   </div>
@@ -400,11 +396,10 @@ export default function MyTasks() {
         </div>
       )}
 
-      {/* === Footer hint === */}
       {myAreaIds.length > 0 && !allDone && (
         <div className="text-center text-xs text-slate-400 pb-4">
           <ClipboardList className="w-4 h-4 inline mr-1 opacity-50" />
-          Tap any task to mark it complete. Changes save instantly.
+          {t("myTasks.tapToComplete")}
         </div>
       )}
     </div>

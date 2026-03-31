@@ -1,54 +1,24 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useListStaff, useListAssignments } from "@workspace/api-client-react";
 import { format } from "date-fns";
+import { useTranslation } from "react-i18next";
 import { useAuth, UserRole } from "@/contexts/AuthContext";
 import { Shield, Users, User, LogIn, ClipboardCheck, Lock, X } from "lucide-react";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
-const ROLE_CONFIG = {
-  admin: {
-    label: "Administrator",
-    icon: Shield,
-    color: "from-violet-600 to-indigo-600",
-    bg: "bg-violet-50 border-violet-200",
-    badge: "bg-violet-100 text-violet-700",
-    description: "Full access — staff management, all areas, reports",
-  },
-  inspector: {
-    label: "Inspector",
-    icon: ClipboardCheck,
-    color: "from-blue-600 to-cyan-500",
-    bg: "bg-blue-50 border-blue-200",
-    badge: "bg-blue-100 text-blue-700",
-    description: "Enter information on open issues and view completed tasks",
-  },
-  supervisor: {
-    label: "Supervisor",
-    icon: Users,
-    color: "from-emerald-600 to-teal-500",
-    bg: "bg-emerald-50 border-emerald-200",
-    badge: "bg-emerald-100 text-emerald-800",
-    description: "Dashboard, assignments, areas, and issue tracking",
-  },
-  staff: {
-    label: "Staff",
-    icon: User,
-    color: "from-emerald-500 to-teal-500",
-    bg: "bg-emerald-50 border-emerald-200",
-    badge: "bg-emerald-100 text-emerald-700",
-    description: "View assigned tasks and report issues",
-  },
-};
-
 type PinMode = "enter" | "set" | "confirm";
 
+
 export default function Login() {
+  const { t } = useTranslation();
   const { data: staffList, isLoading } = useListStaff();
   const today = format(new Date(), "yyyy-MM-dd");
   const { data: todayAssignments } = useListAssignments({ date: today });
   const { login } = useAuth();
   const [selecting, setSelecting] = useState<number | null>(null);
+<<<<<<< HEAD
   const [pinPrompt, setPinPrompt] = useState<{ member: NonNullable<typeof staffList>[number] } | null>(null);
   const [pinMode, setPinMode] = useState<PinMode>("enter");
   const [pinDigits, setPinDigits] = useState<string[]>(["", "", "", ""]);
@@ -56,10 +26,53 @@ export default function Login() {
   const [pinError, setPinError] = useState<string | null>(null);
   const [verifying, setVerifying] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+=======
+  const [passwordPrompt, setPasswordPrompt] = useState<{ member: NonNullable<typeof staffList>[number] } | null>(null);
+  const [pin, setPin] = useState(["", "", "", ""]);
+  const [pinError, setPinError] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const pinInputs = React.useRef<(HTMLInputElement | null)[]>([]);
+>>>>>>> 48518ad (Post-merge setup completed successfully)
+
+  const ROLE_CONFIG = {
+    admin: {
+      label: t("roles.administrator"),
+      icon: Shield,
+      color: "from-violet-600 to-indigo-600",
+      bg: "bg-violet-50 border-violet-200",
+      badge: "bg-violet-100 text-violet-700",
+      description: t("login.roleDescriptions.admin"),
+    },
+    inspector: {
+      label: t("roles.inspector"),
+      icon: ClipboardCheck,
+      color: "from-blue-600 to-cyan-500",
+      bg: "bg-blue-50 border-blue-200",
+      badge: "bg-blue-100 text-blue-700",
+      description: t("login.roleDescriptions.inspector"),
+    },
+    supervisor: {
+      label: t("roles.supervisor"),
+      icon: Users,
+      color: "from-emerald-600 to-teal-500",
+      bg: "bg-emerald-50 border-emerald-200",
+      badge: "bg-emerald-100 text-emerald-800",
+      description: t("login.roleDescriptions.supervisor"),
+    },
+    staff: {
+      label: t("roles.staff"),
+      icon: User,
+      color: "from-emerald-500 to-teal-500",
+      bg: "bg-emerald-50 border-emerald-200",
+      badge: "bg-emerald-100 text-emerald-700",
+      description: t("login.roleDescriptions.staff"),
+    },
+  };
 
   const assignedStaffIds = useMemo(() => {
     return new Set((todayAssignments ?? []).map((a) => a.staffId));
   }, [todayAssignments]);
+<<<<<<< HEAD
 
   useEffect(() => {
     if (pinPrompt && inputRefs.current[0]) {
@@ -79,6 +92,14 @@ export default function Login() {
       const hasPin = (member as any).hasPin;
       setPinMode(hasPin ? "enter" : "set");
       resetPinState();
+=======
+
+  const handleLogin = (member: NonNullable<typeof staffList>[number]) => {
+    if ((member as any).hasPassword) {
+      setPasswordPrompt({ member });
+      setPin(["", "", "", ""]);
+      setPinError(false);
+>>>>>>> 48518ad (Post-merge setup completed successfully)
       return;
     }
     setSelecting(member.id);
@@ -91,6 +112,7 @@ export default function Login() {
     });
   };
 
+<<<<<<< HEAD
   const completeLogin = (member: NonNullable<typeof staffList>[number]) => {
     setPinPrompt(null);
     setSelecting(member.id);
@@ -118,12 +140,12 @@ export default function Login() {
         if (res.ok) {
           completeLogin(pinPrompt.member);
         } else {
-          setPinError("Incorrect PIN. Please try again.");
+          setPinError(t("login.incorrectPin"));
           setPinDigits(["", "", "", ""]);
           setTimeout(() => inputRefs.current[0]?.focus(), 50);
         }
       } catch {
-        setPinError("Incorrect PIN. Please try again.");
+        setPinError(t("login.incorrectPin"));
         setPinDigits(["", "", "", ""]);
         setTimeout(() => inputRefs.current[0]?.focus(), 50);
       } finally {
@@ -136,7 +158,7 @@ export default function Login() {
       setPinError(null);
     } else if (pinMode === "confirm") {
       if (pin !== firstPin) {
-        setPinError("PINs do not match. Please start over.");
+        setPinError(t("layout.pinsNoMatch"));
         setPinMode("set");
         setFirstPin("");
         setPinDigits(["", "", "", ""]);
@@ -154,14 +176,14 @@ export default function Login() {
         if (res.ok) {
           completeLogin(pinPrompt.member);
         } else {
-          setPinError("Failed to set PIN. Please try again.");
+          setPinError(t("layout.failedSetPin"));
           setPinMode("set");
           setFirstPin("");
           setPinDigits(["", "", "", ""]);
           setTimeout(() => inputRefs.current[0]?.focus(), 50);
         }
       } catch {
-        setPinError("Failed to set PIN. Please try again.");
+        setPinError(t("layout.failedSetPin"));
         setPinMode("set");
         setFirstPin("");
         setPinDigits(["", "", "", ""]);
@@ -195,11 +217,77 @@ export default function Login() {
       newDigits[index - 1] = "";
       setPinDigits(newDigits);
       inputRefs.current[index - 1]?.focus();
+=======
+  const handlePasswordSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!passwordPrompt) return;
+    const pinString = pin.join("");
+    if (pinString.length < 4) return;
+
+    setVerifying(true);
+    setPinError(false);
+    try {
+      const res = await fetch(`${BASE_URL}/api/staff/verify-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ staffId: passwordPrompt.member.id, password: pinString }),
+      });
+      if (res.ok) {
+        const member = passwordPrompt.member;
+        setPasswordPrompt(null);
+        setSelecting(member.id);
+        login({
+          id: member.id,
+          name: member.name,
+          role: member.role as UserRole,
+          phone: member.phone,
+          email: member.email,
+        });
+      } else {
+        setPinError(true);
+        setPin(["", "", "", ""]);
+        pinInputs.current[0]?.focus();
+      }
+    } catch {
+      setPinError(true);
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handlePinChange = (index: number, value: string) => {
+    if (!/^\d*$/.test(value)) return;
+
+    const newPin = [...pin];
+    newPin[index] = value.slice(-1);
+    setPin(newPin);
+    setPinError(false);
+
+    if (value && index < 3) {
+      pinInputs.current[index + 1]?.focus();
+    }
+
+    if (newPin.every((digit) => digit !== "")) {
+      // Auto-submit when all digits are entered
+      setTimeout(() => {
+        const pinString = newPin.join("");
+        if (pinString.length === 4) {
+          handlePasswordSubmit();
+        }
+      }, 100);
+    }
+  };
+
+  const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === "Backspace" && !pin[index] && index > 0) {
+      pinInputs.current[index - 1]?.focus();
+>>>>>>> 48518ad (Post-merge setup completed successfully)
     }
   };
 
   const handlePaste = (e: React.ClipboardEvent) => {
     e.preventDefault();
+<<<<<<< HEAD
     const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 4);
     if (pasted.length === 4) {
       const newDigits = pasted.split("");
@@ -210,17 +298,32 @@ export default function Login() {
   };
 
   const getPinTitle = () => {
-    if (pinMode === "set") return "Set your PIN";
-    if (pinMode === "confirm") return "Confirm your PIN";
-    return "Enter your PIN";
+    if (pinMode === "set") return t("login.setYourPin", "Set your PIN");
+    if (pinMode === "confirm") return t("layout.confirmNewPin");
+    return t("login.enterPin");
   };
 
   const getPinSubtitle = () => {
-    if (pinMode === "set") return "Create a 4-digit PIN for future logins";
-    if (pinMode === "confirm") return "Re-enter your PIN to confirm";
-    return "Enter your 4-digit PIN";
+    if (pinMode === "set") return t("login.createPinSubtitle", "Create a 4-digit PIN for future logins");
+    if (pinMode === "confirm") return t("login.confirmPinSubtitle", "Re-enter your PIN to confirm");
+    return t("login.enterPinSubtitle", "Enter your 4-digit PIN");
   };
 
+=======
+    const pastedData = e.clipboardData.getData("text").slice(0, 4);
+    if (!/^\d+$/.test(pastedData)) return;
+
+    const newPin = [...pin];
+    pastedData.split("").forEach((char, i) => {
+      if (i < 4) newPin[i] = char;
+    });
+    setPin(newPin);
+    if (newPin.every((digit) => digit !== "")) {
+      handlePasswordSubmit();
+    }
+  };
+
+>>>>>>> 48518ad (Post-merge setup completed successfully)
   const byRole = {
     admin: (staffList ?? []).filter((s) => s.role === "admin" && s.active),
     inspector: (staffList ?? []).filter((s) => s.role === "inspector" && s.active),
@@ -233,6 +336,10 @@ export default function Login() {
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl" />
+      </div>
+
+      <div className="absolute top-4 right-4 z-20">
+        <LanguageSwitcher variant="login" />
       </div>
 
       <div className="text-center mb-10 relative z-10">
@@ -250,12 +357,12 @@ export default function Login() {
             />
           </div>
         </div>
-        <p className="text-emerald-300 mt-1 text-sm font-medium tracking-wide uppercase">MCO International Airport</p>
-        <p className="text-slate-400 mt-3 text-sm">Select your profile to continue</p>
+        <p className="text-emerald-300 mt-1 text-sm font-medium tracking-wide uppercase">{t("login.mcoAirport")}</p>
+        <p className="text-slate-400 mt-3 text-sm">{t("login.selectProfile")}</p>
       </div>
 
       {isLoading ? (
-        <div className="text-emerald-300 text-sm">Loading staff...</div>
+        <div className="text-emerald-300 text-sm">{t("login.loadingStaff")}</div>
       ) : (
         <div className="w-full max-w-3xl space-y-5 relative z-10">
           {(["admin", "inspector", "supervisor", "staff"] as const).map((role) => {
@@ -273,11 +380,11 @@ export default function Login() {
                     <div className="flex items-center gap-2">
                       <h2 className="font-semibold text-slate-800">{cfg.label}</h2>
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${cfg.badge}`}>
-                        {members.length} {members.length === 1 ? "user" : "users"}
+                        {members.length} {members.length === 1 ? t("common.user") : t("common.users")}
                       </span>
                       {role !== "staff" && (
                         <span className="flex items-center gap-1 text-xs text-slate-400">
-                          <Lock className="w-3 h-3" /> PIN required
+                          <Lock className="w-3 h-3" /> {t("login.pinRequired")}
                         </span>
                       )}
                     </div>
@@ -314,7 +421,7 @@ export default function Login() {
                             <p className="text-xs text-slate-400 truncate">{member.phone}</p>
                           )}
                           {!isOnShift && (
-                            <p className="text-[10px] text-slate-400 font-medium">Not on shift</p>
+                            <p className="text-[10px] text-slate-400 font-medium">{t("login.notOnShift")}</p>
                           )}
                         </div>
                         {isOnShift && (
@@ -352,6 +459,7 @@ export default function Login() {
               </button>
             </div>
 
+<<<<<<< HEAD
             <div className="text-center mb-6">
               <p className="font-semibold text-slate-800 text-lg">{getPinTitle()}</p>
               <p className="text-sm text-slate-500 mt-1">{getPinSubtitle()}</p>
@@ -384,14 +492,61 @@ export default function Login() {
             {verifying && (
               <div className="flex items-center justify-center gap-2 text-emerald-600 text-sm">
                 <span className="animate-spin">&#8635;</span>
-                <span>{pinMode === "enter" ? "Verifying..." : "Setting PIN..."}</span>
+                <span>{pinMode === "enter" ? t("layout.verifying") : t("layout.settingPin")}</span>
               </div>
-            )}
+            )
+=======
+            <form onSubmit={handlePasswordSubmit}>
+              <label className="text-sm font-medium text-slate-700 mb-2 block text-center">
+                {t("login.enterPin")}
+              </label>
+              <div className="flex justify-center gap-3 mb-4" onPaste={handlePaste}>
+                {pin.map((digit, i) => (
+                  <input
+                    key={i}
+                    ref={(el) => {
+                      pinInputs.current[i] = el;
+                    }}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="\d*"
+                    maxLength={1}
+                    value={digit}
+                    onChange={(e) => handlePinChange(i, e.target.value)}
+                    onKeyDown={(e) => handleKeyDown(i, e)}
+                    autoFocus={i === 0}
+                    className={`w-12 h-14 text-center text-2xl font-bold rounded-xl border-2 transition-all outline-none ${
+                      pinError
+                        ? "border-red-300 bg-red-50 text-red-600 focus:border-red-500"
+                        : "border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                    }`}
+                  />
+                ))}
+              </div>
+              {pinError && (
+                <p className="text-red-500 text-xs mt-2 font-medium text-center">{t("login.incorrectPin")}</p>
+              )}
+              <button
+                type="submit"
+                disabled={verifying || pin.some((d) => d === "")}
+                className="w-full mt-4 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {verifying ? (
+                  <span className="animate-spin text-lg">&#8635;</span>
+                ) : (
+                  <>
+                    <Lock className="w-4 h-4" />
+                    {t("login.signIn")}
+                  </>
+                )}
+              </button>
+            </form>
+>>>>>>> 48518ad (Post-merge setup completed successfully)
           </div>
         </div>
       )}
 
-      <p className="text-slate-600 text-xs mt-8 relative z-10">Marvol Facility Services · MCO Airport · Internal System</p>
+      <p className="text-slate-600 text-xs mt-8 relative z-10">{t("login.footer")}</p>
     </div>
   );
 }

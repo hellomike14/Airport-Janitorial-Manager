@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { format } from "date-fns";
+import { useTranslation } from "react-i18next";
+import { getDateLocale } from "@/i18n/dateLocale";
 import { useGetDashboard } from "@workspace/api-client-react";
 import { 
   CheckCircle2, 
@@ -12,6 +14,8 @@ import {
 import { Link } from "wouter";
 
 export default function Dashboard() {
+  const { t, i18n } = useTranslation();
+  const dateLocale = getDateLocale(i18n.language);
   const [selectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
   
   const { data: stats, isLoading, isError } = useGetDashboard({ date: selectedDate });
@@ -33,8 +37,8 @@ export default function Dashboard() {
     return (
       <div className="p-8 bg-rose-50 border border-rose-100 rounded-2xl text-center">
         <AlertOctagon className="w-12 h-12 text-rose-500 mx-auto mb-4" />
-        <h2 className="text-lg font-bold text-rose-800">Failed to load dashboard</h2>
-        <p className="text-rose-600 mt-2">Make sure the API server is running.</p>
+        <h2 className="text-lg font-bold text-rose-800">{t("dashboard.failedToLoadDashboard")}</h2>
+        <p className="text-rose-600 mt-2">{t("dashboard.apiServerError")}</p>
       </div>
     );
   }
@@ -43,47 +47,44 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8 pb-12">
-      {/* Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-display font-bold text-foreground">Facility Overview</h1>
+          <h1 className="text-3xl font-display font-bold text-foreground">{t("dashboard.facilityOverview")}</h1>
           <p className="text-slate-500 mt-1 flex items-center gap-2">
-            <Clock className="w-4 h-4" /> Real-time status for {format(new Date(selectedDate), "MMMM do, yyyy")}
+            <Clock className="w-4 h-4" /> {t("dashboard.realTimeStatus", { date: format(new Date(selectedDate), "MMMM do, yyyy", { locale: dateLocale }) })}
           </p>
         </div>
       </div>
 
-      {/* Top Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <StatCard 
-          title="Overall Completion" 
+          title={t("dashboard.overallCompletion")}
           value={`${overallProgress}%`} 
-          subtitle={`${stats.completedTasks} of ${stats.totalTasks} tasks done`}
+          subtitle={t("dashboard.tasksOfTotal", { completed: stats.completedTasks, total: stats.totalTasks })}
           icon={TrendingUp}
           colorClass="text-emerald-600 bg-emerald-100"
           progress={overallProgress}
         />
         <StatCard 
-          title="Areas Cleared" 
+          title={t("dashboard.areasCleared")}
           value={`${stats.completedAreas}/${stats.totalAreas}`} 
-          subtitle="Fully completed zones"
+          subtitle={t("dashboard.fullyCompletedZones")}
           icon={MapIcon}
           colorClass="text-blue-600 bg-blue-100"
         />
         <StatCard 
-          title="Open Issues" 
+          title={t("dashboard.openIssues")}
           value={stats.openIssues.toString()} 
-          subtitle="Requires attention"
+          subtitle={t("dashboard.requiresAttention")}
           icon={AlertOctagon}
           colorClass={stats.openIssues > 0 ? "text-rose-600 bg-rose-100" : "text-slate-600 bg-slate-100"}
           alert={stats.openIssues > 0}
         />
       </div>
 
-      {/* Area Progress Grid */}
       <div>
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-display font-bold text-slate-800">Coverage Areas Status</h2>
+          <h2 className="text-xl font-display font-bold text-slate-800">{t("dashboard.coverageAreasStatus")}</h2>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -123,6 +124,7 @@ function StatCard({ title, value, subtitle, icon: Icon, colorClass, progress, al
 }
 
 function AreaProgressCard({ area, delay }: any) {
+  const { t } = useTranslation();
   const isComplete = area.percentage === 100;
   const isDanger = area.percentage < 30;
   
@@ -164,7 +166,7 @@ function AreaProgressCard({ area, delay }: any) {
         <div className="mt-auto">
           <div className="flex justify-between items-end mb-2">
             <div className="text-sm text-slate-500 font-medium">
-              <span className="text-slate-900 font-bold">{area.completedTasks}</span> / {area.totalTasks} Tasks
+              <span className="text-slate-900 font-bold">{area.completedTasks}</span> / {area.totalTasks} {t("dashboard.tasks")}
             </div>
             <div className={`text-lg font-display font-bold ${textDark}`}>
               {area.percentage}%
@@ -187,7 +189,7 @@ function AreaProgressCard({ area, delay }: any) {
                   </div>
                 ))
               ) : (
-                <span className="text-xs text-slate-400 font-medium italic">Unassigned</span>
+                <span className="text-xs text-slate-400 font-medium italic">{t("dashboard.unassigned")}</span>
               )}
             </div>
             <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-accent group-hover:text-white transition-colors">

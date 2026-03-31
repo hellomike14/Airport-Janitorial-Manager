@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import { MapPin, RefreshCw, Clock, Navigation, Users, Shield, UserCheck } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/AuthContext";
 import "leaflet/dist/leaflet.css";
 
@@ -59,6 +60,7 @@ function FlyToLocation({ location }: { location: [number, number] | null }) {
 }
 
 export default function GPSTracking() {
+  const { t } = useTranslation();
   const { viewMode } = useAuth();
   const [locations, setLocations] = useState<StaffLocationData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -104,10 +106,10 @@ export default function GPSTracking() {
         <div>
           <h1 className="text-3xl font-display font-bold text-slate-900 flex items-center gap-3">
             <Navigation className="w-8 h-8 text-emerald-600" />
-            GPS Staff Tracking
+            {t("gpsTracking.title")}
           </h1>
           <p className="text-slate-500 mt-1 font-medium">
-            Real-time location of staff and supervisors at MCO
+            {t("gpsTracking.subtitle")}
           </p>
         </div>
         <button
@@ -115,7 +117,7 @@ export default function GPSTracking() {
           className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-semibold transition-colors shadow-sm"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-          Refresh
+          {t("common.refresh")}
         </button>
       </div>
 
@@ -154,7 +156,7 @@ export default function GPSTracking() {
                       </p>
                       {loc.accuracy && (
                         <p className="text-xs text-slate-400">
-                          Accuracy: ±{Math.round(loc.accuracy)}m
+                          {t("gpsTracking.accuracy", { meters: Math.round(loc.accuracy) })}
                         </p>
                       )}
                     </div>
@@ -169,14 +171,14 @@ export default function GPSTracking() {
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="px-4 py-3 bg-blue-50 border-b border-blue-100 flex items-center gap-2">
               <Shield className="w-4 h-4 text-blue-600" />
-              <span className="font-bold text-blue-900 text-sm">Supervisors</span>
+              <span className="font-bold text-blue-900 text-sm">{t("gpsTracking.supervisors")}</span>
               <span className="ml-auto text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">
                 {supervisors.length}
               </span>
             </div>
             <div className="divide-y divide-slate-50">
               {supervisors.length === 0 && (
-                <p className="text-xs text-slate-400 px-4 py-3 italic">No supervisor locations yet</p>
+                <p className="text-xs text-slate-400 px-4 py-3 italic">{t("gpsTracking.noSupervisorLocations")}</p>
               )}
               {supervisors.map((loc) => (
                 <button
@@ -204,14 +206,14 @@ export default function GPSTracking() {
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="px-4 py-3 bg-emerald-50 border-b border-emerald-100 flex items-center gap-2">
               <Users className="w-4 h-4 text-emerald-600" />
-              <span className="font-bold text-emerald-900 text-sm">Staff</span>
+              <span className="font-bold text-emerald-900 text-sm">{t("gpsTracking.staff")}</span>
               <span className="ml-auto text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">
                 {staff.length}
               </span>
             </div>
             <div className="divide-y divide-slate-50 max-h-[280px] overflow-y-auto">
               {staff.length === 0 && (
-                <p className="text-xs text-slate-400 px-4 py-3 italic">No staff locations yet</p>
+                <p className="text-xs text-slate-400 px-4 py-3 italic">{t("gpsTracking.noStaffLocations")}</p>
               )}
               {staff.map((loc) => (
                 <button
@@ -238,7 +240,7 @@ export default function GPSTracking() {
 
           <div className="bg-slate-50 rounded-xl px-4 py-3 text-xs text-slate-500 flex items-center gap-2">
             <Clock className="w-3.5 h-3.5" />
-            Auto-refreshes every 15s · Last: {lastRefresh.toLocaleTimeString()}
+            {t("gpsTracking.autoRefresh", { time: lastRefresh.toLocaleTimeString() })}
           </div>
         </div>
       </div>

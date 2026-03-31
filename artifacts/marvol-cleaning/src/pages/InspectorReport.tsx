@@ -1,5 +1,7 @@
 import React, { useMemo, useRef } from "react";
 import { format, subDays, parseISO } from "date-fns";
+import { useTranslation } from "react-i18next";
+import { getDateLocale } from "@/i18n/dateLocale";
 import { useListIssues } from "@workspace/api-client-react";
 import {
   Printer,
@@ -16,21 +18,24 @@ import { Button } from "@/components/ui/button";
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
 const SEVERITY_STYLE = {
-  high: { badge: "bg-red-100 text-red-700 border border-red-200", dot: "bg-red-500", label: "High", color: "#dc2626" },
-  medium: { badge: "bg-amber-100 text-amber-700 border border-amber-200", dot: "bg-amber-500", label: "Medium", color: "#d97706" },
-  low: { badge: "bg-slate-100 text-slate-600 border border-slate-200", dot: "bg-slate-400", label: "Low", color: "#64748b" },
+  high: { badge: "bg-red-100 text-red-700 border border-red-200", dot: "bg-red-500", color: "#dc2626" },
+  medium: { badge: "bg-amber-100 text-amber-700 border border-amber-200", dot: "bg-amber-500", color: "#d97706" },
+  low: { badge: "bg-slate-100 text-slate-600 border border-slate-200", dot: "bg-slate-400", color: "#64748b" },
 };
 
 function SeverityBadge({ severity }: { severity: string }) {
+  const { t } = useTranslation();
   const s = SEVERITY_STYLE[severity as keyof typeof SEVERITY_STYLE] ?? SEVERITY_STYLE.low;
-  return <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${s.badge}`}>{s.label}</span>;
+  const labelMap: Record<string, string> = { high: t("inspectorReport.high"), medium: t("inspectorReport.medium"), low: t("inspectorReport.low") };
+  return <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${s.badge}`}>{labelMap[severity] ?? severity}</span>;
 }
 
-function StatusBadge({ resolved }: { resolved: boolean }) {
+function ReportStatusBadge({ resolved }: { resolved: boolean }) {
+  const { t } = useTranslation();
   return resolved ? (
-    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">Resolved</span>
+    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">{t("issues.resolved")}</span>
   ) : (
-    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">Open</span>
+    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">{t("issues.open")}</span>
   );
 }
 
@@ -220,6 +225,8 @@ function DownloadIssueButton({ issue }: { issue: any }) {
 }
 
 export default function InspectorReport() {
+  const { t, i18n } = useTranslation();
+  const dateLocale = getDateLocale(i18n.language);
   const today = format(new Date(), "yyyy-MM-dd");
   const sevenDaysAgo = format(subDays(new Date(), 7), "yyyy-MM-dd");
 
@@ -281,15 +288,15 @@ export default function InspectorReport() {
           <div>
             <h1 className="text-3xl font-display font-bold text-slate-900 flex items-center gap-3">
               <FileText className="w-8 h-8 text-blue-600" />
-              Inspector Report
+              {t("inspectorReport.title")}
             </h1>
-            <p className="text-slate-500 mt-1">Each issue has its own <strong>PDF</strong> download. Use the full report button to print the summary.</p>
+            <p className="text-slate-500 mt-1">{t("inspectorReport.subtitle")}</p>
           </div>
           <Button
             onClick={handlePrint}
             className="bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl shadow-md shadow-emerald-700/20 font-bold gap-2"
           >
-            <Printer className="w-4 h-4" /> Print Full Summary
+            <Printer className="w-4 h-4" /> {t("inspectorReport.printFullSummary")}
           </Button>
         </div>
 
@@ -297,17 +304,17 @@ export default function InspectorReport() {
         <div className="no-print bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-wrap items-end gap-4">
           <div className="flex items-center gap-2 text-slate-500 font-medium">
             <Filter className="w-4 h-4" />
-            <span className="text-sm">Date Range</span>
+            <span className="text-sm">{t("inspectorReport.dateRange")}</span>
           </div>
           <div className="flex items-center gap-3 flex-1 flex-wrap">
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">From</label>
+              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{t("inspectorReport.from")}</label>
               <input type="date" value={from} max={to}
                 onChange={(e) => setFrom(e.target.value)}
                 className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/30" />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">To</label>
+              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{t("inspectorReport.to")}</label>
               <input type="date" value={to} min={from} max={today}
                 onChange={(e) => setTo(e.target.value)}
                 className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/30" />
@@ -315,7 +322,7 @@ export default function InspectorReport() {
             <Button onClick={handleApplyFilter} variant="outline"
               className="rounded-xl border-slate-200 text-sm font-semibold mt-5">
               <Calendar className="w-4 h-4 mr-2" />
-              Apply
+              {t("inspectorReport.apply")}
             </Button>
           </div>
         </div>
@@ -345,12 +352,12 @@ export default function InspectorReport() {
             {/* Summary stats */}
             <div className="grid grid-cols-3 md:grid-cols-6 divide-x divide-slate-100">
               {[
-                { label: "Total Issues", value: stats.total, color: "text-slate-800" },
-                { label: "Resolved", value: stats.resolved, color: "text-emerald-600" },
-                { label: "Open", value: stats.open, color: "text-blue-600" },
-                { label: "High", value: stats.high, color: "text-red-600" },
-                { label: "Medium", value: stats.medium, color: "text-amber-600" },
-                { label: "Low", value: stats.low, color: "text-slate-500" },
+                { label: t("inspectorReport.totalIssues"), value: stats.total, color: "text-slate-800" },
+                { label: t("issues.resolved"), value: stats.resolved, color: "text-emerald-600" },
+                { label: t("issues.open"), value: stats.open, color: "text-blue-600" },
+                { label: t("inspectorReport.high"), value: stats.high, color: "text-red-600" },
+                { label: t("inspectorReport.medium"), value: stats.medium, color: "text-amber-600" },
+                { label: t("inspectorReport.low"), value: stats.low, color: "text-slate-500" },
               ].map(({ label, value, color }) => (
                 <div key={label} className="px-5 py-4 text-center">
                   <p className={`text-2xl font-bold ${color}`}>{value}</p>
@@ -363,7 +370,7 @@ export default function InspectorReport() {
           {/* Loading */}
           {isLoading && (
             <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center text-slate-400 animate-pulse">
-              Loading issues for report...
+              {t("inspectorReport.loadingIssues")}
             </div>
           )}
 
@@ -371,8 +378,8 @@ export default function InspectorReport() {
           {!isLoading && issues.length === 0 && (
             <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center">
               <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
-              <p className="font-bold text-slate-700 text-lg">No Issues Found</p>
-              <p className="text-slate-400 text-sm mt-1">No issues were reported between {fromLabel} and {toLabel}.</p>
+              <p className="font-bold text-slate-700 text-lg">{t("inspectorReport.noIssuesFound")}</p>
+              <p className="text-slate-400 text-sm mt-1">{t("inspectorReport.noIssuesBetween", { from: fromLabel, to: toLabel })}</p>
             </div>
           )}
 
@@ -397,11 +404,11 @@ export default function InspectorReport() {
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-medium">
-                    <span className="text-emerald-600">{resolved} resolved</span>
+                    <span className="text-emerald-600">{resolved} {t("issues.resolved").toLowerCase()}</span>
                     <span className="text-slate-300 hidden sm:inline">·</span>
-                    <span className="text-blue-600">{open} open</span>
+                    <span className="text-blue-600">{open} {t("issues.open").toLowerCase()}</span>
                     <span className="text-slate-300 hidden sm:inline">·</span>
-                    <span className="text-slate-600">{areaIssues.length} total</span>
+                    <span className="text-slate-600">{areaIssues.length} {t("inspectorReport.total")}</span>
                   </div>
                 </div>
 
@@ -416,7 +423,7 @@ export default function InspectorReport() {
                             <div className="flex flex-wrap items-center gap-2 mb-1.5">
                               <span className="text-xs font-bold text-slate-400">#{issue.id}</span>
                               <SeverityBadge severity={issue.severity} />
-                              <StatusBadge resolved={issue.resolved} />
+                              <ReportStatusBadge resolved={issue.resolved} />
                             </div>
                             <p className="text-sm font-semibold text-slate-800 leading-snug">{issue.description}</p>
                           </div>
@@ -430,22 +437,22 @@ export default function InspectorReport() {
                       <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-slate-500">
                         <span className="flex items-center gap-1">
                           <Calendar className="w-3 h-3" />
-                          Reported {format(parseISO(issue.issueDate), "MMM d, yyyy")}
+                          {t("inspectorReport.reported")} {format(parseISO(issue.issueDate), "MMM d, yyyy", { locale: dateLocale })}
                         </span>
                         <span className="flex items-center gap-1">
                           <User className="w-3 h-3" />
-                          By {issue.reportedByName}
+                          {t("issues.by")} {issue.reportedByName}
                         </span>
                         {issue.assignedToName && (
                           <span className="flex items-center gap-1">
                             <User className="w-3 h-3 text-blue-400" />
-                            Assigned to {issue.assignedToName}
+                            {t("issues.assigned")} {issue.assignedToName}
                           </span>
                         )}
                         {issue.resolvedAt && (
                           <span className="flex items-center gap-1 text-emerald-600">
                             <CheckCircle2 className="w-3 h-3" />
-                            Resolved {format(parseISO(issue.resolvedAt), "MMM d, yyyy 'at' h:mm a")}
+                            {t("issues.resolved")} {format(parseISO(issue.resolvedAt), "MMM d, yyyy", { locale: dateLocale })}
                           </span>
                         )}
                       </div>
@@ -453,7 +460,7 @@ export default function InspectorReport() {
                       {/* Completion notes */}
                       {issue.completionNotes && (
                         <div className="mt-3 bg-slate-50 rounded-xl px-4 py-2.5 text-sm text-slate-700 border-l-2 border-emerald-400">
-                          <span className="font-semibold text-slate-500 text-xs uppercase tracking-wide">What was done: </span>
+                          <span className="font-semibold text-slate-500 text-xs uppercase tracking-wide">{t("inspectorReport.whatWasDone")}: </span>
                           {issue.completionNotes}
                         </div>
                       )}

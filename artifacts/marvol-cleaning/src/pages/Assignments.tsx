@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { format } from "date-fns";
+import { useTranslation } from "react-i18next";
+import { getDateLocale } from "@/i18n/dateLocale";
 import { 
   useListAssignments, 
   useCreateAssignment, 
@@ -13,6 +15,8 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function Assignments() {
+  const { t, i18n } = useTranslation();
+  const dateLocale = getDateLocale(i18n.language);
   const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const queryClient = useQueryClient();
   const [isAdding, setIsAdding] = useState(false);
@@ -63,8 +67,8 @@ export default function Assignments() {
     <div className="space-y-8 max-w-5xl mx-auto pb-12">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h1 className="text-3xl font-display font-bold text-slate-900">Shift Assignments</h1>
-          <p className="text-slate-500 mt-1 font-medium">Assign staff to cleaning areas for specific dates.</p>
+          <h1 className="text-3xl font-display font-bold text-slate-900">{t("assignments.shiftAssignments")}</h1>
+          <p className="text-slate-500 mt-1 font-medium">{t("assignments.subtitle")}</p>
         </div>
         
         <div className="flex items-center gap-3 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
@@ -82,29 +86,29 @@ export default function Assignments() {
             onClick={() => setIsAdding(!isAdding)}
             className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl"
           >
-            <Plus className="w-4 h-4 mr-2" /> Assign Staff
+            <Plus className="w-4 h-4 mr-2" /> {t("assignments.assignStaff")}
           </Button>
         </div>
       </div>
 
       {isAdding && (
         <div className="bg-indigo-50/50 rounded-3xl p-6 border border-indigo-100 shadow-sm animate-fade-in-up">
-          <h3 className="text-lg font-bold text-indigo-900 mb-4">Create Assignment for {format(new Date(selectedDate), "MMM do")}</h3>
+          <h3 className="text-lg font-bold text-indigo-900 mb-4">{t("assignments.createAssignment", { date: format(new Date(selectedDate), "MMM do", { locale: dateLocale }) })}</h3>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-indigo-900 mb-1">Select Staff</label>
+                <label className="block text-sm font-semibold text-indigo-900 mb-1">{t("assignments.selectStaff")}</label>
                 <select required value={formData.staffId} onChange={e => setFormData({...formData, staffId: e.target.value})} className="w-full bg-white border border-indigo-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
-                  <option value="">-- Choose Staff Member --</option>
+                  <option value="">{t("assignments.chooseStaffMember")}</option>
                   {staff?.filter(s => s.role === 'staff').map(s => (
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-indigo-900 mb-1">Select Area</label>
+                <label className="block text-sm font-semibold text-indigo-900 mb-1">{t("assignments.selectArea")}</label>
                 <select required value={formData.areaId} onChange={e => setFormData({...formData, areaId: e.target.value})} className="w-full bg-white border border-indigo-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
-                  <option value="">-- Choose Area --</option>
+                  <option value="">{t("assignments.chooseArea")}</option>
                   {areas?.map(a => (
                     <option key={a.id} value={a.id}>{a.name} ({a.terminal})</option>
                   ))}
@@ -113,22 +117,22 @@ export default function Assignments() {
             </div>
             
             <div>
-              <label className="block text-sm font-semibold text-indigo-900 mb-1">Special Instructions / Notes</label>
-              <input value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} placeholder="e.g. Focus on deep cleaning carpets today" className="w-full bg-white border border-indigo-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
+              <label className="block text-sm font-semibold text-indigo-900 mb-1">{t("assignments.specialInstructions")}</label>
+              <input value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} placeholder={t("assignments.specialInstructionsPlaceholder")} className="w-full bg-white border border-indigo-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
             </div>
 
             <div className="flex flex-col sm:flex-row sm:items-center gap-3">
               <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-indigo-800 bg-white px-4 py-2 rounded-xl border border-indigo-200">
                 <input type="checkbox" checked={formData.isSpecial} onChange={e => setFormData({...formData, isSpecial: e.target.checked})} className="w-4 h-4 text-indigo-600 rounded" />
                 <Star className="w-4 h-4 text-amber-500" />
-                Mark as Special Inspector Request
+                {t("assignments.markSpecial")}
               </label>
               
               <div className="sm:flex-1" />
               <div className="flex gap-3 justify-end">
-                <Button type="button" variant="ghost" onClick={() => setIsAdding(false)} className="rounded-xl text-indigo-700 hover:bg-indigo-100">Cancel</Button>
+                <Button type="button" variant="ghost" onClick={() => setIsAdding(false)} className="rounded-xl text-indigo-700 hover:bg-indigo-100">{t("common.cancel")}</Button>
                 <Button type="submit" disabled={createMutation.isPending} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md shadow-indigo-600/20 px-6 font-bold">
-                  {createMutation.isPending ? "Assigning..." : "Confirm Assignment"}
+                  {createMutation.isPending ? t("assignments.assigning") : t("assignments.confirmAssignment")}
                 </Button>
               </div>
             </div>
@@ -138,14 +142,13 @@ export default function Assignments() {
 
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
         {isLoading ? (
-          <div className="p-8 text-center text-slate-500 animate-pulse">Loading assignments...</div>
+          <div className="p-8 text-center text-slate-500 animate-pulse">{t("assignments.loadingAssignments")}</div>
         ) : (!assignments || assignments.length === 0) ? (
           <div className="px-6 py-12 text-center text-slate-500 font-medium">
-            No staff assigned for {format(new Date(selectedDate), "MMM do")}.
+            {t("assignments.noAssignments", { date: format(new Date(selectedDate), "MMM do", { locale: dateLocale }) })}
           </div>
         ) : (
           <>
-            {/* Mobile card list */}
             <div className="sm:hidden divide-y divide-slate-100">
               {assignments.map((assignment) => (
                 <div key={assignment.id} className="p-4 flex items-start gap-3">
@@ -161,12 +164,12 @@ export default function Assignments() {
                   </div>
                   <button
                     onClick={() => {
-                      if (confirm("Remove this assignment? Tasks generated for it will remain but become unassigned.")) {
+                      if (confirm(t("assignments.removeAssignment"))) {
                         deleteMutation.mutate({ id: assignment.id });
                       }
                     }}
                     className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 active:bg-rose-100 rounded-lg transition-colors touch-manipulation"
-                    title="Remove Assignment"
+                    title={t("assignments.removeAssignmentTitle")}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -174,14 +177,13 @@ export default function Assignments() {
               ))}
             </div>
 
-            {/* Desktop table */}
             <table className="hidden sm:table w-full text-left text-sm">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider text-xs font-bold">
                 <tr>
-                  <th className="px-6 py-4">Staff Member</th>
-                  <th className="px-6 py-4">Assigned Area</th>
-                  <th className="px-6 py-4">Notes</th>
-                  <th className="px-6 py-4 text-right">Actions</th>
+                  <th className="px-6 py-4">{t("assignments.staffMember")}</th>
+                  <th className="px-6 py-4">{t("assignments.assignedArea")}</th>
+                  <th className="px-6 py-4">{t("assignments.notes")}</th>
+                  <th className="px-6 py-4 text-right">{t("common.actions")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -200,12 +202,12 @@ export default function Assignments() {
                     <td className="px-6 py-4 text-right">
                       <button
                         onClick={() => {
-                          if (confirm("Remove this assignment? Tasks generated for it will remain but become unassigned.")) {
+                          if (confirm(t("assignments.removeAssignment"))) {
                             deleteMutation.mutate({ id: assignment.id });
                           }
                         }}
                         className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                        title="Remove Assignment"
+                        title={t("assignments.removeAssignmentTitle")}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>

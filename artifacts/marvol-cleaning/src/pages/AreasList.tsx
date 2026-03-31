@@ -3,15 +3,16 @@ import { useListAreas } from "@workspace/api-client-react";
 import { Link } from "wouter";
 import { MapPin, ChevronRight } from "lucide-react";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { useTranslation } from "react-i18next";
 
 export default function AreasList() {
+  const { t } = useTranslation();
   const { data: areas, isLoading } = useListAreas();
 
   if (isLoading) {
-    return <div className="p-8 text-center text-slate-500 animate-pulse">Loading areas...</div>;
+    return <div className="p-8 text-center text-slate-500 animate-pulse">{t("areas.loadingAreas")}</div>;
   }
 
-  // Group by terminal
   const groupedAreas = areas?.reduce((acc: any, area) => {
     if (!acc[area.terminal]) acc[area.terminal] = [];
     acc[area.terminal].push(area);
@@ -21,8 +22,8 @@ export default function AreasList() {
   return (
     <div className="space-y-8 max-w-5xl mx-auto pb-12">
       <div>
-        <h1 className="text-3xl font-display font-bold text-slate-900">Cleaning Zones</h1>
-        <p className="text-slate-500 mt-2 font-medium">Select an area to view and manage daily tasks.</p>
+        <h1 className="text-3xl font-display font-bold text-slate-900">{t("areas.cleaningZones")}</h1>
+        <p className="text-slate-500 mt-2 font-medium">{t("areas.subtitle")}</p>
       </div>
 
       <div className="space-y-10">

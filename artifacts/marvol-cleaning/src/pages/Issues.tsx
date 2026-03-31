@@ -1,5 +1,7 @@
 import React, { useState, useRef } from "react";
 import { format } from "date-fns";
+import { useTranslation } from "react-i18next";
+import { getDateLocale } from "@/i18n/dateLocale";
 import {
   useListIssues,
   useCreateIssue,
@@ -69,9 +71,10 @@ interface ImagePickerProps {
   onRemove: () => void;
   onFileCapture?: (file: File) => void;
   accent?: string;
+  tapToAddLabel?: string;
 }
 
-function ImagePicker({ label, objectPath, onUpload, onRemove, onFileCapture, accent = "blue" }: ImagePickerProps) {
+function ImagePicker({ label, objectPath, onUpload, onRemove, onFileCapture, accent = "blue", tapToAddLabel = "Tap to add photo" }: ImagePickerProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
@@ -140,7 +143,7 @@ function ImagePicker({ label, objectPath, onUpload, onRemove, onFileCapture, acc
           className={`w-full aspect-video rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 transition-all hover:border-${accent}-400 hover:bg-${accent}-50/50 border-slate-200 bg-slate-50 text-slate-400 hover:text-${accent}-500`}
         >
           <Camera className="w-6 h-6" />
-          <span className="text-xs font-medium">Tap to add photo</span>
+          <span className="text-xs font-medium">{tapToAddLabel}</span>
         </button>
       )}
 
@@ -174,12 +177,14 @@ function IssueImageUploader({
   initialPath,
   label,
   accent,
+  tapToAddLabel,
 }: {
   issueId: number;
   field: "beforeImagePath" | "afterImagePath";
   initialPath: string | null;
   label: string;
   accent?: string;
+  tapToAddLabel?: string;
 }) {
   const qc = useQueryClient();
   const updateImages = useUpdateIssueImages({
@@ -197,7 +202,7 @@ function IssueImageUploader({
   };
 
   return (
-    <ImagePicker label={label} objectPath={path} onUpload={handleUpload} onRemove={handleRemove} accent={accent} />
+    <ImagePicker label={label} objectPath={path} onUpload={handleUpload} onRemove={handleRemove} accent={accent} tapToAddLabel={tapToAddLabel} />
   );
 }
 
@@ -212,6 +217,7 @@ function AssignAreaButton({
   assignedById: number;
   onAssigned: () => void;
 }) {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [justAssigned, setJustAssigned] = useState(false);
 
@@ -238,7 +244,7 @@ function AssignAreaButton({
 
   if (staffNames.length === 0) {
     return (
-      <span className="text-xs text-slate-400 italic px-2">No staff on shift</span>
+      <span className="text-xs text-slate-400 italic px-2">{t("issues.noStaffOnShift")}</span>
     );
   }
 
@@ -246,7 +252,7 @@ function AssignAreaButton({
     return (
       <span className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 font-semibold">
         <UserCheck className="w-3.5 h-3.5" />
-        Notified: {staffNames.join(", ")}
+        {t("issues.notified", { names: staffNames.join(", ") })}
       </span>
     );
   }
@@ -258,12 +264,13 @@ function AssignAreaButton({
       className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-colors disabled:opacity-50 max-w-[180px] sm:max-w-none"
     >
       {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /> : <UserCheck className="w-3.5 h-3.5 shrink-0" />}
-      <span className="truncate">Assign → {staffNames.join(", ")}</span>
+      <span className="truncate">{t("issues.assignTo", { names: staffNames.join(", ") })}</span>
     </button>
   );
 }
 
 function StaffCompletionPanel({ issue }: { issue: { id: number; afterImagePath?: string | null; [key: string]: unknown } }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const { currentUser } = useAuth();
   const [notes, setNotes] = useState("");
@@ -300,7 +307,7 @@ function StaffCompletionPanel({ issue }: { issue: { id: number; afterImagePath?:
         className="w-full flex items-center justify-between px-5 py-3 text-sm font-semibold text-amber-800 hover:bg-amber-100/60 transition-colors"
       >
         <span className="flex items-center gap-2">
-          <ClipboardCheck className="w-4 h-4" /> Mark as Complete
+          <ClipboardCheck className="w-4 h-4" /> {t("issues.markAsComplete")}
         </span>
         {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
       </button>
@@ -309,20 +316,20 @@ function StaffCompletionPanel({ issue }: { issue: { id: number; afterImagePath?:
         <div className="px-5 pb-5 space-y-4">
           <div>
             <label className="block text-xs font-semibold text-amber-900 mb-1.5 flex items-center gap-1.5">
-              <MessageSquare className="w-3.5 h-3.5" /> Completion Notes <span className="text-amber-500 font-normal">(optional)</span>
+              <MessageSquare className="w-3.5 h-3.5" /> {t("issues.completionNotes")} <span className="text-amber-500 font-normal">({t("common.optional")})</span>
             </label>
             <textarea
               rows={3}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Describe what was done to resolve this issue..."
+              placeholder={t("issues.completionNotesPlaceholder")}
               className="w-full bg-white border border-amber-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 resize-none"
             />
           </div>
 
           <div>
             <p className="text-xs font-semibold text-amber-900 mb-2 flex items-center gap-1.5">
-              <Camera className="w-3.5 h-3.5" /> After Photo <span className="text-amber-500 font-normal">(optional)</span>
+              <Camera className="w-3.5 h-3.5" /> {t("issues.afterPhoto")} <span className="text-amber-500 font-normal">({t("common.optional")})</span>
             </p>
             <div className="max-w-xs">
               <ImagePicker
@@ -332,6 +339,7 @@ function StaffCompletionPanel({ issue }: { issue: { id: number; afterImagePath?:
                 onRemove={() => { setAfterPath(null); setAfterPhotoFile(null); updateImages.mutate({ id: issue.id, data: { afterImagePath: null } }); }}
                 onFileCapture={setAfterPhotoFile}
                 accent="amber"
+                tapToAddLabel={t("issues.tapToAddPhoto")}
               />
             </div>
           </div>
@@ -342,9 +350,9 @@ function StaffCompletionPanel({ issue }: { issue: { id: number; afterImagePath?:
             className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md shadow-emerald-600/20 font-bold"
           >
             {completeIssue.isPending ? (
-              <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Submitting...</>
+              <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {t("issues.submitting")}</>
             ) : (
-              <><CheckCircle2 className="w-4 h-4 mr-2" /> Mark Issue Done</>
+              <><CheckCircle2 className="w-4 h-4 mr-2" /> {t("issues.markIssueDone")}</>
             )}
           </Button>
         </div>
@@ -407,6 +415,8 @@ function SendNotificationButton({
 }
 
 export default function Issues() {
+  const { t, i18n } = useTranslation();
+  const dateLocale = getDateLocale(i18n.language);
   const { currentUser, viewMode } = useAuth();
   const queryClient = useQueryClient();
   const [isReporting, setIsReporting] = useState(false);
@@ -502,14 +512,14 @@ export default function Issues() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h1 className="text-3xl font-display font-bold text-slate-900">
-            {isStaff ? "My Area Issues" : isInspector ? "Open Issues" : "Inspector Special Assignments"}
+            {isStaff ? t("issues.myAreaIssues") : isInspector ? t("issues.openIssues") : t("issues.title")}
           </h1>
           <p className="text-slate-500 mt-1 font-medium">
             {isStaff
-              ? "Open issues in your assigned area — complete them with notes and an after photo."
+              ? t("issues.staffSubtitle")
               : isInspector
-              ? "Report issues and add information to open items across all areas."
-              : "Report and monitor maintenance or cleaning issues across all areas."}
+              ? t("issues.inspectorSubtitle")
+              : t("issues.subtitle")}
           </p>
         </div>
 
@@ -519,19 +529,19 @@ export default function Issues() {
               onClick={() => setFilterResolved(false)}
               className={`px-4 py-1.5 rounded-lg transition-colors ${filterResolved === false ? "bg-rose-100 text-rose-800" : "text-slate-500 hover:bg-slate-100"}`}
             >
-              Open
+              {t("issues.open")}
             </button>
             <button
               onClick={() => setFilterResolved(true)}
               className={`px-4 py-1.5 rounded-lg transition-colors ${filterResolved === true ? "bg-emerald-100 text-emerald-800" : "text-slate-500 hover:bg-slate-100"}`}
             >
-              Resolved
+              {t("issues.resolved")}
             </button>
             <button
               onClick={() => setFilterResolved(null)}
               className={`px-4 py-1.5 rounded-lg transition-colors ${filterResolved === null ? "bg-slate-200 text-slate-800" : "text-slate-500 hover:bg-slate-100"}`}
             >
-              All
+              {t("common.all")}
             </button>
           </div>
 
@@ -539,7 +549,7 @@ export default function Issues() {
             onClick={() => setIsReporting(!isReporting)}
             className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-md shadow-rose-600/20 font-bold"
           >
-            <Plus className="w-4 h-4 mr-2" /> Report Issue
+            <Plus className="w-4 h-4 mr-2" /> {t("issues.reportIssue")}
           </Button>
         </div>
       </div>
@@ -554,76 +564,75 @@ export default function Issues() {
                 : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
             }`}
           >
-            All Terminals
+            {t("issues.allTerminals")}
           </button>
-          {terminals.map((t) => (
+          {terminals.map((term) => (
             <button
-              key={t}
-              onClick={() => setFilterTerminal(t)}
+              key={term}
+              onClick={() => setFilterTerminal(term)}
               className={`px-4 py-1.5 rounded-xl text-sm font-semibold transition-colors ${
-                filterTerminal === t
+                filterTerminal === term
                   ? "bg-emerald-700 text-white shadow-sm"
                   : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
               }`}
             >
-              {t}
+              {term}
             </button>
           ))}
         </div>
       )}
 
-      {/* Report Form */}
       {isReporting && (
         <div className="bg-rose-50 rounded-3xl p-6 border border-rose-100 shadow-sm">
           <h3 className="text-lg font-bold text-rose-900 mb-4 flex items-center gap-2">
-            <AlertOctagon className="w-5 h-5" /> New Issue Report
+            <AlertOctagon className="w-5 h-5" /> {t("issues.newIssueReport")}
           </h3>
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-rose-900 mb-1">Location / Area</label>
+                <label className="block text-sm font-semibold text-rose-900 mb-1">{t("issues.locationArea")}</label>
                 <select
                   required
                   value={formData.areaId}
                   onChange={(e) => setFormData({ ...formData, areaId: e.target.value })}
                   className="w-full bg-white border border-rose-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-rose-500/20"
                 >
-                  <option value="">-- Choose Area --</option>
+                  <option value="">{t("issues.chooseArea")}</option>
                   {areas?.map((a) => (
                     <option key={a.id} value={a.id}>{a.name}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-rose-900 mb-1">Severity Level</label>
+                <label className="block text-sm font-semibold text-rose-900 mb-1">{t("issues.severityLevel")}</label>
                 <select
                   required
                   value={formData.severity}
                   onChange={(e) => setFormData({ ...formData, severity: e.target.value as any })}
                   className="w-full bg-white border border-rose-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-rose-500/20 font-medium"
                 >
-                  <option value="low">Low - Minor issue, normal cleaning</option>
-                  <option value="medium">Medium - Needs attention soon</option>
-                  <option value="high">High - Urgent maintenance/spill</option>
+                  <option value="low">{t("issues.severityLow")}</option>
+                  <option value="medium">{t("issues.severityMedium")}</option>
+                  <option value="high">{t("issues.severityHigh")}</option>
                 </select>
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-rose-900 mb-1">Description</label>
+              <label className="block text-sm font-semibold text-rose-900 mb-1">{t("issues.description")}</label>
               <textarea
                 required
                 rows={3}
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Describe the issue in detail..."
+                placeholder={t("issues.descriptionPlaceholder")}
                 className="w-full bg-white border border-rose-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-rose-500/20 resize-none"
               />
             </div>
 
             <div>
               <p className="text-sm font-semibold text-rose-900 mb-2 flex items-center gap-2">
-                <Camera className="w-4 h-4" /> Before Photo <span className="text-rose-400 font-normal">(optional)</span>
+                <Camera className="w-4 h-4" /> {t("issues.beforePhoto")} <span className="text-rose-400 font-normal">({t("common.optional")})</span>
               </p>
               <div className="max-w-xs">
                 <ImagePicker
@@ -633,44 +642,42 @@ export default function Issues() {
                   onRemove={() => { setBeforePath(null); setBeforePhotoFile(null); }}
                   onFileCapture={setBeforePhotoFile}
                   accent="rose"
+                  tapToAddLabel={t("issues.tapToAddPhoto")}
                 />
               </div>
             </div>
 
             <div className="flex flex-wrap justify-end gap-3 pt-2">
               <Button type="button" variant="ghost" onClick={() => { setIsReporting(false); setBeforePath(null); }} className="rounded-xl text-rose-700 hover:bg-rose-100">
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button type="submit" disabled={createMutation.isPending} className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-md shadow-rose-600/20 px-6 font-bold">
-                {createMutation.isPending ? "Submitting..." : "Submit Report"}
+                {createMutation.isPending ? t("issues.submitting") : t("issues.submitReport")}
               </Button>
             </div>
           </form>
         </div>
       )}
 
-      {/* Empty state for staff with no shift assignment today */}
       {isStaff && staffAreaId == null && !isLoading && (
         <div className="p-12 text-center bg-slate-50 rounded-3xl border border-slate-200 border-dashed">
           <AlertTriangle className="w-12 h-12 text-amber-400 mx-auto mb-3 opacity-60" />
-          <h3 className="text-lg font-bold text-slate-700">No area assigned today</h3>
-          <p className="text-slate-500 mt-1 text-sm">You don't have a shift assignment for today. Contact your supervisor.</p>
+          <h3 className="text-lg font-bold text-slate-700">{t("issues.noAreaAssigned")}</h3>
+          <p className="text-slate-500 mt-1 text-sm">{t("issues.noAreaAssignedDesc")}</p>
         </div>
       )}
 
-      {/* Empty state for staff with area but no issues */}
       {isStaff && staffAreaId != null && !isLoading && filteredIssues?.length === 0 && filterResolved === false && (
         <div className="p-12 text-center bg-emerald-50 rounded-3xl border border-emerald-100 border-dashed">
           <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto mb-3 opacity-60" />
-          <h3 className="text-lg font-bold text-emerald-700">No open issues in your area</h3>
-          <p className="text-emerald-600 mt-1 text-sm">Your area is clear. A supervisor will notify you if any issues come up.</p>
+          <h3 className="text-lg font-bold text-emerald-700">{t("issues.noOpenIssuesInArea")}</h3>
+          <p className="text-emerald-600 mt-1 text-sm">{t("issues.areaClearDesc")}</p>
         </div>
       )}
 
-      {/* Issue list */}
       <div className="space-y-4">
         {isLoading && (
-          <div className="p-8 text-center text-slate-500 animate-pulse bg-white rounded-3xl">Loading issues...</div>
+          <div className="p-8 text-center text-slate-500 animate-pulse bg-white rounded-3xl">{t("issues.loadingIssues")}</div>
         )}
 
         {filteredIssues?.map((issue) => {
@@ -689,7 +696,6 @@ export default function Issues() {
                   : "bg-white border-slate-200 shadow-sm hover:border-slate-300"
               }`}
             >
-              {/* Main row */}
               <div className="p-5 flex flex-col sm:flex-row gap-4 sm:items-start">
                 <div className="shrink-0 mt-0.5">
                   {issue.resolved ? (
@@ -711,11 +717,11 @@ export default function Issues() {
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <span className="font-bold text-slate-900">{issue.areaName}</span>
                     <span className="text-slate-300">•</span>
-                    <span className="text-sm text-slate-500">{format(new Date(issue.createdAt), "MMM do, h:mm a")}</span>
+                    <span className="text-sm text-slate-500">{format(new Date(issue.createdAt), "MMM do, h:mm a", { locale: dateLocale })}</span>
                     {hasImages && (
                       <span className="flex items-center gap-1 text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
                         <ImageIcon className="w-3 h-3" />
-                        {[issue.beforeImagePath, issue.afterImagePath].filter(Boolean).length} photo{[issue.beforeImagePath, issue.afterImagePath].filter(Boolean).length !== 1 ? "s" : ""}
+                        {[issue.beforeImagePath, issue.afterImagePath].filter(Boolean).length} {t("issues.photos", { count: [issue.beforeImagePath, issue.afterImagePath].filter(Boolean).length })}
                       </span>
                     )}
                   </div>
@@ -724,10 +730,10 @@ export default function Issues() {
                   </p>
 
                   <div className="flex flex-wrap gap-3 mt-2 text-xs text-slate-400">
-                    <span className="font-medium uppercase tracking-wider">By: {issue.reportedByName}</span>
+                    <span className="font-medium uppercase tracking-wider">{t("issues.by")}: {issue.reportedByName}</span>
                     {issue.assignedToName && (
                       <span className="flex items-center gap-1 text-blue-600 font-semibold bg-blue-50 px-2 py-0.5 rounded-full">
-                        <UserCheck className="w-3 h-3" /> Assigned: {issue.assignedToName}
+                        <UserCheck className="w-3 h-3" /> {t("issues.assigned")}: {issue.assignedToName}
                       </span>
                     )}
                     {issue.resolved && issue.completionNotes && (
@@ -743,11 +749,10 @@ export default function Issues() {
                     status={issue.resolved ? "success" : issue.severity === "high" ? "danger" : issue.severity === "medium" ? "warning" : "neutral"}
                     className="uppercase !text-[10px] tracking-wider"
                   >
-                    {issue.resolved ? "Resolved" : `${issue.severity} Priority`}
+                    {issue.resolved ? t("issues.resolved") : t("issues.severityPriority", { severity: issue.severity })}
                   </StatusBadge>
 
                   <div className="flex items-center gap-2 flex-wrap justify-end">
-                    {/* Assign to area staff — supervisors/admin only */}
                     {!isStaff && !isInspector && !issue.resolved && (
                       <AssignAreaButton
                         issue={issue}
@@ -762,8 +767,8 @@ export default function Issues() {
                         issueId={issue.id}
                         senderId={userId}
                         endpoint="send-to-supervisor"
-                        label="Send to Supervisor"
-                        sentLabel="Sent"
+                        label={t("issues.sendToSupervisor")}
+                        sentLabel={t("issues.sent")}
                       />
                     )}
 
@@ -772,8 +777,8 @@ export default function Issues() {
                         issueId={issue.id}
                         senderId={userId}
                         endpoint="send-to-inspector"
-                        label="Notify Inspector"
-                        sentLabel="Sent"
+                        label={t("issues.notifyInspector")}
+                        sentLabel={t("issues.sent")}
                       />
                     )}
 
@@ -782,13 +787,13 @@ export default function Issues() {
                       className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-slate-100 transition-colors"
                     >
                       <Camera className="w-3.5 h-3.5" />
-                      Photos
+                      {t("issues.photosLabel")}
                     </button>
 
                     {!isStaff && !isInspector && !issue.resolved && (
                       <Button
                         onClick={async () => {
-                          if (confirm("Mark this issue as resolved?")) {
+                          if (confirm(t("issues.confirmResolve"))) {
                             const handled = await offlineResolveIssue.mutateOffline(issue.id);
                             if (!handled) {
                               resolveMutation.mutate({ id: issue.id });
@@ -799,26 +804,26 @@ export default function Issues() {
                         variant="outline"
                         className="rounded-xl border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 text-xs h-8 px-3"
                       >
-                        <CheckCircle2 className="w-3 h-3 mr-1" /> Resolve
+                        <CheckCircle2 className="w-3 h-3 mr-1" /> {t("issues.resolve")}
                       </Button>
                     )}
                   </div>
                 </div>
               </div>
 
-              {/* Expandable photo section */}
               {isExpanded && (
                 <div className="border-t border-slate-100 px-5 py-5 bg-slate-50/60">
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4 flex items-center gap-2">
-                    <Camera className="w-3.5 h-3.5" /> Issue Photos
+                    <Camera className="w-3.5 h-3.5" /> {t("issues.issuePhotos")}
                   </p>
                   <div className="flex gap-4 items-start">
                     <IssueImageUploader
                       issueId={issue.id}
                       field="beforeImagePath"
                       initialPath={issue.beforeImagePath ?? null}
-                      label="Before Photo"
+                      label={t("issues.beforePhoto")}
                       accent="blue"
+                      tapToAddLabel={t("issues.tapToAddPhoto")}
                     />
 
                     <div className="flex items-center self-center shrink-0 text-slate-300 mt-4">
@@ -829,14 +834,14 @@ export default function Issues() {
                       issueId={issue.id}
                       field="afterImagePath"
                       initialPath={issue.afterImagePath ?? null}
-                      label="After Photo"
+                      label={t("issues.afterPhoto")}
                       accent="emerald"
+                      tapToAddLabel={t("issues.tapToAddPhoto")}
                     />
                   </div>
                 </div>
               )}
 
-              {/* Staff completion panel */}
               {isMyAssignedIssue && (
                 <StaffCompletionPanel issue={issue} />
               )}
@@ -847,8 +852,8 @@ export default function Issues() {
         {(!filteredIssues || filteredIssues.length === 0) && !isLoading && !(isStaff && filterResolved === false) && (
           <div className="p-12 text-center bg-white rounded-3xl border border-slate-200 border-dashed">
             <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto mb-3 opacity-50" />
-            <h3 className="text-lg font-bold text-slate-700">All Clear!</h3>
-            <p className="text-slate-500 mt-1">No issues matching this filter.</p>
+            <h3 className="text-lg font-bold text-slate-700">{t("issues.allClear")}</h3>
+            <p className="text-slate-500 mt-1">{t("issues.noMatchingFilter")}</p>
           </div>
         )}
       </div>

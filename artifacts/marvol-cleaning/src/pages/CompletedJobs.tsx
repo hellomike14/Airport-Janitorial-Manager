@@ -1,5 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { format, parseISO, subDays } from "date-fns";
+import { useTranslation } from "react-i18next";
+import { getDateLocale } from "@/i18n/dateLocale";
 import {
   useListTasks,
   useListAreas,
@@ -19,6 +21,8 @@ import { Button } from "@/components/ui/button";
 import { TaskPhotoThumbnails, TaskPhotoToggle } from "@/components/TaskPhotos";
 
 export default function CompletedJobs() {
+  const { t, i18n } = useTranslation();
+  const dateLocale = getDateLocale(i18n.language);
   const today = format(new Date(), "yyyy-MM-dd");
   const [selectedDate, setSelectedDate] = useState(today);
 
@@ -60,10 +64,10 @@ export default function CompletedJobs() {
         <div>
           <h1 className="text-3xl font-display font-bold text-slate-900 flex items-center gap-3">
             <CheckCircle2 className="w-8 h-8 text-emerald-500" />
-            Completed Jobs
+            {t("completedJobs.title")}
           </h1>
           <p className="text-slate-500 mt-1 font-medium">
-            View all completed cleaning tasks across every area.
+            {t("completedJobs.subtitle")}
           </p>
         </div>
 
@@ -80,23 +84,22 @@ export default function CompletedJobs() {
               onClick={() => setSelectedDate(today)}
               className="ml-1 text-xs text-accent font-semibold hover:underline"
             >
-              Today
+              {t("common.today")}
             </button>
           )}
         </div>
       </div>
 
-      {/* Summary stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="bg-white rounded-2xl border border-slate-200 px-5 py-4 shadow-sm">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-            Total Tasks
+            {t("completedJobs.totalTasks")}
           </p>
           <p className="text-3xl font-bold text-slate-800 mt-1">{totalTasks}</p>
         </div>
         <div className="bg-emerald-50 rounded-2xl border border-emerald-200 px-5 py-4 shadow-sm">
           <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide">
-            Completed
+            {t("completedJobs.completed")}
           </p>
           <p className="text-3xl font-bold text-emerald-700 mt-1">
             {totalCompleted}
@@ -104,7 +107,7 @@ export default function CompletedJobs() {
         </div>
         <div className="bg-amber-50 rounded-2xl border border-amber-200 px-5 py-4 shadow-sm">
           <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide">
-            Pending
+            {t("completedJobs.pending")}
           </p>
           <p className="text-3xl font-bold text-amber-700 mt-1">
             {totalTasks - totalCompleted}
@@ -112,13 +115,12 @@ export default function CompletedJobs() {
         </div>
         <div className="bg-blue-50 rounded-2xl border border-blue-200 px-5 py-4 shadow-sm">
           <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide">
-            Completion
+            {t("completedJobs.completion")}
           </p>
           <p className="text-3xl font-bold text-blue-700 mt-1">{pct}%</p>
         </div>
       </div>
 
-      {/* Progress bar */}
       <div className="bg-white border border-slate-200 rounded-2xl px-5 py-3 flex items-center gap-4 shadow-sm">
         <BarChart3 className="w-4 h-4 text-slate-400 shrink-0" />
         <div className="flex-1 h-2.5 bg-slate-100 rounded-full overflow-hidden">
@@ -134,7 +136,6 @@ export default function CompletedJobs() {
         </span>
       </div>
 
-      {/* Completed tasks by area */}
       {isLoading ? (
         <div className="space-y-4">
           {[1, 2, 3].map((i) => (
@@ -148,11 +149,10 @@ export default function CompletedJobs() {
         <div className="flex flex-col items-center justify-center py-16 text-center bg-white rounded-3xl border border-slate-200 border-dashed">
           <Filter className="w-10 h-10 text-slate-300 mb-3" />
           <p className="text-slate-600 font-semibold text-lg">
-            No completed tasks
+            {t("completedJobs.noCompletedTasks")}
           </p>
           <p className="text-slate-400 text-sm mt-1">
-            No tasks have been completed for{" "}
-            {format(parseISO(selectedDate), "MMMM d, yyyy")} yet.
+            {t("completedJobs.noTasksCompletedFor", { date: format(parseISO(selectedDate), "MMMM d, yyyy", { locale: dateLocale }) })}
           </p>
         </div>
       ) : (
@@ -192,7 +192,7 @@ export default function CompletedJobs() {
                       <h2 className="font-bold text-slate-800">{area.name}</h2>
                       {allDone && (
                         <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> All Done
+                          <CheckCircle2 className="w-3.5 h-3.5" /> {t("completedJobs.allDone")}
                         </span>
                       )}
                     </div>
@@ -226,7 +226,7 @@ export default function CompletedJobs() {
                           </p>
                           {task.isSpecial && (
                             <span className="inline-flex items-center gap-1 mt-0.5 text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                              <Star className="w-2.5 h-2.5" /> Special Request
+                              <Star className="w-2.5 h-2.5" /> {t("completedJobs.specialRequest")}
                             </span>
                           )}
                           {task.notes && (
@@ -244,7 +244,7 @@ export default function CompletedJobs() {
                             {task.completedAt && (
                               <p className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
                                 <Clock className="w-3 h-3" />
-                                {format(new Date(task.completedAt), "h:mm a")}
+                                {format(new Date(task.completedAt), "h:mm a", { locale: dateLocale })}
                               </p>
                             )}
                             {task.completedByName && (

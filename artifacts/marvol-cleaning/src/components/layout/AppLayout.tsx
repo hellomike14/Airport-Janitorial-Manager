@@ -24,9 +24,12 @@ import {
   Lock,
 } from "lucide-react";
 import { format } from "date-fns";
+import { useTranslation } from "react-i18next";
+import { getDateLocale } from "@/i18n/dateLocale";
 import { useLocationTracker } from "@/hooks/useLocationTracker";
 import { Button } from "@/components/ui/button";
 import { useAuth, ViewMode } from "@/contexts/AuthContext";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import {
   useListNotifications,
   useMarkNotificationRead,
@@ -61,49 +64,55 @@ const NavItem = ({ href, icon: Icon, label, isActive, onClick }: NavItemProps) =
   </Link>
 );
 
-const VIEW_MODES: { value: ViewMode; label: string; icon: React.ElementType; color: string }[] = [
-  { value: "admin", label: "Admin", icon: Shield, color: "text-violet-400" },
-  { value: "inspector", label: "Inspector", icon: ClipboardCheck, color: "text-blue-400" },
-  { value: "supervisor", label: "Supervisor", icon: Users, color: "text-emerald-400" },
-  { value: "staff", label: "Staff", icon: User, color: "text-emerald-400" },
-];
+function useNavConfig() {
+  const { t } = useTranslation();
 
-const NAV_BY_ROLE: Record<ViewMode, { href: string; icon: React.ElementType; label: string }[]> = {
-  admin: [
-    { href: "/", icon: LayoutDashboard, label: "Dashboard" },
-    { href: "/tasks", icon: ListChecks, label: "Task Management" },
-    { href: "/task-types", icon: Layers, label: "Task Type Inventory" },
-    { href: "/areas", icon: Map, label: "Cleaning Areas" },
-    { href: "/assignments", icon: ClipboardList, label: "Assignments" },
-    { href: "/staff", icon: Users, label: "Staff Directory" },
-    { href: "/issues", icon: AlertTriangle, label: "Inspector Special Assignments" },
-    { href: "/report", icon: FileText, label: "Inspector Report" },
-    { href: "/gps-tracking", icon: Navigation, label: "GPS Tracking" },
-  ],
-  supervisor: [
-    { href: "/", icon: LayoutDashboard, label: "Dashboard" },
-    { href: "/tasks", icon: ListChecks, label: "Task Management" },
-    { href: "/areas", icon: Map, label: "Cleaning Areas" },
-    { href: "/assignments", icon: ClipboardList, label: "Assignments" },
-    { href: "/issues", icon: AlertTriangle, label: "Inspector Special Assignments" },
-    { href: "/report", icon: FileText, label: "Inspector Report" },
-  ],
-  inspector: [
-    { href: "/issues", icon: AlertTriangle, label: "Open Issues" },
-    { href: "/completed-jobs", icon: CheckCircle2, label: "Completed Tasks" },
-  ],
-  staff: [
-    { href: "/my-tasks", icon: CheckSquare, label: "My Tasks" },
-    { href: "/issues", icon: AlertTriangle, label: "My Issues" },
-  ],
-};
+  const VIEW_MODES: { value: ViewMode; label: string; icon: React.ElementType; color: string }[] = [
+    { value: "admin", label: t("roles.admin"), icon: Shield, color: "text-violet-400" },
+    { value: "inspector", label: t("roles.inspector"), icon: ClipboardCheck, color: "text-blue-400" },
+    { value: "supervisor", label: t("roles.supervisor"), icon: Users, color: "text-emerald-400" },
+    { value: "staff", label: t("roles.staff"), icon: User, color: "text-emerald-400" },
+  ];
 
-const ROLE_BADGE: Record<ViewMode, { label: string; cls: string }> = {
-  admin: { label: "Admin", cls: "bg-violet-500/20 text-violet-300 border border-violet-500/30" },
-  inspector: { label: "Inspector", cls: "bg-blue-500/20 text-blue-300 border border-blue-500/30" },
-  supervisor: { label: "Supervisor", cls: "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" },
-  staff: { label: "Staff", cls: "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" },
-};
+  const NAV_BY_ROLE: Record<ViewMode, { href: string; icon: React.ElementType; label: string }[]> = {
+    admin: [
+      { href: "/", icon: LayoutDashboard, label: t("nav.dashboard") },
+      { href: "/tasks", icon: ListChecks, label: t("nav.taskManagement") },
+      { href: "/task-types", icon: Layers, label: t("nav.taskTypeInventory") },
+      { href: "/areas", icon: Map, label: t("nav.cleaningAreas") },
+      { href: "/assignments", icon: ClipboardList, label: t("nav.assignments") },
+      { href: "/staff", icon: Users, label: t("nav.staffDirectory") },
+      { href: "/issues", icon: AlertTriangle, label: t("nav.inspectorSpecialAssignments") },
+      { href: "/report", icon: FileText, label: t("nav.inspectorReport") },
+      { href: "/gps-tracking", icon: Navigation, label: t("nav.gpsTracking") },
+    ],
+    supervisor: [
+      { href: "/", icon: LayoutDashboard, label: t("nav.dashboard") },
+      { href: "/tasks", icon: ListChecks, label: t("nav.taskManagement") },
+      { href: "/areas", icon: Map, label: t("nav.cleaningAreas") },
+      { href: "/assignments", icon: ClipboardList, label: t("nav.assignments") },
+      { href: "/issues", icon: AlertTriangle, label: t("nav.inspectorSpecialAssignments") },
+      { href: "/report", icon: FileText, label: t("nav.inspectorReport") },
+    ],
+    inspector: [
+      { href: "/issues", icon: AlertTriangle, label: t("nav.openIssues") },
+      { href: "/completed-jobs", icon: CheckCircle2, label: t("nav.completedTasks") },
+    ],
+    staff: [
+      { href: "/my-tasks", icon: CheckSquare, label: t("nav.myTasks") },
+      { href: "/issues", icon: AlertTriangle, label: t("nav.myIssues") },
+    ],
+  };
+
+  const ROLE_BADGE: Record<ViewMode, { label: string; cls: string }> = {
+    admin: { label: t("roles.admin"), cls: "bg-violet-500/20 text-violet-300 border border-violet-500/30" },
+    inspector: { label: t("roles.inspector"), cls: "bg-blue-500/20 text-blue-300 border border-blue-500/30" },
+    supervisor: { label: t("roles.supervisor"), cls: "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" },
+    staff: { label: t("roles.staff"), cls: "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" },
+  };
+
+  return { VIEW_MODES, NAV_BY_ROLE, ROLE_BADGE };
+}
 
 const BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 const regularSound = new Audio(`${BASE}/sounds/notification.wav`);
@@ -132,6 +141,7 @@ function vibrateDevice(urgent: boolean = false) {
 }
 
 function NotificationBell({ staffId }: { staffId: number }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const qc = useQueryClient();
@@ -220,13 +230,13 @@ function NotificationBell({ staffId }: { staffId: number }) {
       {open && (
         <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl border border-slate-200 shadow-xl z-50 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-            <span className="font-bold text-slate-800 text-sm">Notifications</span>
+            <span className="font-bold text-slate-800 text-sm">{t("layout.notifications")}</span>
             {unreadCount > 0 && (
               <button
                 onClick={handleMarkAllRead}
                 className="text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors"
               >
-                Mark all read
+                {t("layout.markAllRead")}
               </button>
             )}
           </div>
@@ -235,7 +245,7 @@ function NotificationBell({ staffId }: { staffId: number }) {
             {notifications.length === 0 && (
               <div className="p-6 text-center text-slate-400 text-sm">
                 <Bell className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                No notifications yet
+                {t("layout.noNotifications")}
               </div>
             )}
             {notifications.slice(0, 20).map((n) => (
@@ -271,6 +281,7 @@ function NotificationBell({ staffId }: { staffId: number }) {
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
 function SetPinModal({ staffId, hasExistingPin, onClose }: { staffId: number; hasExistingPin: boolean; onClose: () => void }) {
+  const { t } = useTranslation();
   const [currentPinDigits, setCurrentPinDigits] = useState<string[]>(["", "", "", ""]);
   const [pinDigits, setPinDigits] = useState<string[]>(["", "", "", ""]);
   const [confirmDigits, setConfirmDigits] = useState<string[]>(["", "", "", ""]);
@@ -312,7 +323,7 @@ function SetPinModal({ staffId, hasExistingPin, onClose }: { staffId: number; ha
       } else {
         const newPin = pinDigits.join("");
         if (pin !== newPin) {
-          setError("PINs do not match. Please try again.");
+          setError(t("layout.pinsNoMatch"));
           setStep("new");
           setPinDigits(["", "", "", ""]);
           setConfirmDigits(["", "", "", ""]);
@@ -346,12 +357,12 @@ function SetPinModal({ staffId, hasExistingPin, onClose }: { staffId: number; ha
         setStep("new");
         setPinDigits(["", "", "", ""]);
       } else {
-        setError("Incorrect current PIN.");
+        setError(t("layout.incorrectCurrentPin"));
         setCurrentPinDigits(["", "", "", ""]);
         setTimeout(() => inputRefs.current[0]?.focus(), 50);
       }
     } catch {
-      setError("Network error");
+      setError(t("common.networkError"));
       setCurrentPinDigits(["", "", "", ""]);
     } finally {
       setSaving(false);
@@ -371,13 +382,13 @@ function SetPinModal({ staffId, hasExistingPin, onClose }: { staffId: number; ha
         setTimeout(onClose, 1500);
       } else {
         const data = await res.json().catch(() => ({}));
-        setError(data.error || "Failed to set PIN");
+        setError(data.error || t("layout.failedSetPin"));
         setStep("new");
         setPinDigits(["", "", "", ""]);
         setConfirmDigits(["", "", "", ""]);
       }
     } catch {
-      setError("Network error");
+      setError(t("common.networkError"));
       setStep("new");
       setPinDigits(["", "", "", ""]);
       setConfirmDigits(["", "", "", ""]);
@@ -387,7 +398,7 @@ function SetPinModal({ staffId, hasExistingPin, onClose }: { staffId: number; ha
   };
 
   const [currentDigits] = getStepDigits();
-  const stepLabel = step === "current" ? "Enter your current PIN" : step === "new" ? "Enter a new 4-digit PIN" : "Confirm your new PIN";
+  const stepLabel = step === "current" ? t("layout.enterCurrentPin") : step === "new" ? t("layout.enterNewPin") : t("layout.confirmNewPin");
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
@@ -398,7 +409,7 @@ function SetPinModal({ staffId, hasExistingPin, onClose }: { staffId: number; ha
               <Lock className="w-5 h-5 text-white" />
             </div>
             <div>
-              <p className="font-semibold text-slate-800">{hasExistingPin ? "Change PIN" : "Set PIN"}</p>
+              <p className="font-semibold text-slate-800">{hasExistingPin ? t("layout.changePin") : t("layout.setPin")}</p>
               <p className="text-xs text-slate-500">{stepLabel}</p>
             </div>
           </div>
@@ -410,7 +421,7 @@ function SetPinModal({ staffId, hasExistingPin, onClose }: { staffId: number; ha
         {success ? (
           <div className="text-center py-6">
             <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
-            <p className="font-semibold text-slate-800">PIN {hasExistingPin ? "updated" : "set"} successfully!</p>
+            <p className="font-semibold text-slate-800">{hasExistingPin ? t("layout.pinUpdatedSuccess") : t("layout.pinSetSuccess")}</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -436,7 +447,7 @@ function SetPinModal({ staffId, hasExistingPin, onClose }: { staffId: number; ha
             {saving && (
               <div className="flex items-center justify-center gap-2 text-emerald-600 text-sm">
                 <span className="animate-spin">&#8635;</span>
-                <span>{step === "current" ? "Verifying..." : "Setting PIN..."}</span>
+                <span>{step === "current" ? t("layout.verifying") : t("layout.settingPin")}</span>
               </div>
             )}
           </div>
@@ -447,6 +458,7 @@ function SetPinModal({ staffId, hasExistingPin, onClose }: { staffId: number; ha
 }
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
+  const { t, i18n } = useTranslation();
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [viewDropdownOpen, setViewDropdownOpen] = useState(false);
@@ -455,6 +467,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const { data: staffList } = useListStaff();
   const currentStaffData = staffList?.find((s) => s.id === currentUser?.id);
   const hasExistingPin = !!(currentStaffData as any)?.hasPin;
+
+  const { VIEW_MODES, NAV_BY_ROLE, ROLE_BADGE } = useNavConfig();
 
   useLocationTracker();
 
@@ -475,6 +489,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     .join("")
     .slice(0, 2)
     .toUpperCase() ?? "??";
+
+  const dateLocale = getDateLocale(i18n.language);
 
   return (
     <div className="min-h-screen bg-background flex w-full font-sans">
@@ -516,7 +532,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Navigation */}
         <div className="flex-1 overflow-y-auto py-6 px-4 space-y-2">
           <div className="px-2 mb-2 text-xs font-semibold text-sidebar-foreground/40 uppercase tracking-wider">
-            {viewMode === "staff" ? "My Work" : "Management Menu"}
+            {viewMode === "staff" ? t("nav.myWork") : t("nav.managementMenu")}
           </div>
           {navItems.map((item) => (
             <NavItem
@@ -526,6 +542,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               onClick={closeMobile}
             />
           ))}
+        </div>
+
+        {/* Language Switcher */}
+        <div className="px-4 pb-2">
+          <LanguageSwitcher variant="sidebar" />
         </div>
 
         {/* User Profile */}
@@ -543,7 +564,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <button
               onClick={logout}
               className="text-sidebar-foreground/40 hover:text-red-400 transition-colors"
-              title="Log out"
+              title={t("layout.logout")}
             >
               <LogOut className="w-4 h-4" />
             </button>
@@ -554,7 +575,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-medium bg-sidebar-accent/80 hover:bg-sidebar-accent text-sidebar-foreground/70 hover:text-sidebar-foreground transition-colors"
             >
               <Lock className="w-3.5 h-3.5" />
-              {hasExistingPin ? "Change PIN" : "Set PIN"}
+              {hasExistingPin ? t("layout.changePin") : t("layout.setPin")}
             </button>
           )}
         </div>
@@ -576,12 +597,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <button
               className="lg:hidden min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 active:bg-slate-200 transition-colors touch-manipulation"
               onClick={() => setMobileOpen(true)}
-              aria-label="Open menu"
+              aria-label={t("layout.openMenu")}
             >
               <Menu className="w-6 h-6" />
             </button>
             <div className="hidden sm:flex items-center text-sm font-medium text-slate-500 bg-slate-100 px-4 py-2 rounded-full">
-              {format(new Date(), "EEEE, MMMM do, yyyy")}
+              {format(new Date(), "EEEE, MMMM do, yyyy", { locale: dateLocale })}
             </div>
           </div>
 
@@ -593,7 +614,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   onClick={() => setViewDropdownOpen((v) => !v)}
                   className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-slate-200 bg-slate-50 hover:bg-slate-100 text-sm font-medium text-slate-700 transition-colors"
                 >
-                  <span className="hidden sm:inline text-xs text-slate-500 mr-1">Viewing as</span>
+                  <span className="hidden sm:inline text-xs text-slate-500 mr-1">{t("layout.viewingAs")}</span>
                   {viewMode === "admin" && <Shield className="w-4 h-4 text-violet-500" />}
                   {viewMode === "supervisor" && <Users className="w-4 h-4 text-blue-500" />}
                   {viewMode === "staff" && <User className="w-4 h-4 text-emerald-500" />}
@@ -605,7 +626,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   <>
                     <div className="fixed inset-0 z-30" onClick={() => setViewDropdownOpen(false)} />
                     <div className="absolute right-0 top-full mt-2 w-44 bg-white rounded-xl border border-slate-200 shadow-lg z-40 overflow-hidden">
-                      <div className="px-3 py-2 border-b border-slate-100 text-xs text-slate-500 font-medium">Switch View</div>
+                      <div className="px-3 py-2 border-b border-slate-100 text-xs text-slate-500 font-medium">{t("layout.switchView")}</div>
                       {VIEW_MODES.map((vm) => (
                         <button
                           key={vm.value}
@@ -613,7 +634,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                           className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm text-left transition-colors hover:bg-slate-50 ${viewMode === vm.value ? "bg-slate-50 font-semibold" : ""}`}
                         >
                           <vm.icon className={`w-4 h-4 ${vm.color}`} />
-                          <span>{vm.label} View</span>
+                          <span>{vm.label} {t("layout.view")}</span>
                           {viewMode === vm.value && <span className="ml-auto text-blue-500">✓</span>}
                         </button>
                       ))}
