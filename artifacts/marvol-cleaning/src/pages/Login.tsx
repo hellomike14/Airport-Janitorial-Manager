@@ -1,8 +1,8 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useListStaff, useListAssignments } from "@workspace/api-client-react";
 import { format } from "date-fns";
 import { useAuth, UserRole } from "@/contexts/AuthContext";
-import { Shield, Users, User, LogIn, ClipboardCheck, Lock, X, Eye, EyeOff } from "lucide-react";
+import { Shield, Users, User, LogIn, ClipboardCheck, Lock, X } from "lucide-react";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -41,28 +41,44 @@ const ROLE_CONFIG = {
   },
 };
 
+type PinMode = "enter" | "set" | "confirm";
+
 export default function Login() {
   const { data: staffList, isLoading } = useListStaff();
   const today = format(new Date(), "yyyy-MM-dd");
   const { data: todayAssignments } = useListAssignments({ date: today });
   const { login } = useAuth();
   const [selecting, setSelecting] = useState<number | null>(null);
-  const [passwordPrompt, setPasswordPrompt] = useState<{ member: NonNullable<typeof staffList>[number] } | null>(null);
-  const [password, setPassword] = useState("");
-  const [passwordError, setPasswordError] = useState(false);
+  const [pinPrompt, setPinPrompt] = useState<{ member: NonNullable<typeof staffList>[number] } | null>(null);
+  const [pinMode, setPinMode] = useState<PinMode>("enter");
+  const [pinDigits, setPinDigits] = useState<string[]>(["", "", "", ""]);
+  const [firstPin, setFirstPin] = useState("");
+  const [pinError, setPinError] = useState<string | null>(null);
   const [verifying, setVerifying] = useState(false);
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   const assignedStaffIds = useMemo(() => {
     return new Set((todayAssignments ?? []).map((a) => a.staffId));
   }, [todayAssignments]);
-  const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    if (pinPrompt && inputRefs.current[0]) {
+      inputRefs.current[0]?.focus();
+    }
+  }, [pinPrompt, pinMode]);
+
+  const resetPinState = () => {
+    setPinDigits(["", "", "", ""]);
+    setPinError(null);
+    setFirstPin("");
+  };
 
   const handleLogin = (member: NonNullable<typeof staffList>[number]) => {
-    if ((member as any).hasPassword) {
-      setPasswordPrompt({ member });
-      setPassword("");
-      setPasswordError(false);
-      setShowPassword(false);
+    if (member.role !== "staff") {
+      setPinPrompt({ member });
+      const hasPin = (member as any).hasPin;
+      setPinMode(hasPin ? "enter" : "set");
+      resetPinState();
       return;
     }
     setSelecting(member.id);
@@ -75,36 +91,134 @@ export default function Login() {
     });
   };
 
-  const handlePasswordSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!passwordPrompt) return;
-    setVerifying(true);
-    setPasswordError(false);
-    try {
-      const res = await fetch(`${BASE_URL}/api/staff/verify-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ staffId: passwordPrompt.member.id, password }),
-      });
-      if (res.ok) {
-        const member = passwordPrompt.member;
-        setPasswordPrompt(null);
-        setSelecting(member.id);
-        login({
-          id: member.id,
-          name: member.name,
-          role: member.role as UserRole,
-          phone: member.phone,
-          email: member.email,
+  const completeLogin = (member: NonNullable<typeof staffList>[number]) => {
+    setPinPrompt(null);
+    setSelecting(member.id);
+    login({
+      id: member.id,
+      name: member.name,
+      role: member.role as UserRole,
+      phone: member.phone,
+      email: member.email,
+    });
+  };
+
+  const handlePinComplete = async (pin: string) => {
+    if (!pinPrompt) return;
+
+    if (pinMode === "enter") {
+      setVerifying(true);
+      setPinError(null);
+      try {
+        const res = await fetch(`${BASE_URL}/api/staff/verify-pin`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ staffId: pinPrompt.member.id, pin }),
         });
-      } else {
-        setPasswordError(true);
+        if (res.ok) {
+          completeLogin(pinPrompt.member);
+        } else {
+          setPinError("Incorrect PIN. Please try again.");
+          setPinDigits(["", "", "", ""]);
+          setTimeout(() => inputRefs.current[0]?.focus(), 50);
+        }
+      } catch {
+        setPinError("Incorrect PIN. Please try again.");
+        setPinDigits(["", "", "", ""]);
+        setTimeout(() => inputRefs.current[0]?.focus(), 50);
+      } finally {
+        setVerifying(false);
       }
-    } catch {
-      setPasswordError(true);
-    } finally {
-      setVerifying(false);
+    } else if (pinMode === "set") {
+      setFirstPin(pin);
+      setPinMode("confirm");
+      setPinDigits(["", "", "", ""]);
+      setPinError(null);
+    } else if (pinMode === "confirm") {
+      if (pin !== firstPin) {
+        setPinError("PINs do not match. Please start over.");
+        setPinMode("set");
+        setFirstPin("");
+        setPinDigits(["", "", "", ""]);
+        setTimeout(() => inputRefs.current[0]?.focus(), 50);
+        return;
+      }
+      setVerifying(true);
+      setPinError(null);
+      try {
+        const res = await fetch(`${BASE_URL}/api/staff/set-pin`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ staffId: pinPrompt.member.id, pin }),
+        });
+        if (res.ok) {
+          completeLogin(pinPrompt.member);
+        } else {
+          setPinError("Failed to set PIN. Please try again.");
+          setPinMode("set");
+          setFirstPin("");
+          setPinDigits(["", "", "", ""]);
+          setTimeout(() => inputRefs.current[0]?.focus(), 50);
+        }
+      } catch {
+        setPinError("Failed to set PIN. Please try again.");
+        setPinMode("set");
+        setFirstPin("");
+        setPinDigits(["", "", "", ""]);
+        setTimeout(() => inputRefs.current[0]?.focus(), 50);
+      } finally {
+        setVerifying(false);
+      }
     }
+  };
+
+  const handleDigitChange = (index: number, value: string) => {
+    if (verifying) return;
+    const digit = value.replace(/\D/g, "").slice(-1);
+    const newDigits = [...pinDigits];
+    newDigits[index] = digit;
+    setPinDigits(newDigits);
+    setPinError(null);
+
+    if (digit && index < 3) {
+      inputRefs.current[index + 1]?.focus();
+    }
+
+    if (digit && index === 3 && newDigits.every((d) => d !== "")) {
+      handlePinComplete(newDigits.join(""));
+    }
+  };
+
+  const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace" && !pinDigits[index] && index > 0) {
+      const newDigits = [...pinDigits];
+      newDigits[index - 1] = "";
+      setPinDigits(newDigits);
+      inputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 4);
+    if (pasted.length === 4) {
+      const newDigits = pasted.split("");
+      setPinDigits(newDigits);
+      inputRefs.current[3]?.focus();
+      handlePinComplete(pasted);
+    }
+  };
+
+  const getPinTitle = () => {
+    if (pinMode === "set") return "Set your PIN";
+    if (pinMode === "confirm") return "Confirm your PIN";
+    return "Enter your PIN";
+  };
+
+  const getPinSubtitle = () => {
+    if (pinMode === "set") return "Create a 4-digit PIN for future logins";
+    if (pinMode === "confirm") return "Re-enter your PIN to confirm";
+    return "Enter your 4-digit PIN";
   };
 
   const byRole = {
@@ -163,7 +277,7 @@ export default function Login() {
                       </span>
                       {role !== "staff" && (
                         <span className="flex items-center gap-1 text-xs text-slate-400">
-                          <Lock className="w-3 h-3" /> Password required
+                          <Lock className="w-3 h-3" /> PIN required
                         </span>
                       )}
                     </div>
@@ -204,7 +318,7 @@ export default function Login() {
                           )}
                         </div>
                         {isOnShift && (
-                          (member as any).hasPassword ? (
+                          role !== "staff" ? (
                             <Lock className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 ml-auto shrink-0 transition-colors" />
                           ) : (
                             <LogIn className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 ml-auto shrink-0 transition-colors" />
@@ -220,63 +334,59 @@ export default function Login() {
         </div>
       )}
 
-      {passwordPrompt && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setPasswordPrompt(null)}>
+      {pinPrompt && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => { setPinPrompt(null); resetPinState(); }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${ROLE_CONFIG[passwordPrompt.member.role as keyof typeof ROLE_CONFIG]?.color ?? "from-slate-500 to-slate-600"} flex items-center justify-center text-white text-sm font-bold`}>
-                  {passwordPrompt.member.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${ROLE_CONFIG[pinPrompt.member.role as keyof typeof ROLE_CONFIG]?.color ?? "from-slate-500 to-slate-600"} flex items-center justify-center text-white text-sm font-bold`}>
+                  {pinPrompt.member.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
                 </div>
                 <div>
-                  <p className="font-semibold text-slate-800">{passwordPrompt.member.name}</p>
-                  <p className="text-xs text-slate-500 capitalize">{passwordPrompt.member.role}</p>
+                  <p className="font-semibold text-slate-800">{pinPrompt.member.name}</p>
+                  <p className="text-xs text-slate-500 capitalize">{pinPrompt.member.role}</p>
                 </div>
               </div>
-              <button onClick={() => setPasswordPrompt(null)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => { setPinPrompt(null); resetPinState(); }} className="text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handlePasswordSubmit}>
-              <label className="text-sm font-medium text-slate-700 mb-2 block">
-                Enter your password
-              </label>
-              <div className="relative">
+            <div className="text-center mb-6">
+              <p className="font-semibold text-slate-800 text-lg">{getPinTitle()}</p>
+              <p className="text-sm text-slate-500 mt-1">{getPinSubtitle()}</p>
+            </div>
+
+            <div className="flex justify-center gap-3 mb-4" onPaste={handlePaste}>
+              {pinDigits.map((digit, i) => (
                 <input
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => { setPassword(e.target.value); setPasswordError(false); }}
-                  autoFocus
-                  className={`w-full px-4 py-3 rounded-xl border ${passwordError ? "border-red-300 bg-red-50" : "border-slate-200"} text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 pr-10`}
-                  placeholder="Password"
+                  key={`${pinMode}-${i}`}
+                  ref={(el) => { inputRefs.current[i] = el; }}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={1}
+                  value={digit}
+                  onChange={(e) => handleDigitChange(i, e.target.value)}
+                  onKeyDown={(e) => handleKeyDown(i, e)}
+                  disabled={verifying}
+                  className={`w-14 h-16 text-center text-2xl font-bold rounded-xl border-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all ${
+                    pinError ? "border-red-300 bg-red-50" : digit ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-white"
+                  } disabled:opacity-50`}
+                  autoFocus={i === 0}
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
+              ))}
+            </div>
+
+            {pinError && (
+              <p className="text-red-500 text-xs text-center font-medium mb-3">{pinError}</p>
+            )}
+
+            {verifying && (
+              <div className="flex items-center justify-center gap-2 text-emerald-600 text-sm">
+                <span className="animate-spin">&#8635;</span>
+                <span>{pinMode === "enter" ? "Verifying..." : "Setting PIN..."}</span>
               </div>
-              {passwordError && (
-                <p className="text-red-500 text-xs mt-2 font-medium">Incorrect password. Please try again.</p>
-              )}
-              <button
-                type="submit"
-                disabled={verifying || !password}
-                className="w-full mt-4 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {verifying ? (
-                  <span className="animate-spin">&#8635;</span>
-                ) : (
-                  <>
-                    <Lock className="w-4 h-4" />
-                    Sign In
-                  </>
-                )}
-              </button>
-            </form>
+            )}
           </div>
         </div>
       )}

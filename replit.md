@@ -63,12 +63,10 @@ A comprehensive janitorial cleaning management web app for Marvol Facility at MC
 - Key files: `src/lib/offlineStore.ts`, `src/lib/offlineQueue.ts`, `src/contexts/OfflineContext.tsx`, `src/hooks/useOnlineStatus.ts`, `src/hooks/useOfflineMutations.ts`, `src/hooks/useOfflineCache.ts`, `src/components/OfflineBanner.tsx`
 
 **Auth:**
-- Admin, Inspector, Supervisors require password login (bcrypt-hashed)
-- Default passwords: Admin → `Admin2026`, Inspector → `Inspector2026`, Supervisors (shared) → `Supervisors2026`
-- Staff login is tap-to-login (no password by default), but staff can set their own password via "Set Password" button in sidebar
-- Once a staff member sets a password, they must use it to log in going forward
-- Passwords stored as bcrypt hashes; legacy plaintext passwords auto-verified and should be migrated
-- API: `POST /api/staff/verify-password`, `POST /api/staff/set-password`
+- Admin, Inspector, Supervisors require 4-digit PIN login (bcrypt-hashed, stored in `password` column)
+- First-time login prompts user to set a PIN; subsequent logins ask for the PIN
+- Staff login is tap-to-login (no PIN needed)
+- API: `POST /api/staff/verify-pin`, `POST /api/staff/set-pin`
 - Auth state stored in localStorage
 
 **Pages:**

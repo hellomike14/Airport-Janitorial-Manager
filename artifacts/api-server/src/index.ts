@@ -68,11 +68,11 @@ const SEED_TASK_TYPES = [
 ];
 
 
-const SEED_STAFF: { name: string; role: "admin" | "inspector" | "supervisor" | "staff"; phone?: string; email?: string; password?: string }[] = [
-  { name: "Marcell Sutherland", role: "admin", phone: "407-555-0001", email: "msutherland@marvolenterprises.com", password: "$2b$10$BOd6Ky/dYvLZoHuQqmJ5S.McC.dZsWACX.hXDAWYtSU9rcRd/EFJO" },
-  { name: "MCO Inspector", role: "inspector", phone: "407-555-0099", email: "raquel.santana@goaa.org", password: "$2b$10$MGwP2M8DkjmpZ5lcv9ycZutXOjLsUlki9JKSXTkIEMZco7WojVUVm" },
-  { name: "Priscila Rosero", role: "supervisor", email: "Priscilarosero27@gmail.com", password: "$2b$10$0fG/ZSs6RG3I5eBS1koCqur7vR2NEIcVRd/lT0k3MgAE.FmJpPnIy" },
-  { name: "Reynaldo Hernandez Suarez", role: "supervisor", email: "Cnuevo986@gmail.co", password: "$2b$10$v.9YDrn2LhvD/r2HO5Q4M.jzao46QZZugZMLImfOpLrVym7k3tH8a" },
+const SEED_STAFF: { name: string; role: "admin" | "inspector" | "supervisor" | "staff"; phone?: string; email?: string }[] = [
+  { name: "Marcell Sutherland", role: "admin", phone: "407-555-0001", email: "msutherland@marvolenterprises.com" },
+  { name: "MCO Inspector", role: "inspector", phone: "407-555-0099", email: "raquel.santana@goaa.org" },
+  { name: "Priscila Rosero", role: "supervisor", email: "Priscilarosero27@gmail.com" },
+  { name: "Reynaldo Hernandez Suarez", role: "supervisor", email: "Cnuevo986@gmail.co" },
 
   { name: "Edner Jules", role: "staff" },
   { name: "Ivan Serrano", role: "staff" },
@@ -98,11 +98,19 @@ async function seed() {
         role: s.role,
         phone: s.phone ?? null,
         email: s.email ?? null,
-        password: s.password ?? null,
+        password: null,
         active: true,
       }))
     );
     console.log(`Seeded: ${toInsert.length} staff members (${toInsert.map((s) => s.name).join(", ")})`);
+  }
+
+  const managersWithPasswords = existingStaff.filter(
+    (s) => (s.role === "admin" || s.role === "inspector" || s.role === "supervisor") && s.password
+  );
+  for (const mgr of managersWithPasswords) {
+    await db.update(staffTable).set({ password: null }).where(eq(staffTable.id, mgr.id));
+    console.log(`Cleared password for ${mgr.name} (will set PIN on next login)`);
   }
 
   for (const existing of existingStaff) {
@@ -118,23 +126,9 @@ async function seed() {
       await db.update(staffTable).set({ role: seedEntry.role }).where(eq(staffTable.id, existing.id));
       console.log(`Updated role for ${existing.name}: ${existing.role} → ${seedEntry.role}`);
     }
-    if (seedEntry && seedEntry.email) {
-      const updates: Record<string, string> = {};
-      if (seedEntry.email !== existing.email) {
-        updates.email = seedEntry.email;
-      }
-      if ((seedEntry.role === "admin" || seedEntry.role === "inspector" || seedEntry.role === "supervisor") && seedEntry.password) {
-        updates.password = seedEntry.password;
-      } else if (seedEntry.password && !existing.password) {
-        updates.password = seedEntry.password;
-      }
-      if (Object.keys(updates).length > 0) {
-        await db.update(staffTable).set(updates).where(eq(staffTable.id, existing.id));
-        console.log(`Updated ${existing.name}: ${Object.keys(updates).join(", ")}`);
-      }
-    } else if (seedEntry && seedEntry.password && !existing.password) {
-      await db.update(staffTable).set({ password: seedEntry.password }).where(eq(staffTable.id, existing.id));
-      console.log(`Set password for ${existing.name}`);
+    if (seedEntry && seedEntry.email && seedEntry.email !== existing.email) {
+      await db.update(staffTable).set({ email: seedEntry.email }).where(eq(staffTable.id, existing.id));
+      console.log(`Updated ${existing.name}: email`);
     }
   }
 

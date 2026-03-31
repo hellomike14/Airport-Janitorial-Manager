@@ -11,12 +11,13 @@ import {
 } from "@workspace/api-zod";
 
 const SALT_ROUNDS = 10;
+const PIN_REGEX = /^\d{4}$/;
 
-async function hashPassword(plain: string): Promise<string> {
+async function hashPin(plain: string): Promise<string> {
   return bcrypt.hash(plain, SALT_ROUNDS);
 }
 
-async function verifyPassword(plain: string, hash: string): Promise<boolean> {
+async function verifyPin(plain: string, hash: string): Promise<boolean> {
   if (!hash.startsWith("$2")) {
     return plain === hash;
   }
@@ -36,26 +37,21 @@ router.get("/", async (_req, res) => {
       const { password, ...rest } = s;
       return {
         ...rest,
-        hasPassword: !!password,
+        hasPin: !!password,
         createdAt: s.createdAt.toISOString(),
       };
     })
   );
 });
 
-function matchesNameInitial(input: string, fullName: string): boolean {
-  const parts = fullName.trim().split(/\s+/);
-  if (parts.length < 2) return false;
-  const firstName = parts[0];
-  const lastInitial = parts[parts.length - 1][0];
-  const expected = `${firstName} ${lastInitial}`.toLowerCase();
-  return input.trim().toLowerCase() === expected;
-}
-
-router.post("/verify-password", async (req, res) => {
-  const { staffId, password } = req.body;
-  if (!staffId || !password) {
-    res.status(400).json({ error: "staffId and password required" });
+router.post("/verify-pin", async (req, res) => {
+  const { staffId, pin } = req.body;
+  if (!staffId || !pin) {
+    res.status(400).json({ error: "staffId and pin required" });
+    return;
+  }
+  if (!PIN_REGEX.test(pin)) {
+    res.status(400).json({ error: "PIN must be exactly 4 digits" });
     return;
   }
   const [staff] = await db
@@ -66,34 +62,27 @@ router.post("/verify-password", async (req, res) => {
     res.status(404).json({ error: "Staff not found" });
     return;
   }
-
-  if ((staff.role === "inspector" || staff.role === "admin" || staff.role === "supervisor") && matchesNameInitial(password, staff.name)) {
-    const { password: _, ...rest } = staff;
-    res.json({ ...rest, createdAt: staff.createdAt.toISOString() });
-    return;
-  }
-
   if (!staff.password) {
-    res.status(401).json({ error: "No password set" });
+    res.status(401).json({ error: "No PIN set" });
     return;
   }
-  const valid = await verifyPassword(password, staff.password);
+  const valid = await verifyPin(pin, staff.password);
   if (!valid) {
-    res.status(401).json({ error: "Incorrect password" });
+    res.status(401).json({ error: "Incorrect PIN" });
     return;
   }
   const { password: _, ...rest } = staff;
   res.json({ ...rest, createdAt: staff.createdAt.toISOString() });
 });
 
-router.post("/set-password", async (req, res) => {
-  const { staffId, password, currentPassword } = req.body;
-  if (!staffId || !password) {
-    res.status(400).json({ error: "staffId and password required" });
+router.post("/set-pin", async (req, res) => {
+  const { staffId, pin, currentPin } = req.body;
+  if (!staffId || !pin) {
+    res.status(400).json({ error: "staffId and pin required" });
     return;
   }
-  if (password.length < 4) {
-    res.status(400).json({ error: "Password must be at least 4 characters" });
+  if (!PIN_REGEX.test(pin)) {
+    res.status(400).json({ error: "PIN must be exactly 4 digits" });
     return;
   }
   const [staff] = await db
@@ -105,17 +94,21 @@ router.post("/set-password", async (req, res) => {
     return;
   }
   if (staff.password) {
-    if (!currentPassword) {
-      res.status(401).json({ error: "Current password is required" });
+    if (!currentPin) {
+      res.status(401).json({ error: "Current PIN is required" });
       return;
     }
-    const valid = await verifyPassword(currentPassword, staff.password);
+    if (!PIN_REGEX.test(currentPin)) {
+      res.status(400).json({ error: "Current PIN must be exactly 4 digits" });
+      return;
+    }
+    const valid = await verifyPin(currentPin, staff.password);
     if (!valid) {
-      res.status(401).json({ error: "Current password is incorrect" });
+      res.status(401).json({ error: "Current PIN is incorrect" });
       return;
     }
   }
-  const hashed = await hashPassword(password);
+  const hashed = await hashPin(pin);
   await db
     .update(staffTable)
     .set({ password: hashed })
@@ -125,10 +118,6 @@ router.post("/set-password", async (req, res) => {
 
 router.post("/", async (req, res) => {
   const body = CreateStaffMemberBody.parse(req.body);
-  let password: string | null = null;
-  if ((body.role === "inspector" || body.role === "supervisor") && body.email) {
-    password = await hashPassword(body.email);
-  }
   const [created] = await db
     .insert(staffTable)
     .values({
@@ -136,7 +125,7 @@ router.post("/", async (req, res) => {
       role: body.role,
       phone: body.phone ?? null,
       email: body.email ?? null,
-      password,
+      password: null,
     })
     .returning();
   res.status(201).json({ ...created, createdAt: created.createdAt.toISOString() });
