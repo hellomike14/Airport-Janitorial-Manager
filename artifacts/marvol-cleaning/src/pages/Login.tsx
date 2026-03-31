@@ -240,20 +240,27 @@ export default function Login() {
 
             <form onSubmit={handlePasswordSubmit}>
               <label className="text-sm font-medium text-slate-700 mb-2 block">
-                Enter your first name and last name initial
+                Enter your password
               </label>
               <div className="relative">
                 <input
-                  type="text"
+                  type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => { setPassword(e.target.value); setPasswordError(false); }}
                   autoFocus
                   className={`w-full px-4 py-3 rounded-xl border ${passwordError ? "border-red-300 bg-red-50" : "border-slate-200"} text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 pr-10`}
-                  placeholder="e.g. John S"
+                  placeholder="Password"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
               </div>
               {passwordError && (
-                <p className="text-red-500 text-xs mt-2 font-medium">Incorrect name. Please try again.</p>
+                <p className="text-red-500 text-xs mt-2 font-medium">Incorrect password. Please try again.</p>
               )}
               <button
                 type="submit"
