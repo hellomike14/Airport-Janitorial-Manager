@@ -93,15 +93,11 @@
     "selectProfile": "Seleccione su perfil para continuar",
     "loadingStaff": "Cargando personal...",
     "pinRequired": "PIN requerido",
-<<<<<<< HEAD
     "enterPin": "Ingrese su PIN",
     "enterPinSubtitle": "Ingrese su PIN de 4 dígitos",
     "setYourPin": "Establezca su PIN",
     "createPinSubtitle": "Cree un PIN de 4 dígitos para futuros inicios de sesión",
     "confirmPinSubtitle": "Reingrese su PIN para confirmar",
-=======
-    "enterPin": "Ingrese su PIN de 4 dígitos",
->>>>>>> 48518ad (Post-merge setup completed successfully)
     "incorrectPin": "PIN incorrecto. Intente de nuevo.",
     "signIn": "Iniciar Sesión",
     "notOnShift": "Fuera de turno",

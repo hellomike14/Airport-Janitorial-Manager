@@ -93,15 +93,11 @@
     "selectProfile": "Sélectionnez votre profil pour continuer",
     "loadingStaff": "Chargement du personnel...",
     "pinRequired": "NIP requis",
-<<<<<<< HEAD
     "enterPin": "Entrez votre NIP",
     "enterPinSubtitle": "Entrez votre NIP à 4 chiffres",
     "setYourPin": "Définir votre NIP",
     "createPinSubtitle": "Créez un NIP à 4 chiffres pour les connexions futures",
     "confirmPinSubtitle": "Ressaisissez votre NIP pour confirmer",
-=======
-    "enterPin": "Entrez votre NIP à 4 chiffres",
->>>>>>> 48518ad (Post-merge setup completed successfully)
     "incorrectPin": "NIP incorrect. Veuillez réessayer.",
     "signIn": "Se Connecter",
     "notOnShift": "Hors service",

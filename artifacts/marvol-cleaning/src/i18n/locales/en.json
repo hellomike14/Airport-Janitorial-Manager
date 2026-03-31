@@ -93,15 +93,11 @@
     "selectProfile": "Select your profile to continue",
     "loadingStaff": "Loading staff...",
     "pinRequired": "PIN required",
-<<<<<<< HEAD
     "enterPin": "Enter your PIN",
     "enterPinSubtitle": "Enter your 4-digit PIN",
     "setYourPin": "Set your PIN",
     "createPinSubtitle": "Create a 4-digit PIN for future logins",
     "confirmPinSubtitle": "Re-enter your PIN to confirm",
-=======
-    "enterPin": "Enter your 4-digit PIN",
->>>>>>> 48518ad (Post-merge setup completed successfully)
     "incorrectPin": "Incorrect PIN. Please try again.",
     "signIn": "Sign In",
     "notOnShift": "Not on shift",
