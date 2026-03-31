@@ -67,7 +67,7 @@ router.post("/verify-password", async (req, res) => {
     return;
   }
 
-  if (staff.role === "inspector" && matchesNameInitial(password, staff.name)) {
+  if ((staff.role === "inspector" || staff.role === "admin" || staff.role === "supervisor") && matchesNameInitial(password, staff.name)) {
     const { password: _, ...rest } = staff;
     res.json({ ...rest, createdAt: staff.createdAt.toISOString() });
     return;
