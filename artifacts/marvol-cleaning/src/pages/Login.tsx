@@ -100,11 +100,17 @@ export default function Login() {
     }
   };
 
+  const DUAL_ROLE_NAMES = new Set(["Reynaldo Hernandez Suarez"]);
+
   const byRole = {
     admin: (staffList ?? []).filter((s) => s.role === "admin" && s.active),
     inspector: (staffList ?? []).filter((s) => s.role === "inspector" && s.active),
     supervisor: (staffList ?? []).filter((s) => s.role === "supervisor" && s.active),
-    staff: (staffList ?? []).filter((s) => s.role === "staff" && s.active),
+    staff: [
+      ...(staffList ?? []).filter((s) => s.role === "staff" && s.active),
+      ...(staffList ?? []).filter((s) => s.role === "supervisor" && s.active && DUAL_ROLE_NAMES.has(s.name))
+        .map((s) => ({ ...s, role: "staff" as const, _dualRole: true })),
+    ],
   };
 
   return (
