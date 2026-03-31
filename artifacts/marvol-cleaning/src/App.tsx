@@ -5,6 +5,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import { AppLayout } from "./components/layout/AppLayout";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { OfflineProvider } from "./contexts/OfflineContext";
+import { OfflineBanner } from "./components/OfflineBanner";
 
 import Dashboard from "./pages/Dashboard";
 import AreasList from "./pages/AreasList";
@@ -38,6 +40,7 @@ function ProtectedRoutes() {
 
   return (
     <AppLayout>
+      {effectiveRole === "staff" && <OfflineBanner />}
       <Switch>
         {/* Admin-only routes */}
         {effectiveRole === "admin" && (
@@ -103,11 +106,13 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <AuthProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <ProtectedRoutes />
-          </WouterRouter>
-        </AuthProvider>
+        <OfflineProvider>
+          <AuthProvider>
+            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+              <ProtectedRoutes />
+            </WouterRouter>
+          </AuthProvider>
+        </OfflineProvider>
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>

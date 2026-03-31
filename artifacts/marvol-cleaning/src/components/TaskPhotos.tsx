@@ -1,6 +1,8 @@
 import React, { useState, useRef } from "react";
 import { Camera, X, Loader2, ZoomIn, ArrowRight, ChevronDown, ChevronUp, ImageIcon } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { storePhotoBlob } from "@/lib/offlineStore";
+import { useOffline } from "@/contexts/OfflineContext";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -34,6 +36,7 @@ function PhotoSlot({
   objectPath,
   onUpload,
   onRemove,
+  onFileCapture,
   accent = "blue",
   compact = false,
 }: {
@@ -41,6 +44,7 @@ function PhotoSlot({
   objectPath: string | null;
   onUpload: (path: string) => void;
   onRemove: () => void;
+  onFileCapture?: (file: File) => void;
   accent?: string;
   compact?: boolean;
 }) {
@@ -52,13 +56,24 @@ function PhotoSlot({
   const handleFile = async (file: File) => {
     if (!file.type.startsWith("image/")) return;
     setPreview(URL.createObjectURL(file));
+
+    if (onFileCapture) {
+      onFileCapture(file);
+    }
+
+    if (!navigator.onLine) {
+      return;
+    }
+
     setUploading(true);
     try {
       const path = await uploadFile(file);
       onUpload(path);
     } catch (e) {
       console.error(e);
-      setPreview(null);
+      if (!onFileCapture) {
+        setPreview(null);
+      }
     } finally {
       setUploading(false);
     }
@@ -153,10 +168,14 @@ export function TaskPhotoPanel({
   compact?: boolean;
 }) {
   const qc = useQueryClient();
+  const { queueMutationIfOffline } = useOffline();
   const [before, setBefore] = useState<string | null>(beforeImagePath);
   const [after, setAfter] = useState<string | null>(afterImagePath);
 
   const updatePhoto = async (field: "beforeImagePath" | "afterImagePath", value: string | null) => {
+    if (!navigator.onLine) {
+      return;
+    }
     const res = await fetch(`${BASE_URL}/api/tasks/${taskId}/images`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -170,6 +189,19 @@ export function TaskPhotoPanel({
     qc.invalidateQueries({ queryKey: ["/api/tasks"] });
   };
 
+  const handleFileCapture = async (field: "beforeImagePath" | "afterImagePath", file: File) => {
+    if (!navigator.onLine) {
+      const blobKey = `${field}:task-${taskId}-${Date.now()}`;
+      await storePhotoBlob(blobKey, file, file.name, file.type);
+      await queueMutationIfOffline(
+        "PATCH",
+        `/api/tasks/${taskId}/images`,
+        { [field]: null },
+        [blobKey]
+      );
+    }
+  };
+
   return (
     <div className="flex gap-3 items-start">
       <PhotoSlot
@@ -177,6 +209,7 @@ export function TaskPhotoPanel({
         objectPath={before}
         onUpload={(path) => { setBefore(path); updatePhoto("beforeImagePath", path); }}
         onRemove={() => { setBefore(null); updatePhoto("beforeImagePath", null); }}
+        onFileCapture={(file) => handleFileCapture("beforeImagePath", file)}
         accent="blue"
         compact={compact}
       />
@@ -190,6 +223,7 @@ export function TaskPhotoPanel({
         objectPath={after}
         onUpload={(path) => { setAfter(path); updatePhoto("afterImagePath", path); }}
         onRemove={() => { setAfter(null); updatePhoto("afterImagePath", null); }}
+        onFileCapture={(file) => handleFileCapture("afterImagePath", file)}
         accent="emerald"
         compact={compact}
       />

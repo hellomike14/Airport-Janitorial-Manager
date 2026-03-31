@@ -52,6 +52,16 @@ A comprehensive janitorial cleaning management web app for Marvol Facility at MC
 - **Staff**: My Tasks page + My Issues (assigned issues with completion flow)
   - My Tasks auto-expands to show all areas in the same terminal group (e.g., assigned to East Garage → sees P1-P4, R1-R2 too)
 
+**Offline Mode (Staff):**
+- PWA service worker via `vite-plugin-pwa` (Workbox) precaches app shell and caches API responses
+- IndexedDB-based store (`idb` library) for offline data persistence and action queue
+- Staff can complete/uncomplete tasks and report/complete issues while offline
+- Photos taken offline are stored as blobs in IndexedDB and uploaded on reconnect
+- Offline action queue processes in order on reconnect with conflict handling (404/410 = skip)
+- Offline indicator banner shows when disconnected, syncing, synced, or sync error
+- Only staff-facing pages (My Tasks, Issues) have offline support
+- Key files: `src/lib/offlineStore.ts`, `src/lib/offlineQueue.ts`, `src/contexts/OfflineContext.tsx`, `src/hooks/useOnlineStatus.ts`, `src/hooks/useOfflineMutations.ts`, `src/hooks/useOfflineCache.ts`, `src/components/OfflineBanner.tsx`
+
 **Auth:**
 - Admin, Inspector, Supervisors require password login (bcrypt-hashed)
 - Default passwords: Admin → `Admin2026`, Inspector → `Inspector2026`, Supervisors (shared) → `Supervisors2026`

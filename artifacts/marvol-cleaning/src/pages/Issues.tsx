@@ -13,6 +13,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOfflineCreateIssue, useOfflineCompleteIssue, useOfflineResolveIssue } from "@/hooks/useOfflineMutations";
 import {
   AlertOctagon,
   CheckCircle2,
@@ -66,10 +67,11 @@ interface ImagePickerProps {
   objectPath: string | null;
   onUpload: (path: string) => void;
   onRemove: () => void;
+  onFileCapture?: (file: File) => void;
   accent?: string;
 }
 
-function ImagePicker({ label, objectPath, onUpload, onRemove, accent = "blue" }: ImagePickerProps) {
+function ImagePicker({ label, objectPath, onUpload, onRemove, onFileCapture, accent = "blue" }: ImagePickerProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
@@ -78,13 +80,24 @@ function ImagePicker({ label, objectPath, onUpload, onRemove, accent = "blue" }:
   const handleFile = async (file: File) => {
     if (!file.type.startsWith("image/")) return;
     setPreview(URL.createObjectURL(file));
+
+    if (onFileCapture) {
+      onFileCapture(file);
+    }
+
+    if (!navigator.onLine) {
+      return;
+    }
+
     setUploading(true);
     try {
       const path = await uploadFile(file);
       onUpload(path);
     } catch (e) {
       console.error(e);
-      setPreview(null);
+      if (!onFileCapture) {
+        setPreview(null);
+      }
     } finally {
       setUploading(false);
     }
@@ -250,11 +263,12 @@ function AssignAreaButton({
   );
 }
 
-function StaffCompletionPanel({ issue }: { issue: any }) {
+function StaffCompletionPanel({ issue }: { issue: { id: number; afterImagePath?: string | null; [key: string]: unknown } }) {
   const qc = useQueryClient();
   const { currentUser } = useAuth();
   const [notes, setNotes] = useState("");
   const [afterPath, setAfterPath] = useState<string | null>(issue.afterImagePath ?? null);
+  const [afterPhotoFile, setAfterPhotoFile] = useState<File | null>(null);
   const [expanded, setExpanded] = useState(false);
 
   const completeIssue = useCompleteIssue({
@@ -264,16 +278,19 @@ function StaffCompletionPanel({ issue }: { issue: any }) {
     mutation: { onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/issues"] }) },
   });
 
+  const offlineComplete = useOfflineCompleteIssue();
+
   const handleAfterUpload = (path: string) => {
     setAfterPath(path);
     updateImages.mutate({ id: issue.id, data: { afterImagePath: path } });
   };
 
-  const handleMarkDone = () => {
-    completeIssue.mutate({
-      id: issue.id,
-      data: { completionNotes: notes || null, completedById: currentUser!.id },
-    });
+  const handleMarkDone = async () => {
+    const data = { completionNotes: notes || null, completedById: currentUser!.id };
+    const handled = await offlineComplete.mutateOffline(issue.id, data, afterPhotoFile);
+    if (!handled) {
+      completeIssue.mutate({ id: issue.id, data });
+    }
   };
 
   return (
@@ -312,7 +329,8 @@ function StaffCompletionPanel({ issue }: { issue: any }) {
                 label=""
                 objectPath={afterPath}
                 onUpload={handleAfterUpload}
-                onRemove={() => { setAfterPath(null); updateImages.mutate({ id: issue.id, data: { afterImagePath: null } }); }}
+                onRemove={() => { setAfterPath(null); setAfterPhotoFile(null); updateImages.mutate({ id: issue.id, data: { afterImagePath: null } }); }}
+                onFileCapture={setAfterPhotoFile}
                 accent="amber"
               />
             </div>
@@ -423,6 +441,7 @@ export default function Issues() {
     severity: "medium" as "low" | "medium" | "high",
   });
   const [beforePath, setBeforePath] = useState<string | null>(null);
+  const [beforePhotoFile, setBeforePhotoFile] = useState<File | null>(null);
 
   const createMutation = useCreateIssue({
     mutation: {
@@ -441,6 +460,9 @@ export default function Issues() {
     },
   });
 
+  const offlineCreateIssue = useOfflineCreateIssue();
+  const offlineResolveIssue = useOfflineResolveIssue();
+
   const areaTerminalMap = new Map<number, string>();
   areas?.forEach((a: any) => { if (a.id && a.terminal) areaTerminalMap.set(a.id, a.terminal); });
   const terminals = [...new Set(areas?.map((a: any) => a.terminal).filter(Boolean) ?? [])];
@@ -453,17 +475,26 @@ export default function Issues() {
 
   const toggleExpand = (id: number) => setExpandedId(expandedId === id ? null : id);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    createMutation.mutate({
-      data: {
-        areaId: parseInt(formData.areaId),
-        description: formData.description,
-        severity: formData.severity,
-        reportedById: userId,
-        beforeImagePath: beforePath,
-      } as any,
-    });
+    const issueData = {
+      areaId: parseInt(formData.areaId),
+      description: formData.description,
+      severity: formData.severity,
+      reportedById: userId,
+      beforeImagePath: beforePath,
+    };
+
+    const handled = await offlineCreateIssue.mutateOffline(issueData, beforePhotoFile);
+    if (handled) {
+      setIsReporting(false);
+      setFormData({ areaId: "", description: "", severity: "medium" });
+      setBeforePath(null);
+      setBeforePhotoFile(null);
+      return;
+    }
+
+    createMutation.mutate({ data: issueData as any });
   };
 
   return (
@@ -599,7 +630,8 @@ export default function Issues() {
                   label=""
                   objectPath={beforePath}
                   onUpload={setBeforePath}
-                  onRemove={() => setBeforePath(null)}
+                  onRemove={() => { setBeforePath(null); setBeforePhotoFile(null); }}
+                  onFileCapture={setBeforePhotoFile}
                   accent="rose"
                 />
               </div>
@@ -755,9 +787,12 @@ export default function Issues() {
 
                     {!isStaff && !isInspector && !issue.resolved && (
                       <Button
-                        onClick={() => {
+                        onClick={async () => {
                           if (confirm("Mark this issue as resolved?")) {
-                            resolveMutation.mutate({ id: issue.id });
+                            const handled = await offlineResolveIssue.mutateOffline(issue.id);
+                            if (!handled) {
+                              resolveMutation.mutate({ id: issue.id });
+                            }
                           }
                         }}
                         disabled={resolveMutation.isPending}

@@ -1,0 +1,147 @@
+import {
+  enqueueAction,
+  getQueuedActions,
+  removeQueuedAction,
+  getPhotoBlob,
+  removePhotoBlob,
+  type QueuedAction,
+} from "./offlineStore";
+
+const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+
+export type ActionResult = "success" | "retry" | "discard";
+
+async function uploadPhotoBlob(blobKey: string): Promise<string | null> {
+  const photoData = await getPhotoBlob(blobKey);
+  if (!photoData) return null;
+
+  const file = new File([photoData.blob], photoData.fileName, {
+    type: photoData.contentType,
+  });
+
+  const presignRes = await fetch(`${BASE_URL}/api/storage/uploads/request-url`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: file.name,
+      size: file.size,
+      contentType: file.type,
+    }),
+  });
+
+  if (!presignRes.ok) throw new Error("Failed to get presigned URL");
+
+  const { uploadURL, objectPath } = await presignRes.json();
+
+  const putRes = await fetch(uploadURL, {
+    method: "PUT",
+    headers: { "Content-Type": file.type },
+    body: file,
+  });
+
+  if (!putRes.ok) throw new Error("Failed to upload photo");
+
+  return objectPath;
+}
+
+async function cleanupPhotoBlobsForAction(action: QueuedAction): Promise<void> {
+  if (action.photoBlobKeys) {
+    for (const blobKey of action.photoBlobKeys) {
+      await removePhotoBlob(blobKey).catch(() => {});
+    }
+  }
+}
+
+async function executeAction(action: QueuedAction): Promise<ActionResult> {
+  try {
+    let payload = action.payload as Record<string, unknown> | undefined;
+
+    if (action.photoBlobKeys && action.photoBlobKeys.length > 0) {
+      payload = { ...payload };
+      for (const blobKey of action.photoBlobKeys) {
+        const parts = blobKey.split(":");
+        const fieldName = parts[0];
+        const objectPath = await uploadPhotoBlob(blobKey);
+        if (objectPath && payload) {
+          payload[fieldName] = objectPath;
+        }
+      }
+    }
+
+    const fetchOptions: RequestInit = {
+      method: action.method,
+      headers: { "Content-Type": "application/json" },
+    };
+
+    if (payload && action.method !== "GET") {
+      fetchOptions.body = JSON.stringify(payload);
+    }
+
+    const url = action.endpoint.startsWith("http")
+      ? action.endpoint
+      : `${BASE_URL}${action.endpoint}`;
+
+    const res = await fetch(url, fetchOptions);
+
+    if (res.ok) return "success";
+
+    if (res.status === 401 || res.status === 403) {
+      return "retry";
+    }
+
+    if (res.status === 404 || res.status === 410) {
+      return "discard";
+    }
+
+    if (res.status >= 500 || res.status === 408 || res.status === 429) {
+      return "retry";
+    }
+
+    if (res.status === 409) {
+      return "discard";
+    }
+
+    return "discard";
+  } catch (err) {
+    console.warn("[OfflineQueue] Network error executing action:", err);
+    return "retry";
+  }
+}
+
+export type SyncProgressCallback = (processed: number, total: number) => void;
+
+export async function processQueue(
+  onProgress?: SyncProgressCallback
+): Promise<{ processed: number; failed: number; discarded: number; total: number }> {
+  const actions = await getQueuedActions();
+  const total = actions.length;
+  let processed = 0;
+  let failed = 0;
+  let discarded = 0;
+
+  for (const action of actions) {
+    const result = await executeAction(action);
+    if (result === "success" || result === "discard") {
+      await cleanupPhotoBlobsForAction(action);
+      await removeQueuedAction(action.id!);
+      if (result === "success") processed++;
+      else discarded++;
+    } else {
+      failed++;
+    }
+    onProgress?.(processed + failed + discarded, total);
+  }
+
+  return { processed, failed, discarded, total };
+}
+
+export async function queueMutation(
+  method: string,
+  endpoint: string,
+  payload?: unknown,
+  photoBlobKeys?: string[]
+): Promise<number> {
+  return enqueueAction({ method, endpoint, payload, photoBlobKeys });
+}
+
+export { getQueuedActions, getQueueSize } from "./offlineStore";

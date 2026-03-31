@@ -9,6 +9,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOfflineCompleteTask, useOfflineUncompleteTask } from "@/hooks/useOfflineMutations";
 import {
   CheckCircle2,
   Circle,
@@ -67,6 +68,9 @@ export default function MyTasks() {
   const uncompleteMutation = useUncompleteTask({
     mutation: { onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/tasks"] }) },
   });
+
+  const offlineComplete = useOfflineCompleteTask();
+  const offlineUncomplete = useOfflineUncompleteTask();
 
   const isLoading = loadingAssignments || loadingTasks;
 
@@ -134,11 +138,17 @@ export default function MyTasks() {
   const totalCompleted = areaGroups.reduce((s, g) => s + g.completed, 0) + myExtraTasks.filter((t) => t.completed).length;
   const allDone = totalTasks > 0 && totalCompleted === totalTasks;
 
-  const toggleTask = (task: any) => {
+  const toggleTask = async (task: any) => {
     if (task.completed) {
-      uncompleteMutation.mutate({ id: task.id });
+      const handled = await offlineUncomplete.mutateOffline(task.id);
+      if (!handled) {
+        uncompleteMutation.mutate({ id: task.id });
+      }
     } else {
-      completeMutation.mutate({ id: task.id, data: { completedById: currentUser.id } });
+      const handled = await offlineComplete.mutateOffline(task.id, currentUser.id);
+      if (!handled) {
+        completeMutation.mutate({ id: task.id, data: { completedById: currentUser.id } });
+      }
     }
   };
 
