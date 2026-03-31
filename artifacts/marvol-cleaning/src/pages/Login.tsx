@@ -1,5 +1,6 @@
-import React, { useState } from "react";
-import { useListStaff } from "@workspace/api-client-react";
+import React, { useState, useMemo } from "react";
+import { useListStaff, useListAssignments } from "@workspace/api-client-react";
+import { format } from "date-fns";
 import { useAuth, UserRole } from "@/contexts/AuthContext";
 import { Shield, Users, User, LogIn, ClipboardCheck, Lock, X, Eye, EyeOff } from "lucide-react";
 
@@ -42,12 +43,18 @@ const ROLE_CONFIG = {
 
 export default function Login() {
   const { data: staffList, isLoading } = useListStaff();
+  const today = format(new Date(), "yyyy-MM-dd");
+  const { data: todayAssignments } = useListAssignments({ date: today });
   const { login } = useAuth();
   const [selecting, setSelecting] = useState<number | null>(null);
   const [passwordPrompt, setPasswordPrompt] = useState<{ member: NonNullable<typeof staffList>[number] } | null>(null);
   const [password, setPassword] = useState("");
   const [passwordError, setPasswordError] = useState(false);
   const [verifying, setVerifying] = useState(false);
+
+  const assignedStaffIds = useMemo(() => {
+    return new Set((todayAssignments ?? []).map((a) => a.staffId));
+  }, [todayAssignments]);
   const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = (member: NonNullable<typeof staffList>[number]) => {
@@ -166,28 +173,42 @@ export default function Login() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {members.map((member) => {
                     const initials = member.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+                    const isOnShift = role !== "staff" || assignedStaffIds.has(member.id);
                     return (
                       <button
                         key={member.id}
                         onClick={() => handleLogin(member)}
                         disabled={selecting !== null}
-                        className="flex items-center gap-3 bg-white/80 hover:bg-white border border-white/60 hover:border-slate-200 rounded-xl p-3 text-left transition-all hover:shadow-md active:scale-95 group disabled:opacity-60"
+                        className={`flex items-center gap-3 border rounded-xl p-3 text-left transition-all active:scale-95 group disabled:opacity-60 ${
+                          isOnShift
+                            ? "bg-white/80 hover:bg-white border-white/60 hover:border-slate-200 hover:shadow-md"
+                            : "bg-white/30 border-white/20 opacity-50"
+                        }`}
                       >
-                        <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${cfg.color} flex items-center justify-center text-white text-xs font-bold shrink-0 shadow-sm`}>
+                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 shadow-sm ${
+                          isOnShift
+                            ? `bg-gradient-to-br ${cfg.color} text-white`
+                            : "bg-slate-300 text-slate-500"
+                        }`}>
                           {selecting === member.id ? (
                             <span className="animate-spin text-base">&#8635;</span>
                           ) : initials}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-slate-800 truncate leading-tight">{member.name}</p>
+                          <p className={`text-sm font-medium truncate leading-tight ${isOnShift ? "text-slate-800" : "text-slate-400"}`}>{member.name}</p>
                           {member.phone && (
                             <p className="text-xs text-slate-400 truncate">{member.phone}</p>
                           )}
+                          {!isOnShift && (
+                            <p className="text-[10px] text-slate-400 font-medium">Not on shift</p>
+                          )}
                         </div>
-                        {(member as any).hasPassword ? (
-                          <Lock className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 ml-auto shrink-0 transition-colors" />
-                        ) : (
-                          <LogIn className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 ml-auto shrink-0 transition-colors" />
+                        {isOnShift && (
+                          (member as any).hasPassword ? (
+                            <Lock className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 ml-auto shrink-0 transition-colors" />
+                          ) : (
+                            <LogIn className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 ml-auto shrink-0 transition-colors" />
+                          )
                         )}
                       </button>
                     );
