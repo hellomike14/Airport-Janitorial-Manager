@@ -50,6 +50,7 @@ A comprehensive janitorial cleaning management web app for Marvol Facility at MC
 - **Inspector**: Open Issues (report and add information to issues, no assign/resolve), Completed Tasks (view all completed tasks across areas)
 - **Supervisor**: Dashboard, areas, assignments, issue tracker (no staff management)
 - **Staff**: My Tasks page + My Issues (assigned issues with completion flow)
+  - My Tasks auto-expands to show all areas in the same terminal group (e.g., assigned to East Garage → sees P1-P4, R1-R2 too)
 
 **Auth:**
 - Admin, Inspector, Supervisors require password login (bcrypt-hashed)

@@ -138,8 +138,18 @@ router.get("/", async (req, res) => {
   const areaId = query.areaId;
   const assignedToId = (query as any).assignedToId ? Number((query as any).assignedToId) : undefined;
 
+  const terminalParam = req.query.terminal as string | undefined;
+
   if (areaId) {
     await ensureTasksForDate(areaId, date);
+  } else if (terminalParam) {
+    const terminalAreas = await db
+      .select({ id: areasTable.id })
+      .from(areasTable)
+      .where(eq(areasTable.terminal, terminalParam));
+    for (const area of terminalAreas) {
+      await ensureTasksForDate(area.id, date);
+    }
   }
 
   const tasks = await db

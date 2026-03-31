@@ -1,8 +1,9 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useEffect } from "react";
 import { format, getHours } from "date-fns";
 import {
   useListTasks,
   useListAssignments,
+  useListAreas,
   useCompleteTask,
   useUncompleteTask,
 } from "@workspace/api-client-react";
@@ -24,8 +25,10 @@ import {
 import { TaskPhotoToggle } from "@/components/TaskPhotos";
 
 const TERMINAL_STYLES: Record<string, { bg: string; text: string; dot: string; bar: string; border: string }> = {
-  "Terminal A": { bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500", bar: "bg-blue-500", border: "border-blue-200" },
-  "Terminal B": { bg: "bg-violet-50", text: "text-violet-700", dot: "bg-violet-500", bar: "bg-violet-500", border: "border-violet-200" },
+  "Terminal A - East": { bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500", bar: "bg-blue-500", border: "border-blue-200" },
+  "Terminal A - West": { bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500", bar: "bg-blue-500", border: "border-blue-200" },
+  "Terminal B - East": { bg: "bg-violet-50", text: "text-violet-700", dot: "bg-violet-500", bar: "bg-violet-500", border: "border-violet-200" },
+  "Terminal B - West": { bg: "bg-violet-50", text: "text-violet-700", dot: "bg-violet-500", bar: "bg-violet-500", border: "border-violet-200" },
   "Terminal C": { bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500", bar: "bg-emerald-500", border: "border-emerald-200" },
   "Top Terminal": { bg: "bg-amber-50", text: "text-amber-700", dot: "bg-amber-500", bar: "bg-amber-500", border: "border-amber-200" },
 };
@@ -50,6 +53,7 @@ export default function MyTasks() {
     staffId: currentUser?.id,
   });
 
+  const { data: allAreas } = useListAreas();
   const { data: allTasks, isLoading: loadingTasks } = useListTasks({ date: today });
 
   const { data: extraTasks } = useListTasks({
@@ -68,19 +72,49 @@ export default function MyTasks() {
 
   if (!currentUser) return null;
 
-  const myAreaIds = (assignments ?? []).map((a) => a.areaId);
+  const myTerminals = useMemo(() => {
+    const terminals = new Set<string>();
+    for (const a of assignments ?? []) {
+      const terminal = (a as any)?.terminal;
+      if (terminal) terminals.add(terminal);
+    }
+    return terminals;
+  }, [assignments]);
+
+  const expandedAreaIds = useMemo(() => {
+    if (myTerminals.size === 0 || !allAreas) return [] as number[];
+    return allAreas
+      .filter((a) => myTerminals.has(a.terminal))
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((a) => a.id);
+  }, [myTerminals, allAreas]);
+
+  useEffect(() => {
+    if (expandedAreaIds.length === 0) return;
+    const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
+    Promise.all(
+      expandedAreaIds.map((aId) =>
+        fetch(`${BASE_URL}/api/tasks?date=${today}&areaId=${aId}`).catch(() => {})
+      )
+    ).then(() => {
+      qc.invalidateQueries({ queryKey: ["/api/tasks"] });
+    });
+  }, [expandedAreaIds.join(","), today]);
+
+  const myAreaIds = expandedAreaIds.length > 0 ? expandedAreaIds : (assignments ?? []).map((a) => a.areaId);
 
   const areaGroups = useMemo(() => {
     return myAreaIds.map((areaId) => {
       const assignment = assignments?.find((a) => a.areaId === areaId);
+      const areaInfo = allAreas?.find((a) => a.id === areaId);
       const tasks = (allTasks ?? [])
         .filter((t) => t.areaId === areaId)
         .sort((a, b) => a.taskOrder - b.taskOrder);
       const completed = tasks.filter((t) => t.completed).length;
       return {
         areaId,
-        areaName: assignment?.areaName ?? "Area",
-        terminal: (assignment as any)?.terminal ?? "",
+        areaName: assignment?.areaName ?? areaInfo?.name ?? "Area",
+        terminal: (assignment as any)?.terminal ?? areaInfo?.terminal ?? "",
         assignedByName: (assignment as any)?.assignedByName ?? "",
         notes: assignment?.notes ?? "",
         tasks,
@@ -89,7 +123,7 @@ export default function MyTasks() {
         pct: tasks.length > 0 ? Math.round((tasks.filter((t) => t.completed).length / tasks.length) * 100) : 0,
       };
     });
-  }, [myAreaIds, assignments, allTasks]);
+  }, [myAreaIds, assignments, allAreas, allTasks]);
 
   const myExtraTasks = useMemo(() => {
     const areaTaskIds = new Set(areaGroups.flatMap((g) => g.tasks.map((t) => t.id)));
