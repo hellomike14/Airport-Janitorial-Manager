@@ -46,7 +46,7 @@ A comprehensive janitorial cleaning management web app for Marvol Facility at MC
 - Issues API extended: `GET /api/issues?from=YYYY-MM-DD&to=YYYY-MM-DD` date range filter
 
 **Role-Based Access Control:**
-- **Admin**: Full access — can switch view mode between Admin/Inspector/Supervisor/Staff views
+- **Admin**: Full access — can switch view mode between Admin/Inspector/Supervisor/Staff views; can toggle staff/supervisor roles in Staff Directory
 - **Inspector**: Open Issues (report and add information to issues, no assign/resolve), Completed Tasks (view all completed tasks across areas)
 - **Supervisor**: Dashboard, areas, assignments, issue tracker (no staff management)
 - **Staff**: My Tasks page + My Issues (assigned issues with completion flow)

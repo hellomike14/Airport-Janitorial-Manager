@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { useListStaff, useCreateStaffMember, useDeleteStaffMember } from "@workspace/api-client-react";
+import { useListStaff, useCreateStaffMember, useDeleteStaffMember, useUpdateStaffMember } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { UserPlus, Shield, User, Phone, Mail, Trash2, Lock } from "lucide-react";
+import { UserPlus, Shield, User, Phone, Mail, Trash2, Lock, ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 
@@ -27,6 +27,12 @@ export default function Staff() {
     },
   });
 
+  const updateMutation = useUpdateStaffMember({
+    mutation: {
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/staff"] }),
+    },
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     createMutation.mutate({ data: formData as any });
@@ -35,6 +41,14 @@ export default function Staff() {
   const handleDelete = (id: number) => {
     if (confirm("Remove this staff member?")) {
       deleteMutation.mutate({ id });
+    }
+  };
+
+  const handleToggleRole = (person: any) => {
+    const newRole = person.role === "staff" ? "supervisor" : "staff";
+    const label = newRole === "supervisor" ? "Supervisor" : "Staff";
+    if (confirm(`Switch ${person.name} to ${label} role?`)) {
+      updateMutation.mutate({ id: person.id, data: { role: newRole } });
     }
   };
 
@@ -139,7 +153,7 @@ export default function Staff() {
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {supervisors.map((person) => (
-            <StaffCard key={person.id} person={person} onDelete={() => handleDelete(person.id)} roleType="supervisor" />
+            <StaffCard key={person.id} person={person} onDelete={() => handleDelete(person.id)} onToggleRole={() => handleToggleRole(person)} roleType="supervisor" />
           ))}
         </div>
       </div>
@@ -151,7 +165,7 @@ export default function Staff() {
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {regularStaff.map((person) => (
-            <StaffCard key={person.id} person={person} onDelete={() => handleDelete(person.id)} roleType="staff" />
+            <StaffCard key={person.id} person={person} onDelete={() => handleDelete(person.id)} onToggleRole={() => handleToggleRole(person)} roleType="staff" />
           ))}
         </div>
       </div>
@@ -180,7 +194,7 @@ const ROLE_STYLES = {
   },
 };
 
-function StaffCard({ person, onDelete, roleType }: { person: any; onDelete: () => void; roleType: "admin" | "supervisor" | "staff" }) {
+function StaffCard({ person, onDelete, onToggleRole, roleType }: { person: any; onDelete: () => void; onToggleRole?: () => void; roleType: "admin" | "supervisor" | "staff" }) {
   const style = ROLE_STYLES[roleType];
   const initials = person.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
 
@@ -199,12 +213,23 @@ function StaffCard({ person, onDelete, roleType }: { person: any; onDelete: () =
             </StatusBadge>
           </div>
         </div>
-        <button
-          onClick={onDelete}
-          className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1">
+          {onToggleRole && (
+            <button
+              onClick={onToggleRole}
+              title={roleType === "staff" ? "Switch to Supervisor" : "Switch to Staff"}
+              className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+            >
+              <ArrowUpDown className="w-4 h-4" />
+            </button>
+          )}
+          <button
+            onClick={onDelete}
+            className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
       </div>
       <div className="space-y-2 text-sm text-slate-500">
         <div className="flex items-center gap-2">
