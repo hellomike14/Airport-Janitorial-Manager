@@ -218,15 +218,19 @@ export default function Login() {
             </div>
 
             <form onSubmit={handlePasswordSubmit}>
-              <label className="text-sm font-medium text-slate-700 mb-2 block">Enter password</label>
+              <label className="text-sm font-medium text-slate-700 mb-2 block">
+                {passwordPrompt.member.role === "inspector"
+                  ? "Enter your first name and last name initial"
+                  : "Enter password"}
+              </label>
               <div className="relative">
                 <input
-                  type={showPassword ? "text" : "password"}
+                  type={passwordPrompt.member.role === "inspector" ? "text" : (showPassword ? "text" : "password")}
                   value={password}
                   onChange={(e) => { setPassword(e.target.value); setPasswordError(false); }}
                   autoFocus
                   className={`w-full px-4 py-3 rounded-xl border ${passwordError ? "border-red-300 bg-red-50" : "border-slate-200"} text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 pr-10`}
-                  placeholder="Password"
+                  placeholder={passwordPrompt.member.role === "inspector" ? "e.g. John S" : "Password"}
                 />
                 <button
                   type="button"
