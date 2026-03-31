@@ -57,9 +57,9 @@
     "date-fns": "^3.6.0",
     "embla-carousel-react": "^8.6.0",
     "framer-motion": "catalog:",
-    "idb": "^8.0.3",
     "i18next": "^26.0.2",
     "i18next-browser-languagedetector": "^8.2.1",
+    "idb": "^8.0.3",
     "input-otp": "^1.4.2",
     "lucide-react": "catalog:",
     "next-themes": "^0.4.6",
@@ -83,6 +83,7 @@
   },
   "dependencies": {
     "leaflet": "^1.9.4",
-    "react-leaflet": "^5.0.0"
+    "react-leaflet": "^5.0.0",
+    "workbox-window": "^7.4.0"
   }
 }
