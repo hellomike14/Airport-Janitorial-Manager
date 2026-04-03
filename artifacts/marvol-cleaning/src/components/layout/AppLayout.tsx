@@ -22,6 +22,8 @@ import {
   ClipboardCheck,
   Navigation,
   Lock,
+  Send,
+  Megaphone,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useTranslation } from "react-i18next";
@@ -174,7 +176,7 @@ function NotificationBell({ staffId }: { staffId: number }) {
     const newNotifications = unread.filter((n) => !prevUnreadIdsRef.current.has(n.id));
     if (newNotifications.length > 0) {
       const hasUrgent = newNotifications.some(
-        (n) => n.type === "inspector_to_supervisor" || n.type === "supervisor_to_inspector" || n.type === "new_issue" || n.type === "task_completed"
+        (n) => n.type === "inspector_to_supervisor" || n.type === "supervisor_to_inspector" || n.type === "new_issue" || n.type === "task_completed" || n.type === "direct_alert"
       );
       playNotificationSound(hasUrgent);
       vibrateDevice(hasUrgent);
@@ -204,11 +206,12 @@ function NotificationBell({ staffId }: { staffId: number }) {
     if (type === "task_completed") return <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />;
     if (type === "inspector_to_supervisor") return <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />;
     if (type === "supervisor_to_inspector") return <CheckCircle2 className="w-3.5 h-3.5 text-blue-500 shrink-0" />;
+    if (type === "direct_alert") return <Megaphone className="w-3.5 h-3.5 text-orange-500 shrink-0" />;
     return <AlertOctagon className="w-3.5 h-3.5 text-rose-500 shrink-0" />;
   };
 
   const hasUrgentUnread = unread.some(
-    (n) => n.type === "inspector_to_supervisor" || n.type === "supervisor_to_inspector" || n.type === "new_issue" || n.type === "task_completed"
+    (n) => n.type === "inspector_to_supervisor" || n.type === "supervisor_to_inspector" || n.type === "new_issue" || n.type === "task_completed" || n.type === "direct_alert"
   );
 
   return (
@@ -457,12 +460,143 @@ function SetPinModal({ staffId, hasExistingPin, onClose }: { staffId: number; ha
   );
 }
 
+function SendAlertModal({ staffId, staffRole, onClose }: { staffId: number; staffRole: string; onClose: () => void }) {
+  const { t } = useTranslation();
+  const [message, setMessage] = useState("");
+  const [targetRole, setTargetRole] = useState<"supervisor" | "staff" | "all">("supervisor");
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [sentCount, setSentCount] = useState(0);
+
+  const canSendToStaff = staffRole === "inspector" || staffRole === "admin";
+
+  const handleSend = async () => {
+    if (!message.trim()) return;
+    setSending(true);
+    try {
+      const res = await fetch(`${BASE_URL}/api/notifications/send-alert`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ senderId: staffId, message: message.trim(), targetRole }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSentCount(data.sent);
+        setSent(true);
+        setTimeout(() => onClose(), 1500);
+      }
+    } catch {}
+    setSending(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center text-white">
+              <Megaphone className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="font-semibold text-slate-800">{t("alerts.sendAlert")}</p>
+              <p className="text-xs text-slate-500">{t("alerts.sendAlertDesc")}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {sent ? (
+          <div className="text-center py-8">
+            <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-3">
+              <CheckCircle2 className="w-8 h-8 text-emerald-500" />
+            </div>
+            <p className="font-semibold text-slate-800">{t("alerts.alertSent")}</p>
+            <p className="text-sm text-slate-500 mt-1">{t("alerts.sentTo", { count: sentCount })}</p>
+          </div>
+        ) : (
+          <>
+            {canSendToStaff && (
+              <div className="mb-4">
+                <label className="text-sm font-medium text-slate-700 mb-2 block">{t("alerts.sendTo")}</label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setTargetRole("supervisor")}
+                    className={`flex-1 py-2 px-3 rounded-xl text-sm font-medium border transition-colors ${
+                      targetRole === "supervisor"
+                        ? "bg-emerald-50 border-emerald-300 text-emerald-700"
+                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {t("alerts.supervisors")}
+                  </button>
+                  <button
+                    onClick={() => setTargetRole("staff")}
+                    className={`flex-1 py-2 px-3 rounded-xl text-sm font-medium border transition-colors ${
+                      targetRole === "staff"
+                        ? "bg-blue-50 border-blue-300 text-blue-700"
+                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {t("alerts.staffMembers")}
+                  </button>
+                  <button
+                    onClick={() => setTargetRole("all")}
+                    className={`flex-1 py-2 px-3 rounded-xl text-sm font-medium border transition-colors ${
+                      targetRole === "all"
+                        ? "bg-orange-50 border-orange-300 text-orange-700"
+                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {t("alerts.everyone")}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="mb-4">
+              <label className="text-sm font-medium text-slate-700 mb-2 block">{t("alerts.message")}</label>
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder={t("alerts.messagePlaceholder")}
+                maxLength={500}
+                rows={3}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none text-sm resize-none"
+                autoFocus
+              />
+              <p className="text-xs text-slate-400 mt-1 text-right">{message.length}/500</p>
+            </div>
+
+            <button
+              onClick={handleSend}
+              disabled={sending || !message.trim()}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {sending ? (
+                <span className="animate-spin text-lg">&#8635;</span>
+              ) : (
+                <>
+                  <Send className="w-4 h-4" />
+                  {t("alerts.sendNow")}
+                </>
+              )}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { t, i18n } = useTranslation();
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [viewDropdownOpen, setViewDropdownOpen] = useState(false);
   const [showSetPin, setShowSetPin] = useState(false);
+  const [showSendAlert, setShowSendAlert] = useState(false);
   const { currentUser, viewMode, setViewMode, logout } = useAuth();
   const { data: staffList } = useListStaff();
   const currentStaffData = staffList?.find((s) => s.id === currentUser?.id);
@@ -589,6 +723,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         />
       )}
 
+      {showSendAlert && currentUser && (
+        <SendAlertModal
+          staffId={currentUser.id}
+          staffRole={currentUser.role}
+          onClose={() => setShowSendAlert(false)}
+        />
+      )}
+
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
         {/* Top Header */}
@@ -644,6 +786,17 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               </div>
             )}
 
+            {currentUser && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="relative rounded-full hover:bg-orange-50 text-slate-600 hover:text-orange-500"
+                onClick={() => setShowSendAlert(true)}
+                title={t("alerts.sendAlert")}
+              >
+                <Megaphone className="w-5 h-5" />
+              </Button>
+            )}
             {currentUser && <NotificationBell staffId={currentUser.id} />}
           </div>
         </header>

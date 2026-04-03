@@ -84,4 +84,73 @@ router.post("/notifications/mark-all-read", async (req: Request, res: Response) 
   res.json({ updated: result.length });
 });
 
+const SendAlertBody = z.object({
+  senderId: z.number(),
+  message: z.string().min(1).max(500),
+  targetRole: z.enum(["supervisor", "staff", "all"]),
+});
+
+router.post("/notifications/send-alert", async (req: Request, res: Response) => {
+  const body = SendAlertBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: "Invalid request", details: body.error.flatten() });
+    return;
+  }
+
+  const sender = await db
+    .select()
+    .from(staffTable)
+    .where(eq(staffTable.id, body.data.senderId))
+    .then((r) => r[0]);
+
+  if (!sender) {
+    res.status(404).json({ error: "Sender not found" });
+    return;
+  }
+
+  const senderRole = sender.role;
+  const allowedSenderRoles = ["inspector", "supervisor", "staff", "admin"];
+  if (!allowedSenderRoles.includes(senderRole)) {
+    res.status(403).json({ error: "Not authorized to send alerts" });
+    return;
+  }
+
+  const allActive = await db
+    .select()
+    .from(staffTable)
+    .where(eq(staffTable.active, true));
+
+  let recipients: typeof allActive = [];
+
+  if (senderRole === "inspector" || senderRole === "admin") {
+    if (body.data.targetRole === "supervisor") {
+      recipients = allActive.filter((s) => (s.role === "supervisor" || s.role === "admin") && s.id !== sender.id);
+    } else if (body.data.targetRole === "staff") {
+      recipients = allActive.filter((s) => s.role === "staff");
+    } else {
+      recipients = allActive.filter((s) => (s.role === "supervisor" || s.role === "admin" || s.role === "staff") && s.id !== sender.id);
+    }
+  } else if (senderRole === "supervisor" || senderRole === "staff") {
+    recipients = allActive.filter((s) => (s.role === "supervisor" || s.role === "admin") && s.id !== sender.id);
+  }
+
+  if (recipients.length === 0) {
+    res.json({ sent: 0 });
+    return;
+  }
+
+  const roleName = sender.role.charAt(0).toUpperCase() + sender.role.slice(1);
+  const msg = `🔔 Alert from ${sender.name} (${roleName}): ${body.data.message}`;
+
+  const notifs = recipients.map((s) => ({
+    staffId: s.id,
+    type: "direct_alert" as const,
+    message: msg,
+  }));
+
+  await db.insert(notificationsTable).values(notifs);
+
+  res.json({ sent: notifs.length });
+});
+
 export default router;

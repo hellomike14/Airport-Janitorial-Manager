@@ -88,6 +88,19 @@
     "incorrectCurrentPin": "NIP actuel incorrect",
     "language": "Langue"
   },
+  "alerts": {
+    "sendAlert": "Envoyer une Alerte",
+    "sendAlertDesc": "Envoyer une notification avec son et vibration",
+    "sendTo": "Envoyer à",
+    "supervisors": "Superviseurs",
+    "staffMembers": "Personnel",
+    "everyone": "Tout le monde",
+    "message": "Message",
+    "messagePlaceholder": "Tapez votre message d'alerte...",
+    "sendNow": "Envoyer l'Alerte",
+    "alertSent": "Alerte Envoyée !",
+    "sentTo": "Envoyée à {{count}} personnes"
+  },
   "login": {
     "mcoAirport": "Aéroport International MCO",
     "selectProfile": "Sélectionnez votre profil pour continuer",

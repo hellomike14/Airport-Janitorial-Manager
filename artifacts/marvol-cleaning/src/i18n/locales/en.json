@@ -88,6 +88,19 @@
     "incorrectCurrentPin": "Incorrect current PIN",
     "language": "Language"
   },
+  "alerts": {
+    "sendAlert": "Send Alert",
+    "sendAlertDesc": "Send a notification with sound and vibration",
+    "sendTo": "Send to",
+    "supervisors": "Supervisors",
+    "staffMembers": "Staff",
+    "everyone": "Everyone",
+    "message": "Message",
+    "messagePlaceholder": "Type your alert message...",
+    "sendNow": "Send Alert",
+    "alertSent": "Alert Sent!",
+    "sentTo": "Sent to {{count}} people"
+  },
   "login": {
     "mcoAirport": "MCO International Airport",
     "selectProfile": "Select your profile to continue",

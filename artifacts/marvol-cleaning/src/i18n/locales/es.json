@@ -88,6 +88,19 @@
     "incorrectCurrentPin": "PIN actual incorrecto",
     "language": "Idioma"
   },
+  "alerts": {
+    "sendAlert": "Enviar Alerta",
+    "sendAlertDesc": "Enviar una notificación con sonido y vibración",
+    "sendTo": "Enviar a",
+    "supervisors": "Supervisores",
+    "staffMembers": "Personal",
+    "everyone": "Todos",
+    "message": "Mensaje",
+    "messagePlaceholder": "Escriba su mensaje de alerta...",
+    "sendNow": "Enviar Alerta",
+    "alertSent": "¡Alerta Enviada!",
+    "sentTo": "Enviada a {{count}} personas"
+  },
   "login": {
     "mcoAirport": "Aeropuerto Internacional MCO",
     "selectProfile": "Seleccione su perfil para continuar",

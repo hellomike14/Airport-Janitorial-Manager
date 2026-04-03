@@ -112,6 +112,7 @@ A comprehensive janitorial cleaning management web app for Marvol Facility at MC
 - `GET /api/storage/objects/*` - Serve uploaded objects
 - `POST /api/locations/update` - Update staff GPS location (staffId, lat, lng, accuracy)
 - `GET /api/locations` - List all staff locations with names and roles
+- `POST /api/notifications/send-alert` - Send direct alert notification with sound+vibration (inspector/admin can target supervisors, staff, or all; staff/supervisors send to supervisors only)
 - `POST /api/issues/send-to-supervisor` - Inspector sends issue notification to supervisors
 - `POST /api/issues/send-to-inspector` - Supervisor sends completion notification to inspector
 
