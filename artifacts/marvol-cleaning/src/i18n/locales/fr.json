@@ -66,7 +66,8 @@
     "myIssues": "Mes Problèmes",
     "employeePortal": "Portail Employé",
     "mySchedule": "Mon Horaire",
-    "photoShare": "Partage Photos"
+    "photoShare": "Partage Photos",
+    "weeklyReport": "Rapport Hebdomadaire"
   },
   "layout": {
     "logout": "Déconnexion",
@@ -366,6 +367,48 @@
     "noStaffLocations": "Aucune localisation de personnel pour le moment",
     "autoRefresh": "Actualisation auto toutes les 15s · Dernière : {{time}}",
     "accuracy": "Précision : ±{{meters}}m"
+  },
+  "weeklyReport": {
+    "title": "Rapport Hebdomadaire",
+    "subtitle": "Aperçu de toutes les activités hebdomadaires",
+    "print": "Imprimer",
+    "noData": "Aucune donnée disponible pour cette semaine",
+    "tasksCompleted": "Tâches Terminées",
+    "of": "sur",
+    "completionRate": "Taux de Complétion",
+    "issuesReported": "Problèmes Signalés",
+    "resolved": "résolus",
+    "activeStaff": "Personnel Actif",
+    "photosShared": "Photos Partagées",
+    "notifications": "Notifications",
+    "dailyTaskCompletion": "Complétion Quotidienne des Tâches",
+    "noTasks": "Aucune tâche cette semaine",
+    "issueSummary": "Résumé des Problèmes",
+    "high": "Élevé",
+    "medium": "Moyen",
+    "low": "Faible",
+    "resolutionRate": "Taux de Résolution",
+    "topIssueAreas": "Zones les Plus Problématiques",
+    "staffPerformance": "Performance du Personnel",
+    "areaPerformance": "Performance par Zone",
+    "noActivity": "Aucune activité cette semaine",
+    "tasks": "tâches",
+    "sun": "Dim",
+    "mon": "Lun",
+    "tue": "Mar",
+    "wed": "Mer",
+    "thu": "Jeu",
+    "fri": "Ven",
+    "sat": "Sam"
+  },
+  "report": {
+    "sun": "Dim",
+    "mon": "Lun",
+    "tue": "Mar",
+    "wed": "Mer",
+    "thu": "Jeu",
+    "fri": "Ven",
+    "sat": "Sam"
   },
   "photoShare": {
     "title": "Partage Photos",

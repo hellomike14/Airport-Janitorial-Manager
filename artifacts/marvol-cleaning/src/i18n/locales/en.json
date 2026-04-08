@@ -66,7 +66,8 @@
     "myIssues": "My Issues",
     "employeePortal": "Employee Portal",
     "mySchedule": "My Schedule",
-    "photoShare": "Photo Share"
+    "photoShare": "Photo Share",
+    "weeklyReport": "Weekly Report"
   },
   "layout": {
     "logout": "Log out",
@@ -366,6 +367,48 @@
     "noStaffLocations": "No staff locations yet",
     "autoRefresh": "Auto-refreshes every 15s · Last: {{time}}",
     "accuracy": "Accuracy: ±{{meters}}m"
+  },
+  "weeklyReport": {
+    "title": "Weekly Report",
+    "subtitle": "Overview of all weekly activities",
+    "print": "Print",
+    "noData": "No data available for this week",
+    "tasksCompleted": "Tasks Completed",
+    "of": "of",
+    "completionRate": "Completion Rate",
+    "issuesReported": "Issues Reported",
+    "resolved": "resolved",
+    "activeStaff": "Active Staff",
+    "photosShared": "Photos Shared",
+    "notifications": "Notifications",
+    "dailyTaskCompletion": "Daily Task Completion",
+    "noTasks": "No tasks this week",
+    "issueSummary": "Issue Summary",
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low",
+    "resolutionRate": "Resolution Rate",
+    "topIssueAreas": "Top Issue Areas",
+    "staffPerformance": "Staff Performance",
+    "areaPerformance": "Area Performance",
+    "noActivity": "No activity this week",
+    "tasks": "tasks",
+    "sun": "Sun",
+    "mon": "Mon",
+    "tue": "Tue",
+    "wed": "Wed",
+    "thu": "Thu",
+    "fri": "Fri",
+    "sat": "Sat"
+  },
+  "report": {
+    "sun": "Sun",
+    "mon": "Mon",
+    "tue": "Tue",
+    "wed": "Wed",
+    "thu": "Thu",
+    "fri": "Fri",
+    "sat": "Sat"
   },
   "photoShare": {
     "title": "Photo Share",

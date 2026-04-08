@@ -12,6 +12,7 @@ import storageRouter from "./storage";
 import locationsRouter from "./locations";
 import schedulesRouter from "./schedules";
 import sharedPhotosRouter from "./sharedPhotos";
+import weeklyReportRouter from "./weeklyReport";
 
 const router: IRouter = Router();
 
@@ -28,5 +29,6 @@ router.use(storageRouter);
 router.use(locationsRouter);
 router.use("/schedules", schedulesRouter);
 router.use("/shared-photos", sharedPhotosRouter);
+router.use("/weekly-report", weeklyReportRouter);
 
 export default router;

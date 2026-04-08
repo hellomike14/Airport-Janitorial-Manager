@@ -23,6 +23,7 @@ import CompletedJobs from "./pages/CompletedJobs";
 import GPSTracking from "./pages/GPSTracking";
 import EmployeePortal from "./pages/EmployeePortal";
 import PhotoShare from "./pages/PhotoShare";
+import WeeklyReport from "./pages/WeeklyReport";
 import Login from "./pages/Login";
 
 const queryClient = new QueryClient({
@@ -60,6 +61,7 @@ function ProtectedRoutes() {
             <Route path="/gps-tracking" component={GPSTracking} />
             <Route path="/employee-portal" component={EmployeePortal} />
             <Route path="/photo-share" component={PhotoShare} />
+            <Route path="/weekly-report" component={WeeklyReport} />
           </>
         )}
 

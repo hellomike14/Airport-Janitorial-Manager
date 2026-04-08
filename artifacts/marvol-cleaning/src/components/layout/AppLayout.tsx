@@ -26,6 +26,7 @@ import {
   Megaphone,
   Calendar,
   Camera,
+  BarChart3,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useTranslation } from "react-i18next";
@@ -91,6 +92,7 @@ function useNavConfig() {
       { href: "/gps-tracking", icon: Navigation, label: t("nav.gpsTracking") },
       { href: "/employee-portal", icon: Calendar, label: t("nav.employeePortal") },
       { href: "/photo-share", icon: Camera, label: t("nav.photoShare") },
+      { href: "/weekly-report", icon: BarChart3, label: t("nav.weeklyReport") },
     ],
     supervisor: [
       { href: "/", icon: LayoutDashboard, label: t("nav.dashboard") },
