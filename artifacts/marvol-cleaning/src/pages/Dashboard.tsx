@@ -1,24 +1,70 @@
 import React, { useState } from "react";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { useTranslation } from "react-i18next";
 import { getDateLocale } from "@/i18n/dateLocale";
 import { useGetDashboard } from "@workspace/api-client-react";
+import { useQuery } from "@tanstack/react-query";
 import { 
   CheckCircle2, 
   Map as MapIcon, 
   AlertOctagon, 
   TrendingUp,
   ArrowRight,
-  Clock
+  Clock,
+  Camera,
+  MapPin,
+  ZoomIn,
+  X,
 } from "lucide-react";
 import { Link } from "wouter";
+
+const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+
+type SharedPhoto = {
+  id: number;
+  staffId: number;
+  imagePath: string;
+  caption: string | null;
+  areaId: number | null;
+  latitude: number | null;
+  longitude: number | null;
+  takenAt: string | null;
+  createdAt: string;
+  staffName: string | null;
+  staffRole: string | null;
+  areaName: string | null;
+  areaTerminal: string | null;
+};
+
+function imageUrl(objectPath: string) {
+  return `${BASE_URL}/api/storage${objectPath}`;
+}
+
+const ROLE_COLORS: Record<string, string> = {
+  admin: "bg-violet-100 text-violet-700",
+  supervisor: "bg-emerald-100 text-emerald-700",
+  inspector: "bg-blue-100 text-blue-700",
+  staff: "bg-amber-100 text-amber-700",
+};
 
 export default function Dashboard() {
   const { t, i18n } = useTranslation();
   const dateLocale = getDateLocale(i18n.language);
   const [selectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [lightbox, setLightbox] = useState<string | null>(null);
   
   const { data: stats, isLoading, isError } = useGetDashboard({ date: selectedDate });
+
+  const { data: photos = [] } = useQuery<SharedPhoto[]>({
+    queryKey: ["/api/shared-photos"],
+    queryFn: async () => {
+      const res = await fetch(`${BASE_URL}/api/shared-photos`);
+      return res.json();
+    },
+    refetchInterval: 15000,
+  });
+
+  const recentPhotos = photos.slice(0, 6);
 
   if (isLoading) {
     return (
@@ -56,7 +102,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <StatCard 
           title={t("dashboard.overallCompletion")}
           value={`${overallProgress}%`} 
@@ -80,7 +126,85 @@ export default function Dashboard() {
           colorClass={stats.openIssues > 0 ? "text-rose-600 bg-rose-100" : "text-slate-600 bg-slate-100"}
           alert={stats.openIssues > 0}
         />
+        <StatCard
+          title={t("dashboard.photosShared")}
+          value={photos.length.toString()}
+          subtitle={t("dashboard.teamPhotoFeed")}
+          icon={Camera}
+          colorClass="text-indigo-600 bg-indigo-100"
+          href="/photo-share"
+        />
       </div>
+
+      {recentPhotos.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-display font-bold text-slate-800 flex items-center gap-2">
+              <Camera className="w-5 h-5 text-indigo-500" />
+              {t("dashboard.recentPhotos")}
+            </h2>
+            <Link href="/photo-share" className="text-sm font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 transition-colors">
+              {t("dashboard.viewAll")}
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            {recentPhotos.map((photo) => (
+              <div
+                key={photo.id}
+                className="bg-white rounded-2xl border border-slate-200 overflow-hidden group cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
+                onClick={() => setLightbox(imageUrl(photo.imagePath))}
+              >
+                <div className="relative aspect-square">
+                  <img
+                    src={imageUrl(photo.imagePath)}
+                    alt={photo.caption ?? "Shared photo"}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center">
+                    <ZoomIn className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 drop-shadow-lg transition-opacity" />
+                  </div>
+                  {photo.takenAt && (
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-2 pt-4 pb-1.5">
+                      <p className="text-[10px] font-mono text-white/90 flex items-center gap-1">
+                        <Clock className="w-2.5 h-2.5" />
+                        {format(new Date(photo.takenAt), "HH:mm")}
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <div className="p-2.5">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center text-white text-[8px] font-bold shrink-0">
+                      {photo.staffName?.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase() ?? "?"}
+                    </div>
+                    <p className="text-xs font-semibold text-slate-700 truncate">{photo.staffName?.split(" ")[0]}</p>
+                    {photo.staffRole && (
+                      <span className={`text-[8px] font-semibold px-1 py-0.5 rounded-full capitalize ${ROLE_COLORS[photo.staffRole] ?? "bg-slate-100 text-slate-600"}`}>
+                        {photo.staffRole}
+                      </span>
+                    )}
+                  </div>
+                  {photo.caption && (
+                    <p className="text-[11px] text-slate-500 truncate">{photo.caption}</p>
+                  )}
+                  {photo.areaName && (
+                    <p className="text-[10px] text-slate-400 flex items-center gap-0.5 mt-0.5 truncate">
+                      <MapPin className="w-2.5 h-2.5 shrink-0" />
+                      {photo.areaTerminal} - {photo.areaName}
+                    </p>
+                  )}
+                  <p className="text-[10px] text-slate-300 mt-0.5">
+                    {formatDistanceToNow(new Date(photo.createdAt), { addSuffix: true, locale: dateLocale })}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div>
         <div className="flex items-center justify-between mb-6">
@@ -93,13 +217,30 @@ export default function Dashboard() {
           ))}
         </div>
       </div>
+
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setLightbox(null)}
+        >
+          <button className="absolute top-4 right-4 text-white/70 hover:text-white">
+            <X className="w-7 h-7" />
+          </button>
+          <img
+            src={lightbox}
+            alt="Photo"
+            className="max-w-full max-h-full rounded-xl shadow-2xl object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 }
 
-function StatCard({ title, value, subtitle, icon: Icon, colorClass, progress, alert }: any) {
-  return (
-    <div className="bg-white rounded-3xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-slate-100 relative overflow-hidden group hover:shadow-[0_8px_30px_-4px_rgba(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-300">
+function StatCard({ title, value, subtitle, icon: Icon, colorClass, progress, alert, href }: any) {
+  const content = (
+    <div className={`bg-white rounded-3xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-slate-100 relative overflow-hidden group hover:shadow-[0_8px_30px_-4px_rgba(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-300 ${href ? 'cursor-pointer' : ''}`}>
       <div className="flex justify-between items-start">
         <div>
           <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider">{title}</p>
@@ -121,6 +262,11 @@ function StatCard({ title, value, subtitle, icon: Icon, colorClass, progress, al
       )}
     </div>
   );
+
+  if (href) {
+    return <Link href={href}>{content}</Link>;
+  }
+  return content;
 }
 
 function AreaProgressCard({ area, delay }: any) {

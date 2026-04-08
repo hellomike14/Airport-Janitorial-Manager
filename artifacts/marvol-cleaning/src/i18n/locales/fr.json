@@ -139,7 +139,11 @@
     "failedToLoadDashboard": "Échec du chargement du tableau de bord",
     "apiServerError": "Assurez-vous que le serveur API est en cours d'exécution.",
     "tasks": "Tâches",
-    "unassigned": "Non assigné"
+    "unassigned": "Non assigné",
+    "photosShared": "Photos Partagées",
+    "teamPhotoFeed": "Fil photo de l'équipe",
+    "recentPhotos": "Photos Récentes",
+    "viewAll": "Voir Tout"
   },
   "myTasks": {
     "yourShift": "Votre Quart",

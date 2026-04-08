@@ -139,7 +139,11 @@
     "failedToLoadDashboard": "Error al cargar el panel",
     "apiServerError": "Asegúrese de que el servidor API esté funcionando.",
     "tasks": "Tareas",
-    "unassigned": "Sin asignar"
+    "unassigned": "Sin asignar",
+    "photosShared": "Fotos Compartidas",
+    "teamPhotoFeed": "Fotos del equipo",
+    "recentPhotos": "Fotos Recientes",
+    "viewAll": "Ver Todo"
   },
   "myTasks": {
     "yourShift": "Tu Turno",

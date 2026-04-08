@@ -139,7 +139,11 @@
     "failedToLoadDashboard": "Failed to load dashboard",
     "apiServerError": "Make sure the API server is running.",
     "tasks": "Tasks",
-    "unassigned": "Unassigned"
+    "unassigned": "Unassigned",
+    "photosShared": "Photos Shared",
+    "teamPhotoFeed": "Team photo feed",
+    "recentPhotos": "Recent Photos",
+    "viewAll": "View All"
   },
   "myTasks": {
     "yourShift": "Your Shift",
