@@ -419,7 +419,8 @@
     "sharePhoto": "Share Photo",
     "sharing": "Sharing...",
     "recentPhotos": "Recent Photos",
-    "noPhotos": "No photos shared yet"
+    "noPhotos": "No photos shared yet",
+    "gpsUnavailable": "GPS location unavailable — photo stamped with time only"
   },
   "portal": {
     "title": "Employee Portal",

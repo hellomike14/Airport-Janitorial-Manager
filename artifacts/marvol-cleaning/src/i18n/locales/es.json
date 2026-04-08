@@ -419,7 +419,8 @@
     "sharePhoto": "Compartir Foto",
     "sharing": "Compartiendo...",
     "recentPhotos": "Fotos Recientes",
-    "noPhotos": "No hay fotos compartidas aún"
+    "noPhotos": "No hay fotos compartidas aún",
+    "gpsUnavailable": "Ubicación GPS no disponible — foto marcada solo con hora"
   },
   "portal": {
     "title": "Portal del Empleado",

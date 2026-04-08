@@ -15,6 +15,9 @@ router.get("/", async (_req: Request, res: Response) => {
         imagePath: sharedPhotosTable.imagePath,
         caption: sharedPhotosTable.caption,
         areaId: sharedPhotosTable.areaId,
+        latitude: sharedPhotosTable.latitude,
+        longitude: sharedPhotosTable.longitude,
+        takenAt: sharedPhotosTable.takenAt,
         createdAt: sharedPhotosTable.createdAt,
         staffName: staffTable.name,
         staffRole: staffTable.role,
@@ -38,6 +41,9 @@ const CreatePhotoBody = z.object({
   imagePath: z.string().min(1),
   caption: z.string().optional(),
   areaId: z.number().int().positive().nullable().optional(),
+  latitude: z.number().nullable().optional(),
+  longitude: z.number().nullable().optional(),
+  takenAt: z.string().optional(),
 });
 
 router.post("/", async (req: Request, res: Response) => {
@@ -55,6 +61,9 @@ router.post("/", async (req: Request, res: Response) => {
         imagePath: body.data.imagePath,
         caption: body.data.caption ?? null,
         areaId: body.data.areaId ?? null,
+        latitude: body.data.latitude ?? null,
+        longitude: body.data.longitude ?? null,
+        takenAt: body.data.takenAt ? new Date(body.data.takenAt) : null,
       })
       .returning();
 

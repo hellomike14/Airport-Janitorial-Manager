@@ -419,7 +419,8 @@
     "sharePhoto": "Partager la Photo",
     "sharing": "Partage en cours...",
     "recentPhotos": "Photos Récentes",
-    "noPhotos": "Aucune photo partagée"
+    "noPhotos": "Aucune photo partagée",
+    "gpsUnavailable": "Position GPS indisponible — photo horodatée uniquement"
   },
   "portal": {
     "title": "Portail Employé",

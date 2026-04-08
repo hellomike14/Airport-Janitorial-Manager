@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -12,9 +12,10 @@ import {
   Trash2,
   Image,
   ZoomIn,
+  Navigation,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, format } from "date-fns";
 import { getDateLocale } from "@/i18n/dateLocale";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
@@ -25,6 +26,9 @@ type SharedPhoto = {
   imagePath: string;
   caption: string | null;
   areaId: number | null;
+  latitude: number | null;
+  longitude: number | null;
+  takenAt: string | null;
   createdAt: string;
   staffName: string | null;
   staffRole: string | null;
@@ -36,6 +40,11 @@ type Area = {
   id: number;
   name: string;
   terminal: string;
+};
+
+type GeoPosition = {
+  latitude: number;
+  longitude: number;
 };
 
 function imageUrl(objectPath: string) {
@@ -63,6 +72,93 @@ async function uploadFile(file: File): Promise<string> {
   return objectPath;
 }
 
+function formatCoords(lat: number, lng: number): string {
+  const latDir = lat >= 0 ? "N" : "S";
+  const lngDir = lng >= 0 ? "E" : "W";
+  return `${Math.abs(lat).toFixed(6)}°${latDir}, ${Math.abs(lng).toFixed(6)}°${lngDir}`;
+}
+
+function getGPSPosition(): Promise<GeoPosition> {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error("Geolocation not supported"));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+      (err) => reject(err),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+  });
+}
+
+function stampPhoto(file: File, position: GeoPosition | null, timestamp: Date): Promise<File> {
+  return new Promise((resolve) => {
+    const img = new window.Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0);
+
+      const fontSize = Math.max(14, Math.round(img.width / 40));
+      const padding = Math.round(fontSize * 0.6);
+      const lineHeight = fontSize * 1.4;
+
+      const timeStr = format(timestamp, "yyyy-MM-dd HH:mm:ss");
+      const coordStr = position ? formatCoords(position.latitude, position.longitude) : null;
+      const locLabel = "KMCO - MCO International Airport";
+
+      const lines = [timeStr];
+      if (coordStr) lines.push(`GPS: ${coordStr}`);
+      lines.push(locLabel);
+
+      ctx.font = `bold ${fontSize}px monospace`;
+      const maxTextWidth = Math.max(...lines.map((l) => ctx.measureText(l).width));
+      const boxWidth = maxTextWidth + padding * 2;
+      const boxHeight = lines.length * lineHeight + padding * 2;
+
+      const x = img.width - boxWidth - padding;
+      const y = img.height - boxHeight - padding;
+
+      ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
+      ctx.beginPath();
+      const r = fontSize * 0.4;
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + boxWidth - r, y);
+      ctx.quadraticCurveTo(x + boxWidth, y, x + boxWidth, y + r);
+      ctx.lineTo(x + boxWidth, y + boxHeight - r);
+      ctx.quadraticCurveTo(x + boxWidth, y + boxHeight, x + boxWidth - r, y + boxHeight);
+      ctx.lineTo(x + r, y + boxHeight);
+      ctx.quadraticCurveTo(x, y + boxHeight, x, y + boxHeight - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.fill();
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = `bold ${fontSize}px monospace`;
+      ctx.textBaseline = "top";
+      lines.forEach((line, i) => {
+        ctx.fillText(line, x + padding, y + padding + i * lineHeight);
+      });
+
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            resolve(new File([blob], file.name, { type: "image/jpeg" }));
+          } else {
+            resolve(file);
+          }
+        },
+        "image/jpeg",
+        0.92
+      );
+    };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 const ROLE_COLORS: Record<string, string> = {
   admin: "bg-violet-100 text-violet-700",
   supervisor: "bg-emerald-100 text-emerald-700",
@@ -83,6 +179,9 @@ export default function PhotoShare() {
   const [areaId, setAreaId] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
   const [lightbox, setLightbox] = useState<string | null>(null);
+  const [geoPosition, setGeoPosition] = useState<GeoPosition | null>(null);
+  const [geoError, setGeoError] = useState(false);
+  const [photoTimestamp, setPhotoTimestamp] = useState<Date | null>(null);
 
   const { data: photos = [], isLoading } = useQuery<SharedPhoto[]>({
     queryKey: ["/api/shared-photos"],
@@ -109,11 +208,26 @@ export default function PhotoShare() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/shared-photos"] }),
   });
 
-  const handleFileSelect = (file: File) => {
+  const handleFileSelect = useCallback(async (file: File) => {
     if (!file.type.startsWith("image/")) return;
-    setSelectedFile(file);
-    setPreview(URL.createObjectURL(file));
-  };
+
+    const now = new Date();
+    setPhotoTimestamp(now);
+
+    let pos: GeoPosition | null = null;
+    try {
+      pos = await getGPSPosition();
+      setGeoPosition(pos);
+      setGeoError(false);
+    } catch {
+      setGeoPosition(null);
+      setGeoError(true);
+    }
+
+    const stamped = await stampPhoto(file, pos, now);
+    setSelectedFile(stamped);
+    setPreview(URL.createObjectURL(stamped));
+  }, []);
 
   const handleSubmit = async () => {
     if (!selectedFile || !currentUser) return;
@@ -128,6 +242,9 @@ export default function PhotoShare() {
           imagePath: objectPath,
           caption: caption.trim() || undefined,
           areaId,
+          latitude: geoPosition?.latitude ?? null,
+          longitude: geoPosition?.longitude ?? null,
+          takenAt: photoTimestamp?.toISOString() ?? undefined,
         }),
       });
       if (!res.ok) throw new Error("Failed to share photo");
@@ -135,6 +252,9 @@ export default function PhotoShare() {
       setSelectedFile(null);
       setCaption("");
       setAreaId(null);
+      setGeoPosition(null);
+      setGeoError(false);
+      setPhotoTimestamp(null);
       qc.invalidateQueries({ queryKey: ["/api/shared-photos"] });
     } catch (err) {
       console.error(err);
@@ -148,6 +268,9 @@ export default function PhotoShare() {
     setSelectedFile(null);
     setCaption("");
     setAreaId(null);
+    setGeoPosition(null);
+    setGeoError(false);
+    setPhotoTimestamp(null);
   };
 
   const isManager = effectiveRole === "admin" || effectiveRole === "supervisor";
@@ -207,6 +330,35 @@ export default function PhotoShare() {
 
         {preview && (
           <>
+            {(geoPosition || geoError || photoTimestamp) && (
+              <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 space-y-1.5">
+                {photoTimestamp && (
+                  <div className="flex items-center gap-2 text-xs text-slate-600">
+                    <Clock className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                    <span className="font-mono">{format(photoTimestamp, "yyyy-MM-dd HH:mm:ss")}</span>
+                  </div>
+                )}
+                {geoPosition && (
+                  <div className="flex items-center gap-2 text-xs text-slate-600">
+                    <Navigation className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                    <span className="font-mono">{formatCoords(geoPosition.latitude, geoPosition.longitude)}</span>
+                  </div>
+                )}
+                {geoPosition && (
+                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <MapPin className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                    <span>KMCO - MCO International Airport</span>
+                  </div>
+                )}
+                {geoError && (
+                  <div className="flex items-center gap-2 text-xs text-amber-600">
+                    <MapPin className="w-3.5 h-3.5 shrink-0" />
+                    <span>{t("photoShare.gpsUnavailable")}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             <input
               type="text"
               value={caption}
@@ -301,6 +453,23 @@ export default function PhotoShare() {
 
               {photo.caption && (
                 <p className="px-4 pb-2 text-sm text-slate-600">{photo.caption}</p>
+              )}
+
+              {(photo.takenAt || photo.latitude != null) && (
+                <div className="px-4 pb-2 flex flex-wrap items-center gap-3 text-[11px] text-slate-400">
+                  {photo.takenAt && (
+                    <span className="flex items-center gap-1 font-mono">
+                      <Clock className="w-3 h-3 text-blue-400" />
+                      {format(new Date(photo.takenAt), "yyyy-MM-dd HH:mm:ss")}
+                    </span>
+                  )}
+                  {photo.latitude != null && photo.longitude != null && (
+                    <span className="flex items-center gap-1 font-mono">
+                      <Navigation className="w-3 h-3 text-green-400" />
+                      {formatCoords(photo.latitude, photo.longitude)}
+                    </span>
+                  )}
+                </div>
               )}
 
               <div

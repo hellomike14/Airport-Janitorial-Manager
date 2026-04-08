@@ -80,7 +80,7 @@ A comprehensive janitorial cleaning management web app for Marvol Facility at MC
 - My Tasks - Staff-only page showing today's assigned area tasks with completion
 - My Issues - Staff-only page showing issues assigned to them with completion flow (notes + photos)
 - Employee Portal - Weekly schedule management (admin/supervisor can add/delete shifts; staff view their own schedule read-only)
-- Photo Share - All roles can take photos and share with the team; shows recent photo feed with captions, area tags, and role badges; notifies all other users when a photo is shared
+- Photo Share - All roles can take photos and share with the team; GPS location + timestamp are automatically captured and stamped directly onto photos (visible overlay with date/time, GPS coordinates, and "KMCO - MCO International Airport"); location data stored in DB and displayed in photo feed; notifies all other users when a photo is shared
 - Weekly Report - Admin-only page aggregating all weekly activities: task completion by day, issues by severity/area, staff productivity rankings, area performance, photos shared, notifications sent; week navigation + print/PDF support
 - Open Issues - Inspector page to report issues and add information (no assign/resolve)
 - Completed Tasks - Inspector page showing all completed tasks grouped by area with progress stats
