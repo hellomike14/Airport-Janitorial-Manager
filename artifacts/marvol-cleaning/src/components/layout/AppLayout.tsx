@@ -185,7 +185,7 @@ function NotificationBell({ staffId }: { staffId: number }) {
     const newNotifications = unread.filter((n) => !prevUnreadIdsRef.current.has(n.id));
     if (newNotifications.length > 0) {
       const hasUrgent = newNotifications.some(
-        (n) => n.type === "inspector_to_supervisor" || n.type === "supervisor_to_inspector" || n.type === "new_issue" || n.type === "task_completed" || n.type === "direct_alert"
+        (n) => n.type === "inspector_to_supervisor" || n.type === "supervisor_to_inspector" || n.type === "new_issue" || n.type === "task_completed" || n.type === "direct_alert" || n.type === "photo_shared"
       );
       playNotificationSound(hasUrgent);
       vibrateDevice(hasUrgent);
@@ -216,11 +216,12 @@ function NotificationBell({ staffId }: { staffId: number }) {
     if (type === "inspector_to_supervisor") return <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />;
     if (type === "supervisor_to_inspector") return <CheckCircle2 className="w-3.5 h-3.5 text-blue-500 shrink-0" />;
     if (type === "direct_alert") return <Megaphone className="w-3.5 h-3.5 text-orange-500 shrink-0" />;
+    if (type === "photo_shared") return <Camera className="w-3.5 h-3.5 text-blue-500 shrink-0" />;
     return <AlertOctagon className="w-3.5 h-3.5 text-rose-500 shrink-0" />;
   };
 
   const hasUrgentUnread = unread.some(
-    (n) => n.type === "inspector_to_supervisor" || n.type === "supervisor_to_inspector" || n.type === "new_issue" || n.type === "task_completed" || n.type === "direct_alert"
+    (n) => n.type === "inspector_to_supervisor" || n.type === "supervisor_to_inspector" || n.type === "new_issue" || n.type === "task_completed" || n.type === "direct_alert" || n.type === "photo_shared"
   );
 
   return (

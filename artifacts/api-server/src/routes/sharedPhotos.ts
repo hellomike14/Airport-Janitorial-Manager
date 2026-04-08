@@ -76,7 +76,7 @@ router.post("/", async (req: Request, res: Response) => {
       await db.insert(notificationsTable).values(
         allStaff.map((s) => ({
           staffId: s.id,
-          type: "direct_alert" as const,
+          type: "photo_shared" as const,
           message: `📷 ${senderName} shared a photo${captionSnippet}`,
         }))
       );
