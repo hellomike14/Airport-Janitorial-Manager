@@ -6,3 +6,4 @@ export * from "./issues";
 export * from "./notifications";
 export * from "./locations";
 export * from "./schedules";
+export * from "./sharedPhotos";

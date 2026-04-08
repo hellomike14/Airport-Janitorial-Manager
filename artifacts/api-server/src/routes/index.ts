@@ -11,6 +11,7 @@ import dashboardRouter from "./dashboard";
 import storageRouter from "./storage";
 import locationsRouter from "./locations";
 import schedulesRouter from "./schedules";
+import sharedPhotosRouter from "./sharedPhotos";
 
 const router: IRouter = Router();
 
@@ -26,5 +27,6 @@ router.use(taskTypesRouter);
 router.use(storageRouter);
 router.use(locationsRouter);
 router.use("/schedules", schedulesRouter);
+router.use("/shared-photos", sharedPhotosRouter);
 
 export default router;

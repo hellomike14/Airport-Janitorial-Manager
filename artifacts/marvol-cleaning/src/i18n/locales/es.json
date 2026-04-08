@@ -65,7 +65,8 @@
     "myTasks": "Mis Tareas",
     "myIssues": "Mis Problemas",
     "employeePortal": "Portal del Empleado",
-    "mySchedule": "Mi Horario"
+    "mySchedule": "Mi Horario",
+    "photoShare": "Compartir Fotos"
   },
   "layout": {
     "logout": "Cerrar sesión",
@@ -365,6 +366,17 @@
     "noStaffLocations": "Sin ubicaciones de personal aún",
     "autoRefresh": "Actualización automática cada 15s · Última: {{time}}",
     "accuracy": "Precisión: ±{{meters}}m"
+  },
+  "photoShare": {
+    "title": "Compartir Fotos",
+    "subtitle": "Toma y comparte fotos con tu equipo",
+    "tapToCapture": "Toca para tomar una foto",
+    "captionPlaceholder": "Agregar una descripción...",
+    "noArea": "Sin área específica",
+    "sharePhoto": "Compartir Foto",
+    "sharing": "Compartiendo...",
+    "recentPhotos": "Fotos Recientes",
+    "noPhotos": "No hay fotos compartidas aún"
   },
   "portal": {
     "title": "Portal del Empleado",

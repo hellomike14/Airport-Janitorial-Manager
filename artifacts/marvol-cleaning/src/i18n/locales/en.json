@@ -65,7 +65,8 @@
     "myTasks": "My Tasks",
     "myIssues": "My Issues",
     "employeePortal": "Employee Portal",
-    "mySchedule": "My Schedule"
+    "mySchedule": "My Schedule",
+    "photoShare": "Photo Share"
   },
   "layout": {
     "logout": "Log out",
@@ -365,6 +366,17 @@
     "noStaffLocations": "No staff locations yet",
     "autoRefresh": "Auto-refreshes every 15s · Last: {{time}}",
     "accuracy": "Accuracy: ±{{meters}}m"
+  },
+  "photoShare": {
+    "title": "Photo Share",
+    "subtitle": "Take and share photos with your team",
+    "tapToCapture": "Tap to take a photo",
+    "captionPlaceholder": "Add a caption...",
+    "noArea": "No specific area",
+    "sharePhoto": "Share Photo",
+    "sharing": "Sharing...",
+    "recentPhotos": "Recent Photos",
+    "noPhotos": "No photos shared yet"
   },
   "portal": {
     "title": "Employee Portal",

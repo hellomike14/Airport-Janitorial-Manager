@@ -80,6 +80,7 @@ A comprehensive janitorial cleaning management web app for Marvol Facility at MC
 - My Tasks - Staff-only page showing today's assigned area tasks with completion
 - My Issues - Staff-only page showing issues assigned to them with completion flow (notes + photos)
 - Employee Portal - Weekly schedule management (admin/supervisor can add/delete shifts; staff view their own schedule read-only)
+- Photo Share - All roles can take photos and share with the team; shows recent photo feed with captions, area tags, and role badges; notifies all other users when a photo is shared
 - Open Issues - Inspector page to report issues and add information (no assign/resolve)
 - Completed Tasks - Inspector page showing all completed tasks grouped by area with progress stats
 
@@ -122,6 +123,9 @@ A comprehensive janitorial cleaning management web app for Marvol Facility at MC
 - `PUT /api/schedules/:id` - Update schedule entry
 - `DELETE /api/schedules/:id` - Delete schedule entry
 - `DELETE /api/schedules/staff/:staffId/clear` - Clear all schedules for a staff member
+- `GET /api/shared-photos` - List recent shared photos (last 100, newest first)
+- `POST /api/shared-photos` - Share a photo (staffId, imagePath, caption optional, areaId optional); notifies all other users
+- `DELETE /api/shared-photos/:id` - Delete a shared photo
 
 ## Structure
 
@@ -154,6 +158,7 @@ artifacts-monorepo/
 - `notifications` - In-app notifications (staffId, issueId, type, message, isRead)
 - `staff_locations` - Real-time GPS positions (staffId, latitude, longitude, accuracy, updatedAt)
 - `schedules` - Weekly shift schedules (staffId, areaId, dayOfWeek 0-6, startTime HH:mm, endTime HH:mm, notes)
+- `shared_photos` - Team photo sharing (staffId, imagePath, caption, areaId, createdAt)
 
 ## TypeScript & Composite Projects
 
