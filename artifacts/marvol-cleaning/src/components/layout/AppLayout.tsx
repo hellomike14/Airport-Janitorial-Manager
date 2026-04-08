@@ -24,6 +24,7 @@ import {
   Lock,
   Send,
   Megaphone,
+  Calendar,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useTranslation } from "react-i18next";
@@ -87,6 +88,7 @@ function useNavConfig() {
       { href: "/issues", icon: AlertTriangle, label: t("nav.inspectorSpecialAssignments") },
       { href: "/report", icon: FileText, label: t("nav.inspectorReport") },
       { href: "/gps-tracking", icon: Navigation, label: t("nav.gpsTracking") },
+      { href: "/employee-portal", icon: Calendar, label: t("nav.employeePortal") },
     ],
     supervisor: [
       { href: "/", icon: LayoutDashboard, label: t("nav.dashboard") },
@@ -95,6 +97,7 @@ function useNavConfig() {
       { href: "/assignments", icon: ClipboardList, label: t("nav.assignments") },
       { href: "/issues", icon: AlertTriangle, label: t("nav.inspectorSpecialAssignments") },
       { href: "/report", icon: FileText, label: t("nav.inspectorReport") },
+      { href: "/employee-portal", icon: Calendar, label: t("nav.employeePortal") },
     ],
     inspector: [
       { href: "/issues", icon: AlertTriangle, label: t("nav.openIssues") },
@@ -103,6 +106,7 @@ function useNavConfig() {
     staff: [
       { href: "/my-tasks", icon: CheckSquare, label: t("nav.myTasks") },
       { href: "/issues", icon: AlertTriangle, label: t("nav.myIssues") },
+      { href: "/employee-portal", icon: Calendar, label: t("nav.mySchedule") },
     ],
   };
 

@@ -5,3 +5,4 @@ export * from "./assignments";
 export * from "./issues";
 export * from "./notifications";
 export * from "./locations";
+export * from "./schedules";

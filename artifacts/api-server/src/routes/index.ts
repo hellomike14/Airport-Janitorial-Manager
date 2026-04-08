@@ -10,6 +10,7 @@ import taskTypesRouter from "./taskTypes";
 import dashboardRouter from "./dashboard";
 import storageRouter from "./storage";
 import locationsRouter from "./locations";
+import schedulesRouter from "./schedules";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use(notificationsRouter);
 router.use(taskTypesRouter);
 router.use(storageRouter);
 router.use(locationsRouter);
+router.use("/schedules", schedulesRouter);
 
 export default router;
