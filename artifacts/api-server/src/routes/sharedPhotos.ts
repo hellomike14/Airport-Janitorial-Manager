@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db } from "@workspace/db";
-import { sharedPhotosTable, staffTable, areasTable, notificationsTable } from "@workspace/db/schema";
-import { eq, desc, ne } from "drizzle-orm";
+import { sharedPhotosTable, staffTable, areasTable, notificationsTable, schedulesTable } from "@workspace/db/schema";
+import { eq, desc, ne, and, lte, gte } from "drizzle-orm";
 import { z } from "zod";
 
 const router: IRouter = Router();
@@ -75,16 +75,27 @@ router.post("/", async (req: Request, res: Response) => {
 
     const senderName = sender[0]?.name ?? "Someone";
 
-    const allStaff = await db
-      .select({ id: staffTable.id })
-      .from(staffTable)
-      .where(ne(staffTable.id, body.data.staffId));
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 
-    if (allStaff.length > 0) {
+    const onShiftStaff = await db
+      .selectDistinct({ staffId: schedulesTable.staffId })
+      .from(schedulesTable)
+      .where(
+        and(
+          eq(schedulesTable.dayOfWeek, dayOfWeek),
+          lte(schedulesTable.startTime, currentTime),
+          gte(schedulesTable.endTime, currentTime),
+          ne(schedulesTable.staffId, body.data.staffId)
+        )
+      );
+
+    if (onShiftStaff.length > 0) {
       const captionSnippet = body.data.caption ? `: "${body.data.caption.slice(0, 50)}"` : "";
       await db.insert(notificationsTable).values(
-        allStaff.map((s) => ({
-          staffId: s.id,
+        onShiftStaff.map((s) => ({
+          staffId: s.staffId,
           type: "photo_shared" as const,
           message: `📷 ${senderName} shared a photo${captionSnippet}`,
         }))
