@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { assignmentsTable, staffTable, areasTable } from "@workspace/db/schema";
+import { assignmentsTable, staffTable, areasTable, schedulesTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 import {
   ListAssignmentsQueryParams,
@@ -76,6 +76,41 @@ router.post("/", async (req, res) => {
       isSpecial: body.isSpecial,
     })
     .returning();
+
+  const assignDate = new Date(body.assignmentDate + "T12:00:00");
+  const dayOfWeek = assignDate.getDay();
+
+  const existing = await db
+    .select({ id: schedulesTable.id })
+    .from(schedulesTable)
+    .where(
+      and(
+        eq(schedulesTable.staffId, body.staffId),
+        eq(schedulesTable.dayOfWeek, dayOfWeek),
+        eq(schedulesTable.areaId, body.areaId)
+      )
+    )
+    .limit(1);
+
+  if (existing.length === 0) {
+    const existingShift = await db
+      .select({ startTime: schedulesTable.startTime, endTime: schedulesTable.endTime })
+      .from(schedulesTable)
+      .where(eq(schedulesTable.staffId, body.staffId))
+      .limit(1);
+
+    const startTime = existingShift[0]?.startTime ?? "14:00";
+    const endTime = existingShift[0]?.endTime ?? "22:00";
+
+    await db.insert(schedulesTable).values({
+      staffId: body.staffId,
+      areaId: body.areaId,
+      dayOfWeek,
+      startTime,
+      endTime,
+      notes: body.notes ?? null,
+    });
+  }
 
   const [staff] = await db
     .select({ name: staffTable.name })
