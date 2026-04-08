@@ -17,6 +17,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow, format } from "date-fns";
 import { getDateLocale } from "@/i18n/dateLocale";
+import RefreshButton from "@/components/RefreshButton";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -182,6 +183,7 @@ export default function PhotoShare() {
   const [geoPosition, setGeoPosition] = useState<GeoPosition | null>(null);
   const [geoError, setGeoError] = useState(false);
   const [photoTimestamp, setPhotoTimestamp] = useState<Date | null>(null);
+  const lastUpdatedRef = useRef<Date>(new Date());
 
   const { data: photos = [], isLoading } = useQuery<SharedPhoto[]>({
     queryKey: ["/api/shared-photos"],
@@ -277,14 +279,24 @@ export default function PhotoShare() {
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center">
-            <Camera className="w-5 h-5 text-white" />
-          </div>
-          {t("photoShare.title")}
-        </h1>
-        <p className="text-slate-500 text-sm mt-1">{t("photoShare.subtitle")}</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center">
+              <Camera className="w-5 h-5 text-white" />
+            </div>
+            {t("photoShare.title")}
+          </h1>
+          <p className="text-slate-500 text-sm mt-1">{t("photoShare.subtitle")}</p>
+        </div>
+        <RefreshButton
+          compact
+          lastUpdated={lastUpdatedRef.current}
+          onRefresh={async () => {
+            await qc.invalidateQueries({ queryKey: ["/api/shared-photos"] });
+            lastUpdatedRef.current = new Date();
+          }}
+        />
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">

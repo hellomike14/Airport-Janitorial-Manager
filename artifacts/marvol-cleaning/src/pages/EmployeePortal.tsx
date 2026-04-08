@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { format } from "date-fns";
 import { getDateLocale } from "@/i18n/dateLocale";
@@ -16,6 +16,7 @@ import {
   Save,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import RefreshButton from "@/components/RefreshButton";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -251,6 +252,7 @@ export default function EmployeePortal() {
     isStaff && currentUser ? currentUser.id : null
   );
   const [showAddModal, setShowAddModal] = useState(false);
+  const lastUpdatedRef = useRef<Date>(new Date());
 
   const { data: schedules = [], isLoading } = useSchedules(selectedStaffId ?? undefined);
   const { data: staffList = [] } = useStaffList();
@@ -351,6 +353,14 @@ export default function EmployeePortal() {
               {t("portal.addShift")}
             </button>
           )}
+          <RefreshButton
+            compact
+            lastUpdated={lastUpdatedRef.current}
+            onRefresh={async () => {
+              await qc.invalidateQueries({ queryKey: ["/api/schedules"] });
+              lastUpdatedRef.current = new Date();
+            }}
+          />
         </div>
       </div>
 

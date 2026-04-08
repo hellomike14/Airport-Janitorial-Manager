@@ -1,9 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { format, formatDistanceToNow } from "date-fns";
 import { useTranslation } from "react-i18next";
 import { getDateLocale } from "@/i18n/dateLocale";
 import { useGetDashboard } from "@workspace/api-client-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { 
   CheckCircle2, 
   Map as MapIcon, 
@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { Link } from "wouter";
+import RefreshButton from "@/components/RefreshButton";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -53,6 +54,9 @@ export default function Dashboard() {
   const [selectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [lightbox, setLightbox] = useState<string | null>(null);
   
+  const qc = useQueryClient();
+  const lastUpdatedRef = useRef<Date>(new Date());
+
   const { data: stats, isLoading, isError } = useGetDashboard({ date: selectedDate });
 
   const { data: photos = [] } = useQuery<SharedPhoto[]>({
@@ -100,6 +104,13 @@ export default function Dashboard() {
             <Clock className="w-4 h-4" /> {t("dashboard.realTimeStatus", { date: format(new Date(selectedDate), "MMMM do, yyyy", { locale: dateLocale }) })}
           </p>
         </div>
+        <RefreshButton
+          lastUpdated={lastUpdatedRef.current}
+          onRefresh={async () => {
+            await qc.invalidateQueries();
+            lastUpdatedRef.current = new Date();
+          }}
+        />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
