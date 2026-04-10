@@ -79,6 +79,7 @@ A comprehensive janitorial cleaning management web app for Marvol Facility at MC
 - Issue Tracker - Report, assign, and resolve facility issues; supervisor assigns to staff
 - My Tasks - Staff-only page showing today's assigned area tasks with completion
 - My Issues - Staff-only page showing issues assigned to them with completion flow (notes + photos)
+- Special Requests (`/special-requests`) - All roles can view special cleaning/inspection requests; inspectors/supervisors/admins can create requests with target area + notes; staff and supervisors can respond by marking requests as done with optional completion notes; staff view is filtered to show only their assigned area's requests; tracks creator (createdById) and completer
 - Employee Portal - Weekly schedule management (admin/supervisor can add/delete shifts; staff view their own schedule read-only); auto-populated when staff are assigned to areas via Assignments page
 - Photo Share - All roles can take photos and share with the team; GPS location + timestamp are automatically captured and stamped directly onto photos (visible overlay with date/time, GPS coordinates, and "KMCO - MCO International Airport"); location data stored in DB and displayed in photo feed; notifications only sent to staff currently on shift (based on schedules)
 - Weekly Report - Admin-only page aggregating all weekly activities: task completion by day, issues by severity/area, staff productivity rankings, area performance, photos shared, notifications sent; week navigation + print/PDF support
@@ -93,7 +94,8 @@ A comprehensive janitorial cleaning management web app for Marvol Facility at MC
 - `GET /api/tasks` - Task list (filterable by area + date)
 - `POST /api/tasks/:id/complete` - Mark task complete
 - `POST /api/tasks/:id/uncomplete` - Mark task incomplete
-- `POST /api/tasks/special` - Create a special task for an area (inspector use)
+- `GET /api/tasks/special` - List special tasks (filterable by date + areaId); returns createdByName, completedByName, areaName
+- `POST /api/tasks/special` - Create a special task for an area (with createdById tracking)
 - `PATCH /api/tasks/:id/images` - Update before/after photos on a task
 - `POST /api/tasks/complete-all` - Complete all tasks for an area
 - `GET/POST /api/assignments` - Assignments management

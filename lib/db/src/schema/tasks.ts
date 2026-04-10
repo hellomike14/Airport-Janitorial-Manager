@@ -25,6 +25,7 @@ export const tasksTable = pgTable("tasks", {
   completedById: integer("completed_by_id").references(() => staffTable.id),
   assignedToId: integer("assigned_to_id").references(() => staffTable.id),
   isSpecial: boolean("is_special").notNull().default(false),
+  createdById: integer("created_by_id").references(() => staffTable.id),
   notes: text("notes"),
   beforeImagePath: text("before_image_path"),
   afterImagePath: text("after_image_path"),

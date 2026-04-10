@@ -189,6 +189,60 @@ router.get("/", async (req, res) => {
   );
 });
 
+router.get("/special", async (req, res) => {
+  const now = new Date();
+  const defaultDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const date = (req.query.date as string) ?? defaultDate;
+  const areaId = req.query.areaId ? parseInt(req.query.areaId as string) : undefined;
+
+  const conditions = [
+    eq(tasksTable.isSpecial, true),
+    eq(tasksTable.taskDate, date),
+  ];
+  if (areaId) conditions.push(eq(tasksTable.areaId, areaId));
+
+  const rows = await db
+    .select({
+      id: tasksTable.id,
+      areaId: tasksTable.areaId,
+      taskDate: tasksTable.taskDate,
+      taskName: tasksTable.taskName,
+      taskOrder: tasksTable.taskOrder,
+      completed: tasksTable.completed,
+      completedAt: tasksTable.completedAt,
+      completedById: tasksTable.completedById,
+      createdById: tasksTable.createdById,
+      notes: tasksTable.notes,
+      createdAt: tasksTable.createdAt,
+    })
+    .from(tasksTable)
+    .where(and(...conditions))
+    .orderBy(tasksTable.createdAt);
+
+  const staffIds = [...new Set(rows.flatMap(r => [r.completedById, r.createdById]).filter(Boolean))] as number[];
+  const staffNames: Record<number, string> = {};
+  for (const sid of staffIds) {
+    const [s] = await db.select({ name: staffTable.name }).from(staffTable).where(eq(staffTable.id, sid));
+    if (s) staffNames[sid] = s.name;
+  }
+
+  const areaIds = [...new Set(rows.map(r => r.areaId))];
+  const areaNames: Record<number, string> = {};
+  for (const aid of areaIds) {
+    const [a] = await db.select({ name: areasTable.name }).from(areasTable).where(eq(areasTable.id, aid));
+    if (a) areaNames[aid] = a.name;
+  }
+
+  res.json(rows.map(r => ({
+    ...r,
+    completedAt: r.completedAt?.toISOString() ?? null,
+    createdAt: r.createdAt?.toISOString() ?? null,
+    completedByName: r.completedById ? (staffNames[r.completedById] ?? null) : null,
+    createdByName: r.createdById ? (staffNames[r.createdById] ?? null) : null,
+    areaName: areaNames[r.areaId] ?? "Unknown Area",
+  })));
+});
+
 router.post("/special", async (req, res) => {
   const { areaId, date, notes, createdById } = req.body;
   if (!areaId || !date || !notes || typeof areaId !== "number" || typeof notes !== "string" || notes.trim().length === 0) {
@@ -221,6 +275,7 @@ router.post("/special", async (req, res) => {
       taskOrder: (maxOrder[0]?.maxO ?? 0) + 1,
       completed: false,
       isSpecial: true,
+      createdById: createdById ?? null,
       notes: notes.trim(),
     })
     .returning();
