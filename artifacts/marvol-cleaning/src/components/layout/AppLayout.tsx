@@ -133,17 +133,62 @@ function useNavConfig() {
 }
 
 const BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+
+let audioUnlocked = false;
+let audioCtx: AudioContext | null = null;
 const regularSound = new Audio(`${BASE}/sounds/notification.wav`);
 const urgentSound = new Audio(`${BASE}/sounds/notification-urgent.wav`);
 regularSound.preload = "auto";
 urgentSound.preload = "auto";
 
+function unlockAudio() {
+  if (audioUnlocked) return;
+  try {
+    audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    if (audioCtx.state === "suspended") {
+      audioCtx.resume();
+    }
+    regularSound.volume = 0.01;
+    regularSound.play().then(() => {
+      regularSound.pause();
+      regularSound.currentTime = 0;
+      regularSound.volume = 1;
+    }).catch(() => { regularSound.volume = 1; });
+    urgentSound.volume = 0.01;
+    urgentSound.play().then(() => {
+      urgentSound.pause();
+      urgentSound.currentTime = 0;
+      urgentSound.volume = 1;
+    }).catch(() => { urgentSound.volume = 1; });
+    audioUnlocked = true;
+  } catch {}
+}
+
+if (typeof window !== "undefined") {
+  const unlockHandler = () => {
+    unlockAudio();
+    document.removeEventListener("click", unlockHandler, true);
+    document.removeEventListener("touchstart", unlockHandler, true);
+    document.removeEventListener("keydown", unlockHandler, true);
+  };
+  document.addEventListener("click", unlockHandler, true);
+  document.addEventListener("touchstart", unlockHandler, true);
+  document.addEventListener("keydown", unlockHandler, true);
+}
+
 function playNotificationSound(urgent: boolean = false) {
   try {
+    if (audioCtx && audioCtx.state === "suspended") {
+      audioCtx.resume();
+    }
     const sound = urgent ? urgentSound : regularSound;
     sound.currentTime = 0;
-    sound.play().catch(() => {});
-  } catch {}
+    sound.play().catch((err) => {
+      console.warn("Notification sound blocked:", err.message);
+    });
+  } catch (err) {
+    console.warn("Notification sound error:", err);
+  }
 }
 
 function vibrateDevice(urgent: boolean = false) {
@@ -191,9 +236,12 @@ function NotificationBell({ staffId }: { staffId: number }) {
 
     const newNotifications = unread.filter((n) => !prevUnreadIdsRef.current.has(n.id));
     if (newNotifications.length > 0) {
-      const hasUrgent = newNotifications.some(
-        (n) => n.type === "inspector_to_supervisor" || n.type === "supervisor_to_inspector" || n.type === "new_issue" || n.type === "task_completed" || n.type === "direct_alert" || n.type === "photo_shared"
-      );
+      const URGENT_TYPES = new Set([
+        "inspector_to_supervisor", "supervisor_to_inspector",
+        "new_issue", "issue_assigned", "issue_completed",
+        "task_completed", "direct_alert", "photo_shared",
+      ]);
+      const hasUrgent = newNotifications.some((n) => URGENT_TYPES.has(n.type));
       playNotificationSound(hasUrgent);
       vibrateDevice(hasUrgent);
     }
@@ -227,9 +275,12 @@ function NotificationBell({ staffId }: { staffId: number }) {
     return <AlertOctagon className="w-3.5 h-3.5 text-rose-500 shrink-0" />;
   };
 
-  const hasUrgentUnread = unread.some(
-    (n) => n.type === "inspector_to_supervisor" || n.type === "supervisor_to_inspector" || n.type === "new_issue" || n.type === "task_completed" || n.type === "direct_alert" || n.type === "photo_shared"
-  );
+  const URGENT_TYPES_BADGE = new Set([
+    "inspector_to_supervisor", "supervisor_to_inspector",
+    "new_issue", "issue_assigned", "issue_completed",
+    "task_completed", "direct_alert", "photo_shared",
+  ]);
+  const hasUrgentUnread = unread.some((n) => URGENT_TYPES_BADGE.has(n.type));
 
   return (
     <div className="relative" ref={ref}>

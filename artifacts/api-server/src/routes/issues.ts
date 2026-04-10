@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db } from "@workspace/db";
 import { issuesTable, staffTable, areasTable, notificationsTable, assignmentsTable } from "@workspace/db/schema";
-import { eq, and, gte, lte } from "drizzle-orm";
+import { eq, and, gte, lte, inArray } from "drizzle-orm";
 import {
   ListIssuesQueryParams,
   CreateIssueBody,
@@ -320,10 +320,27 @@ router.patch("/:id/complete", async (req: Request, res: Response) => {
   const issue = await fetchFullIssue(params.data.id);
   const [completedBy] = await db.select({ name: staffTable.name }).from(staffTable).where(eq(staffTable.id, body.data.completedById));
 
-  await notifySupervisors(
-    `Issue in ${issue?.areaName ?? "an area"} marked complete by ${completedBy?.name ?? "Staff"}: "${updated.description.slice(0, 60)}${updated.description.length > 60 ? "…" : ""}"`,
-    updated.id
-  );
+  const completionMsg = `Issue in ${issue?.areaName ?? "an area"} marked complete by ${completedBy?.name ?? "Staff"}: "${updated.description.slice(0, 60)}${updated.description.length > 60 ? "…" : ""}"`;
+
+  const supervisorsAndAdmins = await db
+    .select({ id: staffTable.id })
+    .from(staffTable)
+    .where(inArray(staffTable.role, ["supervisor", "admin", "inspector"]));
+
+  const completionRecipients = supervisorsAndAdmins
+    .filter((s) => s.id !== body.data.completedById)
+    .map((s) => s.id);
+
+  if (completionRecipients.length > 0) {
+    await db.insert(notificationsTable).values(
+      completionRecipients.map((staffId) => ({
+        staffId,
+        issueId: updated.id,
+        type: "issue_completed" as const,
+        message: completionMsg,
+      }))
+    );
+  }
 
   res.json(issue);
 });

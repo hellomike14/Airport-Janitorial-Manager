@@ -338,7 +338,7 @@ router.post("/:id/complete", async (req, res) => {
     : null;
 
   const area = await db.select({ name: areasTable.name }).from(areasTable).where(eq(areasTable.id, updated.areaId)).then((r) => r[0]);
-  const recipients = await db.select({ id: staffTable.id }).from(staffTable).where(inArray(staffTable.role, ["inspector", "supervisor"]));
+  const recipients = await db.select({ id: staffTable.id }).from(staffTable).where(inArray(staffTable.role, ["inspector", "supervisor", "admin"]));
   if (recipients.length > 0 && area) {
     const completedBy = staffMember?.name ?? "Staff";
     await db.insert(notificationsTable).values(
