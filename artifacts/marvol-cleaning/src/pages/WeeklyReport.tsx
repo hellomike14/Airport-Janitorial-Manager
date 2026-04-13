@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   BarChart3,
@@ -13,6 +13,9 @@ import {
   TrendingUp,
   Printer,
   Calendar,
+  ChevronDown,
+  ChevronUp,
+  User,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from "date-fns";
@@ -42,6 +45,17 @@ type WeeklyReportData = {
     staffName: string;
     staffRole: string;
     tasksCompleted: number;
+  }[];
+  staffBreakdown: {
+    staffId: number;
+    staffName: string;
+    staffRole: string;
+    tasksCompleted: number;
+    specialRequestsCompleted: number;
+    issuesResolved: number;
+    issuesReported: number;
+    photosShared: number;
+    areasWorked: number;
   }[];
   areaPerformance: {
     areaId: number;
@@ -105,6 +119,131 @@ function ProgressBar({ value, max, color = "emerald" }: { value: number; max: nu
         <div className={`h-full rounded-full ${colorMap[color] ?? colorMap.emerald} transition-all`} style={{ width: `${pct}%` }} />
       </div>
       <span className="text-xs font-semibold text-slate-600 w-10 text-right">{pct}%</span>
+    </div>
+  );
+}
+
+function StaffBreakdownSection({ staffBreakdown }: { staffBreakdown: WeeklyReportData["staffBreakdown"] }) {
+  const { t } = useTranslation();
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+
+  const ROLE_COLORS: Record<string, string> = {
+    staff: "bg-blue-100 text-blue-700",
+    supervisor: "bg-violet-100 text-violet-700",
+    inspector: "bg-amber-100 text-amber-700",
+    admin: "bg-rose-100 text-rose-700",
+  };
+
+  if (staffBreakdown.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200 p-5">
+        <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+          <User className="w-4 h-4 text-indigo-500" />
+          {t("weeklyReport.staffBreakdown")}
+        </h3>
+        <p className="text-sm text-slate-400 text-center py-4">{t("weeklyReport.noActivity")}</p>
+      </div>
+    );
+  }
+
+  const maxTasks = Math.max(...staffBreakdown.map((s) => s.tasksCompleted), 1);
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 p-5">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="font-semibold text-slate-800 flex items-center gap-2">
+            <User className="w-4 h-4 text-indigo-500" />
+            {t("weeklyReport.staffBreakdown")}
+          </h3>
+          <p className="text-xs text-slate-400 mt-0.5">{t("weeklyReport.staffBreakdownSubtitle")}</p>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-100">
+              <th className="text-left py-2 px-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">{t("weeklyReport.staffPerformance")}</th>
+              <th className="text-center py-2 px-2 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">{t("weeklyReport.regularTasks")}</th>
+              <th className="text-center py-2 px-2 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">{t("weeklyReport.specialReqs")}</th>
+              <th className="text-center py-2 px-2 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">{t("weeklyReport.issuesFixed")}</th>
+              <th className="text-center py-2 px-2 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">{t("weeklyReport.reported")}</th>
+              <th className="text-center py-2 px-2 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">{t("weeklyReport.photos")}</th>
+              <th className="text-center py-2 px-2 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">{t("weeklyReport.areas")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {staffBreakdown.map((s, i) => {
+              const isExpanded = expandedId === s.staffId;
+              return (
+                <React.Fragment key={s.staffId}>
+                  <tr
+                    className={`border-b border-slate-50 hover:bg-slate-50/50 cursor-pointer transition-colors ${isExpanded ? "bg-indigo-50/40" : ""}`}
+                    onClick={() => setExpandedId(isExpanded ? null : s.staffId)}
+                  >
+                    <td className="py-3 px-2">
+                      <div className="flex items-center gap-2.5">
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0 ${i === 0 ? "bg-amber-500" : i === 1 ? "bg-slate-400" : i === 2 ? "bg-amber-700" : "bg-slate-300"}`}>
+                          {i + 1}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-slate-700 truncate">{s.staffName}</p>
+                          <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded-full font-medium capitalize ${ROLE_COLORS[s.staffRole] ?? "bg-slate-100 text-slate-600"}`}>{s.staffRole}</span>
+                        </div>
+                        {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-slate-400 shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />}
+                      </div>
+                    </td>
+                    <td className="text-center py-3 px-2">
+                      <span className={`inline-flex items-center justify-center min-w-[28px] h-7 rounded-lg text-sm font-bold ${s.tasksCompleted > 0 ? "bg-emerald-50 text-emerald-700" : "text-slate-300"}`}>
+                        {s.tasksCompleted}
+                      </span>
+                    </td>
+                    <td className="text-center py-3 px-2">
+                      <span className={`inline-flex items-center justify-center min-w-[28px] h-7 rounded-lg text-sm font-bold ${s.specialRequestsCompleted > 0 ? "bg-violet-50 text-violet-700" : "text-slate-300"}`}>
+                        {s.specialRequestsCompleted}
+                      </span>
+                    </td>
+                    <td className="text-center py-3 px-2">
+                      <span className={`inline-flex items-center justify-center min-w-[28px] h-7 rounded-lg text-sm font-bold ${s.issuesResolved > 0 ? "bg-blue-50 text-blue-700" : "text-slate-300"}`}>
+                        {s.issuesResolved}
+                      </span>
+                    </td>
+                    <td className="text-center py-3 px-2">
+                      <span className={`inline-flex items-center justify-center min-w-[28px] h-7 rounded-lg text-sm font-bold ${s.issuesReported > 0 ? "bg-amber-50 text-amber-700" : "text-slate-300"}`}>
+                        {s.issuesReported}
+                      </span>
+                    </td>
+                    <td className="text-center py-3 px-2">
+                      <span className={`inline-flex items-center justify-center min-w-[28px] h-7 rounded-lg text-sm font-bold ${s.photosShared > 0 ? "bg-cyan-50 text-cyan-700" : "text-slate-300"}`}>
+                        {s.photosShared}
+                      </span>
+                    </td>
+                    <td className="text-center py-3 px-2">
+                      <span className={`inline-flex items-center justify-center min-w-[28px] h-7 rounded-lg text-sm font-bold ${s.areasWorked > 0 ? "bg-indigo-50 text-indigo-700" : "text-slate-300"}`}>
+                        {s.areasWorked}
+                      </span>
+                    </td>
+                  </tr>
+                  {isExpanded && (
+                    <tr className="bg-indigo-50/30">
+                      <td colSpan={7} className="px-4 py-3">
+                        <div className="ml-9 flex items-center gap-4">
+                          <span className="text-xs text-slate-500 font-medium whitespace-nowrap">{t("weeklyReport.completionRate")}:</span>
+                          <div className="w-64">
+                            <ProgressBar value={s.tasksCompleted} max={maxTasks} color={s.tasksCompleted >= maxTasks * 0.8 ? "emerald" : s.tasksCompleted >= maxTasks * 0.5 ? "amber" : "rose"} />
+                          </div>
+                          <span className="text-xs text-slate-400">{s.tasksCompleted} / {maxTasks} {t("weeklyReport.tasks")}</span>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -318,6 +457,8 @@ export default function WeeklyReport() {
               </div>
             </div>
           </div>
+
+          <StaffBreakdownSection staffBreakdown={data.staffBreakdown ?? []} />
         </>
       )}
     </div>

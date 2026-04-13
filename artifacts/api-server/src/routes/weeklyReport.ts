@@ -9,7 +9,7 @@ import {
   sharedPhotosTable,
   assignmentsTable,
 } from "@workspace/db/schema";
-import { eq, sql, and, gte, lte, between } from "drizzle-orm";
+import { eq, sql, and, gte, lte } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -133,6 +133,122 @@ router.get("/", async (req: Request, res: Response) => {
       .orderBy(sql`count(*) desc`)
       .limit(10);
 
+    const allStaff = await db
+      .select({ id: staffTable.id, name: staffTable.name, role: staffTable.role })
+      .from(staffTable)
+      .where(eq(staffTable.active, true));
+
+    const staffTasksCompleted = await db
+      .select({
+        staffId: tasksTable.completedById,
+        total: sql<number>`count(*)::int`,
+      })
+      .from(tasksTable)
+      .where(
+        and(
+          gte(tasksTable.taskDate, weekStart),
+          lte(tasksTable.taskDate, weekEnd),
+          eq(tasksTable.completed, true)
+        )
+      )
+      .groupBy(tasksTable.completedById);
+
+    const staffSpecialCompleted = await db
+      .select({
+        staffId: tasksTable.completedById,
+        total: sql<number>`count(*)::int`,
+      })
+      .from(tasksTable)
+      .where(
+        and(
+          gte(tasksTable.taskDate, weekStart),
+          lte(tasksTable.taskDate, weekEnd),
+          eq(tasksTable.completed, true),
+          eq(tasksTable.isSpecial, true)
+        )
+      )
+      .groupBy(tasksTable.completedById);
+
+    const staffIssuesResolved = await db
+      .select({
+        staffId: issuesTable.assignedToId,
+        total: sql<number>`count(*)::int`,
+      })
+      .from(issuesTable)
+      .where(
+        and(
+          eq(issuesTable.resolved, true),
+          gte(issuesTable.resolvedAt, new Date(weekStart + "T00:00:00Z")),
+          lte(issuesTable.resolvedAt, new Date(weekEnd + "T23:59:59Z"))
+        )
+      )
+      .groupBy(issuesTable.assignedToId);
+
+    const staffIssuesReported = await db
+      .select({
+        staffId: issuesTable.reportedById,
+        total: sql<number>`count(*)::int`,
+      })
+      .from(issuesTable)
+      .where(
+        and(
+          gte(issuesTable.issueDate, weekStart),
+          lte(issuesTable.issueDate, weekEnd)
+        )
+      )
+      .groupBy(issuesTable.reportedById);
+
+    const staffPhotoCount = await db
+      .select({
+        staffId: sharedPhotosTable.staffId,
+        total: sql<number>`count(*)::int`,
+      })
+      .from(sharedPhotosTable)
+      .where(
+        and(
+          gte(sharedPhotosTable.createdAt, new Date(weekStart + "T00:00:00Z")),
+          lte(sharedPhotosTable.createdAt, new Date(weekEnd + "T23:59:59Z"))
+        )
+      )
+      .groupBy(sharedPhotosTable.staffId);
+
+    const staffAreasWorked = await db
+      .select({
+        staffId: tasksTable.completedById,
+        areaCount: sql<number>`count(distinct ${tasksTable.areaId})::int`,
+      })
+      .from(tasksTable)
+      .where(
+        and(
+          gte(tasksTable.taskDate, weekStart),
+          lte(tasksTable.taskDate, weekEnd),
+          eq(tasksTable.completed, true)
+        )
+      )
+      .groupBy(tasksTable.completedById);
+
+    const tcMap = new Map(staffTasksCompleted.map((r) => [r.staffId, r.total]));
+    const scMap = new Map(staffSpecialCompleted.map((r) => [r.staffId, r.total]));
+    const irMap = new Map(staffIssuesResolved.map((r) => [r.staffId, r.total]));
+    const rpMap = new Map(staffIssuesReported.map((r) => [r.staffId, r.total]));
+    const phMap = new Map(staffPhotoCount.map((r) => [r.staffId, r.total]));
+    const awMap = new Map(staffAreasWorked.map((r) => [r.staffId, r.areaCount]));
+
+    const staffBreakdown = allStaff
+      .map((s) => ({
+        staffId: s.id,
+        staffName: s.name,
+        staffRole: s.role,
+        tasksCompleted: tcMap.get(s.id) ?? 0,
+        specialRequestsCompleted: scMap.get(s.id) ?? 0,
+        issuesResolved: irMap.get(s.id) ?? 0,
+        issuesReported: rpMap.get(s.id) ?? 0,
+        photosShared: phMap.get(s.id) ?? 0,
+        areasWorked: awMap.get(s.id) ?? 0,
+      }))
+      .filter((s) => s.tasksCompleted > 0 || s.issuesResolved > 0 || s.issuesReported > 0 || s.photosShared > 0 || s.specialRequestsCompleted > 0)
+      .sort((a, b) => b.tasksCompleted - a.tasksCompleted);
+
     res.json({
       weekStart,
       weekEnd,
@@ -151,6 +267,7 @@ router.get("/", async (req: Request, res: Response) => {
         byArea: issuesByArea,
       },
       staffProductivity,
+      staffBreakdown,
       areaPerformance: areaPerformance.map((a) => ({
         ...a,
         completionRate: a.total > 0 ? Math.round((a.completed / a.total) * 100) : 0,
