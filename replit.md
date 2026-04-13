@@ -75,7 +75,7 @@ A comprehensive janitorial cleaning management web app for Marvol Facility at MC
 - Cleaning Areas - List of all areas with progress (admin/supervisor)
 - Area Tasks - 15 daily tasks per area with checkbox completion + timestamps
 - Staff Directory - Add/edit/delete staff including admin role (admin only)
-- Assignments - Supervisors assign staff to areas daily + special inspector assignments
+- Assignments - Supervisors assign staff to areas daily + special inspector assignments; shows "Assigned By" column with supervisor/admin name; dashboard area cards display assigned staff initials
 - Issue Tracker - Report, assign, and resolve facility issues; supervisor assigns to staff
 - My Tasks - Staff-only page showing today's assigned area tasks with completion
 - My Issues - Staff-only page showing issues assigned to them with completion flow (notes + photos)

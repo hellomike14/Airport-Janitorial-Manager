@@ -1,10 +1,11 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { tasksTable, areasTable, issuesTable } from "@workspace/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { tasksTable, areasTable, issuesTable, assignmentsTable, staffTable, taskTypesTable } from "@workspace/db/schema";
+import { eq, and, sql, asc } from "drizzle-orm";
 import { GetDashboardQueryParams } from "@workspace/api-zod";
+import { AREA_SPECIFIC_TASKS } from "../area-tasks";
 
-const DAILY_TASKS = [
+const FALLBACK_TASKS = [
   "Routine sweep of all levels — remove debris, trash, and litter",
   "Mop and sanitize all floor surfaces — extra attention to high-traffic zones",
   "Deep clean stairwells — scrub landings, steps, and corners",
@@ -19,22 +20,39 @@ const DAILY_TASKS = [
   "Final supervisor inspection walk-through and sign-off",
 ];
 
+async function getActiveTaskTypes(): Promise<{ taskName: string; taskOrder: number }[]> {
+  const types = await db
+    .select({ taskName: taskTypesTable.taskName, taskOrder: taskTypesTable.taskOrder })
+    .from(taskTypesTable)
+    .where(eq(taskTypesTable.active, true))
+    .orderBy(asc(taskTypesTable.taskOrder));
+
+  if (types.length === 0) {
+    return FALLBACK_TASKS.map((name, idx) => ({ taskName: name, taskOrder: idx + 1 }));
+  }
+  return types;
+}
+
 async function ensureTasksForDate(areaId: number, date: string) {
   const existing = await db
     .select({ id: tasksTable.id })
     .from(tasksTable)
-    .where(
-      sql`${tasksTable.areaId} = ${areaId} AND ${tasksTable.taskDate} = ${date}`
-    )
+    .where(and(eq(tasksTable.areaId, areaId), eq(tasksTable.taskDate, date)))
     .limit(1);
 
   if (existing.length === 0) {
+    const activeTypes = await getActiveTaskTypes();
+
+    const [area] = await db.select({ name: areasTable.name }).from(areasTable).where(eq(areasTable.id, areaId));
+    const extraTasks = area ? (AREA_SPECIFIC_TASKS[area.name] ?? []) : [];
+    const allTasks = [...activeTypes, ...extraTasks];
+
     await db.insert(tasksTable).values(
-      DAILY_TASKS.map((name, idx) => ({
+      allTasks.map((t) => ({
         areaId,
         taskDate: date,
-        taskName: name,
-        taskOrder: idx + 1,
+        taskName: t.taskName,
+        taskOrder: t.taskOrder,
         completed: false,
         isSpecial: false,
       }))
@@ -75,6 +93,22 @@ router.get("/dashboard", async (req, res) => {
     .from(issuesTable)
     .where(eq(issuesTable.resolved, false));
 
+  const dayAssignments = await db
+    .select({
+      areaId: assignmentsTable.areaId,
+      staffName: staffTable.name,
+    })
+    .from(assignmentsTable)
+    .innerJoin(staffTable, eq(assignmentsTable.staffId, staffTable.id))
+    .where(eq(assignmentsTable.assignmentDate, date));
+
+  const assignmentsByArea = new Map<number, string[]>();
+  for (const a of dayAssignments) {
+    const list = assignmentsByArea.get(a.areaId) ?? [];
+    list.push(a.staffName);
+    assignmentsByArea.set(a.areaId, list);
+  }
+
   const areaProgress = areas.map((area) => {
     const stats = statsMap.get(area.id) ?? { total: 15, completed: 0 };
     return {
@@ -85,7 +119,7 @@ router.get("/dashboard", async (req, res) => {
       completedTasks: stats.completed,
       percentage:
         stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0,
-      assignedStaff: [] as string[],
+      assignedStaff: assignmentsByArea.get(area.id) ?? [],
     };
   });
 

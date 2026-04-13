@@ -240,7 +240,8 @@
     "removeAssignmentTitle": "Eliminar Asignación",
     "staffMember": "Miembro del Personal",
     "assignedArea": "Área Asignada",
-    "notes": "Notas"
+    "notes": "Notas",
+    "assignedByCol": "Asignado Por"
   },
   "staff": {
     "staffDirectory": "Directorio de Personal",

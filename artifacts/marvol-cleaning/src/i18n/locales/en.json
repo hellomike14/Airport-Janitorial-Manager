@@ -240,7 +240,8 @@
     "removeAssignmentTitle": "Remove Assignment",
     "staffMember": "Staff Member",
     "assignedArea": "Assigned Area",
-    "notes": "Notes"
+    "notes": "Notes",
+    "assignedByCol": "Assigned By"
   },
   "staff": {
     "staffDirectory": "Staff Directory",

@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { tasksTable, staffTable, areasTable, issuesTable, taskTypesTable, notificationsTable } from "@workspace/db/schema";
+import { tasksTable, staffTable, areasTable, issuesTable, taskTypesTable, notificationsTable, assignmentsTable } from "@workspace/db/schema";
 import { eq, and, sql, asc, inArray } from "drizzle-orm";
 import { AREA_SPECIFIC_TASKS } from "../area-tasks";
 import {
@@ -100,6 +100,22 @@ router.get("/dashboard", async (req, res) => {
     .from(issuesTable)
     .where(eq(issuesTable.resolved, false));
 
+  const dayAssignments = await db
+    .select({
+      areaId: assignmentsTable.areaId,
+      staffName: staffTable.name,
+    })
+    .from(assignmentsTable)
+    .innerJoin(staffTable, eq(assignmentsTable.staffId, staffTable.id))
+    .where(eq(assignmentsTable.assignmentDate, date));
+
+  const assignmentsByArea = new Map<number, string[]>();
+  for (const a of dayAssignments) {
+    const list = assignmentsByArea.get(a.areaId) ?? [];
+    list.push(a.staffName);
+    assignmentsByArea.set(a.areaId, list);
+  }
+
   const areaProgress = areas.map((area) => {
     const stats = statsMap.get(area.id) ?? { total: 15, completed: 0 };
     return {
@@ -109,7 +125,7 @@ router.get("/dashboard", async (req, res) => {
       totalTasks: stats.total,
       completedTasks: stats.completed,
       percentage: stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0,
-      assignedStaff: [] as string[],
+      assignedStaff: assignmentsByArea.get(area.id) ?? [],
     };
   });
 

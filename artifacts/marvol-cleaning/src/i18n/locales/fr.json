@@ -240,7 +240,8 @@
     "removeAssignmentTitle": "Supprimer l'Affectation",
     "staffMember": "Membre du Personnel",
     "assignedArea": "Zone Assignée",
-    "notes": "Notes"
+    "notes": "Notes",
+    "assignedByCol": "Assigné Par"
   },
   "staff": {
     "staffDirectory": "Répertoire du Personnel",

@@ -155,6 +155,7 @@ export default function Assignments() {
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-slate-800 text-sm">{assignment.staffName}</p>
                     <p className="text-sm text-slate-600 mt-0.5 font-medium">{assignment.areaName}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">{t("assignments.assignedByCol")}: {assignment.assignedByName}</p>
                     {(assignment.notes || assignment.isSpecial) && (
                       <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
                         {assignment.isSpecial && <Star className="w-3 h-3 text-amber-500 shrink-0" />}
@@ -182,6 +183,7 @@ export default function Assignments() {
                 <tr>
                   <th className="px-6 py-4">{t("assignments.staffMember")}</th>
                   <th className="px-6 py-4">{t("assignments.assignedArea")}</th>
+                  <th className="px-6 py-4">{t("assignments.assignedByCol")}</th>
                   <th className="px-6 py-4">{t("assignments.notes")}</th>
                   <th className="px-6 py-4 text-right">{t("common.actions")}</th>
                 </tr>
@@ -194,6 +196,9 @@ export default function Assignments() {
                     </td>
                     <td className="px-6 py-4">
                       <span className="font-medium text-slate-700">{assignment.areaName}</span>
+                    </td>
+                    <td className="px-6 py-4 text-slate-500">
+                      {assignment.assignedByName}
                     </td>
                     <td className="px-6 py-4 text-slate-500 max-w-xs truncate">
                       {assignment.isSpecial && <Star className="inline w-3 h-3 text-amber-500 mr-1" />}

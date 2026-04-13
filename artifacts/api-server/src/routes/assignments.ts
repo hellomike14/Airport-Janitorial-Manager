@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { assignmentsTable, staffTable, areasTable, schedulesTable } from "@workspace/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import {
   ListAssignmentsQueryParams,
   CreateAssignmentBody,
@@ -43,14 +43,13 @@ router.get("/", async (req, res) => {
       )
     );
 
-  // Get assigned-by names
-  const supervisorIds = [...new Set(assignments.map((a) => a.assignedById))];
+  const supervisorIds = [...new Set(assignments.map((a) => a.assignedById).filter(Boolean))] as number[];
   const supervisors =
     supervisorIds.length > 0
       ? await db
           .select({ id: staffTable.id, name: staffTable.name })
           .from(staffTable)
-          .where(eq(staffTable.id, supervisorIds[0]))
+          .where(inArray(staffTable.id, supervisorIds))
       : [];
   const supMap = new Map(supervisors.map((s) => [s.id, s.name]));
 
