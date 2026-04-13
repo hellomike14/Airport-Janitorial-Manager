@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db } from "@workspace/db";
 import { sharedPhotosTable, staffTable, areasTable, notificationsTable, schedulesTable } from "@workspace/db/schema";
-import { eq, desc, ne, and, lte, gte } from "drizzle-orm";
+import { eq, desc, ne, and, lte, gte, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 const router: IRouter = Router();
@@ -91,11 +91,25 @@ router.post("/", async (req: Request, res: Response) => {
         )
       );
 
-    if (onShiftStaff.length > 0) {
+    const adminsAndSupervisors = await db
+      .select({ id: staffTable.id })
+      .from(staffTable)
+      .where(inArray(staffTable.role, ["admin", "supervisor"]));
+
+    const onShiftIds = new Set(onShiftStaff.map((s) => s.staffId));
+    for (const mgr of adminsAndSupervisors) {
+      if (mgr.id !== body.data.staffId) {
+        onShiftIds.add(mgr.id);
+      }
+    }
+
+    const recipientIds = Array.from(onShiftIds);
+
+    if (recipientIds.length > 0) {
       const captionSnippet = body.data.caption ? `: "${body.data.caption.slice(0, 50)}"` : "";
       await db.insert(notificationsTable).values(
-        onShiftStaff.map((s) => ({
-          staffId: s.staffId,
+        recipientIds.map((staffId) => ({
+          staffId,
           type: "photo_shared" as const,
           message: `📷 ${senderName} shared a photo${captionSnippet}`,
         }))
