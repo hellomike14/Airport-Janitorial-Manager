@@ -758,7 +758,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               {initials}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{currentUser?.name ?? "Unknown"}</p>
+              <p className="text-sm font-medium truncate">{currentUser?.name ?? t("issuePdf.unknown")}</p>
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badge.cls}`}>
                 {badge.label}
               </span>

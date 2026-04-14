@@ -51,7 +51,7 @@ function IssueImage({ path, label }: { path: string | null; label: string }) {
   );
 }
 
-function buildIssuePDF(issue: any): string {
+function buildIssuePDF(issue: any, t: (key: string, opts?: any) => string): string {
   const origin = window.location.origin;
   const logoUrl = `${origin}${BASE_URL}/logo.png`;
   const logoMarkUrl = `${origin}${BASE_URL}/logo-mark.png`;
@@ -65,14 +65,14 @@ function buildIssuePDF(issue: any): string {
 
   const photosSection = (beforeUrl || afterUrl) ? `
     <div style="margin-top:24px;">
-      <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px;">Photos</div>
+      <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px;">${t("issuePdf.photos")}</div>
       <div style="display:flex;gap:20px;flex-wrap:wrap;">
         ${beforeUrl ? `<div>
-          <div style="font-size:10px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Before</div>
+          <div style="font-size:10px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">${t("issuePdf.before")}</div>
           <img src="${beforeUrl}" style="width:220px;height:155px;object-fit:cover;border-radius:10px;border:1px solid #e2e8f0;" onerror="this.style.display='none'" />
         </div>` : ''}
         ${afterUrl ? `<div>
-          <div style="font-size:10px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">After</div>
+          <div style="font-size:10px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">${t("issuePdf.after")}</div>
           <img src="${afterUrl}" style="width:220px;height:155px;object-fit:cover;border-radius:10px;border:1px solid #e2e8f0;" onerror="this.style.display='none'" />
         </div>` : ''}
       </div>
@@ -80,26 +80,28 @@ function buildIssuePDF(issue: any): string {
 
   const completionSection = issue.completionNotes ? `
     <div style="margin-top:20px;background:#f8fafc;border-radius:10px;padding:14px 16px;border-left:3px solid #10b981;">
-      <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Completion Notes</div>
+      <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">${t("issuePdf.completionNotes")}</div>
       <div style="font-size:13px;color:#334155;line-height:1.6;">${issue.completionNotes}</div>
     </div>` : '';
 
   const resolvedSection = resolvedDate ? `
     <div style="margin-top:12px;display:flex;align-items:center;gap:8px;color:#059669;font-size:12px;font-weight:600;">
       <span style="width:8px;height:8px;background:#10b981;border-radius:50%;display:inline-block;"></span>
-      Resolved on ${resolvedDate}
+      ${t("issuePdf.resolvedOn", { date: resolvedDate })}
     </div>` : `
     <div style="margin-top:12px;display:flex;align-items:center;gap:8px;color:#2563eb;font-size:12px;font-weight:600;">
       <span style="width:8px;height:8px;background:#3b82f6;border-radius:50%;display:inline-block;"></span>
-      Status: Open — Awaiting Resolution
+      ${t("issuePdf.statusOpenAwaiting")}
     </div>`;
 
+  const severityDesc = issue.severity === 'high' ? t("issuePdf.urgentAttention") : issue.severity === 'medium' ? t("issuePdf.needsAttention") : t("issuePdf.routineIssue");
+
   return `<!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Issue Report #${issue.id} — Marvol Facility Services</title>
+  <title>${t("issuePdf.issueReportTitle", { id: issue.id })}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f1f5f9; color: #1e293b; }
@@ -121,23 +123,23 @@ function buildIssuePDF(issue: any): string {
           <div style="background:rgba(255,255,255,0.95);border-radius:8px;padding:5px 12px;display:inline-block;margin-bottom:5px;">
             <img src="${logoUrl}" style="height:22px;object-fit:contain;" onerror="this.style.display='none'" />
           </div>
-          <div style="color:#94a3b8;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;">Facility Services · MCO International Airport</div>
+          <div style="color:#94a3b8;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;">${t("issuePdf.facilityServices")}</div>
         </div>
       </div>
       <div style="text-align:right;">
-        <div style="color:#fff;font-weight:700;font-size:15px;letter-spacing:0.01em;">Issue Report</div>
-        <div style="color:#64748b;font-size:11px;margin-top:3px;">Issue #${issue.id}</div>
-        <div style="color:#475569;font-size:10px;margin-top:2px;">Generated ${generatedAt}</div>
+        <div style="color:#fff;font-weight:700;font-size:15px;letter-spacing:0.01em;">${t("issuePdf.issueReport")}</div>
+        <div style="color:#64748b;font-size:11px;margin-top:3px;">${t("issuePdf.issueNumber", { id: issue.id })}</div>
+        <div style="color:#475569;font-size:10px;margin-top:2px;">${t("issuePdf.generated", { date: generatedAt })}</div>
       </div>
     </div>
 
     <!-- Severity banner -->
     <div style="background:${sev.color}15;border-bottom:3px solid ${sev.color};padding:12px 32px;display:flex;align-items:center;justify-content:space-between;">
       <div style="display:flex;align-items:center;gap:10px;">
-        <span style="background:${sev.color};color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;padding:3px 10px;border-radius:20px;">${sev.label} Priority</span>
-        <span style="font-size:12px;font-weight:600;color:${sev.color};">${issue.severity === 'high' ? 'Urgent — Requires Immediate Attention' : issue.severity === 'medium' ? 'Needs Attention Soon' : 'Routine Cleaning Issue'}</span>
+        <span style="background:${sev.color};color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;padding:3px 10px;border-radius:20px;">${t("issuePdf.priority", { level: sev.label })}</span>
+        <span style="font-size:12px;font-weight:600;color:${sev.color};">${severityDesc}</span>
       </div>
-      <span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:${issue.resolved ? '#d1fae5' : '#dbeafe'};color:${issue.resolved ? '#065f46' : '#1d4ed8'};">${issue.resolved ? '✓ Resolved' : 'Open'}</span>
+      <span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:${issue.resolved ? '#d1fae5' : '#dbeafe'};color:${issue.resolved ? '#065f46' : '#1d4ed8'};">${issue.resolved ? t("issuePdf.resolvedLabel") : t("issuePdf.openLabel")}</span>
     </div>
 
     <!-- Body -->
@@ -145,9 +147,9 @@ function buildIssuePDF(issue: any): string {
 
       <!-- Location -->
       <div style="margin-bottom:20px;">
-        <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Location</div>
+        <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">${t("issuePdf.location")}</div>
         ${issue.terminal ? `<div style="font-size:10px;font-weight:700;color:#2563eb;text-transform:uppercase;letter-spacing:0.06em;">${issue.terminal}</div>` : ''}
-        <div style="font-size:16px;font-weight:700;color:#1e293b;">${issue.areaName ?? 'Unknown Area'}</div>
+        <div style="font-size:16px;font-weight:700;color:#1e293b;">${issue.areaName ?? t("issuePdf.unknownArea")}</div>
       </div>
 
       <!-- Divider -->
@@ -155,23 +157,23 @@ function buildIssuePDF(issue: any): string {
 
       <!-- Description -->
       <div style="margin-bottom:20px;">
-        <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Issue Description</div>
+        <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">${t("issuePdf.issueDescription")}</div>
         <div style="font-size:15px;color:#1e293b;line-height:1.6;font-weight:500;">${issue.description}</div>
       </div>
 
       <!-- Meta grid -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
         <div style="background:#f8fafc;border-radius:10px;padding:12px 14px;">
-          <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Date Reported</div>
+          <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">${t("issuePdf.dateReported")}</div>
           <div style="font-size:13px;color:#334155;font-weight:600;">${reportedDate}</div>
         </div>
         <div style="background:#f8fafc;border-radius:10px;padding:12px 14px;">
-          <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Reported By</div>
-          <div style="font-size:13px;color:#334155;font-weight:600;">${issue.reportedByName ?? 'Unknown'}</div>
+          <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">${t("issuePdf.reportedBy")}</div>
+          <div style="font-size:13px;color:#334155;font-weight:600;">${issue.reportedByName ?? t("issuePdf.unknown")}</div>
         </div>
         ${issue.assignedToName ? `
         <div style="background:#eff6ff;border-radius:10px;padding:12px 14px;">
-          <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Assigned To</div>
+          <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">${t("issuePdf.assignedTo")}</div>
           <div style="font-size:13px;color:#1d4ed8;font-weight:600;">${issue.assignedToName}</div>
         </div>` : ''}
       </div>
@@ -187,9 +189,9 @@ function buildIssuePDF(issue: any): string {
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
         <div style="display:flex;align-items:center;gap:8px;">
           <img src="${logoMarkUrl}" style="width:24px;height:24px;object-fit:contain;opacity:0.5;" onerror="this.style.display='none'" />
-          <span style="font-size:10px;color:#475569;">Marvol Facility Services · MCO International Airport · Confidential Operations Record</span>
+          <span style="font-size:10px;color:#475569;">${t("issuePdf.confidentialRecord")}</span>
         </div>
-        <span style="font-size:10px;color:#64748b;white-space:nowrap;">Issue #${issue.id}</span>
+        <span style="font-size:10px;color:#64748b;white-space:nowrap;">${t("issuePdf.issueNumber", { id: issue.id })}</span>
       </div>
     </div>
   </div>
@@ -204,8 +206,9 @@ function buildIssuePDF(issue: any): string {
 }
 
 function DownloadIssueButton({ issue }: { issue: any }) {
+  const { t } = useTranslation();
   const handleDownload = () => {
-    const html = buildIssuePDF(issue);
+    const html = buildIssuePDF(issue, t);
     const win = window.open("", "_blank");
     if (!win) return;
     win.document.write(html);
@@ -215,7 +218,7 @@ function DownloadIssueButton({ issue }: { issue: any }) {
   return (
     <button
       onClick={handleDownload}
-      title="Download PDF for this issue"
+      title={t("issuePdf.downloadPdf")}
       className="no-print flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-colors shrink-0"
     >
       <Download className="w-3.5 h-3.5" />

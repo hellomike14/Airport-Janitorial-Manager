@@ -511,5 +511,43 @@
   "notFound": {
     "title": "404 Page Not Found",
     "message": "Did you forget to add the page to the router?"
+  },
+  "offline": {
+    "youreOffline": "You're offline — your work is being saved locally",
+    "pending": "({{count}} pending)",
+    "syncing": "Syncing your changes...",
+    "synced": "All changes synced",
+    "syncError": "Some changes couldn't sync — will retry"
+  },
+  "taskPhotos": {
+    "tapToAdd": "Tap to add photo"
+  },
+  "issuePdf": {
+    "facilityServices": "Facility Services · MCO International Airport",
+    "issueReport": "Issue Report",
+    "issueNumber": "Issue #{{id}}",
+    "generated": "Generated {{date}}",
+    "priority": "{{level}} Priority",
+    "urgentAttention": "Urgent — Requires Immediate Attention",
+    "needsAttention": "Needs Attention Soon",
+    "routineIssue": "Routine Cleaning Issue",
+    "resolvedLabel": "✓ Resolved",
+    "openLabel": "Open",
+    "location": "Location",
+    "unknownArea": "Unknown Area",
+    "issueDescription": "Issue Description",
+    "dateReported": "Date Reported",
+    "reportedBy": "Reported By",
+    "assignedTo": "Assigned To",
+    "unknown": "Unknown",
+    "resolvedOn": "Resolved on {{date}}",
+    "statusOpenAwaiting": "Status: Open — Awaiting Resolution",
+    "completionNotes": "Completion Notes",
+    "photos": "Photos",
+    "before": "Before",
+    "after": "After",
+    "confidentialRecord": "Marvol Facility Services · MCO International Airport · Confidential Operations Record",
+    "downloadPdf": "Download PDF for this issue",
+    "issueReportTitle": "Issue Report #{{id}} — Marvol Facility Services"
   }
 }

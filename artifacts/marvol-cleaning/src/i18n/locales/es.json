@@ -511,5 +511,43 @@
   "notFound": {
     "title": "404 Página No Encontrada",
     "message": "¿Olvidó agregar la página al enrutador?"
+  },
+  "offline": {
+    "youreOffline": "Estás sin conexión — tu trabajo se guarda localmente",
+    "pending": "({{count}} pendientes)",
+    "syncing": "Sincronizando tus cambios...",
+    "synced": "Todos los cambios sincronizados",
+    "syncError": "Algunos cambios no se pudieron sincronizar — se reintentará"
+  },
+  "taskPhotos": {
+    "tapToAdd": "Toca para agregar foto"
+  },
+  "issuePdf": {
+    "facilityServices": "Servicios de Instalaciones · Aeropuerto Internacional MCO",
+    "issueReport": "Informe de Problema",
+    "issueNumber": "Problema #{{id}}",
+    "generated": "Generado {{date}}",
+    "priority": "Prioridad {{level}}",
+    "urgentAttention": "Urgente — Requiere Atención Inmediata",
+    "needsAttention": "Necesita Atención Pronto",
+    "routineIssue": "Problema de Limpieza Rutinario",
+    "resolvedLabel": "✓ Resuelto",
+    "openLabel": "Abierto",
+    "location": "Ubicación",
+    "unknownArea": "Área Desconocida",
+    "issueDescription": "Descripción del Problema",
+    "dateReported": "Fecha de Reporte",
+    "reportedBy": "Reportado Por",
+    "assignedTo": "Asignado A",
+    "unknown": "Desconocido",
+    "resolvedOn": "Resuelto el {{date}}",
+    "statusOpenAwaiting": "Estado: Abierto — Esperando Resolución",
+    "completionNotes": "Notas de Finalización",
+    "photos": "Fotos",
+    "before": "Antes",
+    "after": "Después",
+    "confidentialRecord": "Marvol Servicios de Instalaciones · Aeropuerto Internacional MCO · Registro Operacional Confidencial",
+    "downloadPdf": "Descargar PDF de este problema",
+    "issueReportTitle": "Informe de Problema #{{id}} — Marvol Servicios de Instalaciones"
   }
 }

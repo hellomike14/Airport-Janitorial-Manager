@@ -3,6 +3,7 @@ import { Camera, X, Loader2, ZoomIn, ArrowRight, ChevronDown, ChevronUp, ImageIc
 import { useQueryClient } from "@tanstack/react-query";
 import { storePhotoBlob } from "@/lib/offlineStore";
 import { useOffline } from "@/contexts/OfflineContext";
+import { useTranslation } from "react-i18next";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -48,6 +49,7 @@ function PhotoSlot({
   accent?: string;
   compact?: boolean;
 }) {
+  const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
@@ -123,7 +125,7 @@ function PhotoSlot({
             ${compact ? "aspect-[4/3] py-3" : "aspect-video py-4"}`}
         >
           <Camera className={compact ? "w-5 h-5" : "w-6 h-6"} />
-          <span className="text-xs font-medium">Tap to add photo</span>
+          <span className="text-xs font-medium">{t("taskPhotos.tapToAdd")}</span>
         </button>
       )}
 

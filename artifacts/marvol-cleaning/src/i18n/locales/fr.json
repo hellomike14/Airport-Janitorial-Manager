@@ -511,5 +511,43 @@
   "notFound": {
     "title": "404 Page Non Trouvée",
     "message": "Avez-vous oublié d'ajouter la page au routeur ?"
+  },
+  "offline": {
+    "youreOffline": "Vous êtes hors ligne — votre travail est sauvegardé localement",
+    "pending": "({{count}} en attente)",
+    "syncing": "Synchronisation de vos modifications...",
+    "synced": "Toutes les modifications synchronisées",
+    "syncError": "Certaines modifications n'ont pas pu être synchronisées — nouvelle tentative"
+  },
+  "taskPhotos": {
+    "tapToAdd": "Appuyez pour ajouter une photo"
+  },
+  "issuePdf": {
+    "facilityServices": "Services d'Installations · Aéroport International MCO",
+    "issueReport": "Rapport de Problème",
+    "issueNumber": "Problème #{{id}}",
+    "generated": "Généré {{date}}",
+    "priority": "Priorité {{level}}",
+    "urgentAttention": "Urgent — Nécessite une Attention Immédiate",
+    "needsAttention": "Nécessite une Attention Prochaine",
+    "routineIssue": "Problème de Nettoyage Courant",
+    "resolvedLabel": "✓ Résolu",
+    "openLabel": "Ouvert",
+    "location": "Emplacement",
+    "unknownArea": "Zone Inconnue",
+    "issueDescription": "Description du Problème",
+    "dateReported": "Date de Signalement",
+    "reportedBy": "Signalé Par",
+    "assignedTo": "Assigné À",
+    "unknown": "Inconnu",
+    "resolvedOn": "Résolu le {{date}}",
+    "statusOpenAwaiting": "Statut : Ouvert — En Attente de Résolution",
+    "completionNotes": "Notes de Finalisation",
+    "photos": "Photos",
+    "before": "Avant",
+    "after": "Après",
+    "confidentialRecord": "Marvol Services d'Installations · Aéroport International MCO · Dossier Opérationnel Confidentiel",
+    "downloadPdf": "Télécharger le PDF de ce problème",
+    "issueReportTitle": "Rapport de Problème #{{id}} — Marvol Services d'Installations"
   }
 }
