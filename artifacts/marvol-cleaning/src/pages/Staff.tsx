@@ -225,7 +225,7 @@ function StaffCard({ person, onDelete, onToggleRole, roleType }: { person: any; 
           )}
           <button
             onClick={onDelete}
-            className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+            className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 active:bg-rose-100 rounded-lg transition-colors touch-manipulation"
           >
             <Trash2 className="w-4 h-4" />
           </button>
