@@ -439,7 +439,8 @@
     "sharing": "Partage en cours...",
     "recentPhotos": "Photos Récentes",
     "noPhotos": "Aucune photo partagée",
-    "gpsUnavailable": "Position GPS indisponible — photo horodatée uniquement"
+    "gpsUnavailable": "Position GPS indisponible — photo horodatée uniquement",
+    "confirmDelete": "Supprimer cette photo ? Cette action est irréversible."
   },
   "portal": {
     "title": "Portail Employé",

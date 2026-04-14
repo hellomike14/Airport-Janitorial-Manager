@@ -455,8 +455,12 @@ export default function PhotoShare() {
                 </div>
                 {(isManager || photo.staffId === currentUser?.id) && (
                   <button
-                    onClick={() => deletePhoto.mutate(photo.id)}
-                    className="p-2 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
+                    onClick={() => {
+                      if (confirm(t("photoShare.confirmDelete"))) {
+                        deletePhoto.mutate(photo.id);
+                      }
+                    }}
+                    className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 active:bg-red-100 transition-all touch-manipulation"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>

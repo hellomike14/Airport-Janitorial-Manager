@@ -439,7 +439,8 @@
     "sharing": "Compartiendo...",
     "recentPhotos": "Fotos Recientes",
     "noPhotos": "No hay fotos compartidas aún",
-    "gpsUnavailable": "Ubicación GPS no disponible — foto marcada solo con hora"
+    "gpsUnavailable": "Ubicación GPS no disponible — foto marcada solo con hora",
+    "confirmDelete": "¿Eliminar esta foto? Esto no se puede deshacer."
   },
   "portal": {
     "title": "Portal del Empleado",
