@@ -241,6 +241,15 @@ function StaffCard({ person, onDelete, onToggleRole, roleType }: { person: any; 
           {person.email || t("staff.noEmailAdded")}
         </div>
       </div>
+      {onToggleRole && (
+        <button
+          onClick={onToggleRole}
+          className="mt-4 w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-indigo-50 hover:bg-indigo-100 active:bg-indigo-200 text-indigo-700 font-semibold text-sm border border-indigo-200 transition-colors touch-manipulation"
+        >
+          <ArrowUpDown className="w-4 h-4" />
+          {roleType === "staff" ? t("staff.switchToSupervisor") : t("staff.switchToStaff")}
+        </button>
+      )}
     </div>
   );
 }
