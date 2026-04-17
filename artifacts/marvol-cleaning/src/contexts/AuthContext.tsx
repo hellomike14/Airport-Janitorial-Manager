@@ -63,6 +63,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem(VIEW_MODE_KEY, mode);
   };
 
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const refreshProfile = async () => {
+      try {
+        const res = await fetch(`${import.meta.env.BASE_URL}api/staff`);
+        if (!res.ok) return;
+        const list = await res.json();
+        const fresh = Array.isArray(list) ? list.find((s: any) => s.id === currentUser.id) : null;
+        if (!fresh) return;
+        const changed =
+          fresh.role !== currentUser.role ||
+          fresh.name !== currentUser.name ||
+          (fresh.phone || null) !== (currentUser.phone || null) ||
+          (fresh.email || null) !== (currentUser.email || null);
+        if (changed) {
+          const updated: CurrentUser = {
+            id: fresh.id,
+            name: fresh.name,
+            role: fresh.role,
+            phone: fresh.phone,
+            email: fresh.email,
+          };
+          setCurrentUser(updated);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+          if (fresh.role !== currentUser.role) {
+            setViewModeState(fresh.role as ViewMode);
+            localStorage.setItem(VIEW_MODE_KEY, fresh.role);
+          }
+        }
+      } catch {
+        // ignore network errors
+      }
+    };
+
+    refreshProfile();
+    const interval = setInterval(refreshProfile, 20000);
+    const onFocus = () => refreshProfile();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [currentUser?.id, currentUser?.role, currentUser?.name, currentUser?.phone, currentUser?.email]);
+
   const effectiveRole = viewMode;
 
   return (
