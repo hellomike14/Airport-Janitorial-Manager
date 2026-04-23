@@ -1,6 +1,6 @@
 import app from "./app";
 import { db } from "@workspace/db";
-import { staffTable, areasTable, taskTypesTable } from "@workspace/db/schema";
+import { staffTable, areasTable, taskTypesTable, notificationsTable, staffLocationsTable } from "@workspace/db/schema";
 import { eq, count, inArray } from "drizzle-orm";
 
 const rawPort = process.env["PORT"];
@@ -131,6 +131,20 @@ async function seed() {
       }))
     );
     console.log(`Seeded: ${toInsert.length} staff members (${toInsert.map((s) => s.name).join(", ")})`);
+  }
+
+  const REMOVED_STAFF_NAMES = ["Floraima Pinero Valdez", "Ashandre Longmore"];
+  const removedStaff = existingStaff.filter((s) => REMOVED_STAFF_NAMES.includes(s.name));
+  if (removedStaff.length > 0) {
+    const removedIds = removedStaff.map((s) => s.id);
+    await db.delete(notificationsTable).where(inArray(notificationsTable.staffId, removedIds));
+    await db.delete(staffLocationsTable).where(inArray(staffLocationsTable.staffId, removedIds));
+    for (const s of removedStaff) {
+      if (s.active) {
+        await db.update(staffTable).set({ active: false }).where(eq(staffTable.id, s.id));
+        console.log(`Marked ex-staff inactive: ${s.name}`);
+      }
+    }
   }
 
   const managersWithPasswords = existingStaff.filter(

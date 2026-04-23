@@ -101,6 +101,7 @@ function useNavConfig() {
       { href: "/tasks", icon: ListChecks, label: t("nav.taskManagement") },
       { href: "/areas", icon: Map, label: t("nav.cleaningAreas") },
       { href: "/assignments", icon: ClipboardList, label: t("nav.assignments") },
+      { href: "/staff", icon: Users, label: t("nav.staffDirectory") },
       { href: "/issues", icon: AlertTriangle, label: t("nav.inspectorSpecialAssignments") },
       { href: "/report", icon: FileText, label: t("nav.inspectorReport") },
       { href: "/employee-portal", icon: Calendar, label: t("nav.employeePortal") },

@@ -9,6 +9,8 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export default function Staff() {
   const { t } = useTranslation();
+  const { effectiveRole } = useAuth();
+  const readOnly = effectiveRole === "supervisor";
   const { data: staff, isLoading } = useListStaff();
   const { currentUser, logout } = useAuth();
   const queryClient = useQueryClient();
@@ -71,15 +73,17 @@ export default function Staff() {
             {t("staff.subtitle", { admins: admins.length, supervisors: supervisors.length, staff: regularStaff.length })}
           </p>
         </div>
-        <Button
-          onClick={() => setIsAdding(!isAdding)}
-          className="bg-accent hover:bg-accent/90 text-white rounded-xl shadow-lg shadow-accent/20 font-bold"
-        >
-          <UserPlus className="w-4 h-4 mr-2" /> {t("staff.addMember")}
-        </Button>
+        {!readOnly && (
+          <Button
+            onClick={() => setIsAdding(!isAdding)}
+            className="bg-accent hover:bg-accent/90 text-white rounded-xl shadow-lg shadow-accent/20 font-bold"
+          >
+            <UserPlus className="w-4 h-4 mr-2" /> {t("staff.addMember")}
+          </Button>
+        )}
       </div>
 
-      {isAdding && (
+      {!readOnly && isAdding && (
         <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-md">
           <h3 className="text-lg font-bold text-slate-800 mb-4">{t("staff.newTeamMember")}</h3>
           <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -143,7 +147,13 @@ export default function Staff() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {admins.map((person) => (
-              <StaffCard key={person.id} person={person} onDelete={() => handleDelete(person.id)} roleType="admin" onLogout={currentUser?.id === person.id ? logout : undefined} />
+              <StaffCard
+                key={person.id}
+                person={person}
+                onDelete={readOnly ? undefined : () => handleDelete(person.id)}
+                roleType="admin"
+                onLogout={currentUser?.id === person.id ? logout : undefined}
+              />
             ))}
           </div>
         </div>
@@ -155,7 +165,14 @@ export default function Staff() {
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {supervisors.map((person) => (
-            <StaffCard key={person.id} person={person} onDelete={() => handleDelete(person.id)} onToggleRole={() => handleToggleRole(person)} roleType="supervisor" onLogout={currentUser?.id === person.id ? logout : undefined} />
+            <StaffCard
+              key={person.id}
+              person={person}
+              onDelete={readOnly ? undefined : () => handleDelete(person.id)}
+              onToggleRole={readOnly ? undefined : () => handleToggleRole(person)}
+              roleType="supervisor"
+              onLogout={currentUser?.id === person.id ? logout : undefined}
+            />
           ))}
         </div>
       </div>
@@ -166,7 +183,14 @@ export default function Staff() {
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {regularStaff.map((person) => (
-            <StaffCard key={person.id} person={person} onDelete={() => handleDelete(person.id)} onToggleRole={() => handleToggleRole(person)} roleType="staff" onLogout={currentUser?.id === person.id ? logout : undefined} />
+            <StaffCard
+              key={person.id}
+              person={person}
+              onDelete={readOnly ? undefined : () => handleDelete(person.id)}
+              onToggleRole={readOnly ? undefined : () => handleToggleRole(person)}
+              roleType="staff"
+              onLogout={currentUser?.id === person.id ? logout : undefined}
+            />
           ))}
         </div>
       </div>
@@ -195,7 +219,7 @@ const ROLE_STYLES = {
   },
 };
 
-function StaffCard({ person, onDelete, onToggleRole, roleType, onLogout }: { person: any; onDelete: () => void; onToggleRole?: () => void; roleType: "admin" | "supervisor" | "staff"; onLogout?: () => void }) {
+function StaffCard({ person, onDelete, onToggleRole, roleType, onLogout }: { person: any; onDelete?: () => void; onToggleRole?: () => void; roleType: "admin" | "supervisor" | "staff"; onLogout?: () => void }) {
   const { t } = useTranslation();
   const style = ROLE_STYLES[roleType];
   const initials = person.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
@@ -225,12 +249,14 @@ function StaffCard({ person, onDelete, onToggleRole, roleType, onLogout }: { per
               <ArrowUpDown className="w-4 h-4" />
             </button>
           )}
-          <button
-            onClick={onDelete}
-            className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 active:bg-rose-100 rounded-lg transition-colors touch-manipulation"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+          {onDelete && (
+            <button
+              onClick={onDelete}
+              className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 active:bg-rose-100 rounded-lg transition-colors touch-manipulation"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
       <div className="space-y-2 text-sm text-slate-500">

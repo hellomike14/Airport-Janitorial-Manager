@@ -99,7 +99,10 @@ router.get("/dashboard", async (req, res) => {
       staffName: staffTable.name,
     })
     .from(assignmentsTable)
-    .innerJoin(staffTable, eq(assignmentsTable.staffId, staffTable.id))
+    .innerJoin(
+      staffTable,
+      and(eq(assignmentsTable.staffId, staffTable.id), eq(staffTable.active, true))
+    )
     .where(eq(assignmentsTable.assignmentDate, date));
 
   const assignmentsByArea = new Map<number, string[]>();

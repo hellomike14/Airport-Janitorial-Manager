@@ -54,7 +54,10 @@ async function fetchFullIssue(id: number) {
     })
     .from(issuesTable)
     .innerJoin(areasTable, eq(issuesTable.areaId, areasTable.id))
-    .innerJoin(staffTable, eq(issuesTable.reportedById, staffTable.id))
+    .leftJoin(
+      staffTable,
+      and(eq(issuesTable.reportedById, staffTable.id), eq(staffTable.active, true))
+    )
     .where(eq(issuesTable.id, id));
 
   if (!rows[0]) return null;
@@ -65,8 +68,8 @@ async function fetchFullIssue(id: number) {
     const [s] = await db
       .select({ name: staffTable.name })
       .from(staffTable)
-      .where(eq(staffTable.id, row.assignedToId));
-    assignedToName = s?.name ?? null;
+      .where(and(eq(staffTable.id, row.assignedToId), eq(staffTable.active, true)));
+    assignedToName = s?.name ?? "Former staff";
   }
 
   return formatIssueRow({ ...row, assignedToName });
@@ -78,7 +81,7 @@ function formatIssueRow(i: any) {
     areaId: i.areaId,
     areaName: i.areaName,
     reportedById: i.reportedById,
-    reportedByName: i.reportedByName,
+    reportedByName: i.reportedByName ?? "Former staff",
     assignedToId: i.assignedToId ?? null,
     assignedToName: i.assignedToName ?? null,
     issueDate: i.issueDate,
@@ -97,12 +100,12 @@ async function notifySupervisors(message: string, issueId: number, excludeId?: n
   const supervisors = await db
     .select({ id: staffTable.id })
     .from(staffTable)
-    .where(eq(staffTable.role, "supervisor"));
+    .where(and(eq(staffTable.role, "supervisor"), eq(staffTable.active, true)));
 
   const admins = await db
     .select({ id: staffTable.id })
     .from(staffTable)
-    .where(eq(staffTable.role, "admin"));
+    .where(and(eq(staffTable.role, "admin"), eq(staffTable.active, true)));
 
   const recipients = [...supervisors, ...admins]
     .filter((s) => s.id !== excludeId)
@@ -150,7 +153,10 @@ router.get("/", async (req: Request, res: Response) => {
     })
     .from(issuesTable)
     .innerJoin(areasTable, eq(issuesTable.areaId, areasTable.id))
-    .innerJoin(staffTable, eq(issuesTable.reportedById, staffTable.id))
+    .leftJoin(
+      staffTable,
+      and(eq(issuesTable.reportedById, staffTable.id), eq(staffTable.active, true))
+    )
     .where(
       and(
         query.date ? eq(issuesTable.issueDate, query.date) : undefined,
@@ -165,11 +171,21 @@ router.get("/", async (req: Request, res: Response) => {
   const assignedIds = [...new Set(rows.filter((r) => r.assignedToId).map((r) => r.assignedToId as number))];
   const assignedNames: Record<number, string> = {};
   for (const sid of assignedIds) {
-    const [s] = await db.select({ name: staffTable.name }).from(staffTable).where(eq(staffTable.id, sid));
+    const [s] = await db
+      .select({ name: staffTable.name })
+      .from(staffTable)
+      .where(and(eq(staffTable.id, sid), eq(staffTable.active, true)));
     if (s) assignedNames[sid] = s.name;
   }
 
-  res.json(rows.map((r) => formatIssueRow({ ...r, assignedToName: r.assignedToId ? (assignedNames[r.assignedToId] ?? null) : null })));
+  res.json(
+    rows.map((r) =>
+      formatIssueRow({
+        ...r,
+        assignedToName: r.assignedToId ? (assignedNames[r.assignedToId] ?? "Former staff") : null,
+      })
+    )
+  );
 });
 
 router.post("/", async (req: Request, res: Response) => {
@@ -264,7 +280,10 @@ router.patch("/:id/assign-area", async (req: Request, res: Response) => {
   const rawAreaAssignments = await db
     .select({ staffId: assignmentsTable.staffId, staffName: staffTable.name })
     .from(assignmentsTable)
-    .innerJoin(staffTable, eq(assignmentsTable.staffId, staffTable.id))
+    .innerJoin(
+      staffTable,
+      and(eq(assignmentsTable.staffId, staffTable.id), eq(staffTable.active, true))
+    )
     .where(and(eq(assignmentsTable.areaId, issue.areaId), eq(assignmentsTable.assignmentDate, today)));
 
   const seen = new Set<number>();
@@ -325,7 +344,7 @@ router.patch("/:id/complete", async (req: Request, res: Response) => {
   const supervisorsAndAdmins = await db
     .select({ id: staffTable.id })
     .from(staffTable)
-    .where(inArray(staffTable.role, ["supervisor", "admin", "inspector"]));
+    .where(and(inArray(staffTable.role, ["supervisor", "admin", "inspector"]), eq(staffTable.active, true)));
 
   const completionRecipients = supervisorsAndAdmins
     .filter((s) => s.id !== body.data.completedById)

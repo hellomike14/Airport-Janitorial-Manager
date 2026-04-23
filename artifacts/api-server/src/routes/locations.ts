@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db } from "@workspace/db";
 import { staffLocationsTable, staffTable } from "@workspace/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 
 const router: IRouter = Router();
@@ -64,7 +64,10 @@ router.get("/locations", async (_req: Request, res: Response) => {
       updatedAt: staffLocationsTable.updatedAt,
     })
     .from(staffLocationsTable)
-    .innerJoin(staffTable, eq(staffLocationsTable.staffId, staffTable.id));
+    .innerJoin(
+      staffTable,
+      and(eq(staffLocationsTable.staffId, staffTable.id), eq(staffTable.active, true))
+    );
 
   res.json(
     locations.map((l) => ({

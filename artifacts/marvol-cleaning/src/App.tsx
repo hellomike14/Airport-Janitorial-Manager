@@ -80,7 +80,7 @@ function ProtectedRoutes() {
             <Route path="/employee-portal" component={EmployeePortal} />
             <Route path="/photo-share" component={PhotoShare} />
             <Route path="/special-requests" component={SpecialRequests} />
-            <Route path="/staff"><Redirect to="/" /></Route>
+            <Route path="/staff" component={Staff} />
           </>
         )}
 

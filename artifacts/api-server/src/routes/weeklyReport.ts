@@ -75,7 +75,10 @@ router.get("/", async (req: Request, res: Response) => {
         tasksCompleted: sql<number>`count(*)::int`,
       })
       .from(tasksTable)
-      .innerJoin(staffTable, eq(tasksTable.completedById, staffTable.id))
+      .innerJoin(
+        staffTable,
+        and(eq(tasksTable.completedById, staffTable.id), eq(staffTable.active, true))
+      )
       .where(
         and(
           gte(tasksTable.taskDate, weekStart),

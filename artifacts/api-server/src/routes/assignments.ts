@@ -34,7 +34,10 @@ router.get("/", async (req, res) => {
       createdAt: assignmentsTable.createdAt,
     })
     .from(assignmentsTable)
-    .innerJoin(staffTable, eq(assignmentsTable.staffId, staffTable.id))
+    .innerJoin(
+      staffTable,
+      and(eq(assignmentsTable.staffId, staffTable.id), eq(staffTable.active, true))
+    )
     .innerJoin(areasTable, eq(assignmentsTable.areaId, areasTable.id))
     .where(
       and(
