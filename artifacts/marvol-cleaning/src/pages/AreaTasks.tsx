@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { TaskPhotoToggle } from "@/components/TaskPhotos";
+import { StaffName } from "@/components/StaffName";
 
 export default function AreaTasks() {
   const { t, i18n } = useTranslation();
@@ -93,7 +94,11 @@ export default function AreaTasks() {
             <p className="text-slate-500 mt-2 font-medium flex items-center gap-2">
               <User className="w-4 h-4" /> 
               {t("areaTasks.assigned")} <span className="text-slate-800">
-                {tasks?.[0]?.assignedToName || t("areaTasks.noSpecificAssignment")}
+                {tasks?.[0]?.assignedToName ? (
+                  <StaffName name={tasks[0].assignedToName} />
+                ) : (
+                  t("areaTasks.noSpecificAssignment")
+                )}
               </span>
             </p>
           </div>
@@ -166,7 +171,9 @@ export default function AreaTasks() {
                       <Clock className="w-3 h-3" /> {task.completedAt ? format(new Date(task.completedAt), "h:mm a", { locale: dateLocale }) : t("common.done")}
                     </span>
                     {task.completedByName && (
-                      <span className="text-[10px] font-medium text-slate-400 mt-1">{t("common.by")} {task.completedByName}</span>
+                      <span className="text-[10px] font-medium text-slate-400 mt-1">
+                        {t("common.by")} <StaffName name={task.completedByName} />
+                      </span>
                     )}
                   </div>
                 ) : (

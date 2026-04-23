@@ -26,6 +26,7 @@ import {
   Camera,
 } from "lucide-react";
 import { TaskPhotoToggle } from "@/components/TaskPhotos";
+import { StaffName } from "@/components/StaffName";
 
 const TERMINAL_STYLES: Record<string, { bg: string; text: string; dot: string; bar: string; border: string }> = {
   "Terminal A - East": { bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500", bar: "bg-blue-500", border: "border-blue-200" },
@@ -313,7 +314,12 @@ export default function MyTasks() {
                         <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
                           <Clock className="w-3 h-3" />
                           {t("myTasks.doneAt", { time: format(new Date(task.completedAt), "h:mm a", { locale: dateLocale }) })}
-                          {task.completedByName && ` · ${task.completedByName}`}
+                          {task.completedByName && (
+                            <>
+                              {" · "}
+                              <StaffName name={task.completedByName} />
+                            </>
+                          )}
                         </p>
                       )}
                     </div>

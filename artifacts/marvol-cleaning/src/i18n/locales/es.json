@@ -1,5 +1,6 @@
 {
   "common": {
+    "former": "Ex",
     "loading": "Cargando...",
     "save": "Guardar",
     "cancel": "Cancelar",
@@ -497,7 +498,7 @@
     "noRequestsStaff": "No hay solicitudes especiales para tu área hoy.",
     "done": "Hecho",
     "createdBy": "Creado por {{name}}",
-    "completedBy": "Completado por {{name}}",
+    "completedBy": "Completado por <1>{{name}}</1>",
     "doneAt": "Hecho a las {{time}}",
     "markComplete": "Marcar Completo",
     "completing": "Completando...",

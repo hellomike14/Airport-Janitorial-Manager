@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { format } from "date-fns";
-import { useTranslation } from "react-i18next";
+import { useTranslation, Trans } from "react-i18next";
 import { getDateLocale } from "@/i18n/dateLocale";
 import {
   useListAreas,
@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import RefreshButton from "@/components/RefreshButton";
+import { StaffName } from "@/components/StaffName";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -405,7 +406,12 @@ function RequestCard({ task, canRespond, dateLocale }: { task: any; canRespond: 
             )}
             {task.completedByName && (
               <span className="text-emerald-600 font-medium">
-                {t("specialRequests.completedBy", { name: task.completedByName })}
+                <Trans
+                  i18nKey="specialRequests.completedBy"
+                  values={{ name: task.completedByName }}
+                  components={{ 1: <StaffName name={task.completedByName} /> }}
+                  shouldUnescape
+                />
               </span>
             )}
           </div>

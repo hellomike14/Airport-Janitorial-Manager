@@ -1,5 +1,6 @@
 {
   "common": {
+    "former": "Former",
     "loading": "Loading...",
     "save": "Save",
     "cancel": "Cancel",
@@ -497,7 +498,7 @@
     "noRequestsStaff": "No special requests for your area today.",
     "done": "Done",
     "createdBy": "Created by {{name}}",
-    "completedBy": "Completed by {{name}}",
+    "completedBy": "Completed by <1>{{name}}</1>",
     "doneAt": "Done at {{time}}",
     "markComplete": "Mark Complete",
     "completing": "Completing...",

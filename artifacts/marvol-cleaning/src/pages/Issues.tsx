@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { StaffName } from "@/components/StaffName";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -730,10 +731,12 @@ export default function Issues() {
                   </p>
 
                   <div className="flex flex-wrap gap-3 mt-2 text-xs text-slate-400">
-                    <span className="font-medium uppercase tracking-wider">{t("issues.by")}: {issue.reportedByName}</span>
+                    <span className="font-medium uppercase tracking-wider">
+                      {t("issues.by")}: <StaffName name={issue.reportedByName} />
+                    </span>
                     {issue.assignedToName && (
                       <span className="flex items-center gap-1 text-blue-600 font-semibold bg-blue-50 px-2 py-0.5 rounded-full">
-                        <UserCheck className="w-3 h-3" /> {t("issues.assigned")}: {issue.assignedToName}
+                        <UserCheck className="w-3 h-3" /> {t("issues.assigned")}: <StaffName name={issue.assignedToName} />
                       </span>
                     )}
                     {issue.resolved && issue.completionNotes && (

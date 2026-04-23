@@ -25,6 +25,7 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { StaffName } from "@/components/StaffName";
 
 type StatusFilter = "all" | "pending" | "completed";
 
@@ -340,7 +341,9 @@ export default function TaskManagement() {
                                   {task.completedAt ? format(new Date(task.completedAt), "h:mm a", { locale: dateLocale }) : t("common.done")}
                                 </span>
                                 {task.completedByName && (
-                                  <span className="text-[10px] text-slate-400">{task.completedByName}</span>
+                                  <span className="text-[10px] text-slate-400">
+                                    <StaffName name={task.completedByName} />
+                                  </span>
                                 )}
                               </div>
                             ) : (

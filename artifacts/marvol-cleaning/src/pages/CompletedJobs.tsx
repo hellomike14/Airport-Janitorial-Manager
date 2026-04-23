@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TaskPhotoThumbnails, TaskPhotoToggle } from "@/components/TaskPhotos";
+import { StaffName } from "@/components/StaffName";
 
 export default function CompletedJobs() {
   const { t, i18n } = useTranslation();
@@ -250,7 +251,7 @@ export default function CompletedJobs() {
                             {task.completedByName && (
                               <p className="text-[10px] text-slate-400 flex items-center gap-1 justify-end mt-0.5">
                                 <User className="w-2.5 h-2.5" />
-                                {task.completedByName}
+                                <StaffName name={task.completedByName} />
                               </p>
                             )}
                           </div>

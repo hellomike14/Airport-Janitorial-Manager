@@ -20,6 +20,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from "date-fns";
 import { getDateLocale } from "@/i18n/dateLocale";
+import { StaffName } from "@/components/StaffName";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -44,12 +45,14 @@ type WeeklyReportData = {
     staffId: number;
     staffName: string;
     staffRole: string;
+    staffActive?: boolean;
     tasksCompleted: number;
   }[];
   staffBreakdown: {
     staffId: number;
     staffName: string;
     staffRole: string;
+    staffActive?: boolean;
     tasksCompleted: number;
     specialRequestsCompleted: number;
     issuesResolved: number;
@@ -188,7 +191,9 @@ function StaffBreakdownSection({ staffBreakdown }: { staffBreakdown: WeeklyRepor
                           {i + 1}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-slate-700 truncate">{s.staffName}</p>
+                          <p className="text-sm font-medium text-slate-700 truncate">
+                            <StaffName name={s.staffName} active={s.staffActive} />
+                          </p>
                           <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded-full font-medium capitalize ${ROLE_COLORS[s.staffRole] ?? "bg-slate-100 text-slate-600"}`}>{s.staffRole}</span>
                         </div>
                         {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-slate-400 shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />}
@@ -418,7 +423,9 @@ export default function WeeklyReport() {
                         {i + 1}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-slate-700 truncate">{s.staffName}</p>
+                        <p className="text-sm font-medium text-slate-700 truncate">
+                          <StaffName name={s.staffName} active={s.staffActive} />
+                        </p>
                         <p className="text-[10px] text-slate-400 capitalize">{s.staffRole}</p>
                       </div>
                       <div className="text-right">
