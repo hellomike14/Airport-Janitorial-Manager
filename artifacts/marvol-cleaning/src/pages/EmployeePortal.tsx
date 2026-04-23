@@ -14,6 +14,7 @@ import {
   User,
   X,
   Save,
+  LogOut,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import RefreshButton from "@/components/RefreshButton";
@@ -243,7 +244,7 @@ function AddScheduleModal({
 
 export default function EmployeePortal() {
   const { t, i18n } = useTranslation();
-  const { currentUser, effectiveRole } = useAuth();
+  const { currentUser, effectiveRole, logout } = useAuth();
   const qc = useQueryClient();
   const isManager = effectiveRole === "admin" || effectiveRole === "supervisor";
   const isStaff = effectiveRole === "staff";
@@ -381,6 +382,16 @@ export default function EmployeePortal() {
             <p className="text-2xl font-bold text-blue-600">{schedules.length}</p>
             <p className="text-xs text-slate-500">{t("portal.shifts")}</p>
           </div>
+          {currentUser?.id === selectedStaffId && (
+            <button
+              onClick={logout}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 active:bg-red-200 text-red-600 font-semibold text-sm border border-red-200 transition-colors touch-manipulation"
+              title={t("layout.logout")}
+            >
+              <LogOut className="w-4 h-4" />
+              {t("layout.logout")}
+            </button>
+          )}
         </div>
       )}
 

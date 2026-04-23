@@ -763,14 +763,15 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 {badge.label}
               </span>
             </div>
-            <button
-              onClick={logout}
-              className="text-sidebar-foreground/40 hover:text-red-400 transition-colors"
-              title={t("layout.logout")}
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
           </div>
+          <button
+            onClick={logout}
+            className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-medium bg-red-500/10 hover:bg-red-500/20 text-red-300 hover:text-red-200 transition-colors"
+            title={t("layout.logout")}
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            {t("layout.logout")}
+          </button>
           {currentUser?.role !== "staff" && (
             <button
               onClick={() => setShowSetPin(true)}

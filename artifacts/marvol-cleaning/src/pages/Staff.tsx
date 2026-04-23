@@ -1,14 +1,16 @@
 import React, { useState } from "react";
 import { useListStaff, useCreateStaffMember, useDeleteStaffMember, useUpdateStaffMember } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { UserPlus, Shield, User, Phone, Mail, Trash2, Lock, ArrowUpDown } from "lucide-react";
+import { UserPlus, Shield, User, Phone, Mail, Trash2, Lock, ArrowUpDown, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useTranslation } from "react-i18next";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Staff() {
   const { t } = useTranslation();
   const { data: staff, isLoading } = useListStaff();
+  const { currentUser, logout } = useAuth();
   const queryClient = useQueryClient();
   const [isAdding, setIsAdding] = useState(false);
   const [formData, setFormData] = useState({ name: "", role: "staff", phone: "", email: "" });
@@ -141,7 +143,7 @@ export default function Staff() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {admins.map((person) => (
-              <StaffCard key={person.id} person={person} onDelete={() => handleDelete(person.id)} roleType="admin" />
+              <StaffCard key={person.id} person={person} onDelete={() => handleDelete(person.id)} roleType="admin" onLogout={currentUser?.id === person.id ? logout : undefined} />
             ))}
           </div>
         </div>
@@ -153,7 +155,7 @@ export default function Staff() {
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {supervisors.map((person) => (
-            <StaffCard key={person.id} person={person} onDelete={() => handleDelete(person.id)} onToggleRole={() => handleToggleRole(person)} roleType="supervisor" />
+            <StaffCard key={person.id} person={person} onDelete={() => handleDelete(person.id)} onToggleRole={() => handleToggleRole(person)} roleType="supervisor" onLogout={currentUser?.id === person.id ? logout : undefined} />
           ))}
         </div>
       </div>
@@ -164,7 +166,7 @@ export default function Staff() {
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {regularStaff.map((person) => (
-            <StaffCard key={person.id} person={person} onDelete={() => handleDelete(person.id)} onToggleRole={() => handleToggleRole(person)} roleType="staff" />
+            <StaffCard key={person.id} person={person} onDelete={() => handleDelete(person.id)} onToggleRole={() => handleToggleRole(person)} roleType="staff" onLogout={currentUser?.id === person.id ? logout : undefined} />
           ))}
         </div>
       </div>
@@ -193,7 +195,7 @@ const ROLE_STYLES = {
   },
 };
 
-function StaffCard({ person, onDelete, onToggleRole, roleType }: { person: any; onDelete: () => void; onToggleRole?: () => void; roleType: "admin" | "supervisor" | "staff" }) {
+function StaffCard({ person, onDelete, onToggleRole, roleType, onLogout }: { person: any; onDelete: () => void; onToggleRole?: () => void; roleType: "admin" | "supervisor" | "staff"; onLogout?: () => void }) {
   const { t } = useTranslation();
   const style = ROLE_STYLES[roleType];
   const initials = person.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
@@ -248,6 +250,15 @@ function StaffCard({ person, onDelete, onToggleRole, roleType }: { person: any; 
         >
           <ArrowUpDown className="w-4 h-4" />
           {roleType === "staff" ? t("staff.switchToSupervisor") : t("staff.switchToStaff")}
+        </button>
+      )}
+      {onLogout && (
+        <button
+          onClick={onLogout}
+          className="mt-3 w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-red-50 hover:bg-red-100 active:bg-red-200 text-red-600 font-semibold text-sm border border-red-200 transition-colors touch-manipulation"
+        >
+          <LogOut className="w-4 h-4" />
+          {t("layout.logout")}
         </button>
       )}
     </div>
