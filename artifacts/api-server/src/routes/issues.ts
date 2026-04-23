@@ -241,6 +241,17 @@ router.patch("/:id/assign", async (req: Request, res: Response) => {
     return;
   }
 
+  if (body.data.assignedToId != null) {
+    const [target] = await db
+      .select({ id: staffTable.id, active: staffTable.active })
+      .from(staffTable)
+      .where(eq(staffTable.id, body.data.assignedToId));
+    if (!target || target.active === false) {
+      res.status(400).json({ error: "Cannot assign to an inactive staff member" });
+      return;
+    }
+  }
+
   const [updated] = await db
     .update(issuesTable)
     .set({ assignedToId: body.data.assignedToId ?? null })
