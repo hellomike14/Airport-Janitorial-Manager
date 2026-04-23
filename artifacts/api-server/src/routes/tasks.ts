@@ -182,6 +182,7 @@ router.get("/", async (req, res) => {
       completedAt: tasksTable.completedAt,
       completedById: tasksTable.completedById,
       completedByName: staffTable.name,
+      completedByActive: staffTable.active,
       assignedToId: tasksTable.assignedToId,
       isSpecial: tasksTable.isSpecial,
       notes: tasksTable.notes,
@@ -200,11 +201,23 @@ router.get("/", async (req, res) => {
     .orderBy(tasksTable.areaId, tasksTable.taskOrder);
 
   res.json(
-    tasks.map((t) => ({
-      ...t,
-      completedAt: t.completedAt?.toISOString() ?? null,
-      assignedToName: null,
-    }))
+    tasks.map((t) => {
+      const { completedByActive, ...rest } = t;
+      let completedByName: string | null = null;
+      if (t.completedById) {
+        if (t.completedByName) {
+          completedByName = completedByActive === false ? `${t.completedByName} (former)` : t.completedByName;
+        } else {
+          completedByName = "Former staff";
+        }
+      }
+      return {
+        ...rest,
+        completedByName,
+        completedAt: t.completedAt?.toISOString() ?? null,
+        assignedToName: null,
+      };
+    })
   );
 });
 
@@ -241,9 +254,13 @@ router.get("/special", async (req, res) => {
   const staffIds = [...new Set(rows.flatMap(r => [r.completedById, r.createdById]).filter(Boolean))] as number[];
   const staffNames: Record<number, string> = {};
   for (const sid of staffIds) {
-    const [s] = await db.select({ name: staffTable.name }).from(staffTable).where(eq(staffTable.id, sid));
-    if (s) staffNames[sid] = s.name;
+    const [s] = await db.select({ name: staffTable.name, active: staffTable.active }).from(staffTable).where(eq(staffTable.id, sid));
+    if (s) staffNames[sid] = s.active ? s.name : `${s.name} (former)`;
   }
+  const formatStaffName = (id: number | null | undefined): string | null => {
+    if (!id) return null;
+    return staffNames[id] ?? "Former staff";
+  };
 
   const areaIds = [...new Set(rows.map(r => r.areaId))];
   const areaNames: Record<number, string> = {};
@@ -256,8 +273,8 @@ router.get("/special", async (req, res) => {
     ...r,
     completedAt: r.completedAt?.toISOString() ?? null,
     createdAt: r.createdAt?.toISOString() ?? null,
-    completedByName: r.completedById ? (staffNames[r.completedById] ?? null) : null,
-    createdByName: r.createdById ? (staffNames[r.createdById] ?? null) : null,
+    completedByName: formatStaffName(r.completedById),
+    createdByName: formatStaffName(r.createdById),
     areaName: areaNames[r.areaId] ?? "Unknown Area",
   })));
 });
@@ -350,16 +367,19 @@ router.post("/:id/complete", async (req, res) => {
 
   const staffMember = updated.completedById
     ? await db
-        .select({ name: staffTable.name })
+        .select({ name: staffTable.name, active: staffTable.active })
         .from(staffTable)
         .where(eq(staffTable.id, updated.completedById))
         .then((r) => r[0])
     : null;
+  const completedByDisplay = staffMember
+    ? (staffMember.active ? staffMember.name : `${staffMember.name} (former)`)
+    : (updated.completedById ? "Former staff" : null);
 
   const area = await db.select({ name: areasTable.name }).from(areasTable).where(eq(areasTable.id, updated.areaId)).then((r) => r[0]);
   const recipients = await db.select({ id: staffTable.id }).from(staffTable).where(inArray(staffTable.role, ["inspector", "supervisor", "admin"]));
   if (recipients.length > 0 && area) {
-    const completedBy = staffMember?.name ?? "Staff";
+    const completedBy = completedByDisplay ?? "Staff";
     await db.insert(notificationsTable).values(
       recipients.map((r) => ({
         staffId: r.id,
@@ -373,7 +393,7 @@ router.post("/:id/complete", async (req, res) => {
     ...updated,
     taskDate: updated.taskDate,
     completedAt: updated.completedAt?.toISOString() ?? null,
-    completedByName: staffMember?.name ?? null,
+    completedByName: completedByDisplay,
     assignedToName: null,
   });
 });

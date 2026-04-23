@@ -67,18 +67,16 @@ router.get("/", async (req: Request, res: Response) => {
     const mediumIssues = issueStats[0]?.medium ?? 0;
     const lowIssues = issueStats[0]?.low ?? 0;
 
-    const staffProductivity = await db
+    const staffProductivityRaw = await db
       .select({
         staffId: tasksTable.completedById,
         staffName: staffTable.name,
         staffRole: staffTable.role,
+        staffActive: staffTable.active,
         tasksCompleted: sql<number>`count(*)::int`,
       })
       .from(tasksTable)
-      .innerJoin(
-        staffTable,
-        and(eq(tasksTable.completedById, staffTable.id), eq(staffTable.active, true))
-      )
+      .innerJoin(staffTable, eq(tasksTable.completedById, staffTable.id))
       .where(
         and(
           gte(tasksTable.taskDate, weekStart),
@@ -86,8 +84,16 @@ router.get("/", async (req: Request, res: Response) => {
           eq(tasksTable.completed, true)
         )
       )
-      .groupBy(tasksTable.completedById, staffTable.name, staffTable.role)
+      .groupBy(tasksTable.completedById, staffTable.name, staffTable.role, staffTable.active)
       .orderBy(sql`count(*) desc`);
+
+    const staffProductivity = staffProductivityRaw.map((s) => ({
+      staffId: s.staffId,
+      staffName: s.staffActive ? s.staffName : `${s.staffName} (former)`,
+      staffRole: s.staffRole,
+      staffActive: s.staffActive,
+      tasksCompleted: s.tasksCompleted,
+    }));
 
     const areaPerformance = await db
       .select({
@@ -137,9 +143,8 @@ router.get("/", async (req: Request, res: Response) => {
       .limit(10);
 
     const allStaff = await db
-      .select({ id: staffTable.id, name: staffTable.name, role: staffTable.role })
-      .from(staffTable)
-      .where(eq(staffTable.active, true));
+      .select({ id: staffTable.id, name: staffTable.name, role: staffTable.role, active: staffTable.active })
+      .from(staffTable);
 
     const staffTasksCompleted = await db
       .select({
@@ -240,8 +245,9 @@ router.get("/", async (req: Request, res: Response) => {
     const staffBreakdown = allStaff
       .map((s) => ({
         staffId: s.id,
-        staffName: s.name,
+        staffName: s.active ? s.name : `${s.name} (former)`,
         staffRole: s.role,
+        staffActive: s.active,
         tasksCompleted: tcMap.get(s.id) ?? 0,
         specialRequestsCompleted: scMap.get(s.id) ?? 0,
         issuesResolved: irMap.get(s.id) ?? 0,

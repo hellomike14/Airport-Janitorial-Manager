@@ -31,9 +31,13 @@ const ListIssuesWithAssignedQuery = z.object({
   assignedToId: z.coerce.number().optional(),
 });
 
-async function fetchFullIssue(id: number) {
-  const assigned = db.select({ name: staffTable.name }).from(staffTable);
+function displayStaffName(name: string | null | undefined, active: boolean | null | undefined, hasId: boolean): string | null {
+  if (!hasId) return null;
+  if (!name) return "Former staff";
+  return active === false ? `${name} (former)` : name;
+}
 
+async function fetchFullIssue(id: number) {
   const rows = await db
     .select({
       id: issuesTable.id,
@@ -41,6 +45,7 @@ async function fetchFullIssue(id: number) {
       areaName: areasTable.name,
       reportedById: issuesTable.reportedById,
       reportedByName: staffTable.name,
+      reportedByActive: staffTable.active,
       assignedToId: issuesTable.assignedToId,
       issueDate: issuesTable.issueDate,
       description: issuesTable.description,
@@ -54,10 +59,7 @@ async function fetchFullIssue(id: number) {
     })
     .from(issuesTable)
     .innerJoin(areasTable, eq(issuesTable.areaId, areasTable.id))
-    .leftJoin(
-      staffTable,
-      and(eq(issuesTable.reportedById, staffTable.id), eq(staffTable.active, true))
-    )
+    .leftJoin(staffTable, eq(issuesTable.reportedById, staffTable.id))
     .where(eq(issuesTable.id, id));
 
   if (!rows[0]) return null;
@@ -66,13 +68,17 @@ async function fetchFullIssue(id: number) {
   let assignedToName: string | null = null;
   if (row.assignedToId) {
     const [s] = await db
-      .select({ name: staffTable.name })
+      .select({ name: staffTable.name, active: staffTable.active })
       .from(staffTable)
-      .where(and(eq(staffTable.id, row.assignedToId), eq(staffTable.active, true)));
-    assignedToName = s?.name ?? "Former staff";
+      .where(eq(staffTable.id, row.assignedToId));
+    assignedToName = displayStaffName(s?.name, s?.active, true);
   }
 
-  return formatIssueRow({ ...row, assignedToName });
+  return formatIssueRow({
+    ...row,
+    reportedByName: displayStaffName(row.reportedByName, row.reportedByActive, !!row.reportedById),
+    assignedToName,
+  });
 }
 
 function formatIssueRow(i: any) {
@@ -81,7 +87,7 @@ function formatIssueRow(i: any) {
     areaId: i.areaId,
     areaName: i.areaName,
     reportedById: i.reportedById,
-    reportedByName: i.reportedByName ?? "Former staff",
+    reportedByName: i.reportedByName ?? (i.reportedById ? "Former staff" : null),
     assignedToId: i.assignedToId ?? null,
     assignedToName: i.assignedToName ?? null,
     issueDate: i.issueDate,
@@ -140,6 +146,7 @@ router.get("/", async (req: Request, res: Response) => {
       terminal: areasTable.terminal,
       reportedById: issuesTable.reportedById,
       reportedByName: staffTable.name,
+      reportedByActive: staffTable.active,
       assignedToId: issuesTable.assignedToId,
       issueDate: issuesTable.issueDate,
       description: issuesTable.description,
@@ -153,10 +160,7 @@ router.get("/", async (req: Request, res: Response) => {
     })
     .from(issuesTable)
     .innerJoin(areasTable, eq(issuesTable.areaId, areasTable.id))
-    .leftJoin(
-      staffTable,
-      and(eq(issuesTable.reportedById, staffTable.id), eq(staffTable.active, true))
-    )
+    .leftJoin(staffTable, eq(issuesTable.reportedById, staffTable.id))
     .where(
       and(
         query.date ? eq(issuesTable.issueDate, query.date) : undefined,
@@ -169,20 +173,22 @@ router.get("/", async (req: Request, res: Response) => {
     .orderBy(issuesTable.createdAt);
 
   const assignedIds = [...new Set(rows.filter((r) => r.assignedToId).map((r) => r.assignedToId as number))];
-  const assignedNames: Record<number, string> = {};
+  const assignedDisplay: Record<number, string> = {};
   for (const sid of assignedIds) {
     const [s] = await db
-      .select({ name: staffTable.name })
+      .select({ name: staffTable.name, active: staffTable.active })
       .from(staffTable)
-      .where(and(eq(staffTable.id, sid), eq(staffTable.active, true)));
-    if (s) assignedNames[sid] = s.name;
+      .where(eq(staffTable.id, sid));
+    const display = displayStaffName(s?.name, s?.active, true);
+    if (display) assignedDisplay[sid] = display;
   }
 
   res.json(
     rows.map((r) =>
       formatIssueRow({
         ...r,
-        assignedToName: r.assignedToId ? (assignedNames[r.assignedToId] ?? "Former staff") : null,
+        reportedByName: displayStaffName(r.reportedByName, r.reportedByActive, !!r.reportedById),
+        assignedToName: r.assignedToId ? (assignedDisplay[r.assignedToId] ?? "Former staff") : null,
       })
     )
   );
