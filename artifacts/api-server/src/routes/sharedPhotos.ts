@@ -82,19 +82,21 @@ router.post("/", async (req: Request, res: Response) => {
     const onShiftStaff = await db
       .selectDistinct({ staffId: schedulesTable.staffId })
       .from(schedulesTable)
+      .innerJoin(staffTable, eq(schedulesTable.staffId, staffTable.id))
       .where(
         and(
           eq(schedulesTable.dayOfWeek, dayOfWeek),
           lte(schedulesTable.startTime, currentTime),
           gte(schedulesTable.endTime, currentTime),
-          ne(schedulesTable.staffId, body.data.staffId)
+          ne(schedulesTable.staffId, body.data.staffId),
+          eq(staffTable.active, true)
         )
       );
 
     const adminsAndSupervisors = await db
       .select({ id: staffTable.id })
       .from(staffTable)
-      .where(inArray(staffTable.role, ["admin", "supervisor"]));
+      .where(and(inArray(staffTable.role, ["admin", "supervisor"]), eq(staffTable.active, true)));
 
     const onShiftIds = new Set(onShiftStaff.map((s) => s.staffId));
     for (const mgr of adminsAndSupervisors) {
