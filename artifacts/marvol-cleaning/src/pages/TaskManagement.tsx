@@ -195,7 +195,7 @@ export default function TaskManagement() {
           )}
         </div>
 
-        <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-1 overflow-x-auto shrink-0">
+        <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-1 overflow-x-auto flex-1 min-w-0 filter-scroll">
           <button
             onClick={() => setAreaFilter("all")}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${areaFilter === "all" ? "bg-slate-900 text-white shadow" : "text-slate-500 hover:text-slate-800"}`}
