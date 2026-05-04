@@ -124,7 +124,6 @@ const SEED_STAFF: { name: string; role: "admin" | "inspector" | "supervisor" | "
   { name: "Jose Camargo", role: "staff" },
   { name: "Juan Carlos Zurita Blacio", role: "staff" },
   { name: "Kevin Gonzalez Fernandez", role: "staff" },
-  { name: "Marie Ingrid Daniel", role: "staff" },
   { name: "Steeve Alphonse", role: "staff" },
 ];
 
@@ -148,7 +147,7 @@ async function seed() {
     console.log(`Seeded: ${toInsert.length} staff members (${toInsert.map((s) => s.name).join(", ")})`);
   }
 
-  const REMOVED_STAFF_NAMES = ["Floraima Pinero Valdez", "Ashandre Longmore"];
+  const REMOVED_STAFF_NAMES = ["Floraima Pinero Valdez", "Ashandre Longmore", "Marie Ingrid Daniel"];
   const removedStaff = existingStaff.filter((s) => REMOVED_STAFF_NAMES.includes(s.name));
   if (removedStaff.length > 0) {
     const removedIds = removedStaff.map((s) => s.id);
