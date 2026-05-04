@@ -147,7 +147,7 @@ async function seed() {
     console.log(`Seeded: ${toInsert.length} staff members (${toInsert.map((s) => s.name).join(", ")})`);
   }
 
-  const REMOVED_STAFF_NAMES = ["Floraima Pinero Valdez", "Ashandre Longmore", "Marie Ingrid Daniel"];
+  const REMOVED_STAFF_NAMES = ["Floraima Pinero Valdez", "Ashandre Longmore", "Marie Ingrid Daniel", "Jose Altagracia Maria"];
   const removedStaff = existingStaff.filter((s) => REMOVED_STAFF_NAMES.includes(s.name));
   if (removedStaff.length > 0) {
     const removedIds = removedStaff.map((s) => s.id);
