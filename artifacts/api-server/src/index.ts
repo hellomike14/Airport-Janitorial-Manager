@@ -1,7 +1,8 @@
 import app from "./app";
 import { db } from "@workspace/db";
 import { staffTable, areasTable, taskTypesTable, notificationsTable, staffLocationsTable } from "@workspace/db/schema";
-import { eq, count, inArray } from "drizzle-orm";
+import { eq, and, count, inArray } from "drizzle-orm";
+import { renameSharedAreaName, AREA_RENAME_MAP } from "./area-renames";
 
 const rawPort = process.env["PORT"];
 
@@ -17,7 +18,7 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-const SEED_AREAS = [
+const RAW_SEED_AREAS = [
   { name: "Terminal A - East Garage",    terminal: "Terminal A - East", location: "East",         sortOrder: 1 },
   { name: "Level P1 - East",             terminal: "Terminal A - East", location: "East",         sortOrder: 2 },
   { name: "Level P2 - East",             terminal: "Terminal A - East", location: "East",         sortOrder: 3 },
@@ -93,6 +94,11 @@ const SEED_AREAS = [
   { name: "Level 1 - Pedestrian Walkway",                     terminal: "Terminal C", location: "Level 1", sortOrder: 73 },
   { name: "Top Terminal - Levels 4-11",  terminal: "Top Terminal", location: "Levels 4-11", sortOrder: 74 },
 ];
+
+const SEED_AREAS = RAW_SEED_AREAS.map((a) => ({
+  ...a,
+  name: renameSharedAreaName(a.name, a.terminal),
+}));
 
 const SEED_TASK_TYPES = [
   { taskName: "Routine sweep of all levels — remove debris, trash, and litter", taskOrder: 1 },
@@ -185,6 +191,18 @@ async function seed() {
     if (seedEntry && seedEntry.email && seedEntry.email !== existing.email) {
       await db.update(staffTable).set({ email: seedEntry.email }).where(eq(staffTable.id, existing.id));
       console.log(`Updated ${existing.name}: email`);
+    }
+  }
+
+  for (const { oldName, terminal, newName } of AREA_RENAME_MAP) {
+    if (oldName === newName) continue;
+    const result = await db
+      .update(areasTable)
+      .set({ name: newName })
+      .where(and(eq(areasTable.name, oldName), eq(areasTable.terminal, terminal)))
+      .returning({ id: areasTable.id });
+    if (result.length > 0) {
+      console.log(`Renamed area ${oldName} (${terminal}) → ${newName}`);
     }
   }
 

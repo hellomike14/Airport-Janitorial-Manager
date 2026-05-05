@@ -1,4 +1,6 @@
-export const AREA_SPECIFIC_TASKS: Record<string, { taskName: string; taskOrder: number }[]> = {
+import { renameSharedAreaName } from "./area-renames";
+
+const RAW_AREA_SPECIFIC_TASKS: Record<string, { taskName: string; taskOrder: number }[]> = {
   "Level P1 - East": [
     { taskName: "Clean trash bin #1", taskOrder: 16 },
     { taskName: "Clean trash bin #2", taskOrder: 17 },
@@ -239,3 +241,32 @@ export const AREA_SPECIFIC_TASKS: Record<string, { taskName: string; taskOrder: 
     { taskName: "Clean trash bin #51", taskOrder: 66 },
   ],
 };
+
+const TERMINALS_FOR_OLD_KEY: Record<string, string[]> = {
+  "Level P1 - East": ["Terminal A - East", "Terminal B - East"],
+  "Level P2 - East": ["Terminal A - East", "Terminal B - East"],
+  "Level P3 - East": ["Terminal A - East", "Terminal B - East"],
+  "Level P4 - East": ["Terminal A - East", "Terminal B - East"],
+  "Level P1 - West": ["Terminal A - West", "Terminal B - West"],
+  "Level P2 - West": ["Terminal A - West", "Terminal B - West"],
+  "Level P3 - West": ["Terminal A - West", "Terminal B - West"],
+  "Level P4 - West": ["Terminal A - West", "Terminal B - West"],
+  "Level R1 - West": ["Terminal A - West", "Terminal B - West"],
+  "Level R2 - East": ["Terminal A - East", "Terminal B - East"],
+  "Level R2 - West": ["Terminal A - West", "Terminal B - West"],
+};
+
+export const AREA_SPECIFIC_TASKS: Record<string, { taskName: string; taskOrder: number }[]> = (() => {
+  const out: Record<string, { taskName: string; taskOrder: number }[]> = {};
+  for (const [oldKey, tasks] of Object.entries(RAW_AREA_SPECIFIC_TASKS)) {
+    const terminals = TERMINALS_FOR_OLD_KEY[oldKey];
+    if (!terminals) {
+      out[oldKey] = tasks;
+      continue;
+    }
+    for (const terminal of terminals) {
+      out[renameSharedAreaName(oldKey, terminal)] = tasks;
+    }
+  }
+  return out;
+})();
