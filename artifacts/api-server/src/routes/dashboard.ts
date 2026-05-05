@@ -43,8 +43,11 @@ async function ensureTasksForDate(areaId: number, date: string) {
   if (existing.length === 0) {
     const activeTypes = await getActiveTaskTypes();
 
-    const [area] = await db.select({ name: areasTable.name }).from(areasTable).where(eq(areasTable.id, areaId));
-    const extraTasks = area ? (AREA_SPECIFIC_TASKS[area.name] ?? []) : [];
+    const [area] = await db.select({ name: areasTable.name, terminal: areasTable.terminal }).from(areasTable).where(eq(areasTable.id, areaId));
+    const qualifiedKey = area ? `${area.terminal}::${area.name}` : "";
+    const extraTasks = area
+      ? (AREA_SPECIFIC_TASKS[qualifiedKey] ?? AREA_SPECIFIC_TASKS[area.name] ?? [])
+      : [];
     const allTasks = [...activeTypes, ...extraTasks];
 
     await db.insert(tasksTable).values(

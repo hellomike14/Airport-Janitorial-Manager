@@ -1,7 +1,7 @@
 import app from "./app";
 import { db } from "@workspace/db";
-import { staffTable, areasTable, taskTypesTable, notificationsTable, staffLocationsTable } from "@workspace/db/schema";
-import { eq, and, count, inArray } from "drizzle-orm";
+import { staffTable, areasTable, taskTypesTable, notificationsTable, staffLocationsTable, tasksTable } from "@workspace/db/schema";
+import { eq, and, count, inArray, or, gte, like } from "drizzle-orm";
 import { renameSharedAreaName, AREA_RENAME_MAP } from "./area-renames";
 import { SEED_STAFF, REMOVED_STAFF_NAMES } from "./seed-data";
 
@@ -231,6 +231,30 @@ async function seed() {
       SEED_TASK_TYPES.map((t) => ({ taskName: t.taskName, taskOrder: t.taskOrder, active: true }))
     );
     console.log(`Seeded: ${SEED_TASK_TYPES.length} task types`);
+  }
+
+  const termBWestR1Areas = await db
+    .select({ id: areasTable.id })
+    .from(areasTable)
+    .where(and(eq(areasTable.name, "Level R1 - West"), eq(areasTable.terminal, "Terminal B - West")));
+
+  for (const area of termBWestR1Areas) {
+    const deleted = await db
+      .delete(tasksTable)
+      .where(
+        and(
+          eq(tasksTable.areaId, area.id),
+          gte(tasksTable.taskOrder, 16),
+          or(
+            like(tasksTable.taskName, "Before Lunch%"),
+            like(tasksTable.taskName, "After Lunch%")
+          )
+        )
+      )
+      .returning({ id: tasksTable.id });
+    if (deleted.length > 0) {
+      console.log(`Cleaned up ${deleted.length} duplicate R1-West bin tasks from Terminal B - West (area ${area.id})`);
+    }
   }
 }
 

@@ -47,7 +47,7 @@ const RAW_AREA_SPECIFIC_TASKS: Record<string, { taskName: string; taskOrder: num
   "Level P4 - West": [
     { taskName: "Clean trash bin #1", taskOrder: 16 },
   ],
-  "Level R1 - West": [
+  "Terminal A - West::Level R1 - West": [
     { taskName: "Before Lunch — Line 1 Bin #1", taskOrder: 16 },
     { taskName: "Before Lunch — Line 1 Bin #2", taskOrder: 17 },
     { taskName: "Before Lunch — Line 1 Bin #3", taskOrder: 18 },
