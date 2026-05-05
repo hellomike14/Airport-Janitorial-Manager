@@ -105,8 +105,20 @@ export const ListTasksResponseItem = zod.object({
   completedAt: zod.string().nullish(),
   completedById: zod.number().nullish(),
   completedByName: zod.string().nullish(),
+  completedByActive: zod
+    .boolean()
+    .nullish()
+    .describe(
+      "Whether the staff member who completed the task is still active. Null when no completer is recorded.",
+    ),
   assignedToId: zod.number().nullish(),
   assignedToName: zod.string().nullish(),
+  assignedToActive: zod
+    .boolean()
+    .nullish()
+    .describe(
+      "Whether the assigned staff member is still active. Null when no one is assigned.",
+    ),
   isSpecial: zod.boolean(),
   notes: zod.string().nullish(),
 });
@@ -133,8 +145,20 @@ export const CompleteTaskResponse = zod.object({
   completedAt: zod.string().nullish(),
   completedById: zod.number().nullish(),
   completedByName: zod.string().nullish(),
+  completedByActive: zod
+    .boolean()
+    .nullish()
+    .describe(
+      "Whether the staff member who completed the task is still active. Null when no completer is recorded.",
+    ),
   assignedToId: zod.number().nullish(),
   assignedToName: zod.string().nullish(),
+  assignedToActive: zod
+    .boolean()
+    .nullish()
+    .describe(
+      "Whether the assigned staff member is still active. Null when no one is assigned.",
+    ),
   isSpecial: zod.boolean(),
   notes: zod.string().nullish(),
 });
@@ -156,8 +180,20 @@ export const UncompleteTaskResponse = zod.object({
   completedAt: zod.string().nullish(),
   completedById: zod.number().nullish(),
   completedByName: zod.string().nullish(),
+  completedByActive: zod
+    .boolean()
+    .nullish()
+    .describe(
+      "Whether the staff member who completed the task is still active. Null when no completer is recorded.",
+    ),
   assignedToId: zod.number().nullish(),
   assignedToName: zod.string().nullish(),
+  assignedToActive: zod
+    .boolean()
+    .nullish()
+    .describe(
+      "Whether the assigned staff member is still active. Null when no one is assigned.",
+    ),
   isSpecial: zod.boolean(),
   notes: zod.string().nullish(),
 });
@@ -244,8 +280,19 @@ export const ListIssuesResponseItem = zod.object({
   areaName: zod.string(),
   reportedById: zod.number(),
   reportedByName: zod.string(),
+  reportedByActive: zod
+    .boolean()
+    .describe(
+      "Whether the staff member who reported the issue is still active.",
+    ),
   assignedToId: zod.number().nullish(),
   assignedToName: zod.string().nullish(),
+  assignedToActive: zod
+    .boolean()
+    .nullish()
+    .describe(
+      "Whether the assigned staff member is still active. Null when no one is assigned.",
+    ),
   issueDate: zod.string(),
   description: zod.string(),
   severity: zod.enum(["low", "medium", "high"]),
@@ -282,8 +329,19 @@ export const ResolveIssueResponse = zod.object({
   areaName: zod.string(),
   reportedById: zod.number(),
   reportedByName: zod.string(),
+  reportedByActive: zod
+    .boolean()
+    .describe(
+      "Whether the staff member who reported the issue is still active.",
+    ),
   assignedToId: zod.number().nullish(),
   assignedToName: zod.string().nullish(),
+  assignedToActive: zod
+    .boolean()
+    .nullish()
+    .describe(
+      "Whether the assigned staff member is still active. Null when no one is assigned.",
+    ),
   issueDate: zod.string(),
   description: zod.string(),
   severity: zod.enum(["low", "medium", "high"]),
@@ -313,8 +371,19 @@ export const UpdateIssueImagesResponse = zod.object({
   areaName: zod.string(),
   reportedById: zod.number(),
   reportedByName: zod.string(),
+  reportedByActive: zod
+    .boolean()
+    .describe(
+      "Whether the staff member who reported the issue is still active.",
+    ),
   assignedToId: zod.number().nullish(),
   assignedToName: zod.string().nullish(),
+  assignedToActive: zod
+    .boolean()
+    .nullish()
+    .describe(
+      "Whether the assigned staff member is still active. Null when no one is assigned.",
+    ),
   issueDate: zod.string(),
   description: zod.string(),
   severity: zod.enum(["low", "medium", "high"]),
@@ -344,8 +413,19 @@ export const AssignIssueResponse = zod.object({
   areaName: zod.string(),
   reportedById: zod.number(),
   reportedByName: zod.string(),
+  reportedByActive: zod
+    .boolean()
+    .describe(
+      "Whether the staff member who reported the issue is still active.",
+    ),
   assignedToId: zod.number().nullish(),
   assignedToName: zod.string().nullish(),
+  assignedToActive: zod
+    .boolean()
+    .nullish()
+    .describe(
+      "Whether the assigned staff member is still active. Null when no one is assigned.",
+    ),
   issueDate: zod.string(),
   description: zod.string(),
   severity: zod.enum(["low", "medium", "high"]),
@@ -375,8 +455,19 @@ export const CompleteIssueResponse = zod.object({
   areaName: zod.string(),
   reportedById: zod.number(),
   reportedByName: zod.string(),
+  reportedByActive: zod
+    .boolean()
+    .describe(
+      "Whether the staff member who reported the issue is still active.",
+    ),
   assignedToId: zod.number().nullish(),
   assignedToName: zod.string().nullish(),
+  assignedToActive: zod
+    .boolean()
+    .nullish()
+    .describe(
+      "Whether the assigned staff member is still active. Null when no one is assigned.",
+    ),
   issueDate: zod.string(),
   description: zod.string(),
   severity: zod.enum(["low", "medium", "high"]),

@@ -82,8 +82,12 @@ export interface Task {
   completedAt?: string | null;
   completedById?: number | null;
   completedByName?: string | null;
+  /** Whether the staff member who completed the task is still active. Null when no completer is recorded. */
+  completedByActive?: boolean | null;
   assignedToId?: number | null;
   assignedToName?: string | null;
+  /** Whether the assigned staff member is still active. Null when no one is assigned. */
+  assignedToActive?: boolean | null;
   isSpecial: boolean;
   notes?: string | null;
 }
@@ -139,8 +143,12 @@ export interface Issue {
   areaName: string;
   reportedById: number;
   reportedByName: string;
+  /** Whether the staff member who reported the issue is still active. */
+  reportedByActive: boolean;
   assignedToId?: number | null;
   assignedToName?: string | null;
+  /** Whether the assigned staff member is still active. Null when no one is assigned. */
+  assignedToActive?: boolean | null;
   issueDate: string;
   description: string;
   severity: IssueSeverity;

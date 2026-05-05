@@ -374,7 +374,7 @@ export default function TaskManagement() {
                                 </span>
                                 {task.completedByName && (
                                   <span className="text-[10px] text-slate-400">
-                                    <StaffName name={task.completedByName} />
+                                    <StaffName name={task.completedByName} active={task.completedByActive} />
                                   </span>
                                 )}
                               </div>

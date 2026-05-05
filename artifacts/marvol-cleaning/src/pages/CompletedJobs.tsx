@@ -251,7 +251,7 @@ export default function CompletedJobs() {
                             {task.completedByName && (
                               <p className="text-[10px] text-slate-400 flex items-center gap-1 justify-end mt-0.5">
                                 <User className="w-2.5 h-2.5" />
-                                <StaffName name={task.completedByName} />
+                                <StaffName name={task.completedByName} active={task.completedByActive} />
                               </p>
                             )}
                           </div>

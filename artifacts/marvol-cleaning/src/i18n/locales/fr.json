@@ -497,7 +497,7 @@
     "noRequestsDesc": "Utilisez le bouton \"Nouvelle Demande\" pour créer une demande spéciale de nettoyage ou d'inspection.",
     "noRequestsStaff": "Aucune demande spéciale pour votre zone aujourd'hui.",
     "done": "Fait",
-    "createdBy": "Créé par {{name}}",
+    "createdBy": "Créé par <1>{{name}}</1>",
     "completedBy": "Complété par <1>{{name}}</1>",
     "doneAt": "Fait à {{time}}",
     "markComplete": "Marquer Terminé",

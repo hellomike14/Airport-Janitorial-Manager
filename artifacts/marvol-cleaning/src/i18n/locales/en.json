@@ -497,7 +497,7 @@
     "noRequestsDesc": "Use the \"New Request\" button to create a special cleaning or inspection request for any area.",
     "noRequestsStaff": "No special requests for your area today.",
     "done": "Done",
-    "createdBy": "Created by {{name}}",
+    "createdBy": "Created by <1>{{name}}</1>",
     "completedBy": "Completed by <1>{{name}}</1>",
     "doneAt": "Done at {{time}}",
     "markComplete": "Mark Complete",

@@ -732,11 +732,11 @@ export default function Issues() {
 
                   <div className="flex flex-wrap gap-3 mt-2 text-xs text-slate-400">
                     <span className="font-medium uppercase tracking-wider">
-                      {t("issues.by")}: <StaffName name={issue.reportedByName} />
+                      {t("issues.by")}: <StaffName name={issue.reportedByName} active={issue.reportedByActive} />
                     </span>
                     {issue.assignedToName && (
                       <span className="flex items-center gap-1 text-blue-600 font-semibold bg-blue-50 px-2 py-0.5 rounded-full">
-                        <UserCheck className="w-3 h-3" /> {t("issues.assigned")}: <StaffName name={issue.assignedToName} />
+                        <UserCheck className="w-3 h-3" /> {t("issues.assigned")}: <StaffName name={issue.assignedToName} active={issue.assignedToActive} />
                       </span>
                     )}
                     {issue.resolved && issue.completionNotes && (

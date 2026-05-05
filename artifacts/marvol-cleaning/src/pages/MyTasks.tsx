@@ -317,7 +317,7 @@ export default function MyTasks() {
                           {task.completedByName && (
                             <>
                               {" · "}
-                              <StaffName name={task.completedByName} />
+                              <StaffName name={task.completedByName} active={task.completedByActive} />
                             </>
                           )}
                         </p>

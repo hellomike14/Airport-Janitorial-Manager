@@ -389,7 +389,12 @@ function RequestCard({ task, canRespond, dateLocale }: { task: any; canRespond: 
             {task.createdByName && (
               <span className="flex items-center gap-1 text-blue-600 font-medium">
                 <User className="w-3 h-3" />
-                {t("specialRequests.createdBy", { name: task.createdByName })}
+                <Trans
+                  i18nKey="specialRequests.createdBy"
+                  values={{ name: task.createdByName }}
+                  components={{ 1: <StaffName name={task.createdByName} active={task.createdByActive} /> }}
+                  shouldUnescape
+                />
               </span>
             )}
             {task.createdAt && (
@@ -409,7 +414,7 @@ function RequestCard({ task, canRespond, dateLocale }: { task: any; canRespond: 
                 <Trans
                   i18nKey="specialRequests.completedBy"
                   values={{ name: task.completedByName }}
-                  components={{ 1: <StaffName name={task.completedByName} /> }}
+                  components={{ 1: <StaffName name={task.completedByName} active={task.completedByActive} /> }}
                   shouldUnescape
                 />
               </span>

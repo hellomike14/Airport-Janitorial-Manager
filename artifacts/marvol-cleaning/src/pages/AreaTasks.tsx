@@ -95,7 +95,7 @@ export default function AreaTasks() {
               <User className="w-4 h-4" /> 
               {t("areaTasks.assigned")} <span className="text-slate-800">
                 {tasks?.[0]?.assignedToName ? (
-                  <StaffName name={tasks[0].assignedToName} />
+                  <StaffName name={tasks[0].assignedToName} active={tasks[0].assignedToActive} />
                 ) : (
                   t("areaTasks.noSpecificAssignment")
                 )}
@@ -172,7 +172,7 @@ export default function AreaTasks() {
                     </span>
                     {task.completedByName && (
                       <span className="text-[10px] font-medium text-slate-400 mt-1">
-                        {t("common.by")} <StaffName name={task.completedByName} />
+                        {t("common.by")} <StaffName name={task.completedByName} active={task.completedByActive} />
                       </span>
                     )}
                   </div>

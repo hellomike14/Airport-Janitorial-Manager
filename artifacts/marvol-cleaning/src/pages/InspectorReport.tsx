@@ -14,7 +14,7 @@ import {
   Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { StaffName, isFormerStaff, stripFormerSuffix } from "@/components/StaffName";
+import { StaffName } from "@/components/StaffName";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -29,15 +29,15 @@ function escapeHtml(value: string): string {
 
 function renderStaffNameHtml(
   name: string | null | undefined,
+  active: boolean | null | undefined,
   t: (key: string, opts?: any) => string,
   opts: { color?: string; fallback?: string } = {},
 ): string {
   const fallback = opts.fallback ?? "";
   if (!name) return fallback;
   const color = opts.color ?? "#334155";
-  const former = isFormerStaff(name);
-  const display = escapeHtml(stripFormerSuffix(name));
-  if (!former) {
+  const display = escapeHtml(name);
+  if (active !== false) {
     return `<span style="color:${color};">${display}</span>`;
   }
   const formerLabel = escapeHtml(t("common.former", "Former"));
@@ -196,12 +196,12 @@ function buildIssuePDF(issue: any, t: (key: string, opts?: any) => string): stri
         </div>
         <div style="background:#f8fafc;border-radius:10px;padding:12px 14px;">
           <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">${t("issuePdf.reportedBy")}</div>
-          <div style="font-size:13px;font-weight:600;">${renderStaffNameHtml(issue.reportedByName, t, { color: "#334155", fallback: `<span style="color:#334155;">${escapeHtml(t("issuePdf.unknown"))}</span>` })}</div>
+          <div style="font-size:13px;font-weight:600;">${renderStaffNameHtml(issue.reportedByName, issue.reportedByActive, t, { color: "#334155", fallback: `<span style="color:#334155;">${escapeHtml(t("issuePdf.unknown"))}</span>` })}</div>
         </div>
         ${issue.assignedToName ? `
         <div style="background:#eff6ff;border-radius:10px;padding:12px 14px;">
           <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">${t("issuePdf.assignedTo")}</div>
-          <div style="font-size:13px;font-weight:600;">${renderStaffNameHtml(issue.assignedToName, t, { color: "#1d4ed8" })}</div>
+          <div style="font-size:13px;font-weight:600;">${renderStaffNameHtml(issue.assignedToName, issue.assignedToActive, t, { color: "#1d4ed8" })}</div>
         </div>` : ''}
       </div>
 
@@ -471,12 +471,12 @@ export default function InspectorReport() {
                         </span>
                         <span className="flex items-center gap-1">
                           <User className="w-3 h-3" />
-                          {t("issues.by")} <StaffName name={issue.reportedByName} />
+                          {t("issues.by")} <StaffName name={issue.reportedByName} active={issue.reportedByActive} />
                         </span>
                         {issue.assignedToName && (
                           <span className="flex items-center gap-1">
                             <User className="w-3 h-3 text-blue-400" />
-                            {t("issues.assigned")} <StaffName name={issue.assignedToName} />
+                            {t("issues.assigned")} <StaffName name={issue.assignedToName} active={issue.assignedToActive} />
                           </span>
                         )}
                         {issue.resolvedAt && (

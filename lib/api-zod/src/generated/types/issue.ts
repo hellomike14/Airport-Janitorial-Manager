@@ -13,8 +13,12 @@ export interface Issue {
   areaName: string;
   reportedById: number;
   reportedByName: string;
+  /** Whether the staff member who reported the issue is still active. */
+  reportedByActive: boolean;
   assignedToId?: number | null;
   assignedToName?: string | null;
+  /** Whether the assigned staff member is still active. Null when no one is assigned. */
+  assignedToActive?: boolean | null;
   issueDate: string;
   description: string;
   severity: IssueSeverity;

@@ -31,12 +31,6 @@ const ListIssuesWithAssignedQuery = z.object({
   assignedToId: z.coerce.number().optional(),
 });
 
-function displayStaffName(name: string | null | undefined, active: boolean | null | undefined, hasId: boolean): string | null {
-  if (!hasId) return null;
-  if (!name) return "Former staff";
-  return active === false ? `${name} (former)` : name;
-}
-
 async function fetchFullIssue(id: number) {
   const rows = await db
     .select({
@@ -59,25 +53,27 @@ async function fetchFullIssue(id: number) {
     })
     .from(issuesTable)
     .innerJoin(areasTable, eq(issuesTable.areaId, areasTable.id))
-    .leftJoin(staffTable, eq(issuesTable.reportedById, staffTable.id))
+    .innerJoin(staffTable, eq(issuesTable.reportedById, staffTable.id))
     .where(eq(issuesTable.id, id));
 
   if (!rows[0]) return null;
   const row = rows[0];
 
   let assignedToName: string | null = null;
+  let assignedToActive: boolean | null = null;
   if (row.assignedToId) {
     const [s] = await db
       .select({ name: staffTable.name, active: staffTable.active })
       .from(staffTable)
       .where(eq(staffTable.id, row.assignedToId));
-    assignedToName = displayStaffName(s?.name, s?.active, true);
+    assignedToName = s?.name ?? null;
+    assignedToActive = s?.active ?? false;
   }
 
   return formatIssueRow({
     ...row,
-    reportedByName: displayStaffName(row.reportedByName, row.reportedByActive, !!row.reportedById),
     assignedToName,
+    assignedToActive,
   });
 }
 
@@ -87,9 +83,11 @@ function formatIssueRow(i: any) {
     areaId: i.areaId,
     areaName: i.areaName,
     reportedById: i.reportedById,
-    reportedByName: i.reportedByName ?? (i.reportedById ? "Former staff" : null),
+    reportedByName: i.reportedByName,
+    reportedByActive: i.reportedByActive ?? false,
     assignedToId: i.assignedToId ?? null,
     assignedToName: i.assignedToName ?? null,
+    assignedToActive: i.assignedToId ? (i.assignedToActive ?? false) : null,
     issueDate: i.issueDate,
     description: i.description,
     severity: i.severity,
@@ -160,7 +158,7 @@ router.get("/", async (req: Request, res: Response) => {
     })
     .from(issuesTable)
     .innerJoin(areasTable, eq(issuesTable.areaId, areasTable.id))
-    .leftJoin(staffTable, eq(issuesTable.reportedById, staffTable.id))
+    .innerJoin(staffTable, eq(issuesTable.reportedById, staffTable.id))
     .where(
       and(
         query.date ? eq(issuesTable.issueDate, query.date) : undefined,
@@ -173,24 +171,24 @@ router.get("/", async (req: Request, res: Response) => {
     .orderBy(issuesTable.createdAt);
 
   const assignedIds = [...new Set(rows.filter((r) => r.assignedToId).map((r) => r.assignedToId as number))];
-  const assignedDisplay: Record<number, string> = {};
+  const assignedInfo: Record<number, { name: string | null; active: boolean }> = {};
   for (const sid of assignedIds) {
     const [s] = await db
       .select({ name: staffTable.name, active: staffTable.active })
       .from(staffTable)
       .where(eq(staffTable.id, sid));
-    const display = displayStaffName(s?.name, s?.active, true);
-    if (display) assignedDisplay[sid] = display;
+    assignedInfo[sid] = { name: s?.name ?? null, active: s?.active ?? false };
   }
 
   res.json(
-    rows.map((r) =>
-      formatIssueRow({
+    rows.map((r) => {
+      const assigned = r.assignedToId ? assignedInfo[r.assignedToId] : null;
+      return formatIssueRow({
         ...r,
-        reportedByName: displayStaffName(r.reportedByName, r.reportedByActive, !!r.reportedById),
-        assignedToName: r.assignedToId ? (assignedDisplay[r.assignedToId] ?? "Former staff") : null,
-      })
-    )
+        assignedToName: assigned?.name ?? null,
+        assignedToActive: assigned?.active ?? null,
+      });
+    })
   );
 });
 
@@ -212,10 +210,14 @@ router.post("/", async (req: Request, res: Response) => {
     .returning();
 
   const [area] = await db.select({ name: areasTable.name }).from(areasTable).where(eq(areasTable.id, created.areaId));
-  const [reporter] = await db.select({ name: staffTable.name }).from(staffTable).where(eq(staffTable.id, created.reportedById));
+  const [reporter] = await db
+    .select({ name: staffTable.name, active: staffTable.active })
+    .from(staffTable)
+    .where(eq(staffTable.id, created.reportedById));
 
   const areaName = area?.name ?? "Unknown area";
   const reporterName = reporter?.name ?? "Unknown";
+  const reporterActive = reporter?.active ?? false;
   const severityLabel = body.severity.charAt(0).toUpperCase() + body.severity.slice(1);
 
   await notifySupervisors(
@@ -228,8 +230,10 @@ router.post("/", async (req: Request, res: Response) => {
     ...created,
     areaName,
     reportedByName: reporterName,
+    reportedByActive: reporterActive,
     assignedToId: null,
     assignedToName: null,
+    assignedToActive: null,
   }));
 });
 

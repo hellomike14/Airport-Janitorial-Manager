@@ -772,12 +772,20 @@ components:
         completedByName:
           type: string
           nullable: true
+        completedByActive:
+          type: boolean
+          nullable: true
+          description: Whether the staff member who completed the task is still active. Null when no completer is recorded.
         assignedToId:
           type: integer
           nullable: true
         assignedToName:
           type: string
           nullable: true
+        assignedToActive:
+          type: boolean
+          nullable: true
+          description: Whether the assigned staff member is still active. Null when no one is assigned.
         isSpecial:
           type: boolean
         notes:
@@ -896,12 +904,19 @@ components:
           type: integer
         reportedByName:
           type: string
+        reportedByActive:
+          type: boolean
+          description: Whether the staff member who reported the issue is still active.
         assignedToId:
           type: integer
           nullable: true
         assignedToName:
           type: string
           nullable: true
+        assignedToActive:
+          type: boolean
+          nullable: true
+          description: Whether the assigned staff member is still active. Null when no one is assigned.
         issueDate:
           type: string
         description:
@@ -931,6 +946,7 @@ components:
         - areaName
         - reportedById
         - reportedByName
+        - reportedByActive
         - issueDate
         - description
         - severity
