@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { staffTable, areasTable, taskTypesTable, notificationsTable, staffLocationsTable } from "@workspace/db/schema";
 import { eq, and, count, inArray } from "drizzle-orm";
 import { renameSharedAreaName, AREA_RENAME_MAP } from "./area-renames";
+import { SEED_STAFF, REMOVED_STAFF_NAMES } from "./seed-data";
 
 const rawPort = process.env["PORT"];
 
@@ -117,21 +118,6 @@ const SEED_TASK_TYPES = [
 ];
 
 
-const SEED_STAFF: { name: string; role: "admin" | "inspector" | "supervisor" | "staff"; phone?: string; email?: string }[] = [
-  { name: "Marcell Sutherland", role: "admin", phone: "407-555-0001", email: "msutherland@marvolenterprises.com" },
-  { name: "MCO Inspector", role: "inspector", phone: "407-555-0099", email: "raquel.santana@goaa.org" },
-  { name: "Priscila Rosero", role: "supervisor", email: "Priscilarosero27@gmail.com" },
-  { name: "Reynaldo Hernandez Suarez", role: "supervisor", email: "Cnuevo986@gmail.co" },
-
-  { name: "Edner Jules", role: "staff" },
-  { name: "Ivan Serrano", role: "staff" },
-  { name: "Jason Delgado", role: "staff" },
-  { name: "Jean Gardy Rigueur", role: "staff" },
-  { name: "Jose Camargo", role: "staff" },
-  { name: "Juan Carlos Zurita Blacio", role: "staff" },
-  { name: "Kevin Gonzalez Fernandez", role: "staff" },
-  { name: "Steeve Alphonse", role: "staff" },
-];
 
 async function seed() {
   const seedNames = new Set(SEED_STAFF.map((s) => s.name));
@@ -153,7 +139,6 @@ async function seed() {
     console.log(`Seeded: ${toInsert.length} staff members (${toInsert.map((s) => s.name).join(", ")})`);
   }
 
-  const REMOVED_STAFF_NAMES = ["Floraima Pinero Valdez", "Ashandre Longmore", "Marie Ingrid Daniel", "Jose Altagracia Maria"];
   const removedStaff = existingStaff.filter((s) => REMOVED_STAFF_NAMES.includes(s.name));
   if (removedStaff.length > 0) {
     const removedIds = removedStaff.map((s) => s.id);
