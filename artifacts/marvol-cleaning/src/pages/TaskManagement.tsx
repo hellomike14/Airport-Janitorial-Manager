@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { format, addDays, subDays, parseISO } from "date-fns";
 import { useTranslation } from "react-i18next";
 import { getDateLocale } from "@/i18n/dateLocale";
@@ -52,6 +52,9 @@ export default function TaskManagement() {
   const [search, setSearch] = useState("");
   const [collapsed, setCollapsed] = useState<Record<number, boolean>>({});
 
+  const areaScrollRef = useRef<HTMLDivElement>(null);
+  const areaPillRefs = useRef<Map<number | "all", HTMLButtonElement>>(new Map());
+
   const { data: areas } = useListAreas();
   const { data: tasks, isLoading } = useListTasks({ date });
 
@@ -78,6 +81,27 @@ export default function TaskManagement() {
   const toggleCollapse = (areaId: number) => {
     setCollapsed((prev) => ({ ...prev, [areaId]: !prev[areaId] }));
   };
+
+  useEffect(() => {
+    const container = areaScrollRef.current;
+    const pill = areaPillRefs.current.get(areaFilter);
+    if (!container || !pill) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const pillRect = pill.getBoundingClientRect();
+    const pillLeftInContent = pillRect.left - containerRect.left + container.scrollLeft;
+    const pillRightInContent = pillLeftInContent + pillRect.width;
+    const viewLeft = container.scrollLeft;
+    const viewRight = viewLeft + container.clientWidth;
+
+    if (pillLeftInContent < viewLeft || pillRightInContent > viewRight) {
+      const targetLeft = Math.max(
+        0,
+        pillLeftInContent - (container.clientWidth - pillRect.width) / 2,
+      );
+      container.scrollTo({ left: targetLeft, behavior: "smooth" });
+    }
+  }, [areaFilter, areas]);
 
   const grouped = useMemo(() => {
     const taskList = tasks ?? [];
@@ -195,8 +219,12 @@ export default function TaskManagement() {
           )}
         </div>
 
-        <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-1 overflow-x-auto flex-1 min-w-0 filter-scroll">
+        <div ref={areaScrollRef} className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-1 overflow-x-auto flex-1 min-w-0 filter-scroll">
           <button
+            ref={(el) => {
+              if (el) areaPillRefs.current.set("all", el);
+              else areaPillRefs.current.delete("all");
+            }}
             onClick={() => setAreaFilter("all")}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${areaFilter === "all" ? "bg-slate-900 text-white shadow" : "text-slate-500 hover:text-slate-800"}`}
           >
@@ -205,6 +233,10 @@ export default function TaskManagement() {
           {(areas ?? []).map((a) => (
             <button
               key={a.id}
+              ref={(el) => {
+                if (el) areaPillRefs.current.set(a.id, el);
+                else areaPillRefs.current.delete(a.id);
+              }}
               onClick={() => setAreaFilter(a.id)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${areaFilter === a.id ? "bg-slate-900 text-white shadow" : "text-slate-500 hover:text-slate-800"}`}
             >
