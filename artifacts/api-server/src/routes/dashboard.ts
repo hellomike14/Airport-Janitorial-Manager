@@ -1,67 +1,9 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { tasksTable, areasTable, issuesTable, assignmentsTable, staffTable, taskTypesTable } from "@workspace/db/schema";
-import { eq, and, sql, asc } from "drizzle-orm";
+import { tasksTable, areasTable, issuesTable, assignmentsTable, staffTable } from "@workspace/db/schema";
+import { eq, and, sql } from "drizzle-orm";
 import { GetDashboardQueryParams } from "@workspace/api-zod";
-import { AREA_SPECIFIC_TASKS } from "../area-tasks";
-
-const FALLBACK_TASKS = [
-  "Routine sweep of all levels — remove debris, trash, and litter",
-  "Mop and sanitize all floor surfaces — extra attention to high-traffic zones",
-  "Deep clean stairwells — scrub landings, steps, and corners",
-  "Clean and sanitize elevator cabs — floors, walls, buttons, and tracks",
-  "Sanitize all handrails, elevator buttons, and high-touch surfaces",
-  "Empty all trash receptacles and replace liners",
-  "Spot clean walls, pillars, signs, and partitions",
-  "Remove gum, stains, and debris from floor surfaces",
-  "Clean entry/exit areas, doors, and glass partitions",
-  "Inspect and clean drainage grates and floor drains",
-  "Inspect and report any maintenance issues or safety hazards",
-  "Final supervisor inspection walk-through and sign-off",
-];
-
-async function getActiveTaskTypes(): Promise<{ taskName: string; taskOrder: number }[]> {
-  const types = await db
-    .select({ taskName: taskTypesTable.taskName, taskOrder: taskTypesTable.taskOrder })
-    .from(taskTypesTable)
-    .where(eq(taskTypesTable.active, true))
-    .orderBy(asc(taskTypesTable.taskOrder));
-
-  if (types.length === 0) {
-    return FALLBACK_TASKS.map((name, idx) => ({ taskName: name, taskOrder: idx + 1 }));
-  }
-  return types;
-}
-
-async function ensureTasksForDate(areaId: number, date: string) {
-  const existing = await db
-    .select({ id: tasksTable.id })
-    .from(tasksTable)
-    .where(and(eq(tasksTable.areaId, areaId), eq(tasksTable.taskDate, date)))
-    .limit(1);
-
-  if (existing.length === 0) {
-    const activeTypes = await getActiveTaskTypes();
-
-    const [area] = await db.select({ name: areasTable.name, terminal: areasTable.terminal }).from(areasTable).where(eq(areasTable.id, areaId));
-    const qualifiedKey = area ? `${area.terminal}::${area.name}` : "";
-    const extraTasks = area
-      ? (AREA_SPECIFIC_TASKS[qualifiedKey] ?? AREA_SPECIFIC_TASKS[area.name] ?? [])
-      : [];
-    const allTasks = [...activeTypes, ...extraTasks];
-
-    await db.insert(tasksTable).values(
-      allTasks.map((t) => ({
-        areaId,
-        taskDate: date,
-        taskName: t.taskName,
-        taskOrder: t.taskOrder,
-        completed: false,
-        isSpecial: false,
-      }))
-    );
-  }
-}
+import { ensureTasksForDate } from "../lib/ensureTasksForDate";
 
 const router: IRouter = Router();
 
