@@ -1,5 +1,18 @@
 import { renameSharedAreaName } from "./area-renames";
 
+// Audit notes (shared area names that exist in both Terminal A and Terminal B):
+//   - "Level P1 - East" / "Level P1 - West" / "Level P2 - East" / "Level P2 - West"
+//     "Level P3 - East" / "Level P3 - West" / "Level P4 - East" / "Level P4 - West":
+//     generic "Clean trash bin #N" lists — confirmed as physical bins that exist on
+//     both terminals' parking levels, so the plain (unqualified) key intentionally
+//     applies to both terminals.
+//   - "Level R2 - West": generic "Clean trash bin #N" list, same reasoning — applies
+//     to both terminals.
+//   - "Level R1 - West": Terminal-A-specific operational "Before/After Lunch — Line X
+//     Bin #N" layout — already qualified with the "Terminal::AreaName" key.
+//   - "Level R2 - East": Terminal-A-specific operational "Before/After Lunch — Line X
+//     Bin #N" layout (same shape as R1-West) — qualified with the "Terminal::AreaName"
+//     key so Terminal B - East no longer receives these extra tasks.
 const RAW_AREA_SPECIFIC_TASKS: Record<string, { taskName: string; taskOrder: number }[]> = {
   "Level P1 - East": [
     { taskName: "Clean trash bin #1", taskOrder: 16 },
@@ -93,7 +106,7 @@ const RAW_AREA_SPECIFIC_TASKS: Record<string, { taskName: string; taskOrder: num
     { taskName: "After Lunch — Elevator Bin #2", taskOrder: 58 },
     { taskName: "After Lunch — Elevator Bin #3", taskOrder: 59 },
   ],
-  "Level R2 - East": [
+  "Terminal A - East::Level R2 - East": [
     { taskName: "Before Lunch — Line 1 Bin #1", taskOrder: 16 },
     { taskName: "Before Lunch — Line 1 Bin #2", taskOrder: 17 },
     { taskName: "Before Lunch — Line 1 Bin #3", taskOrder: 18 },
@@ -251,21 +264,32 @@ const TERMINALS_FOR_OLD_KEY: Record<string, string[]> = {
   "Level P2 - West": ["Terminal A - West", "Terminal B - West"],
   "Level P3 - West": ["Terminal A - West", "Terminal B - West"],
   "Level P4 - West": ["Terminal A - West", "Terminal B - West"],
-  "Level R1 - West": ["Terminal A - West", "Terminal B - West"],
-  "Level R2 - East": ["Terminal A - East", "Terminal B - East"],
   "Level R2 - West": ["Terminal A - West", "Terminal B - West"],
 };
 
 export const AREA_SPECIFIC_TASKS: Record<string, { taskName: string; taskOrder: number }[]> = (() => {
   const out: Record<string, { taskName: string; taskOrder: number }[]> = {};
-  for (const [oldKey, tasks] of Object.entries(RAW_AREA_SPECIFIC_TASKS)) {
-    const terminals = TERMINALS_FOR_OLD_KEY[oldKey];
+  for (const [rawKey, tasks] of Object.entries(RAW_AREA_SPECIFIC_TASKS)) {
+    // Qualified key form: "Terminal X - Side::Old Area Name" — rename only the
+    // area-name half so the resulting key matches `${area.terminal}::${area.name}`
+    // built from the (already-renamed) DB row.
+    const sep = rawKey.indexOf("::");
+    if (sep !== -1) {
+      const terminal = rawKey.slice(0, sep);
+      const oldAreaName = rawKey.slice(sep + 2);
+      out[`${terminal}::${renameSharedAreaName(oldAreaName, terminal)}`] = tasks;
+      continue;
+    }
+
+    // Plain (unqualified) key: applies to every terminal that shares this area
+    // name. Expand into one entry per renamed area name.
+    const terminals = TERMINALS_FOR_OLD_KEY[rawKey];
     if (!terminals) {
-      out[oldKey] = tasks;
+      out[rawKey] = tasks;
       continue;
     }
     for (const terminal of terminals) {
-      out[renameSharedAreaName(oldKey, terminal)] = tasks;
+      out[renameSharedAreaName(rawKey, terminal)] = tasks;
     }
   }
   return out;

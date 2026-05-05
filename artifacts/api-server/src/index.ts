@@ -233,27 +233,45 @@ async function seed() {
     console.log(`Seeded: ${SEED_TASK_TYPES.length} task types`);
   }
 
-  const termBWestR1Areas = await db
-    .select({ id: areasTable.id })
-    .from(areasTable)
-    .where(and(eq(areasTable.name, "Level R1 - West"), eq(areasTable.terminal, "Terminal B - West")));
+  // Clean up Before/After Lunch bin tasks that were auto-generated for terminals
+  // that should not receive the Terminal-A-specific R1-West / R2-East lists.
+  // Names are queried in their renamed form (post AREA_RENAME_MAP migration).
+  const STRAY_LUNCH_BIN_AREAS: Array<{ name: string; terminal: string; label: string }> = [
+    {
+      name: renameSharedAreaName("Level R1 - West", "Terminal B - West"),
+      terminal: "Terminal B - West",
+      label: "R1-West bin tasks from Terminal B - West",
+    },
+    {
+      name: renameSharedAreaName("Level R2 - East", "Terminal B - East"),
+      terminal: "Terminal B - East",
+      label: "R2-East bin tasks from Terminal B - East",
+    },
+  ];
 
-  for (const area of termBWestR1Areas) {
-    const deleted = await db
-      .delete(tasksTable)
-      .where(
-        and(
-          eq(tasksTable.areaId, area.id),
-          gte(tasksTable.taskOrder, 16),
-          or(
-            like(tasksTable.taskName, "Before Lunch%"),
-            like(tasksTable.taskName, "After Lunch%")
+  for (const target of STRAY_LUNCH_BIN_AREAS) {
+    const matchingAreas = await db
+      .select({ id: areasTable.id })
+      .from(areasTable)
+      .where(and(eq(areasTable.name, target.name), eq(areasTable.terminal, target.terminal)));
+
+    for (const area of matchingAreas) {
+      const deleted = await db
+        .delete(tasksTable)
+        .where(
+          and(
+            eq(tasksTable.areaId, area.id),
+            gte(tasksTable.taskOrder, 16),
+            or(
+              like(tasksTable.taskName, "Before Lunch%"),
+              like(tasksTable.taskName, "After Lunch%")
+            )
           )
         )
-      )
-      .returning({ id: tasksTable.id });
-    if (deleted.length > 0) {
-      console.log(`Cleaned up ${deleted.length} duplicate R1-West bin tasks from Terminal B - West (area ${area.id})`);
+        .returning({ id: tasksTable.id });
+      if (deleted.length > 0) {
+        console.log(`Cleaned up ${deleted.length} duplicate ${target.label} (area ${area.id})`);
+      }
     }
   }
 }
