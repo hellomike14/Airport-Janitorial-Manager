@@ -14,8 +14,35 @@ import {
   Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { StaffName, isFormerStaff, stripFormerSuffix } from "@/components/StaffName";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function renderStaffNameHtml(
+  name: string | null | undefined,
+  t: (key: string, opts?: any) => string,
+  opts: { color?: string; fallback?: string } = {},
+): string {
+  const fallback = opts.fallback ?? "";
+  if (!name) return fallback;
+  const color = opts.color ?? "#334155";
+  const former = isFormerStaff(name);
+  const display = escapeHtml(stripFormerSuffix(name));
+  if (!former) {
+    return `<span style="color:${color};">${display}</span>`;
+  }
+  const formerLabel = escapeHtml(t("common.former", "Former"));
+  return `<span style="color:#94a3b8;font-style:italic;">${display}<span style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:9999px;background:#f1f5f9;color:#64748b;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;font-style:normal;vertical-align:middle;">${formerLabel}</span></span>`;
+}
 
 const SEVERITY_STYLE = {
   high: { badge: "bg-red-100 text-red-700 border border-red-200", dot: "bg-red-500", color: "#dc2626" },
@@ -169,12 +196,12 @@ function buildIssuePDF(issue: any, t: (key: string, opts?: any) => string): stri
         </div>
         <div style="background:#f8fafc;border-radius:10px;padding:12px 14px;">
           <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">${t("issuePdf.reportedBy")}</div>
-          <div style="font-size:13px;color:#334155;font-weight:600;">${issue.reportedByName ?? t("issuePdf.unknown")}</div>
+          <div style="font-size:13px;font-weight:600;">${renderStaffNameHtml(issue.reportedByName, t, { color: "#334155", fallback: `<span style="color:#334155;">${escapeHtml(t("issuePdf.unknown"))}</span>` })}</div>
         </div>
         ${issue.assignedToName ? `
         <div style="background:#eff6ff;border-radius:10px;padding:12px 14px;">
           <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">${t("issuePdf.assignedTo")}</div>
-          <div style="font-size:13px;color:#1d4ed8;font-weight:600;">${issue.assignedToName}</div>
+          <div style="font-size:13px;font-weight:600;">${renderStaffNameHtml(issue.assignedToName, t, { color: "#1d4ed8" })}</div>
         </div>` : ''}
       </div>
 
@@ -444,12 +471,12 @@ export default function InspectorReport() {
                         </span>
                         <span className="flex items-center gap-1">
                           <User className="w-3 h-3" />
-                          {t("issues.by")} {issue.reportedByName}
+                          {t("issues.by")} <StaffName name={issue.reportedByName} />
                         </span>
                         {issue.assignedToName && (
                           <span className="flex items-center gap-1">
                             <User className="w-3 h-3 text-blue-400" />
-                            {t("issues.assigned")} {issue.assignedToName}
+                            {t("issues.assigned")} <StaffName name={issue.assignedToName} />
                           </span>
                         )}
                         {issue.resolvedAt && (
