@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { tasksTable, areasTable, issuesTable, assignmentsTable, staffTable } from "@workspace/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 import { GetDashboardQueryParams } from "@workspace/api-zod";
 import { ensureTasksForDate } from "../lib/ensureTasksForDate";
 
@@ -12,21 +12,28 @@ router.get("/dashboard", async (req, res) => {
   const today = new Date().toISOString().split("T")[0];
   const date = query.date ?? today;
 
-  const areas = await db.select().from(areasTable).orderBy(areasTable.sortOrder);
+  const areas = await db
+    .select()
+    .from(areasTable)
+    .where(eq(areasTable.archived, false))
+    .orderBy(areasTable.sortOrder);
 
   for (const area of areas) {
     await ensureTasksForDate(area.id, date);
   }
 
-  const taskStats = await db
-    .select({
-      areaId: tasksTable.areaId,
-      total: sql<number>`count(*)::int`,
-      completed: sql<number>`sum(case when ${tasksTable.completed} then 1 else 0 end)::int`,
-    })
-    .from(tasksTable)
-    .where(eq(tasksTable.taskDate, date))
-    .groupBy(tasksTable.areaId);
+  const activeAreaIds = areas.map((a) => a.id);
+  const taskStats = activeAreaIds.length === 0
+    ? []
+    : await db
+        .select({
+          areaId: tasksTable.areaId,
+          total: sql<number>`count(*)::int`,
+          completed: sql<number>`sum(case when ${tasksTable.completed} then 1 else 0 end)::int`,
+        })
+        .from(tasksTable)
+        .where(and(eq(tasksTable.taskDate, date), inArray(tasksTable.areaId, activeAreaIds)))
+        .groupBy(tasksTable.areaId);
 
   const statsMap = new Map(taskStats.map((s) => [s.areaId, s]));
 

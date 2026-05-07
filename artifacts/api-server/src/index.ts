@@ -1,7 +1,7 @@
 import app from "./app";
 import { db } from "@workspace/db";
-import { staffTable, areasTable, taskTypesTable, notificationsTable, staffLocationsTable, tasksTable } from "@workspace/db/schema";
-import { eq, and, count, inArray, or, gte, like } from "drizzle-orm";
+import { staffTable, areasTable, taskTypesTable, notificationsTable, staffLocationsTable, tasksTable, assignmentsTable, schedulesTable, issuesTable, sharedPhotosTable } from "@workspace/db/schema";
+import { eq, and, count, inArray, or, gte, like, sql } from "drizzle-orm";
 import { renameSharedAreaName, AREA_RENAME_MAP } from "./area-renames";
 import { SEED_STAFF, REMOVED_STAFF_NAMES } from "./seed-data";
 
@@ -20,80 +20,52 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 const RAW_SEED_AREAS = [
-  { name: "Terminal A - East Garage",    terminal: "Terminal A - East", location: "East",         sortOrder: 1 },
-  { name: "Level P1 - East",             terminal: "Terminal A - East", location: "East",         sortOrder: 2 },
-  { name: "Level P2 - East",             terminal: "Terminal A - East", location: "East",         sortOrder: 3 },
-  { name: "Level P3 - East",             terminal: "Terminal A - East", location: "East",         sortOrder: 4 },
-  { name: "Level P4 - East",             terminal: "Terminal A - East", location: "East",         sortOrder: 5 },
-  { name: "Level R1 - East",             terminal: "Terminal A - East", location: "East",         sortOrder: 6 },
-  { name: "Level R2 - East",             terminal: "Terminal A - East", location: "East",         sortOrder: 7 },
-  { name: "Level 4 - Row L-H",           terminal: "Terminal A - East", location: "East",         sortOrder: 8 },
-  { name: "Level 3 - Row H-P",           terminal: "Terminal A - East", location: "East",         sortOrder: 9 },
-  { name: "Level 2 - Row H-P",           terminal: "Terminal A - East", location: "East",         sortOrder: 10 },
-  { name: "Level 1 - Row H-P",           terminal: "Terminal A - East", location: "East",         sortOrder: 11 },
-  { name: "R2 - Avis",                   terminal: "Terminal A - East", location: "East",         sortOrder: 12 },
-  { name: "R1 - Avis",                   terminal: "Terminal A - East", location: "East",         sortOrder: 13 },
-  { name: "Taxis",                       terminal: "Terminal A - East", location: "East",         sortOrder: 14 },
-  { name: "Check Point",                 terminal: "Terminal A - East", location: "East",         sortOrder: 15 },
-  { name: "Garden",                      terminal: "Terminal A - East", location: "East",         sortOrder: 16 },
-  { name: "Terminal A - West Garage",    terminal: "Terminal A - West", location: "West",         sortOrder: 17 },
-  { name: "Level P1 - West",             terminal: "Terminal A - West", location: "West",         sortOrder: 18 },
-  { name: "Level P2 - West",             terminal: "Terminal A - West", location: "West",         sortOrder: 19 },
-  { name: "Level P3 - West",             terminal: "Terminal A - West", location: "West",         sortOrder: 20 },
-  { name: "Level P4 - West",             terminal: "Terminal A - West", location: "West",         sortOrder: 21 },
-  { name: "Level R1 - West",             terminal: "Terminal A - West", location: "West",         sortOrder: 22 },
-  { name: "Level R2 - West",             terminal: "Terminal A - West", location: "West",         sortOrder: 23 },
-  { name: "Level 4 - Row C-G",           terminal: "Terminal A - West", location: "West",         sortOrder: 24 },
-  { name: "Level 3 - Row A-G",           terminal: "Terminal A - West", location: "West",         sortOrder: 25 },
-  { name: "Level 2 - Row A-G",           terminal: "Terminal A - West", location: "West",         sortOrder: 26 },
-  { name: "Level 1 - Row D-G",           terminal: "Terminal A - West", location: "West",         sortOrder: 27 },
-  { name: "R2 - Enterprises",            terminal: "Terminal A - West", location: "West",         sortOrder: 28 },
-  { name: "R1 - Hertz",                  terminal: "Terminal A - West", location: "West",         sortOrder: 29 },
-  { name: "Terminal B - East Garage",    terminal: "Terminal B - East", location: "East",         sortOrder: 30 },
-  { name: "Level P1 - East",             terminal: "Terminal B - East", location: "East",         sortOrder: 31 },
-  { name: "Level P2 - East",             terminal: "Terminal B - East", location: "East",         sortOrder: 32 },
-  { name: "Level P3 - East",             terminal: "Terminal B - East", location: "East",         sortOrder: 33 },
-  { name: "Level P4 - East",             terminal: "Terminal B - East", location: "East",         sortOrder: 34 },
-  { name: "Level R1 - East",             terminal: "Terminal B - East", location: "East",         sortOrder: 35 },
-  { name: "Level R2 - East",             terminal: "Terminal B - East", location: "East",         sortOrder: 36 },
-  { name: "Level 4 - Row C-G",                                terminal: "Terminal B - East", location: "East",         sortOrder: 37 },
-  { name: "Level 3 - Row A-G",                                terminal: "Terminal B - East", location: "East",         sortOrder: 38 },
-  { name: "Level 2 - Row A-G",                                terminal: "Terminal B - East", location: "East",         sortOrder: 39 },
-  { name: "Level 1 - Row D-G",                                terminal: "Terminal B - East", location: "East",         sortOrder: 40 },
-  { name: "R2 - Avis",                                        terminal: "Terminal B - East", location: "East",         sortOrder: 41 },
-  { name: "R1 - Hertz/Enterprise Return",                     terminal: "Terminal B - East", location: "East",         sortOrder: 42 },
-  { name: "Terminal B - West Garage",    terminal: "Terminal B - West", location: "West",         sortOrder: 43 },
-  { name: "Level P1 - West",             terminal: "Terminal B - West", location: "West",         sortOrder: 44 },
-  { name: "Level P2 - West",             terminal: "Terminal B - West", location: "West",         sortOrder: 45 },
-  { name: "Level P3 - West",             terminal: "Terminal B - West", location: "West",         sortOrder: 46 },
-  { name: "Level P4 - West",             terminal: "Terminal B - West", location: "West",         sortOrder: 47 },
-  { name: "Level R1 - West",             terminal: "Terminal B - West", location: "West",         sortOrder: 48 },
-  { name: "Level R2 - West",             terminal: "Terminal B - West", location: "West",         sortOrder: 49 },
-  { name: "Level 4 - Row H-M",                                terminal: "Terminal B - West", location: "West",         sortOrder: 50 },
-  { name: "Level 3 - Row H-P",                                terminal: "Terminal B - West", location: "West",         sortOrder: 51 },
-  { name: "Level 2 - Row H-P",                                terminal: "Terminal B - West", location: "West",         sortOrder: 52 },
-  { name: "Level 1 - Row H-P",                                terminal: "Terminal B - West", location: "West",         sortOrder: 53 },
-  { name: "R2 - Hertz",                                       terminal: "Terminal B - West", location: "West",         sortOrder: 54 },
-  { name: "R1 - Aloma/Enterprise Pick up",                    terminal: "Terminal B - West", location: "West",         sortOrder: 55 },
-  { name: "Taxis",                                            terminal: "Terminal B - West", location: "West",         sortOrder: 56 },
-  { name: "Garden",                                           terminal: "Terminal B - West", location: "West",         sortOrder: 57 },
-  { name: "Terminal C - Levels 1, 3, 5", terminal: "Terminal C", location: "Levels 1, 3, 5", sortOrder: 58 },
-  { name: "Terminal C - Levels 2, 4, 6", terminal: "Terminal C", location: "Levels 2, 4, 6", sortOrder: 59 },
-  { name: "Level 6 - C6 C59-C69",                             terminal: "Terminal C", location: "Level 6", sortOrder: 60 },
-  { name: "Level 5 - C5 C59-C69",                             terminal: "Terminal C", location: "Level 5", sortOrder: 61 },
-  { name: "Level 5 - Pedestrian Crossing",                    terminal: "Terminal C", location: "Level 5", sortOrder: 62 },
-  { name: "Level 4 - C4 C59-C69",                             terminal: "Terminal C", location: "Level 4", sortOrder: 63 },
-  { name: "Level 4 - Driveway",                               terminal: "Terminal C", location: "Level 4", sortOrder: 64 },
-  { name: "Level 3 - C3 C59-C69",                             terminal: "Terminal C", location: "Level 3", sortOrder: 65 },
-  { name: "Level 3 - Driveway/Pedestrian Walkway to trains",  terminal: "Terminal C", location: "Level 3", sortOrder: 66 },
-  { name: "Level 3 - Pedestrian Walkway",                     terminal: "Terminal C", location: "Level 3", sortOrder: 67 },
-  { name: "Level 2 - C2 Avis",                                terminal: "Terminal C", location: "Level 2", sortOrder: 68 },
-  { name: "Level 2 - Pick up/Return Hertz, Return Hertz Pick up", terminal: "Terminal C", location: "Level 2", sortOrder: 69 },
-  { name: "Level 2 - Pedestrian Walkway",                     terminal: "Terminal C", location: "Level 2", sortOrder: 70 },
-  { name: "Level 1 - C1 Enterprise Return",                   terminal: "Terminal C", location: "Level 1", sortOrder: 71 },
-  { name: "Level 1 - Sixt Return/Pick up",                    terminal: "Terminal C", location: "Level 1", sortOrder: 72 },
-  { name: "Level 1 - Pedestrian Walkway",                     terminal: "Terminal C", location: "Level 1", sortOrder: 73 },
-  { name: "Top Terminal - Levels 4-11",  terminal: "Top Terminal", location: "Levels 4-11", sortOrder: 74 },
+  { name: "Level 4 - Row L-H",           terminal: "Terminal A - East", location: "East",         sortOrder: 1 },
+  { name: "Level 3 - Row H-P",           terminal: "Terminal A - East", location: "East",         sortOrder: 2 },
+  { name: "Level 2 - Row H-P",           terminal: "Terminal A - East", location: "East",         sortOrder: 3 },
+  { name: "Level 1 - Row H-P",           terminal: "Terminal A - East", location: "East",         sortOrder: 4 },
+  { name: "R2 - Avis",                   terminal: "Terminal A - East", location: "East",         sortOrder: 5 },
+  { name: "R1 - Avis",                   terminal: "Terminal A - East", location: "East",         sortOrder: 6 },
+  { name: "Taxis",                       terminal: "Terminal A - East", location: "East",         sortOrder: 7 },
+  { name: "Check point",                 terminal: "Terminal A - East", location: "East",         sortOrder: 8 },
+  { name: "Garden",                      terminal: "Terminal A - East", location: "East",         sortOrder: 9 },
+  { name: "Level 4 - Row C-G",           terminal: "Terminal A - West", location: "West",         sortOrder: 10 },
+  { name: "Level 3 - Row A-G",           terminal: "Terminal A - West", location: "West",         sortOrder: 11 },
+  { name: "Level 2 - Row A-G",           terminal: "Terminal A - West", location: "West",         sortOrder: 12 },
+  { name: "Level 1 - Row D-G",           terminal: "Terminal A - West", location: "West",         sortOrder: 13 },
+  { name: "R2 - Enterprises",            terminal: "Terminal A - West", location: "West",         sortOrder: 14 },
+  { name: "R1 - Hertz",                  terminal: "Terminal A - West", location: "West",         sortOrder: 15 },
+  { name: "Level 4 - Row C-G",                                terminal: "Terminal B - East", location: "East",         sortOrder: 16 },
+  { name: "Level 3 - Row A-G",                                terminal: "Terminal B - East", location: "East",         sortOrder: 17 },
+  { name: "Level 2 - Row A-G",                                terminal: "Terminal B - East", location: "East",         sortOrder: 18 },
+  { name: "Level 1 - Row D-G",                                terminal: "Terminal B - East", location: "East",         sortOrder: 19 },
+  { name: "R2 - Avis",                                        terminal: "Terminal B - East", location: "East",         sortOrder: 20 },
+  { name: "R1 - Hertz/Enterprise Return",                     terminal: "Terminal B - East", location: "East",         sortOrder: 21 },
+  { name: "Level 4 - Row H-M",                                terminal: "Terminal B - West", location: "West",         sortOrder: 22 },
+  { name: "Level 3 - Row H-P",                                terminal: "Terminal B - West", location: "West",         sortOrder: 23 },
+  { name: "Level 2 - Row H-P",                                terminal: "Terminal B - West", location: "West",         sortOrder: 24 },
+  { name: "Level 1 - Row H-P",                                terminal: "Terminal B - West", location: "West",         sortOrder: 25 },
+  { name: "R2 - Hertz",                                       terminal: "Terminal B - West", location: "West",         sortOrder: 26 },
+  { name: "R1 - Aloma/Enterprise Pick up",                    terminal: "Terminal B - West", location: "West",         sortOrder: 27 },
+  { name: "Taxis",                                            terminal: "Terminal B - West", location: "West",         sortOrder: 28 },
+  { name: "Garden",                                           terminal: "Terminal B - West", location: "West",         sortOrder: 29 },
+  { name: "Terminal C - Levels 1, 3, 5", terminal: "Terminal C", location: "Levels 1, 3, 5", sortOrder: 30 },
+  { name: "Terminal C - Levels 2, 4, 6", terminal: "Terminal C", location: "Levels 2, 4, 6", sortOrder: 31 },
+  { name: "Level 6 - C6 C59-C69",                             terminal: "Terminal C", location: "Level 6", sortOrder: 32 },
+  { name: "Level 5 - C5 C59-C69",                             terminal: "Terminal C", location: "Level 5", sortOrder: 33 },
+  { name: "Level 5 - Pedestrian Crossing",                    terminal: "Terminal C", location: "Level 5", sortOrder: 34 },
+  { name: "Level 4 - C4 C59-C69",                             terminal: "Terminal C", location: "Level 4", sortOrder: 35 },
+  { name: "Level 4 - Driveway",                               terminal: "Terminal C", location: "Level 4", sortOrder: 36 },
+  { name: "Level 3 - C3 C59-C69",                             terminal: "Terminal C", location: "Level 3", sortOrder: 37 },
+  { name: "Level 3 - Driveway/Pedestrian Walkway to trains",  terminal: "Terminal C", location: "Level 3", sortOrder: 38 },
+  { name: "Level 3 - Pedestrian Walkway",                     terminal: "Terminal C", location: "Level 3", sortOrder: 39 },
+  { name: "Level 2 - C2 Avis",                                terminal: "Terminal C", location: "Level 2", sortOrder: 40 },
+  { name: "Level 2 - Pick up/Return Hertz, Return Hertz Pick up", terminal: "Terminal C", location: "Level 2", sortOrder: 41 },
+  { name: "Level 2 - Pedestrian Walkway",                     terminal: "Terminal C", location: "Level 2", sortOrder: 42 },
+  { name: "Level 1 - C1 Enterprise Return",                   terminal: "Terminal C", location: "Level 1", sortOrder: 43 },
+  { name: "Level 1 - Sixt Return/Pick up",                    terminal: "Terminal C", location: "Level 1", sortOrder: 44 },
+  { name: "Level 1 - Pedestrian Walkway",                     terminal: "Terminal C", location: "Level 1", sortOrder: 45 },
+  { name: "Top Terminal - Levels 4-11",  terminal: "Top Terminal", location: "Levels 4-11", sortOrder: 46 },
 ];
 
 const SEED_AREAS = RAW_SEED_AREAS.map((a) => ({
@@ -120,6 +92,12 @@ const SEED_TASK_TYPES = [
 
 
 async function seed() {
+  // Startup-safe DDL guard: ensures the `archived` column exists in
+  // environments where `drizzle-kit push` has not been run yet. Idempotent.
+  await db.execute(
+    sql`ALTER TABLE "areas" ADD COLUMN IF NOT EXISTS "archived" boolean NOT NULL DEFAULT false`
+  );
+
   const seedNames = new Set(SEED_STAFF.map((s) => s.name));
   const existingStaff = await db.select().from(staffTable);
   const existingNames = new Set(existingStaff.map((s) => s.name));
@@ -179,9 +157,13 @@ async function seed() {
     }
   }
 
+  // Run the rename + merge + archive cleanup in a single transaction so
+  // either every reference is re-pointed and every duplicate cleared, or
+  // none of it lands.
+  await db.transaction(async (tx) => {
   for (const { oldName, terminal, newName } of AREA_RENAME_MAP) {
     if (oldName === newName) continue;
-    const result = await db
+    const result = await tx
       .update(areasTable)
       .set({ name: newName })
       .where(and(eq(areasTable.name, oldName), eq(areasTable.terminal, terminal)))
@@ -191,14 +173,110 @@ async function seed() {
     }
   }
 
-  const existingAreas = await db.select({ id: areasTable.id, name: areasTable.name, terminal: areasTable.terminal, sortOrder: areasTable.sortOrder }).from(areasTable);
+  // Merge duplicate area rows into their canonical counterpart. For each
+  // mapping, references in tasks/assignments/schedules/issues/shared photos
+  // are re-pointed at the canonical row and the duplicate row is then
+  // hard-deleted. If the canonical row does not yet exist (fresh DB or
+  // partial migration), the duplicate is renamed in place instead.
+  const AREA_MERGE_PLAN: Array<{
+    from: { name: string; terminal: string };
+    to: { name: string; terminal: string };
+  }> = [
+    // "Taxi Stand" → renamed canonical "Terminal X — Taxis"
+    { from: { name: "Taxi Stand", terminal: "Terminal A - East" }, to: { name: renameSharedAreaName("Taxis", "Terminal A - East"), terminal: "Terminal A - East" } },
+    { from: { name: "Taxi Stand", terminal: "Terminal B - West" }, to: { name: renameSharedAreaName("Taxis", "Terminal B - West"), terminal: "Terminal B - West" } },
+    // "Check Point" / "Checkpoint" → canonical "Check point" (single 'p').
+    // Order matters: rename "Check Point" (canonical id 74) into the target
+    // name first so the second mapping merges "Checkpoint" (id 44) into it.
+    { from: { name: "Check Point", terminal: "Terminal A - East" }, to: { name: "Check point", terminal: "Terminal A - East" } },
+    { from: { name: "Checkpoint", terminal: "Terminal A - East" }, to: { name: "Check point", terminal: "Terminal A - East" } },
+    // Bare Terminal C "Level N" stub rows → corresponding summary row
+    { from: { name: "Level 1", terminal: "Terminal C" }, to: { name: "Terminal C - Levels 1, 3, 5", terminal: "Terminal C" } },
+    { from: { name: "Level 3", terminal: "Terminal C" }, to: { name: "Terminal C - Levels 1, 3, 5", terminal: "Terminal C" } },
+    { from: { name: "Level 5", terminal: "Terminal C" }, to: { name: "Terminal C - Levels 1, 3, 5", terminal: "Terminal C" } },
+    { from: { name: "Level 2", terminal: "Terminal C" }, to: { name: "Terminal C - Levels 2, 4, 6", terminal: "Terminal C" } },
+    { from: { name: "Level 4", terminal: "Terminal C" }, to: { name: "Terminal C - Levels 2, 4, 6", terminal: "Terminal C" } },
+    { from: { name: "Level 6", terminal: "Terminal C" }, to: { name: "Terminal C - Levels 2, 4, 6", terminal: "Terminal C" } },
+  ];
+
+  for (const { from, to } of AREA_MERGE_PLAN) {
+    const fromRows = await tx
+      .select({ id: areasTable.id })
+      .from(areasTable)
+      .where(and(eq(areasTable.name, from.name), eq(areasTable.terminal, from.terminal)));
+    if (fromRows.length === 0) continue;
+
+    const toRows = await tx
+      .select({ id: areasTable.id })
+      .from(areasTable)
+      .where(and(eq(areasTable.name, to.name), eq(areasTable.terminal, to.terminal)));
+
+    for (const fromRow of fromRows) {
+      if (toRows.length === 0) {
+        await tx
+          .update(areasTable)
+          .set({ name: to.name, terminal: to.terminal })
+          .where(eq(areasTable.id, fromRow.id));
+        console.log(`Renamed area #${fromRow.id} ${from.name} (${from.terminal}) → ${to.name} (${to.terminal})`);
+        continue;
+      }
+      const toId = toRows[0].id;
+      if (toId === fromRow.id) continue;
+      await tx.update(tasksTable).set({ areaId: toId }).where(eq(tasksTable.areaId, fromRow.id));
+      await tx.update(assignmentsTable).set({ areaId: toId }).where(eq(assignmentsTable.areaId, fromRow.id));
+      await tx.update(schedulesTable).set({ areaId: toId }).where(eq(schedulesTable.areaId, fromRow.id));
+      await tx.update(issuesTable).set({ areaId: toId }).where(eq(issuesTable.areaId, fromRow.id));
+      await tx.update(sharedPhotosTable).set({ areaId: toId }).where(eq(sharedPhotosTable.areaId, fromRow.id));
+      await tx.delete(areasTable).where(eq(areasTable.id, fromRow.id));
+      console.log(`Merged area #${fromRow.id} (${from.name} / ${from.terminal}) → #${toId} (${to.name} / ${to.terminal})`);
+    }
+  }
+
+  // Archive the obsolete parking garages and parking-level rows so they no
+  // longer surface in Cleaning Areas, area filters, or Task Management while
+  // any historical assignments/tasks/etc. linked to them remain intact.
+  const PARKING_LEVEL_CODES = ["P1", "P2", "P3", "P4", "R1", "R2"] as const;
+  const OBSOLETE_AREA_TARGETS: Array<{ name: string; terminal: string }> = [
+    { name: "Terminal A - East Garage", terminal: "Terminal A - East" },
+    { name: "Terminal A - West Garage", terminal: "Terminal A - West" },
+    { name: "Terminal B - East Garage", terminal: "Terminal B - East" },
+    { name: "Terminal B - West Garage", terminal: "Terminal B - West" },
+  ];
+  for (const lvl of PARKING_LEVEL_CODES) {
+    for (const [terminal, side] of [
+      ["Terminal A - East", "East"],
+      ["Terminal A - West", "West"],
+      ["Terminal B - East", "East"],
+      ["Terminal B - West", "West"],
+    ] as const) {
+      // Pre-rename form, e.g. "Level P1 - East".
+      OBSOLETE_AREA_TARGETS.push({ name: `Level ${lvl} - ${side}`, terminal });
+      // Post-rename form, e.g. "Terminal A — Level P1 East".
+      const short = terminal.startsWith("Terminal A") ? "Terminal A" : "Terminal B";
+      OBSOLETE_AREA_TARGETS.push({ name: `${short} — Level ${lvl} ${side}`, terminal });
+    }
+  }
+  for (const target of OBSOLETE_AREA_TARGETS) {
+    const matches = await tx
+      .select({ id: areasTable.id, archived: areasTable.archived })
+      .from(areasTable)
+      .where(and(eq(areasTable.name, target.name), eq(areasTable.terminal, target.terminal)));
+    for (const row of matches) {
+      if (!row.archived) {
+        await tx.update(areasTable).set({ archived: true }).where(eq(areasTable.id, row.id));
+        console.log(`Archived obsolete area #${row.id} ${target.name} (${target.terminal})`);
+      }
+    }
+  }
+
+  const existingAreas = await tx.select({ id: areasTable.id, name: areasTable.name, terminal: areasTable.terminal, sortOrder: areasTable.sortOrder }).from(areasTable);
   const areaKey = (name: string, terminal: string) => `${name}||${terminal}`;
   const existingAreaKeys = new Map(existingAreas.map((a) => [areaKey(a.name, a.terminal), a]));
 
   for (const area of existingAreas) {
     const seedArea = SEED_AREAS.find((a) => a.name === area.name && a.terminal === area.terminal);
     if (seedArea && seedArea.sortOrder !== area.sortOrder) {
-      await db.update(areasTable).set({ sortOrder: seedArea.sortOrder }).where(eq(areasTable.id, area.id));
+      await tx.update(areasTable).set({ sortOrder: seedArea.sortOrder }).where(eq(areasTable.id, area.id));
       console.log(`Updated area ${area.name} (${area.terminal}): sortOrder → ${seedArea.sortOrder}`);
     }
   }
@@ -208,7 +286,7 @@ async function seed() {
     if (matchByName && matchByName.terminal !== area.terminal) {
       const newKey = areaKey(area.name, matchByName.terminal);
       if (!existingAreaKeys.has(newKey)) {
-        await db.update(areasTable).set({ terminal: matchByName.terminal, sortOrder: matchByName.sortOrder }).where(eq(areasTable.id, area.id));
+        await tx.update(areasTable).set({ terminal: matchByName.terminal, sortOrder: matchByName.sortOrder }).where(eq(areasTable.id, area.id));
         existingAreaKeys.set(newKey, area);
         existingAreaKeys.delete(areaKey(area.name, area.terminal));
         console.log(`Updated area ${area.name}: terminal ${area.terminal} → ${matchByName.terminal}`);
@@ -218,12 +296,13 @@ async function seed() {
 
   const newAreas = SEED_AREAS.filter((a) => !existingAreaKeys.has(areaKey(a.name, a.terminal)));
   if (existingAreas.length === 0) {
-    await db.insert(areasTable).values(SEED_AREAS);
+    await tx.insert(areasTable).values(SEED_AREAS);
     console.log(`Seeded: ${SEED_AREAS.length} areas`);
   } else if (newAreas.length > 0) {
-    await db.insert(areasTable).values(newAreas);
+    await tx.insert(areasTable).values(newAreas);
     console.log(`Added areas: ${newAreas.map((a) => `${a.name} (${a.terminal})`).join(", ")}`);
   }
+  });
 
   const [{ value: ttCount }] = await db.select({ value: count() }).from(taskTypesTable);
   if (ttCount === 0) {

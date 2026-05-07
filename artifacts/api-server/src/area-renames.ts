@@ -6,18 +6,6 @@ const TERMINAL_SHORT: Record<string, string> = {
 };
 
 const SHARED_AREA_OLD_NAMES = [
-  "Level P1 - East",
-  "Level P2 - East",
-  "Level P3 - East",
-  "Level P4 - East",
-  "Level R1 - East",
-  "Level R2 - East",
-  "Level P1 - West",
-  "Level P2 - West",
-  "Level P3 - West",
-  "Level P4 - West",
-  "Level R1 - West",
-  "Level R2 - West",
   "Level 4 - Row C-G",
   "Level 3 - Row A-G",
   "Level 2 - Row A-G",

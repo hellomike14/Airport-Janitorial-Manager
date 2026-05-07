@@ -21,21 +21,28 @@ router.get("/dashboard", async (req, res) => {
   const today = new Date().toISOString().split("T")[0];
   const date = query.date ?? today;
 
-  const areas = await db.select().from(areasTable).orderBy(areasTable.sortOrder);
+  const areas = await db
+    .select()
+    .from(areasTable)
+    .where(eq(areasTable.archived, false))
+    .orderBy(areasTable.sortOrder);
 
   for (const area of areas) {
     await ensureTasksForDate(area.id, date);
   }
 
-  const taskStats = await db
-    .select({
-      areaId: tasksTable.areaId,
-      total: sql<number>`count(*)::int`,
-      completed: sql<number>`sum(case when ${tasksTable.completed} then 1 else 0 end)::int`,
-    })
-    .from(tasksTable)
-    .where(eq(tasksTable.taskDate, date))
-    .groupBy(tasksTable.areaId);
+  const activeAreaIds = areas.map((a) => a.id);
+  const taskStats = activeAreaIds.length === 0
+    ? []
+    : await db
+        .select({
+          areaId: tasksTable.areaId,
+          total: sql<number>`count(*)::int`,
+          completed: sql<number>`sum(case when ${tasksTable.completed} then 1 else 0 end)::int`,
+        })
+        .from(tasksTable)
+        .where(and(eq(tasksTable.taskDate, date), inArray(tasksTable.areaId, activeAreaIds)))
+        .groupBy(tasksTable.areaId);
 
   const statsMap = new Map(taskStats.map((s) => [s.areaId, s]));
 
@@ -106,16 +113,28 @@ router.get("/", async (req, res) => {
 
   const terminalParam = req.query.terminal as string | undefined;
 
+  let activeAreaIdFilter: number[] | null = null;
   if (areaId) {
     await ensureTasksForDate(areaId, date);
   } else if (terminalParam) {
     const terminalAreas = await db
       .select({ id: areasTable.id })
       .from(areasTable)
-      .where(eq(areasTable.terminal, terminalParam));
+      .where(and(eq(areasTable.terminal, terminalParam), eq(areasTable.archived, false)));
     for (const area of terminalAreas) {
       await ensureTasksForDate(area.id, date);
     }
+    activeAreaIdFilter = terminalAreas.map((a) => a.id);
+  } else {
+    const allActive = await db
+      .select({ id: areasTable.id })
+      .from(areasTable)
+      .where(eq(areasTable.archived, false));
+    activeAreaIdFilter = allActive.map((a) => a.id);
+  }
+
+  if (activeAreaIdFilter && activeAreaIdFilter.length === 0) {
+    return res.json([]);
   }
 
   const tasks = await db
@@ -142,6 +161,7 @@ router.get("/", async (req, res) => {
       and(
         eq(tasksTable.taskDate, date),
         areaId ? eq(tasksTable.areaId, areaId) : undefined,
+        activeAreaIdFilter ? inArray(tasksTable.areaId, activeAreaIdFilter) : undefined,
         assignedToId ? eq(tasksTable.assignedToId, assignedToId) : undefined
       )
     )
