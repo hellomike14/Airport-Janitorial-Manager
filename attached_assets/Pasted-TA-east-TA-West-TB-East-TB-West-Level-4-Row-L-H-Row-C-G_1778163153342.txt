@@ -1,0 +1,98 @@
+TA east	TA West	TB East	TB West
+Level 4 Row L -H	Row C- G	Level 4 C-G	Level H - M
+Level 3 H -P	Row A - G	Level 3 A - G	Level 3 H -P
+Level 2 H -P	Row A - G	Level 2 A - G	Level 2 H - P
+Level 1 H -P	Row D - G	Level 1  D - G	Level 1 H - P
+R2 Avis	R2 Enterprises	R2 Avis	R2 Hertz
+R1 Avis	R1 Hertz	R1 Hertz/Enterprise Return	R1 Aloma/Enterprise Pick up
+taxis			Taxis
+Check point			Garden
+Garden			
+
+Terminal C
+Levels 6 C6	C59 -C 69		
+5 C5	C59 - C68	Pedestrian Crossing 	
+4 C4	C59 - C69	Driveway 	
+3 C3	C59 - C68	Driveway/Pedestrian Walkway to trains	Pedestrian Walkway 
+2 C2	Avis Pick up/Return	Hertz Return 	Hertz Pick up pedestrian walkway 
+1 C1	Enterprise Return	Sixt Return/Pick up	Pedestrian Walkway 
+TA East
+Level 4 Row L -H
+Level 3 Row H -P
+Level 2 Row H -P
+Level 1 Row H -P
+R2 Avis
+R1 Avis
+taxis
+Check point
+Garden
+
+TA West
+Level 4 Row C- G
+Level 3 Row A - G
+Level 2 Row A - G
+Level 1 Row D - G
+R2 Enterprises
+R1 Hert
+TA east	TA West	TB East	TB West
+Level 4 Row L -H	Row C- G	Level 4 C-G	Level H - M
+Level 3 H -P	Row A - G	Level 3 A - G	Level 3 H -P
+Level 2 H -P	Row A - G	Level 2 A - G	Level 2 H - P
+Level 1 H -P	Row D - G	Level 1  D - G	Level 1 H - P
+R2 Avis	R2 Enterprises	R2 Avis	R2 Hertz
+R1 Avis	R1 Hertz	R1 Hertz/Enterprise Return	R1 Aloma/Enterprise Pick up
+taxis			Taxis
+Check point			Garden
+Garden			
+
+Terminal C
+Levels 6 C6	C59 -C 69		
+5 C5	C59 - C68	Pedestrian Crossing 	
+4 C4	C59 - C69	Driveway 	
+3 C3	C59 - C68	Driveway/Pedestrian Walkway to trains	Pedestrian Walkway 
+2 C2	Avis Pick up/Return	Hertz Return 	Hertz Pick up pedestrian walkway 
+1 C1	Enterprise Return	Sixt Return/Pick up	Pedestrian Walkway 
+TA East
+Level 4 Row L -H
+Level 3 Row H -P
+Level 2 Row H -P
+Level 1 Row H -P
+R2 Avis
+R1 Avis
+taxis
+Check point
+Garden
+
+TA West
+Level 4 Row C- G
+Level 3 Row A - G
+Level 2 Row A - G
+Level 1 Row D - G
+R2 Enterprises
+R1 Hertz
+
+TB East
+Level 4 C-G
+Level 3 A - G
+Level 2 A - G
+Level 1  D - G
+R2 Avis
+R1 Hertz/Enterprise Return
+
+TB West
+Level H - M
+Level 3 H -P
+Level 2 H - P
+Level 1 H - P
+R2 Hertz
+R1 Aloma/Enterprise Pick up
+Taxis
+Garden
+
+Terminal C 	Rows					Drive & walkways						Walkways
+Levels 6 C6 	C59 -C 69
+Levels 5 C5 	C59 -C 69 				Pedestrian Crossing 
+Levels 4 C4 	C59 -C 69				Driveway 
+Levels 3 C3 	C59 -C 69				Driveway/Pedestrian Walkway to trains	Pedestrian Walkway 
+Levels 2 C2 	Avis Pick up/Return		Hertz Return							Hertz Pick up pedestrian walkway
+Levels 1 C1 	Enterprise Return	Sixt 		Return/Pick up						Pedestrian Walkway
