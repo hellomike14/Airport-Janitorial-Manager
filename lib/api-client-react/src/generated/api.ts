@@ -26,6 +26,7 @@ import type {
   CompleteTaskRequest,
   CreateAssignmentRequest,
   CreateIssueRequest,
+  CreateSpecialTaskRequest,
   CreateStaffMemberRequest,
   CreateTaskTypeRequest,
   DashboardStats,
@@ -37,10 +38,12 @@ import type {
   ListAssignmentsParams,
   ListIssuesParams,
   ListNotificationsParams,
+  ListSpecialTasksParams,
   ListTasksParams,
   MarkAllReadRequest,
   Notification,
   ReorderTaskTypesRequest,
+  SpecialTask,
   StaffMember,
   Task,
   TaskType,
@@ -619,6 +622,189 @@ export function useListTasks<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary List special-request tasks for a date and optional area
+ */
+export const getListSpecialTasksUrl = (params?: ListSpecialTasksParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/tasks/special?${stringifiedParams}`
+    : `/api/tasks/special`;
+};
+
+export const listSpecialTasks = async (
+  params?: ListSpecialTasksParams,
+  options?: RequestInit,
+): Promise<SpecialTask[]> => {
+  return customFetch<SpecialTask[]>(getListSpecialTasksUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListSpecialTasksQueryKey = (
+  params?: ListSpecialTasksParams,
+) => {
+  return [`/api/tasks/special`, ...(params ? [params] : [])] as const;
+};
+
+export const getListSpecialTasksQueryOptions = <
+  TData = Awaited<ReturnType<typeof listSpecialTasks>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListSpecialTasksParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listSpecialTasks>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListSpecialTasksQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listSpecialTasks>>
+  > = ({ signal }) => listSpecialTasks(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listSpecialTasks>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListSpecialTasksQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listSpecialTasks>>
+>;
+export type ListSpecialTasksQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List special-request tasks for a date and optional area
+ */
+
+export function useListSpecialTasks<
+  TData = Awaited<ReturnType<typeof listSpecialTasks>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListSpecialTasksParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listSpecialTasks>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListSpecialTasksQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a special-request task
+ */
+export const getCreateSpecialTaskUrl = () => {
+  return `/api/tasks/special`;
+};
+
+export const createSpecialTask = async (
+  createSpecialTaskRequest: CreateSpecialTaskRequest,
+  options?: RequestInit,
+): Promise<SpecialTask> => {
+  return customFetch<SpecialTask>(getCreateSpecialTaskUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createSpecialTaskRequest),
+  });
+};
+
+export const getCreateSpecialTaskMutationOptions = <
+  TError = ErrorType<ErrorEnvelope>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createSpecialTask>>,
+    TError,
+    { data: BodyType<CreateSpecialTaskRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createSpecialTask>>,
+  TError,
+  { data: BodyType<CreateSpecialTaskRequest> },
+  TContext
+> => {
+  const mutationKey = ["createSpecialTask"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createSpecialTask>>,
+    { data: BodyType<CreateSpecialTaskRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createSpecialTask(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateSpecialTaskMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createSpecialTask>>
+>;
+export type CreateSpecialTaskMutationBody = BodyType<CreateSpecialTaskRequest>;
+export type CreateSpecialTaskMutationError = ErrorType<ErrorEnvelope>;
+
+/**
+ * @summary Create a special-request task
+ */
+export const useCreateSpecialTask = <
+  TError = ErrorType<ErrorEnvelope>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createSpecialTask>>,
+    TError,
+    { data: BodyType<CreateSpecialTaskRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createSpecialTask>>,
+  TError,
+  { data: BodyType<CreateSpecialTaskRequest> },
+  TContext
+> => {
+  return useMutation(getCreateSpecialTaskMutationOptions(options));
+};
 
 /**
  * @summary Mark a task as complete

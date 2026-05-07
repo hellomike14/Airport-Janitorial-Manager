@@ -1,14 +1,17 @@
 import React, { useState, useMemo } from "react";
-import { format } from "date-fns";
+import { format, type Locale } from "date-fns";
 import { useTranslation, Trans } from "react-i18next";
 import { getDateLocale } from "@/i18n/dateLocale";
 import {
   useListAreas,
   useListAssignments,
+  useListSpecialTasks,
+  useCreateSpecialTask,
   useCompleteTask,
-  useUncompleteTask,
+  getListSpecialTasksQueryKey,
+  type SpecialTask,
 } from "@workspace/api-client-react";
-import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Star,
@@ -21,28 +24,12 @@ import {
   ClipboardList,
   ChevronDown,
   ChevronUp,
-  MessageSquare,
   User,
   AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import RefreshButton from "@/components/RefreshButton";
 import { StaffName } from "@/components/StaffName";
-
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
-
-function useSpecialTasks(date: string, areaId?: number) {
-  return useQuery({
-    queryKey: ["/api/tasks/special", date, areaId],
-    queryFn: async () => {
-      const params = new URLSearchParams({ date });
-      if (areaId) params.set("areaId", String(areaId));
-      const res = await fetch(`${BASE}/api/tasks/special?${params}`);
-      if (!res.ok) throw new Error("Failed to fetch special tasks");
-      return res.json() as Promise<any[]>;
-    },
-  });
-}
 
 export default function SpecialRequests() {
   const { t, i18n } = useTranslation();
@@ -69,36 +56,29 @@ export default function SpecialRequests() {
     return ids.length > 0 ? ids : undefined;
   }, [isStaff, currentUser, dateAssignments]);
 
-  const { data: specialTasks = [], isLoading } = useSpecialTasks(
-    selectedDate,
-    isStaff && staffAreaIds?.length === 1 ? staffAreaIds[0] : undefined
-  );
+  const { data: specialTasks = [], isLoading } = useListSpecialTasks({
+    date: selectedDate,
+    ...(isStaff && staffAreaIds?.length === 1 ? { areaId: staffAreaIds[0] } : {}),
+  });
 
   const filteredTasks = useMemo(() => {
     if (!isStaff || !staffAreaIds) return specialTasks;
-    return specialTasks.filter((t: any) => staffAreaIds.includes(t.areaId));
+    return specialTasks.filter((t) => staffAreaIds.includes(t.areaId));
   }, [specialTasks, isStaff, staffAreaIds]);
 
-  const pendingSpecial = filteredTasks.filter((t: any) => !t.completed);
-  const completedSpecial = filteredTasks.filter((t: any) => t.completed);
+  const pendingSpecial = filteredTasks.filter((t) => !t.completed);
+  const completedSpecial = filteredTasks.filter((t) => t.completed);
 
   const [formData, setFormData] = useState({ areaId: "", notes: "" });
 
-  const createMutation = useMutation({
-    mutationFn: async (body: { areaId: number; date: string; notes: string; createdById: number }) => {
-      const resp = await fetch(`${BASE}/api/tasks/special`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!resp.ok) throw new Error("Failed to create special request");
-      return resp.json();
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/tasks/special"] });
-      qc.invalidateQueries({ queryKey: ["/api/tasks"] });
-      setIsCreating(false);
-      setFormData({ areaId: "", notes: "" });
+  const createMutation = useCreateSpecialTask({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: getListSpecialTasksQueryKey() });
+        qc.invalidateQueries({ queryKey: ["/api/tasks"] });
+        setIsCreating(false);
+        setFormData({ areaId: "", notes: "" });
+      },
     },
   });
 
@@ -106,15 +86,17 @@ export default function SpecialRequests() {
     e.preventDefault();
     if (!currentUser) return;
     createMutation.mutate({
-      areaId: parseInt(formData.areaId),
-      date: selectedDate,
-      notes: formData.notes,
-      createdById: currentUser.id,
+      data: {
+        areaId: parseInt(formData.areaId),
+        date: selectedDate,
+        notes: formData.notes,
+        createdById: currentUser.id,
+      },
     });
   };
 
   const handleRefresh = async () => {
-    await qc.invalidateQueries({ queryKey: ["/api/tasks/special"] });
+    await qc.invalidateQueries({ queryKey: getListSpecialTasksQueryKey() });
     setLastUpdated(new Date());
   };
 
@@ -266,7 +248,7 @@ export default function SpecialRequests() {
             <Clock className="w-5 h-5 text-amber-500" /> {t("specialRequests.pendingRequests")}
           </h2>
           <div className="space-y-3">
-            {pendingSpecial.map((task: any) => (
+            {pendingSpecial.map((task) => (
               <RequestCard key={task.id} task={task} canRespond={canRespond} dateLocale={dateLocale} />
             ))}
           </div>
@@ -279,7 +261,7 @@ export default function SpecialRequests() {
             <CheckCircle2 className="w-5 h-5 text-emerald-500" /> {t("specialRequests.completedRequests")}
           </h2>
           <div className="space-y-3">
-            {completedSpecial.map((task: any) => (
+            {completedSpecial.map((task) => (
               <RequestCard key={task.id} task={task} canRespond={false} dateLocale={dateLocale} />
             ))}
           </div>
@@ -303,36 +285,27 @@ export default function SpecialRequests() {
   );
 }
 
-function RequestCard({ task, canRespond, dateLocale }: { task: any; canRespond: boolean; dateLocale: any }) {
+function RequestCard({ task, canRespond, dateLocale }: { task: SpecialTask; canRespond: boolean; dateLocale: Locale | undefined }) {
   const { t } = useTranslation();
   const { currentUser } = useAuth();
   const qc = useQueryClient();
   const [expanded, setExpanded] = useState(false);
-  const [notes, setNotes] = useState("");
 
-  const completeMutation = useMutation({
-    mutationFn: async (data: { completedById: number; completionNotes?: string }) => {
-      const res = await fetch(`${BASE}/api/tasks/${task.id}/complete`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error("Failed to complete task");
-      return res.json();
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/tasks/special"] });
-      qc.invalidateQueries({ queryKey: ["/api/tasks"] });
-      setExpanded(false);
-      setNotes("");
+  const completeMutation = useCompleteTask({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: getListSpecialTasksQueryKey() });
+        qc.invalidateQueries({ queryKey: ["/api/tasks"] });
+        setExpanded(false);
+      },
     },
   });
 
   const handleComplete = () => {
     if (!currentUser) return;
     completeMutation.mutate({
-      completedById: currentUser.id,
-      ...(notes.trim() ? { completionNotes: notes.trim() } : {}),
+      id: task.id,
+      data: { completedById: currentUser.id },
     });
   };
 
@@ -436,19 +409,7 @@ function RequestCard({ task, canRespond, dateLocale }: { task: any; canRespond: 
           </button>
 
           {expanded && (
-            <div className="px-5 pb-5 space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-amber-900 mb-1.5 flex items-center gap-1.5">
-                  <MessageSquare className="w-3.5 h-3.5" /> {t("specialRequests.completionNotes")} <span className="text-amber-500 font-normal">({t("common.optional")})</span>
-                </label>
-                <textarea
-                  rows={3}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder={t("specialRequests.completionNotesPlaceholder")}
-                  className="w-full bg-white border border-amber-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 resize-none"
-                />
-              </div>
+            <div className="px-5 pb-5">
               <Button
                 onClick={handleComplete}
                 disabled={completeMutation.isPending}

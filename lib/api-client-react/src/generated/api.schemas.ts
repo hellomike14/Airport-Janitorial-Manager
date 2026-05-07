@@ -92,6 +92,35 @@ export interface Task {
   notes?: string | null;
 }
 
+export interface SpecialTask {
+  id: number;
+  areaId: number;
+  areaName: string;
+  taskDate: string;
+  taskName: string;
+  taskOrder: number;
+  completed: boolean;
+  completedAt?: string | null;
+  completedById?: number | null;
+  completedByName?: string | null;
+  /** Whether the staff member who completed the task is still active. Null when no completer is recorded. */
+  completedByActive?: boolean | null;
+  createdById?: number | null;
+  createdByName?: string | null;
+  /** Whether the staff member who created the special request is still active. Null when no creator is recorded. */
+  createdByActive?: boolean | null;
+  createdAt: string;
+  notes?: string | null;
+}
+
+export interface CreateSpecialTaskRequest {
+  areaId: number;
+  date: string;
+  /** @minLength 1 */
+  notes: string;
+  createdById?: number | null;
+}
+
 export interface CompleteTaskRequest {
   completedById: number;
 }
@@ -284,6 +313,11 @@ export type ListTasksParams = {
   areaId?: number;
   date?: string;
   assignedToId?: number;
+};
+
+export type ListSpecialTasksParams = {
+  date?: string;
+  areaId?: number;
 };
 
 export type ListAssignmentsParams = {

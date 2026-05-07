@@ -157,6 +157,53 @@ paths:
                 items:
                   $ref: "#/components/schemas/Task"
 
+  /tasks/special:
+    get:
+      operationId: listSpecialTasks
+      tags: [tasks]
+      summary: List special-request tasks for a date and optional area
+      parameters:
+        - name: date
+          in: query
+          schema:
+            type: string
+        - name: areaId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of special-request tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SpecialTask"
+    post:
+      operationId: createSpecialTask
+      tags: [tasks]
+      summary: Create a special-request task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSpecialTaskRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpecialTask"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
   /tasks/{id}/complete:
     post:
       operationId: completeTask
@@ -799,6 +846,79 @@ components:
         - taskOrder
         - completed
         - isSpecial
+
+    SpecialTask:
+      type: object
+      properties:
+        id:
+          type: integer
+        areaId:
+          type: integer
+        areaName:
+          type: string
+        taskDate:
+          type: string
+        taskName:
+          type: string
+        taskOrder:
+          type: integer
+        completed:
+          type: boolean
+        completedAt:
+          type: string
+          nullable: true
+        completedById:
+          type: integer
+          nullable: true
+        completedByName:
+          type: string
+          nullable: true
+        completedByActive:
+          type: boolean
+          nullable: true
+          description: Whether the staff member who completed the task is still active. Null when no completer is recorded.
+        createdById:
+          type: integer
+          nullable: true
+        createdByName:
+          type: string
+          nullable: true
+        createdByActive:
+          type: boolean
+          nullable: true
+          description: Whether the staff member who created the special request is still active. Null when no creator is recorded.
+        createdAt:
+          type: string
+        notes:
+          type: string
+          nullable: true
+      required:
+        - id
+        - areaId
+        - areaName
+        - taskDate
+        - taskName
+        - taskOrder
+        - completed
+        - createdAt
+
+    CreateSpecialTaskRequest:
+      type: object
+      properties:
+        areaId:
+          type: integer
+        date:
+          type: string
+        notes:
+          type: string
+          minLength: 1
+        createdById:
+          type: integer
+          nullable: true
+      required:
+        - areaId
+        - date
+        - notes
 
     CompleteTaskRequest:
       type: object

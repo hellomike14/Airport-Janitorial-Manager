@@ -125,6 +125,55 @@ export const ListTasksResponseItem = zod.object({
 export const ListTasksResponse = zod.array(ListTasksResponseItem);
 
 /**
+ * @summary List special-request tasks for a date and optional area
+ */
+export const ListSpecialTasksQueryParams = zod.object({
+  date: zod.coerce.string().optional(),
+  areaId: zod.coerce.number().optional(),
+});
+
+export const ListSpecialTasksResponseItem = zod.object({
+  id: zod.number(),
+  areaId: zod.number(),
+  areaName: zod.string(),
+  taskDate: zod.string(),
+  taskName: zod.string(),
+  taskOrder: zod.number(),
+  completed: zod.boolean(),
+  completedAt: zod.string().nullish(),
+  completedById: zod.number().nullish(),
+  completedByName: zod.string().nullish(),
+  completedByActive: zod
+    .boolean()
+    .nullish()
+    .describe(
+      "Whether the staff member who completed the task is still active. Null when no completer is recorded.",
+    ),
+  createdById: zod.number().nullish(),
+  createdByName: zod.string().nullish(),
+  createdByActive: zod
+    .boolean()
+    .nullish()
+    .describe(
+      "Whether the staff member who created the special request is still active. Null when no creator is recorded.",
+    ),
+  createdAt: zod.string(),
+  notes: zod.string().nullish(),
+});
+export const ListSpecialTasksResponse = zod.array(ListSpecialTasksResponseItem);
+
+/**
+ * @summary Create a special-request task
+ */
+
+export const CreateSpecialTaskBody = zod.object({
+  areaId: zod.number(),
+  date: zod.string(),
+  notes: zod.string().min(1),
+  createdById: zod.number().nullish(),
+});
+
+/**
  * @summary Mark a task as complete
  */
 export const CompleteTaskParams = zod.object({

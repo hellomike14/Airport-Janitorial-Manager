@@ -10,6 +10,8 @@ import {
   UncompleteTaskParams,
   CompleteAllTasksBody,
   GetDashboardQueryParams,
+  ListSpecialTasksQueryParams,
+  CreateSpecialTaskBody,
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -166,10 +168,15 @@ router.get("/", async (req, res) => {
 });
 
 router.get("/special", async (req, res) => {
+  const query = ListSpecialTasksQueryParams.parse({
+    date: req.query.date,
+    areaId: req.query.areaId,
+  });
+
   const now = new Date();
   const defaultDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-  const date = (req.query.date as string) ?? defaultDate;
-  const areaId = req.query.areaId ? parseInt(req.query.areaId as string) : undefined;
+  const date = query.date ?? defaultDate;
+  const areaId = query.areaId;
 
   const conditions = [
     eq(tasksTable.isSpecial, true),
@@ -221,7 +228,7 @@ router.get("/special", async (req, res) => {
     return {
       ...r,
       completedAt: r.completedAt?.toISOString() ?? null,
-      createdAt: r.createdAt?.toISOString() ?? null,
+      createdAt: r.createdAt.toISOString(),
       completedByName: completedBy.name,
       completedByActive: completedBy.active,
       createdByName: createdBy.name,
@@ -232,49 +239,71 @@ router.get("/special", async (req, res) => {
 });
 
 router.post("/special", async (req, res) => {
-  const { areaId, date, notes, createdById } = req.body;
-  if (!areaId || !date || !notes || typeof areaId !== "number" || typeof notes !== "string" || notes.trim().length === 0) {
+  let body: ReturnType<typeof CreateSpecialTaskBody.parse>;
+  try {
+    body = CreateSpecialTaskBody.parse(req.body);
+  } catch {
     return res.status(400).json({ error: "areaId (number), date (string), and notes (non-empty string) are required" });
   }
 
-  const [area] = await db.select({ id: areasTable.id }).from(areasTable).where(eq(areasTable.id, areaId));
+  const trimmedNotes = body.notes.trim();
+  if (trimmedNotes.length === 0) {
+    return res.status(400).json({ error: "areaId (number), date (string), and notes (non-empty string) are required" });
+  }
+
+  const [area] = await db.select({ id: areasTable.id, name: areasTable.name }).from(areasTable).where(eq(areasTable.id, body.areaId));
   if (!area) {
     return res.status(400).json({ error: "Invalid areaId" });
   }
 
-  if (createdById) {
-    const [staff] = await db.select({ id: staffTable.id }).from(staffTable).where(eq(staffTable.id, createdById));
+  let creator: { name: string; active: boolean } | null = null;
+  if (body.createdById != null) {
+    const [staff] = await db
+      .select({ id: staffTable.id, name: staffTable.name, active: staffTable.active })
+      .from(staffTable)
+      .where(eq(staffTable.id, body.createdById));
     if (!staff) {
       return res.status(400).json({ error: "Invalid createdById" });
     }
+    creator = { name: staff.name, active: staff.active };
   }
 
   const maxOrder = await db
     .select({ maxO: sql<number>`coalesce(max(${tasksTable.taskOrder}), 0)::int` })
     .from(tasksTable)
-    .where(and(eq(tasksTable.areaId, areaId), eq(tasksTable.taskDate, date)));
+    .where(and(eq(tasksTable.areaId, body.areaId), eq(tasksTable.taskDate, body.date)));
 
   const [created] = await db
     .insert(tasksTable)
     .values({
-      areaId,
-      taskDate: date,
-      taskName: notes.trim(),
+      areaId: body.areaId,
+      taskDate: body.date,
+      taskName: trimmedNotes,
       taskOrder: (maxOrder[0]?.maxO ?? 0) + 1,
       completed: false,
       isSpecial: true,
-      createdById: createdById ?? null,
-      notes: notes.trim(),
+      createdById: body.createdById ?? null,
+      notes: trimmedNotes,
     })
     .returning();
 
   res.status(201).json({
-    ...created,
+    id: created.id,
+    areaId: created.areaId,
+    areaName: area.name,
+    taskDate: created.taskDate,
+    taskName: created.taskName,
+    taskOrder: created.taskOrder,
+    completed: created.completed,
     completedAt: null,
+    completedById: null,
     completedByName: null,
     completedByActive: null,
-    assignedToName: null,
-    assignedToActive: null,
+    createdById: created.createdById,
+    createdByName: creator?.name ?? null,
+    createdByActive: creator?.active ?? null,
+    createdAt: created.createdAt.toISOString(),
+    notes: created.notes,
   });
 });
 
