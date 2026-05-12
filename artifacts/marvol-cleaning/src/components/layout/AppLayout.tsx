@@ -686,6 +686,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const closeMobile = () => setMobileOpen(false);
 
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(id);
+  }, []);
+
   const initials = currentUser?.name
     .split(" ")
     .map((n) => n[0])
@@ -813,8 +819,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             >
               <Menu className="w-6 h-6" />
             </button>
-            <div className="hidden sm:flex items-center text-sm font-medium text-slate-500 bg-slate-100 px-4 py-2 rounded-full">
-              {format(new Date(), "EEEE, MMMM do, yyyy", { locale: dateLocale })}
+            <div className="hidden sm:flex items-center text-sm font-medium text-slate-500 bg-slate-100 px-4 py-2 rounded-full whitespace-nowrap">
+              {format(now, "EEEE, MMMM do, yyyy · p", { locale: dateLocale })}
             </div>
           </div>
 
