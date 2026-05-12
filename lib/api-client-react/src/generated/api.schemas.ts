@@ -305,6 +305,30 @@ export interface ReorderTaskTypesRequest {
   orderedIds: number[];
 }
 
+export type AreaEffectiveTaskSource =
+  (typeof AreaEffectiveTaskSource)[keyof typeof AreaEffectiveTaskSource];
+
+export const AreaEffectiveTaskSource = {
+  global: "global",
+  area: "area",
+} as const;
+
+export interface AreaEffectiveTask {
+  taskName: string;
+  taskOrder: number;
+  source: AreaEffectiveTaskSource;
+  excluded: boolean;
+}
+
+export interface AddAreaTaskExclusionRequest {
+  taskName: string;
+  createdById?: number | null;
+}
+
+export interface RemoveAreaTaskExclusionRequest {
+  taskName: string;
+}
+
 export interface DeleteResponse {
   success: boolean;
 }

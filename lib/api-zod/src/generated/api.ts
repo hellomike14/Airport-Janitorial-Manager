@@ -87,6 +87,50 @@ export const ListAreasResponseItem = zod.object({
 export const ListAreasResponse = zod.array(ListAreasResponseItem);
 
 /**
+ * @summary List the effective task list for an area with included/excluded state
+ */
+export const ListAreaEffectiveTasksParams = zod.object({
+  areaId: zod.coerce.number(),
+});
+
+export const ListAreaEffectiveTasksResponseItem = zod.object({
+  taskName: zod.string(),
+  taskOrder: zod.number(),
+  source: zod.enum(["global", "area"]),
+  excluded: zod.boolean(),
+});
+export const ListAreaEffectiveTasksResponse = zod.array(
+  ListAreaEffectiveTasksResponseItem,
+);
+
+/**
+ * @summary Mark a task as not applicable for an area
+ */
+export const AddAreaTaskExclusionParams = zod.object({
+  areaId: zod.coerce.number(),
+});
+
+export const AddAreaTaskExclusionBody = zod.object({
+  taskName: zod.string(),
+  createdById: zod.number().nullish(),
+});
+
+/**
+ * @summary Re-enable a previously excluded task for an area
+ */
+export const RemoveAreaTaskExclusionParams = zod.object({
+  areaId: zod.coerce.number(),
+});
+
+export const RemoveAreaTaskExclusionBody = zod.object({
+  taskName: zod.string(),
+});
+
+export const RemoveAreaTaskExclusionResponse = zod.object({
+  success: zod.boolean(),
+});
+
+/**
  * @summary List all tasks with optional filters
  */
 export const ListTasksQueryParams = zod.object({

@@ -17,6 +17,8 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  AddAreaTaskExclusionRequest,
+  AreaEffectiveTask,
   AssignIssueRequest,
   Assignment,
   BatchCompleteResponse,
@@ -42,6 +44,7 @@ import type {
   ListTasksParams,
   MarkAllReadRequest,
   Notification,
+  RemoveAreaTaskExclusionRequest,
   ReorderTaskTypesRequest,
   SpecialTask,
   StaffMember,
@@ -528,6 +531,274 @@ export function useListAreas<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary List the effective task list for an area with included/excluded state
+ */
+export const getListAreaEffectiveTasksUrl = (areaId: number) => {
+  return `/api/areas/${areaId}/effective-tasks`;
+};
+
+export const listAreaEffectiveTasks = async (
+  areaId: number,
+  options?: RequestInit,
+): Promise<AreaEffectiveTask[]> => {
+  return customFetch<AreaEffectiveTask[]>(
+    getListAreaEffectiveTasksUrl(areaId),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListAreaEffectiveTasksQueryKey = (areaId: number) => {
+  return [`/api/areas/${areaId}/effective-tasks`] as const;
+};
+
+export const getListAreaEffectiveTasksQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAreaEffectiveTasks>>,
+  TError = ErrorType<unknown>,
+>(
+  areaId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAreaEffectiveTasks>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListAreaEffectiveTasksQueryKey(areaId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listAreaEffectiveTasks>>
+  > = ({ signal }) =>
+    listAreaEffectiveTasks(areaId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!areaId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAreaEffectiveTasks>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListAreaEffectiveTasksQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAreaEffectiveTasks>>
+>;
+export type ListAreaEffectiveTasksQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List the effective task list for an area with included/excluded state
+ */
+
+export function useListAreaEffectiveTasks<
+  TData = Awaited<ReturnType<typeof listAreaEffectiveTasks>>,
+  TError = ErrorType<unknown>,
+>(
+  areaId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAreaEffectiveTasks>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAreaEffectiveTasksQueryOptions(areaId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Mark a task as not applicable for an area
+ */
+export const getAddAreaTaskExclusionUrl = (areaId: number) => {
+  return `/api/areas/${areaId}/exclusions`;
+};
+
+export const addAreaTaskExclusion = async (
+  areaId: number,
+  addAreaTaskExclusionRequest: AddAreaTaskExclusionRequest,
+  options?: RequestInit,
+): Promise<DeleteResponse> => {
+  return customFetch<DeleteResponse>(getAddAreaTaskExclusionUrl(areaId), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(addAreaTaskExclusionRequest),
+  });
+};
+
+export const getAddAreaTaskExclusionMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addAreaTaskExclusion>>,
+    TError,
+    { areaId: number; data: BodyType<AddAreaTaskExclusionRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof addAreaTaskExclusion>>,
+  TError,
+  { areaId: number; data: BodyType<AddAreaTaskExclusionRequest> },
+  TContext
+> => {
+  const mutationKey = ["addAreaTaskExclusion"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof addAreaTaskExclusion>>,
+    { areaId: number; data: BodyType<AddAreaTaskExclusionRequest> }
+  > = (props) => {
+    const { areaId, data } = props ?? {};
+
+    return addAreaTaskExclusion(areaId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AddAreaTaskExclusionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof addAreaTaskExclusion>>
+>;
+export type AddAreaTaskExclusionMutationBody =
+  BodyType<AddAreaTaskExclusionRequest>;
+export type AddAreaTaskExclusionMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Mark a task as not applicable for an area
+ */
+export const useAddAreaTaskExclusion = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addAreaTaskExclusion>>,
+    TError,
+    { areaId: number; data: BodyType<AddAreaTaskExclusionRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof addAreaTaskExclusion>>,
+  TError,
+  { areaId: number; data: BodyType<AddAreaTaskExclusionRequest> },
+  TContext
+> => {
+  return useMutation(getAddAreaTaskExclusionMutationOptions(options));
+};
+
+/**
+ * @summary Re-enable a previously excluded task for an area
+ */
+export const getRemoveAreaTaskExclusionUrl = (areaId: number) => {
+  return `/api/areas/${areaId}/exclusions/remove`;
+};
+
+export const removeAreaTaskExclusion = async (
+  areaId: number,
+  removeAreaTaskExclusionRequest: RemoveAreaTaskExclusionRequest,
+  options?: RequestInit,
+): Promise<DeleteResponse> => {
+  return customFetch<DeleteResponse>(getRemoveAreaTaskExclusionUrl(areaId), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(removeAreaTaskExclusionRequest),
+  });
+};
+
+export const getRemoveAreaTaskExclusionMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof removeAreaTaskExclusion>>,
+    TError,
+    { areaId: number; data: BodyType<RemoveAreaTaskExclusionRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof removeAreaTaskExclusion>>,
+  TError,
+  { areaId: number; data: BodyType<RemoveAreaTaskExclusionRequest> },
+  TContext
+> => {
+  const mutationKey = ["removeAreaTaskExclusion"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof removeAreaTaskExclusion>>,
+    { areaId: number; data: BodyType<RemoveAreaTaskExclusionRequest> }
+  > = (props) => {
+    const { areaId, data } = props ?? {};
+
+    return removeAreaTaskExclusion(areaId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RemoveAreaTaskExclusionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof removeAreaTaskExclusion>>
+>;
+export type RemoveAreaTaskExclusionMutationBody =
+  BodyType<RemoveAreaTaskExclusionRequest>;
+export type RemoveAreaTaskExclusionMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Re-enable a previously excluded task for an area
+ */
+export const useRemoveAreaTaskExclusion = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof removeAreaTaskExclusion>>,
+    TError,
+    { areaId: number; data: BodyType<RemoveAreaTaskExclusionRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof removeAreaTaskExclusion>>,
+  TError,
+  { areaId: number; data: BodyType<RemoveAreaTaskExclusionRequest> },
+  TContext
+> => {
+  return useMutation(getRemoveAreaTaskExclusionMutationOptions(options));
+};
 
 /**
  * @summary List all tasks with optional filters

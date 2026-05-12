@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, date } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, date, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { areasTable } from "./areas";
@@ -35,3 +35,19 @@ export const tasksTable = pgTable("tasks", {
 export const insertTaskSchema = createInsertSchema(tasksTable).omit({ id: true, createdAt: true });
 export type InsertTask = z.infer<typeof insertTaskSchema>;
 export type Task = typeof tasksTable.$inferSelect;
+
+export const taskExclusionsTable = pgTable(
+  "task_exclusions",
+  {
+    id: serial("id").primaryKey(),
+    areaId: integer("area_id").notNull().references(() => areasTable.id),
+    taskName: text("task_name").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    createdById: integer("created_by_id").references(() => staffTable.id),
+  },
+  (t) => ({
+    areaTaskUnique: uniqueIndex("task_exclusions_area_task_unique").on(t.areaId, t.taskName),
+  })
+);
+
+export type TaskExclusion = typeof taskExclusionsTable.$inferSelect;

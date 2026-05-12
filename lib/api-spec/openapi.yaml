@@ -129,6 +129,77 @@ paths:
                 items:
                   $ref: "#/components/schemas/CleaningArea"
 
+  /areas/{areaId}/effective-tasks:
+    get:
+      operationId: listAreaEffectiveTasks
+      tags: [areas]
+      summary: List the effective task list for an area with included/excluded state
+      parameters:
+        - name: areaId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Effective tasks for the area
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AreaEffectiveTask"
+
+  /areas/{areaId}/exclusions:
+    post:
+      operationId: addAreaTaskExclusion
+      tags: [areas]
+      summary: Mark a task as not applicable for an area
+      parameters:
+        - name: areaId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddAreaTaskExclusionRequest"
+      responses:
+        "201":
+          description: Exclusion recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+
+  /areas/{areaId}/exclusions/remove:
+    post:
+      operationId: removeAreaTaskExclusion
+      tags: [areas]
+      summary: Re-enable a previously excluded task for an area
+      parameters:
+        - name: areaId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RemoveAreaTaskExclusionRequest"
+      responses:
+        "200":
+          description: Exclusion removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+
   /tasks:
     get:
       operationId: listTasks
@@ -1297,6 +1368,43 @@ components:
             type: integer
       required:
         - orderedIds
+
+    AreaEffectiveTask:
+      type: object
+      properties:
+        taskName:
+          type: string
+        taskOrder:
+          type: integer
+        source:
+          type: string
+          enum: [global, area]
+        excluded:
+          type: boolean
+      required:
+        - taskName
+        - taskOrder
+        - source
+        - excluded
+
+    AddAreaTaskExclusionRequest:
+      type: object
+      properties:
+        taskName:
+          type: string
+        createdById:
+          type: integer
+          nullable: true
+      required:
+        - taskName
+
+    RemoveAreaTaskExclusionRequest:
+      type: object
+      properties:
+        taskName:
+          type: string
+      required:
+        - taskName
 
     DeleteResponse:
       type: object

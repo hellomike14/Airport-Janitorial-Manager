@@ -3,20 +3,24 @@ import { useRoute } from "wouter";
 import { format } from "date-fns";
 import { useTranslation } from "react-i18next";
 import { getDateLocale } from "@/i18n/dateLocale";
-import { 
-  useListTasks, 
-  useCompleteTask, 
-  useUncompleteTask, 
+import {
+  useListTasks,
+  useCompleteTask,
+  useUncompleteTask,
   useCompleteAllTasks,
-  useListAreas
+  useListAreas,
+  useListAreaEffectiveTasks,
+  useAddAreaTaskExclusion,
+  useRemoveAreaTaskExclusion,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Check, Clock, User, AlertCircle, ArrowLeft, Camera } from "lucide-react";
+import { Check, Clock, User, AlertCircle, ArrowLeft, Camera, ToggleLeft, ToggleRight, Loader2, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { TaskPhotoToggle } from "@/components/TaskPhotos";
 import { StaffName } from "@/components/StaffName";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function AreaTasks() {
   const { t, i18n } = useTranslation();
@@ -26,14 +30,50 @@ export default function AreaTasks() {
   const [selectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const queryClient = useQueryClient();
 
+  const { effectiveRole, currentUser } = useAuth();
+  const isAdmin = effectiveRole === "admin";
+
   const { data: areas } = useListAreas();
   const areaInfo = areas?.find(a => a.id === areaId);
 
-  const { data: tasks, isLoading } = useListTasks({ areaId, date: selectedDate }, { 
-    query: { enabled: !!areaId } 
+  const { data: tasks, isLoading } = useListTasks({ areaId, date: selectedDate }, {
+    query: { enabled: !!areaId }
   });
 
-  const currentUserId = 1; 
+  const { data: effectiveTasks, refetch: refetchEffective } = useListAreaEffectiveTasks(areaId, {
+    query: { enabled: !!areaId && isAdmin },
+  });
+
+  const onExclusionChange = () => {
+    refetchEffective();
+    queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+  };
+
+  const addExclusionMutation = useAddAreaTaskExclusion({
+    mutation: { onSuccess: onExclusionChange },
+  });
+  const removeExclusionMutation = useRemoveAreaTaskExclusion({
+    mutation: { onSuccess: onExclusionChange },
+  });
+
+  const togglingTaskName = addExclusionMutation.isPending
+    ? (addExclusionMutation.variables?.data.taskName ?? null)
+    : removeExclusionMutation.isPending
+      ? (removeExclusionMutation.variables?.data.taskName ?? null)
+      : null;
+
+  const handleToggleExclusion = (taskName: string, excluded: boolean) => {
+    if (excluded) {
+      removeExclusionMutation.mutate({ areaId, data: { taskName } });
+    } else {
+      addExclusionMutation.mutate({
+        areaId,
+        data: { taskName, createdById: currentUser?.id ?? null },
+      });
+    }
+  };
+
+  const currentUserId = currentUser?.id ?? 1;
 
   const completeMutation = useCompleteTask({
     mutation: {
@@ -193,6 +233,68 @@ export default function AreaTasks() {
           )}
         </ul>
       </div>
+
+      {isAdmin && (
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/60">
+            <h2 className="text-lg font-display font-bold text-slate-900 flex items-center gap-2">
+              <Settings className="w-5 h-5 text-slate-500" />
+              Tasks for this area
+            </h2>
+            <p className="text-sm text-slate-500 mt-1">
+              Toggle off any task that doesn't apply here. Excluded tasks won't appear on future daily sheets,
+              and any not-yet-completed copies on today's sheet will be removed. Completed tasks stay for the
+              audit trail.
+            </p>
+          </div>
+          <ul className="divide-y divide-slate-100">
+            {(effectiveTasks ?? []).map((item) => {
+              const isToggling = togglingTaskName === item.taskName;
+              return (
+                <li key={`${item.source}-${item.taskName}`} className="px-6 py-3 flex items-center gap-4">
+                  <span className="text-xs font-bold text-slate-400 tabular-nums w-10">{item.taskOrder}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-medium ${item.excluded ? "text-slate-400 line-through" : "text-slate-800"}`}>
+                      {item.taskName}
+                    </p>
+                  </div>
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                    item.source === "global"
+                      ? "bg-blue-50 text-blue-700 border border-blue-100"
+                      : "bg-purple-50 text-purple-700 border border-purple-100"
+                  }`}>
+                    {item.source === "global" ? "Global" : "Area-specific"}
+                  </span>
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                    item.excluded
+                      ? "bg-rose-50 text-rose-600 border border-rose-100"
+                      : "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                  }`}>
+                    {item.excluded ? "Excluded" : "Active"}
+                  </span>
+                  <button
+                    onClick={() => handleToggleExclusion(item.taskName, item.excluded)}
+                    disabled={isToggling}
+                    title={item.excluded ? "Re-enable for this area" : "Mark as not applicable"}
+                    className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 transition-colors disabled:opacity-50"
+                  >
+                    {isToggling ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : item.excluded ? (
+                      <ToggleLeft className="w-6 h-6" />
+                    ) : (
+                      <ToggleRight className="w-6 h-6 text-emerald-500" />
+                    )}
+                  </button>
+                </li>
+              );
+            })}
+            {effectiveTasks && effectiveTasks.length === 0 && (
+              <li className="p-8 text-center text-slate-500 font-medium">No applicable tasks configured.</li>
+            )}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

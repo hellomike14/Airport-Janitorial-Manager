@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./addAreaTaskExclusionRequest";
+export * from "./areaEffectiveTask";
+export * from "./areaEffectiveTaskSource";
 export * from "./areaProgress";
 export * from "./assignIssueRequest";
 export * from "./assignment";
@@ -36,6 +39,7 @@ export * from "./listTasksParams";
 export * from "./markAllReadRequest";
 export * from "./notification";
 export * from "./notificationType";
+export * from "./removeAreaTaskExclusionRequest";
 export * from "./reorderTaskTypesRequest";
 export * from "./specialTask";
 export * from "./staffMember";

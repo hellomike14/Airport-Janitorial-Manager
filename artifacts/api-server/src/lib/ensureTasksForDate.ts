@@ -1,5 +1,5 @@
 import { db } from "@workspace/db";
-import { tasksTable, areasTable, taskTypesTable } from "@workspace/db/schema";
+import { tasksTable, areasTable, taskTypesTable, taskExclusionsTable } from "@workspace/db/schema";
 import { eq, and, asc } from "drizzle-orm";
 import { AREA_SPECIFIC_TASKS } from "../area-tasks";
 
@@ -31,6 +31,31 @@ export async function getActiveTaskTypes(): Promise<{ taskName: string; taskOrde
   return types;
 }
 
+export async function getAreaSpecificTasks(area: { name: string; terminal: string }): Promise<{ taskName: string; taskOrder: number }[]> {
+  const qualifiedKey = `${area.terminal}::${area.name}`;
+  return AREA_SPECIFIC_TASKS[qualifiedKey] ?? AREA_SPECIFIC_TASKS[area.name] ?? [];
+}
+
+export async function getEffectiveTasksForArea(areaId: number): Promise<{ taskName: string; taskOrder: number }[]> {
+  const [area] = await db
+    .select({ name: areasTable.name, terminal: areasTable.terminal })
+    .from(areasTable)
+    .where(eq(areasTable.id, areaId));
+  if (!area) return [];
+
+  const activeTypes = await getActiveTaskTypes();
+  const extraTasks = await getAreaSpecificTasks(area);
+  const allTasks = [...activeTypes, ...extraTasks];
+
+  const exclusions = await db
+    .select({ taskName: taskExclusionsTable.taskName })
+    .from(taskExclusionsTable)
+    .where(eq(taskExclusionsTable.areaId, areaId));
+  const excluded = new Set(exclusions.map((e) => e.taskName));
+
+  return allTasks.filter((t) => !excluded.has(t.taskName));
+}
+
 export async function ensureTasksForDate(areaId: number, date: string) {
   const existing = await db
     .select({ id: tasksTable.id })
@@ -39,14 +64,8 @@ export async function ensureTasksForDate(areaId: number, date: string) {
     .limit(1);
 
   if (existing.length === 0) {
-    const activeTypes = await getActiveTaskTypes();
-
-    const [area] = await db.select({ name: areasTable.name, terminal: areasTable.terminal }).from(areasTable).where(eq(areasTable.id, areaId));
-    const qualifiedKey = area ? `${area.terminal}::${area.name}` : "";
-    const extraTasks = area
-      ? (AREA_SPECIFIC_TASKS[qualifiedKey] ?? AREA_SPECIFIC_TASKS[area.name] ?? [])
-      : [];
-    const allTasks = [...activeTypes, ...extraTasks];
+    const allTasks = await getEffectiveTasksForArea(areaId);
+    if (allTasks.length === 0) return;
 
     await db.insert(tasksTable).values(
       allTasks.map((t) => ({
