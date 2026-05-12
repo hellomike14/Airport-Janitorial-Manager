@@ -1,6 +1,6 @@
 import app from "./app";
 import { db } from "@workspace/db";
-import { staffTable, areasTable, taskTypesTable, notificationsTable, staffLocationsTable, tasksTable, assignmentsTable, schedulesTable, issuesTable, sharedPhotosTable } from "@workspace/db/schema";
+import { staffTable, areasTable, taskTypesTable, notificationsTable, staffLocationsTable, tasksTable, taskExclusionsTable, assignmentsTable, schedulesTable, issuesTable, sharedPhotosTable } from "@workspace/db/schema";
 import { eq, and, count, inArray, or, gte, like, sql } from "drizzle-orm";
 import { renameSharedAreaName, AREA_RENAME_MAP } from "./area-renames";
 import { SEED_STAFF, REMOVED_STAFF_NAMES } from "./seed-data";
@@ -130,22 +130,89 @@ async function seed() {
     }
   }
 
-  const managersWithPasswords = existingStaff.filter(
-    (s) => (s.role === "admin" || s.role === "inspector" || s.role === "supervisor") && s.password
-  );
-  for (const mgr of managersWithPasswords) {
-    await db.update(staffTable).set({ password: null }).where(eq(staffTable.id, mgr.id));
-    console.log(`Cleared password for ${mgr.name} (will set PIN on next login)`);
-  }
+  // Merge duplicate management rows. The seed-rename logic below has, in
+  // the past, renamed an existing admin/inspector row to a seeded name even
+  // when another row already had that name, leaving two identical tiles on
+  // the login screen. For each seeded admin/inspector/supervisor name, find
+  // all active rows with that exact name; if more than one, pick a single
+  // survivor (prefer the row with a non-null password — i.e. PIN set —
+  // breaking ties by lowest id), re-point every staff FK on every loser
+  // row at the survivor, then delete the loser rows. Wrapped in a single
+  // transaction so the merge either fully completes or rolls back.
+  const MGMT_ROLES = new Set(["admin", "inspector", "supervisor"]);
+  const mgmtSeedNames = SEED_STAFF.filter((s) => MGMT_ROLES.has(s.role)).map((s) => s.name);
+  await db.transaction(async (tx) => {
+    for (const seedName of mgmtSeedNames) {
+      const dupes = existingStaff.filter(
+        (s) => s.name === seedName && s.active && MGMT_ROLES.has(s.role)
+      );
+      if (dupes.length < 2) continue;
 
-  for (const existing of existingStaff) {
+      const survivor = [...dupes].sort((a, b) => {
+        const aHas = a.password ? 1 : 0;
+        const bHas = b.password ? 1 : 0;
+        if (aHas !== bHas) return bHas - aHas;
+        return a.id - b.id;
+      })[0]!;
+      const losers = dupes.filter((d) => d.id !== survivor.id);
+
+      for (const loser of losers) {
+        await tx.update(tasksTable).set({ completedById: survivor.id }).where(eq(tasksTable.completedById, loser.id));
+        await tx.update(tasksTable).set({ assignedToId: survivor.id }).where(eq(tasksTable.assignedToId, loser.id));
+        await tx.update(tasksTable).set({ createdById: survivor.id }).where(eq(tasksTable.createdById, loser.id));
+        await tx.update(taskExclusionsTable).set({ createdById: survivor.id }).where(eq(taskExclusionsTable.createdById, loser.id));
+        await tx.update(schedulesTable).set({ staffId: survivor.id }).where(eq(schedulesTable.staffId, loser.id));
+        await tx.update(issuesTable).set({ reportedById: survivor.id }).where(eq(issuesTable.reportedById, loser.id));
+        await tx.update(issuesTable).set({ assignedToId: survivor.id }).where(eq(issuesTable.assignedToId, loser.id));
+        await tx.update(sharedPhotosTable).set({ staffId: survivor.id }).where(eq(sharedPhotosTable.staffId, loser.id));
+        await tx.update(staffLocationsTable).set({ staffId: survivor.id }).where(eq(staffLocationsTable.staffId, loser.id));
+        await tx.update(assignmentsTable).set({ staffId: survivor.id }).where(eq(assignmentsTable.staffId, loser.id));
+        await tx.update(assignmentsTable).set({ assignedById: survivor.id }).where(eq(assignmentsTable.assignedById, loser.id));
+        await tx.update(notificationsTable).set({ staffId: survivor.id }).where(eq(notificationsTable.staffId, loser.id));
+        await tx.delete(staffTable).where(eq(staffTable.id, loser.id));
+        console.log(`Merged duplicate ${survivor.role} "${survivor.name}": kept id=${survivor.id}, merged from id=${loser.id}`);
+      }
+
+      // Keep the in-memory snapshot in sync so subsequent loops (rename,
+      // password clear) don't try to touch a row that no longer exists.
+      for (const loser of losers) {
+        const idx = existingStaff.findIndex((s) => s.id === loser.id);
+        if (idx >= 0) existingStaff.splice(idx, 1);
+      }
+    }
+  });
+
+  // NOTE: a previous version of this seed cleared every manager's PIN on
+  // every startup ("will set PIN on next login"). That was a debug-only
+  // helper and directly conflicts with the requirement that the merge
+  // survivor (e.g. Marcell Sutherland) keep the PIN they already set in
+  // production, so it has been removed. Manager PINs now persist across
+  // restarts the same way staff PINs do.
+
+  // Re-fetch the staff table so the rename loop below sees the post-insert,
+  // post-merge state of the world. The original `existingStaff` snapshot
+  // was loaded before new seed rows were inserted, so a stale snapshot
+  // could let the rename block rename a row to a name that already exists
+  // in DB (re-introducing the very duplicate we just merged).
+  const currentStaff = await db.select().from(staffTable);
+
+  for (const existing of currentStaff) {
     let seedEntry = SEED_STAFF.find((s) => s.name === existing.name);
     if (!seedEntry && (existing.role === "admin" || existing.role === "inspector")) {
       seedEntry = SEED_STAFF.find((s) => s.role === existing.role);
     }
     if (seedEntry && seedEntry.name !== existing.name) {
-      await db.update(staffTable).set({ name: seedEntry.name }).where(eq(staffTable.id, existing.id));
-      console.log(`Renamed ${existing.name} → ${seedEntry.name}`);
+      const targetExists = currentStaff.some(
+        (s) => s.id !== existing.id && s.name === seedEntry!.name
+      );
+      if (targetExists) {
+        console.log(`Skipped renaming ${existing.name} → ${seedEntry.name}: another staff row already has the target name`);
+      } else {
+        const previousName = existing.name;
+        await db.update(staffTable).set({ name: seedEntry.name }).where(eq(staffTable.id, existing.id));
+        existing.name = seedEntry.name;
+        console.log(`Renamed ${previousName} → ${seedEntry.name}`);
+      }
     }
     if (seedEntry && seedEntry.role !== existing.role) {
       await db.update(staffTable).set({ role: seedEntry.role }).where(eq(staffTable.id, existing.id));
