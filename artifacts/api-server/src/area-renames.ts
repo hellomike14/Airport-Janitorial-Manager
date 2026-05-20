@@ -16,6 +16,16 @@ const SHARED_AREA_OLD_NAMES = [
   "R2 - Avis",
   "Taxis",
   "Garden",
+  "Level P1 - East",
+  "Level P1 - West",
+  "Level P2 - East",
+  "Level P2 - West",
+  "Level P3 - East",
+  "Level P3 - West",
+  "Level P4 - East",
+  "Level P4 - West",
+  "Level R2 - East",
+  "Level R2 - West",
 ];
 
 const SHARED = new Set(SHARED_AREA_OLD_NAMES);

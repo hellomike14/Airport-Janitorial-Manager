@@ -4,6 +4,7 @@ import { areasTable, taskExclusionsTable, tasksTable, taskTypesTable } from "@wo
 import { asc, eq, and } from "drizzle-orm";
 import { z } from "zod";
 import { getActiveTaskTypes, getAreaSpecificTasks } from "../lib/ensureTasksForDate";
+import { AREAS_REPLACING_DEFAULTS } from "../area-tasks";
 
 const router: IRouter = Router();
 
@@ -35,7 +36,8 @@ router.get("/:areaId/effective-tasks", async (req, res) => {
     return;
   }
 
-  const globalTypes = await getActiveTaskTypes();
+  const replacesDefaults = AREAS_REPLACING_DEFAULTS.has(`${area.terminal}::${area.name}`);
+  const globalTypes = replacesDefaults ? [] : await getActiveTaskTypes();
   const areaTasks = await getAreaSpecificTasks(area);
 
   const exclusions = await db

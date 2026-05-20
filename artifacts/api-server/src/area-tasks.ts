@@ -25,13 +25,13 @@ const RAW_AREA_SPECIFIC_TASKS: Record<string, { taskName: string; taskOrder: num
     { taskName: "Clean trash bin #2", taskOrder: 17 },
     { taskName: "Clean trash bin #3", taskOrder: 18 },
     { taskName: "Clean trash bin #4", taskOrder: 19 },
-    { taskName: "Clean trash bin #5", taskOrder: 20 },
-    { taskName: "Clean trash bin #6", taskOrder: 21 },
-    { taskName: "Clean trash bin #7", taskOrder: 22 },
-    { taskName: "Clean trash bin #8", taskOrder: 23 },
-    { taskName: "Clean trash bin #9", taskOrder: 24 },
-    { taskName: "Clean trash bin #10", taskOrder: 25 },
-    { taskName: "Clean trash bin #11", taskOrder: 26 },
+  ],
+  "Terminal A - East::Check point": [
+    { taskName: "Clean trash bin #1", taskOrder: 16 },
+  ],
+  "Terminal B - West::Taxis": [
+    { taskName: "Clean trash bin #1", taskOrder: 16 },
+    { taskName: "Clean trash bin #2", taskOrder: 17 },
   ],
   "Level P2 - East": [
     { taskName: "Clean trash bin #1", taskOrder: 16 },
@@ -266,6 +266,24 @@ const TERMINALS_FOR_OLD_KEY: Record<string, string[]> = {
   "Level P4 - West": ["Terminal A - West", "Terminal B - West"],
   "Level R2 - West": ["Terminal A - West", "Terminal B - West"],
 };
+
+// Areas whose area-specific bin list fully replaces the 13 default task types.
+// Keys are raw (pre-rename) qualified keys "Terminal::AreaName"; expanded to
+// post-rename keys below so they line up with what ensureTasksForDate looks up.
+const RAW_AREAS_REPLACING_DEFAULTS: string[] = [
+  "Terminal A - East::Check point",
+  "Terminal A - West::Level P1 - West",
+  "Terminal B - West::Taxis",
+];
+
+export const AREAS_REPLACING_DEFAULTS: Set<string> = new Set(
+  RAW_AREAS_REPLACING_DEFAULTS.map((raw) => {
+    const sep = raw.indexOf("::");
+    const terminal = raw.slice(0, sep);
+    const oldAreaName = raw.slice(sep + 2);
+    return `${terminal}::${renameSharedAreaName(oldAreaName, terminal)}`;
+  }),
+);
 
 export const AREA_SPECIFIC_TASKS: Record<string, { taskName: string; taskOrder: number }[]> = (() => {
   const out: Record<string, { taskName: string; taskOrder: number }[]> = {};

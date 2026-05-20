@@ -1,7 +1,7 @@
 import { db } from "@workspace/db";
 import { tasksTable, areasTable, taskTypesTable, taskExclusionsTable } from "@workspace/db/schema";
 import { eq, and, asc } from "drizzle-orm";
-import { AREA_SPECIFIC_TASKS } from "../area-tasks";
+import { AREA_SPECIFIC_TASKS, AREAS_REPLACING_DEFAULTS } from "../area-tasks";
 
 export const FALLBACK_TASKS = [
   "Routine sweep of all levels — remove debris, trash, and litter",
@@ -43,7 +43,10 @@ export async function getEffectiveTasksForArea(areaId: number): Promise<{ taskNa
     .where(eq(areasTable.id, areaId));
   if (!area) return [];
 
-  const activeTypes = await getActiveTaskTypes();
+  const qualifiedKey = `${area.terminal}::${area.name}`;
+  const replacesDefaults = AREAS_REPLACING_DEFAULTS.has(qualifiedKey);
+
+  const activeTypes = replacesDefaults ? [] : await getActiveTaskTypes();
   const extraTasks = await getAreaSpecificTasks(area);
   const allTasks = [...activeTypes, ...extraTasks];
 

@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { staffTable, areasTable, taskTypesTable, notificationsTable, staffLocationsTable, tasksTable, taskExclusionsTable, assignmentsTable, schedulesTable, issuesTable, sharedPhotosTable } from "@workspace/db/schema";
 import { eq, and, count, inArray, or, gte, like, sql } from "drizzle-orm";
 import { renameSharedAreaName, AREA_RENAME_MAP } from "./area-renames";
+import { AREAS_REPLACING_DEFAULTS } from "./area-tasks";
 import { SEED_STAFF, REMOVED_STAFF_NAMES } from "./seed-data";
 
 const rawPort = process.env["PORT"];
@@ -33,7 +34,7 @@ const RAW_SEED_AREAS = [
   { name: "Level 3 - Row A-G",           terminal: "Terminal A - West", location: "West",         sortOrder: 11 },
   { name: "Level 2 - Row A-G",           terminal: "Terminal A - West", location: "West",         sortOrder: 12 },
   { name: "Level 1 - Row D-G",           terminal: "Terminal A - West", location: "West",         sortOrder: 13 },
-  { name: "R2 - Enterprises",            terminal: "Terminal A - West", location: "West",         sortOrder: 14 },
+  { name: "R1 - Enterprises",            terminal: "Terminal A - West", location: "West",         sortOrder: 14 },
   { name: "R1 - Hertz",                  terminal: "Terminal A - West", location: "West",         sortOrder: 15 },
   { name: "Level 4 - Row C-G",                                terminal: "Terminal B - East", location: "East",         sortOrder: 16 },
   { name: "Level 3 - Row A-G",                                terminal: "Terminal B - East", location: "East",         sortOrder: 17 },
@@ -257,6 +258,11 @@ async function seed() {
     // name first so the second mapping merges "Checkpoint" (id 44) into it.
     { from: { name: "Check Point", terminal: "Terminal A - East" }, to: { name: "Check point", terminal: "Terminal A - East" } },
     { from: { name: "Checkpoint", terminal: "Terminal A - East" }, to: { name: "Check point", terminal: "Terminal A - East" } },
+    // One-time rename: "R2 - Enterprises" → "R1 - Enterprises" on Terminal A
+    // West. Both rental-car rows on that side now live on Level R1. Done in
+    // place via the merge plan so the area's id (and all FK references) are
+    // preserved.
+    { from: { name: "R2 - Enterprises", terminal: "Terminal A - West" }, to: { name: "R1 - Enterprises", terminal: "Terminal A - West" } },
     // Bare Terminal C "Level N" stub rows → corresponding summary row
     { from: { name: "Level 1", terminal: "Terminal C" }, to: { name: "Terminal C - Levels 1, 3, 5", terminal: "Terminal C" } },
     { from: { name: "Level 3", terminal: "Terminal C" }, to: { name: "Terminal C - Levels 1, 3, 5", terminal: "Terminal C" } },
@@ -309,6 +315,15 @@ async function seed() {
     { name: "Terminal B - East Garage", terminal: "Terminal B - East" },
     { name: "Terminal B - West Garage", terminal: "Terminal B - West" },
   ];
+  // Per-terminal parking-level archival exception list. Anything NOT in here
+  // gets archived. Terminal A - West / Level P1 and Level P2 stay active (with
+  // a trimmed bin task list — see area-tasks.ts) per task #38. Terminal B's
+  // Level P1 West is fully removed, the duplicate Level P2 West is removed,
+  // and every other P/R level row stays archived as before.
+  const KEEP_ACTIVE_PARKING: Set<string> = new Set([
+    "Terminal A - West||P1",
+    "Terminal A - West||P2",
+  ]);
   for (const lvl of PARKING_LEVEL_CODES) {
     for (const [terminal, side] of [
       ["Terminal A - East", "East"],
@@ -316,6 +331,7 @@ async function seed() {
       ["Terminal B - East", "East"],
       ["Terminal B - West", "West"],
     ] as const) {
+      if (KEEP_ACTIVE_PARKING.has(`${terminal}||${lvl}`)) continue;
       // Pre-rename form, e.g. "Level P1 - East".
       OBSOLETE_AREA_TARGETS.push({ name: `Level ${lvl} - ${side}`, terminal });
       // Post-rename form, e.g. "Terminal A — Level P1 East".
@@ -332,6 +348,28 @@ async function seed() {
       if (!row.archived) {
         await tx.update(areasTable).set({ archived: true }).where(eq(areasTable.id, row.id));
         console.log(`Archived obsolete area #${row.id} ${target.name} (${target.terminal})`);
+      }
+    }
+  }
+
+  // One-time un-archive for Terminal A - West / Level P1 + Level P2. A previous
+  // version of OBSOLETE_AREA_TARGETS archived these unconditionally; task #38
+  // requires them to be active again with a trimmed bin list (see area-tasks).
+  const REACTIVATE_AREA_TARGETS: Array<{ name: string; terminal: string }> = [
+    { name: "Level P1 - West", terminal: "Terminal A - West" },
+    { name: "Terminal A — Level P1 West", terminal: "Terminal A - West" },
+    { name: "Level P2 - West", terminal: "Terminal A - West" },
+    { name: "Terminal A — Level P2 West", terminal: "Terminal A - West" },
+  ];
+  for (const target of REACTIVATE_AREA_TARGETS) {
+    const matches = await tx
+      .select({ id: areasTable.id, archived: areasTable.archived })
+      .from(areasTable)
+      .where(and(eq(areasTable.name, target.name), eq(areasTable.terminal, target.terminal)));
+    for (const row of matches) {
+      if (row.archived) {
+        await tx.update(areasTable).set({ archived: false }).where(eq(areasTable.id, row.id));
+        console.log(`Reactivated area #${row.id} ${target.name} (${target.terminal})`);
       }
     }
   }
@@ -417,6 +455,78 @@ async function seed() {
         .returning({ id: tasksTable.id });
       if (deleted.length > 0) {
         console.log(`Cleaned up ${deleted.length} duplicate ${target.label} (area ${area.id})`);
+      }
+    }
+  }
+
+  // Trim Terminal A - West / Level P1 West down to bins #1–#4. Any previously
+  // generated "Clean trash bin #5" … "#11" rows for this area on any date are
+  // removed (only the un-completed ones, to preserve historical completion
+  // records the same way exclusions do for today's sheet).
+  const STRAY_P1_WEST_BINS = [
+    "Clean trash bin #5",
+    "Clean trash bin #6",
+    "Clean trash bin #7",
+    "Clean trash bin #8",
+    "Clean trash bin #9",
+    "Clean trash bin #10",
+    "Clean trash bin #11",
+  ];
+  const p1WestAreas = await db
+    .select({ id: areasTable.id })
+    .from(areasTable)
+    .where(
+      and(
+        eq(areasTable.name, renameSharedAreaName("Level P1 - West", "Terminal A - West")),
+        eq(areasTable.terminal, "Terminal A - West"),
+      ),
+    );
+  for (const area of p1WestAreas) {
+    const deleted = await db
+      .delete(tasksTable)
+      .where(
+        and(
+          eq(tasksTable.areaId, area.id),
+          eq(tasksTable.completed, false),
+          inArray(tasksTable.taskName, STRAY_P1_WEST_BINS),
+        ),
+      )
+      .returning({ id: tasksTable.id });
+    if (deleted.length > 0) {
+      console.log(`Cleaned up ${deleted.length} stray P1-West bin tasks (area ${area.id})`);
+    }
+  }
+
+  // Remove the 13 default task-type rows from areas whose area-specific bin
+  // list fully replaces the defaults (Check point, Taxis on Terminal B-West).
+  // Only un-completed rows are removed so historical completion records on
+  // these areas stay intact.
+  const DEFAULT_TASK_NAMES = SEED_TASK_TYPES.map((t) => t.taskName);
+  // Derive the cleanup targets from AREAS_REPLACING_DEFAULTS so the single
+  // configuration source in area-tasks.ts drives both the runtime task
+  // generator and this one-time historical cleanup pass.
+  for (const qualifiedKey of AREAS_REPLACING_DEFAULTS) {
+    const sep = qualifiedKey.indexOf("::");
+    if (sep === -1) continue;
+    const terminal = qualifiedKey.slice(0, sep);
+    const name = qualifiedKey.slice(sep + 2);
+    const matches = await db
+      .select({ id: areasTable.id })
+      .from(areasTable)
+      .where(and(eq(areasTable.name, name), eq(areasTable.terminal, terminal)));
+    for (const area of matches) {
+      const deleted = await db
+        .delete(tasksTable)
+        .where(
+          and(
+            eq(tasksTable.areaId, area.id),
+            eq(tasksTable.completed, false),
+            inArray(tasksTable.taskName, DEFAULT_TASK_NAMES),
+          ),
+        )
+        .returning({ id: tasksTable.id });
+      if (deleted.length > 0) {
+        console.log(`Cleaned up ${deleted.length} default tasks from ${terminal} / ${name} (area ${area.id})`);
       }
     }
   }

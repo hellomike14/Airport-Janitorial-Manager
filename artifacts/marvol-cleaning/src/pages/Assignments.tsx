@@ -148,80 +148,111 @@ export default function Assignments() {
             {t("assignments.noAssignments", { date: format(new Date(selectedDate), "MMM do", { locale: dateLocale }) })}
           </div>
         ) : (
-          <>
-            <div className="sm:hidden divide-y divide-slate-100">
-              {assignments.map((assignment) => (
-                <div key={assignment.id} className="p-4 flex items-start gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-slate-800 text-sm">{assignment.staffName}</p>
-                    <p className="text-sm text-slate-600 mt-0.5 font-medium">{assignment.areaName}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">{t("assignments.assignedByCol")}: {assignment.assignedByName}</p>
-                    {(assignment.notes || assignment.isSpecial) && (
-                      <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
-                        {assignment.isSpecial && <Star className="w-3 h-3 text-amber-500 shrink-0" />}
-                        {assignment.notes || ''}
-                      </p>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => {
-                      if (confirm(t("assignments.removeAssignment"))) {
-                        deleteMutation.mutate({ id: assignment.id });
-                      }
-                    }}
-                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 active:bg-rose-100 rounded-lg transition-colors touch-manipulation"
-                    title={t("assignments.removeAssignmentTitle")}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
+          (() => {
+            // Group assignments by terminal so each terminal only shows the
+            // areas that actually have a shift assignment for the selected
+            // date. Terminals with zero assignments are hidden entirely (per
+            // task #38: stop showing the long jumbled list of unassigned
+            // rows for Terminals A and B).
+            const groupedByTerminal = assignments.reduce<
+              Record<string, typeof assignments>
+            >((acc, a) => {
+              const key = a.terminal || "—";
+              if (!acc[key]) acc[key] = [];
+              acc[key].push(a);
+              return acc;
+            }, {});
+            const terminalOrder = Object.keys(groupedByTerminal).sort();
+            return (
+              <div className="divide-y divide-slate-100">
+                {terminalOrder.map((terminal) => {
+                  const rows = groupedByTerminal[terminal];
+                  return (
+                    <section key={terminal} className="p-0">
+                      <header className="px-6 py-3 bg-slate-50 border-b border-slate-200">
+                        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                          {terminal}
+                        </h2>
+                      </header>
 
-            <table className="hidden sm:table w-full text-left text-sm">
-              <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider text-xs font-bold">
-                <tr>
-                  <th className="px-6 py-4">{t("assignments.staffMember")}</th>
-                  <th className="px-6 py-4">{t("assignments.assignedArea")}</th>
-                  <th className="px-6 py-4">{t("assignments.assignedByCol")}</th>
-                  <th className="px-6 py-4">{t("assignments.notes")}</th>
-                  <th className="px-6 py-4 text-right">{t("common.actions")}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {assignments.map((assignment) => (
-                  <tr key={assignment.id} className="hover:bg-slate-50/50 transition-colors group">
-                    <td className="px-6 py-4 font-bold text-slate-800">
-                      {assignment.staffName}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="font-medium text-slate-700">{assignment.areaName}</span>
-                    </td>
-                    <td className="px-6 py-4 text-slate-500">
-                      {assignment.assignedByName}
-                    </td>
-                    <td className="px-6 py-4 text-slate-500 max-w-xs truncate">
-                      {assignment.isSpecial && <Star className="inline w-3 h-3 text-amber-500 mr-1" />}
-                      {assignment.notes || '-'}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button
-                        onClick={() => {
-                          if (confirm(t("assignments.removeAssignment"))) {
-                            deleteMutation.mutate({ id: assignment.id });
-                          }
-                        }}
-                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                        title={t("assignments.removeAssignmentTitle")}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </>
+                      <div className="sm:hidden divide-y divide-slate-100">
+                        {rows.map((assignment) => (
+                          <div key={assignment.id} className="p-4 flex items-start gap-3">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-bold text-slate-800 text-sm">{assignment.staffName}</p>
+                              <p className="text-sm text-slate-600 mt-0.5 font-medium">{assignment.areaName}</p>
+                              <p className="text-xs text-slate-400 mt-0.5">{t("assignments.assignedByCol")}: {assignment.assignedByName}</p>
+                              {(assignment.notes || assignment.isSpecial) && (
+                                <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
+                                  {assignment.isSpecial && <Star className="w-3 h-3 text-amber-500 shrink-0" />}
+                                  {assignment.notes || ''}
+                                </p>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => {
+                                if (confirm(t("assignments.removeAssignment"))) {
+                                  deleteMutation.mutate({ id: assignment.id });
+                                }
+                              }}
+                              className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 active:bg-rose-100 rounded-lg transition-colors touch-manipulation"
+                              title={t("assignments.removeAssignmentTitle")}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+
+                      <table className="hidden sm:table w-full text-left text-sm">
+                        <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider text-xs font-bold">
+                          <tr>
+                            <th className="px-6 py-4">{t("assignments.staffMember")}</th>
+                            <th className="px-6 py-4">{t("assignments.assignedArea")}</th>
+                            <th className="px-6 py-4">{t("assignments.assignedByCol")}</th>
+                            <th className="px-6 py-4">{t("assignments.notes")}</th>
+                            <th className="px-6 py-4 text-right">{t("common.actions")}</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {rows.map((assignment) => (
+                            <tr key={assignment.id} className="hover:bg-slate-50/50 transition-colors group">
+                              <td className="px-6 py-4 font-bold text-slate-800">
+                                {assignment.staffName}
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className="font-medium text-slate-700">{assignment.areaName}</span>
+                              </td>
+                              <td className="px-6 py-4 text-slate-500">
+                                {assignment.assignedByName}
+                              </td>
+                              <td className="px-6 py-4 text-slate-500 max-w-xs truncate">
+                                {assignment.isSpecial && <Star className="inline w-3 h-3 text-amber-500 mr-1" />}
+                                {assignment.notes || '-'}
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                <button
+                                  onClick={() => {
+                                    if (confirm(t("assignments.removeAssignment"))) {
+                                      deleteMutation.mutate({ id: assignment.id });
+                                    }
+                                  }}
+                                  className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                  title={t("assignments.removeAssignmentTitle")}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </section>
+                  );
+                })}
+              </div>
+            );
+          })()
         )}
       </div>
     </div>
