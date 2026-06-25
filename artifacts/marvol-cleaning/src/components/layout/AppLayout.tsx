@@ -28,6 +28,7 @@ import {
   Camera,
   BarChart3,
   Star,
+  Briefcase,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useTranslation } from "react-i18next";
@@ -95,6 +96,7 @@ function useNavConfig() {
       { href: "/photo-share", icon: Camera, label: t("nav.photoShare") },
       { href: "/weekly-report", icon: BarChart3, label: t("nav.weeklyReport") },
       { href: "/special-requests", icon: Star, label: t("nav.specialRequests") },
+      { href: "/employment", icon: Briefcase, label: t("nav.employment") },
     ],
     supervisor: [
       { href: "/", icon: LayoutDashboard, label: t("nav.dashboard") },
@@ -107,6 +109,7 @@ function useNavConfig() {
       { href: "/employee-portal", icon: Calendar, label: t("nav.employeePortal") },
       { href: "/photo-share", icon: Camera, label: t("nav.photoShare") },
       { href: "/special-requests", icon: Star, label: t("nav.specialRequests") },
+      { href: "/employment", icon: Briefcase, label: t("nav.employment") },
     ],
     inspector: [
       { href: "/issues", icon: AlertTriangle, label: t("nav.openIssues") },

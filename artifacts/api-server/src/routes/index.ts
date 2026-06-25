@@ -13,6 +13,9 @@ import locationsRouter from "./locations";
 import schedulesRouter from "./schedules";
 import sharedPhotosRouter from "./sharedPhotos";
 import weeklyReportRouter from "./weeklyReport";
+import applicationsRouter from "./applications";
+import onboardingRouter from "./onboarding";
+import quickbooksRouter from "./quickbooks";
 
 const router: IRouter = Router();
 
@@ -30,5 +33,8 @@ router.use(locationsRouter);
 router.use("/schedules", schedulesRouter);
 router.use("/shared-photos", sharedPhotosRouter);
 router.use("/weekly-report", weeklyReportRouter);
+router.use("/applications", applicationsRouter);
+router.use("/onboarding", onboardingRouter);
+router.use("/quickbooks", quickbooksRouter);
 
 export default router;

@@ -25,6 +25,8 @@ import EmployeePortal from "./pages/EmployeePortal";
 import PhotoShare from "./pages/PhotoShare";
 import WeeklyReport from "./pages/WeeklyReport";
 import SpecialRequests from "./pages/SpecialRequests";
+import Employment from "./pages/Employment";
+import Apply from "./pages/Apply";
 import Login from "./pages/Login";
 
 const queryClient = new QueryClient({
@@ -64,6 +66,7 @@ function ProtectedRoutes() {
             <Route path="/photo-share" component={PhotoShare} />
             <Route path="/weekly-report" component={WeeklyReport} />
             <Route path="/special-requests" component={SpecialRequests} />
+            <Route path="/employment" component={Employment} />
           </>
         )}
 
@@ -81,6 +84,7 @@ function ProtectedRoutes() {
             <Route path="/photo-share" component={PhotoShare} />
             <Route path="/special-requests" component={SpecialRequests} />
             <Route path="/staff" component={Staff} />
+            <Route path="/employment" component={Employment} />
           </>
         )}
 
@@ -126,7 +130,12 @@ function App() {
         <OfflineProvider>
           <AuthProvider>
             <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-              <ProtectedRoutes />
+              <Switch>
+                <Route path="/apply" component={Apply} />
+                <Route>
+                  <ProtectedRoutes />
+                </Route>
+              </Switch>
             </WouterRouter>
           </AuthProvider>
         </OfflineProvider>

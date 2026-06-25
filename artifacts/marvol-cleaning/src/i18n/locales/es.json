@@ -40,7 +40,6 @@
     "by": "Por",
     "actions": "Acciones",
     "optional": "opcional",
-    "all": "Todos",
     "searchTasks": "Buscar tareas...",
     "noResults": "Sin resultados"
   },
@@ -72,7 +71,8 @@
     "mySchedule": "Mi Horario",
     "photoShare": "Compartir Fotos",
     "weeklyReport": "Informe Semanal",
-    "specialRequests": "Solicitudes Especiales"
+    "specialRequests": "Solicitudes Especiales",
+    "employment": "Empleo"
   },
   "layout": {
     "logout": "Cerrar sesión",
@@ -550,5 +550,175 @@
     "confidentialRecord": "Marvol Servicios de Instalaciones · Aeropuerto Internacional MCO · Registro Operacional Confidencial",
     "downloadPdf": "Descargar PDF de este problema",
     "issueReportTitle": "Informe de Problema #{{id}} — Marvol Servicios de Instalaciones"
+  },
+  "employment": {
+    "title": "Empleo",
+    "subtitle": "Solicitudes, incorporación e integración de nómina",
+    "selectPlaceholder": "Seleccione…",
+    "tabs": {
+      "applications": "Solicitudes",
+      "onboarding": "Incorporación",
+      "quickbooks": "QuickBooks"
+    },
+    "status": {
+      "new": "Nueva",
+      "reviewing": "En revisión",
+      "hired": "Contratado",
+      "rejected": "Rechazada"
+    },
+    "sections": {
+      "applicant": "Solicitante",
+      "applicantDesc": "Información de contacto básica.",
+      "application": "Solicitud de empleo de Marvol",
+      "applicationDesc": "Cuéntenos sobre usted y su historial laboral.",
+      "i9Employee": "Formulario I-9, Sección 1 — Información del empleado",
+      "i9EmployeeDesc": "Verificación de elegibilidad de empleo, completada por el empleado.",
+      "w4Employee": "Formulario W-4 — Certificado de retenciones del empleado",
+      "w4EmployeeDesc": "Información de retención del impuesto federal sobre la renta.",
+      "documents": "Documentos",
+      "documentsDesc": "Suba su identificación, autorización de trabajo o currículum (opcional).",
+      "i9Employer": "Formulario I-9, Sección 2 — Revisión y verificación del empleador",
+      "i9EmployerDesc": "Completada por el empleador tras revisar los documentos del empleado.",
+      "w4Employer": "Formulario W-4 — Solo para uso del empleador",
+      "w4EmployerDesc": "Completada por el empleador."
+    },
+    "fields": {
+      "firstName": "Nombre",
+      "lastName": "Apellido",
+      "email": "Correo electrónico",
+      "phone": "Teléfono",
+      "positionApplied": "Puesto solicitado",
+      "address": "Domicilio",
+      "city": "Ciudad",
+      "state": "Estado",
+      "zip": "Código postal",
+      "desiredPay": "Salario deseado",
+      "employmentType": "Tipo de empleo",
+      "availableStartDate": "Fecha disponible para comenzar",
+      "shiftPreference": "Turno preferido",
+      "legallyAuthorized": "Estoy legalmente autorizado para trabajar en los Estados Unidos",
+      "over18": "Tengo 18 años de edad o más",
+      "emergencyContactName": "Nombre del contacto de emergencia",
+      "emergencyContactPhone": "Teléfono del contacto de emergencia",
+      "previousEmployer": "Empleador más reciente",
+      "previousJobTitle": "Cargo",
+      "previousDuration": "Fechas de empleo",
+      "reasonForLeaving": "Motivo de salida",
+      "education": "Educación",
+      "skills": "Habilidades y experiencia relevantes",
+      "references": "Referencias",
+      "convictedFelony": "¿Alguna vez ha sido condenado por un delito grave?",
+      "felonyExplanation": "Si la respuesta es sí, explique",
+      "howHeard": "¿Cómo se enteró de nosotros?",
+      "middleInitial": "Inicial del segundo nombre",
+      "otherNames": "Otros apellidos usados (si los hay)",
+      "aptNumber": "Número de apartamento",
+      "dateOfBirth": "Fecha de nacimiento",
+      "ssn": "Número de Seguro Social",
+      "citizenshipStatus": "Estado de ciudadanía / inmigración",
+      "uscisNumber": "Número USCIS / Número A",
+      "i94Number": "Número de admisión del Formulario I-94",
+      "passportNumber": "Número de pasaporte extranjero",
+      "countryOfIssuance": "País de emisión",
+      "workAuthExpiration": "Fecha de vencimiento de la autorización de trabajo",
+      "signatureName": "Firma (escriba su nombre completo)",
+      "signatureDate": "Fecha",
+      "filingStatus": "Estado civil para la declaración",
+      "multipleJobs": "Múltiples empleos o el cónyuge trabaja",
+      "claimDependentsAmount": "Crédito por dependientes ($)",
+      "otherDependentsAmount": "Otros dependientes ($)",
+      "otherIncome": "Otros ingresos ($)",
+      "deductions": "Deducciones ($)",
+      "extraWithholding": "Retención adicional ($)",
+      "exempt": "Reclamo exención de retención",
+      "documentTitle": "Título del documento",
+      "issuingAuthority": "Autoridad emisora",
+      "documentNumber": "Número del documento",
+      "expirationDate": "Fecha de vencimiento",
+      "firstDayEmployment": "Primer día de empleo",
+      "employerName": "Nombre del empleador / rep. autorizado",
+      "employerTitle": "Cargo del empleador / rep. autorizado",
+      "businessName": "Nombre de la empresa / organización",
+      "businessAddress": "Dirección de la empresa / organización",
+      "certificationDate": "Fecha de certificación",
+      "employerAddress": "Dirección del empleador",
+      "ein": "Número de identificación del empleador (EIN)",
+      "firstDateEmployment": "Primera fecha de empleo"
+    },
+    "options": {
+      "employmentType": {
+        "fullTime": "Tiempo completo",
+        "partTime": "Medio tiempo",
+        "temporary": "Temporal"
+      },
+      "shiftPreference": {
+        "day": "Día",
+        "evening": "Tarde",
+        "night": "Noche",
+        "any": "Cualquiera"
+      },
+      "citizenshipStatus": {
+        "citizen": "Ciudadano de los EE. UU.",
+        "noncitizenNational": "Nacional no ciudadano",
+        "permanentResident": "Residente permanente legal",
+        "authorizedAlien": "Extranjero autorizado para trabajar"
+      },
+      "filingStatus": {
+        "single": "Soltero o casado declarando por separado",
+        "married": "Casado declarando en conjunto",
+        "headOfHousehold": "Cabeza de familia"
+      }
+    },
+    "apply": {
+      "title": "Solicitud de empleo",
+      "subtitle": "Marvol Facility Services",
+      "uploadPrompt": "Haga clic para subir documentos",
+      "uploadError": "Error al subir. Inténtelo de nuevo.",
+      "nameRequired": "El nombre y el apellido son obligatorios.",
+      "submitError": "No se pudo enviar su solicitud. Inténtelo de nuevo.",
+      "submitButton": "Enviar solicitud",
+      "confirmTitle": "Solicitud recibida",
+      "confirmBody": "Gracias por postularse a Marvol. Nuestro equipo revisará su solicitud y se pondrá en contacto con usted pronto."
+    },
+    "detail": {
+      "printPdf": "Imprimir / PDF",
+      "saved": "Guardado",
+      "status": "Estado",
+      "noPosition": "Sin puesto especificado"
+    },
+    "applications": {
+      "empty": "Aún no hay solicitudes."
+    },
+    "onboarding": {
+      "subtitle": "Siga las listas de verificación de incorporación de cada nuevo empleado.",
+      "addHire": "Agregar empleado",
+      "confirmDelete": "¿Eliminar a este empleado y su lista de verificación?",
+      "progress": "Progreso",
+      "empty": "Aún no hay empleados en incorporación.",
+      "categories": {
+        "step": "Pasos",
+        "document": "Documentos",
+        "training": "Capacitación",
+        "walkthrough": "Recorrido"
+      }
+    },
+    "quickbooks": {
+      "title": "QuickBooks",
+      "subtitle": "Sincronice la nómina y los datos de los empleados con QuickBooks Online.",
+      "connectedBanner": "QuickBooks se conectó correctamente.",
+      "errorBanner": "La conexión con QuickBooks falló. Inténtelo de nuevo.",
+      "notConfiguredTitle": "No configurado",
+      "notConfiguredBody": "Las credenciales de QuickBooks no están configuradas. Agregue el ID de cliente y el secreto de QuickBooks para habilitar esta integración.",
+      "connected": "Conectado a QuickBooks Online",
+      "companyId": "ID de la empresa",
+      "disconnect": "Desconectar",
+      "connectPrompt": "Conecte su cuenta de QuickBooks Online para sincronizar los datos de empleados y nómina.",
+      "connectButton": "Conectar con QuickBooks"
+    },
+    "pdf": {
+      "title": "Solicitud de empleo",
+      "generated": "Generado {{date}}",
+      "confidential": "Registro de empleo confidencial — Marvol Facility Services"
+    }
   }
 }

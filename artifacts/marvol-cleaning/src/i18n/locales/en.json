@@ -40,7 +40,6 @@
     "by": "By",
     "actions": "Actions",
     "optional": "optional",
-    "all": "All",
     "searchTasks": "Search tasks...",
     "noResults": "No results"
   },
@@ -72,7 +71,8 @@
     "mySchedule": "My Schedule",
     "photoShare": "Photo Share",
     "weeklyReport": "Weekly Report",
-    "specialRequests": "Special Requests"
+    "specialRequests": "Special Requests",
+    "employment": "Employment"
   },
   "layout": {
     "logout": "Log out",
@@ -550,5 +550,175 @@
     "confidentialRecord": "Marvol Facility Services · MCO International Airport · Confidential Operations Record",
     "downloadPdf": "Download PDF for this issue",
     "issueReportTitle": "Issue Report #{{id}} — Marvol Facility Services"
+  },
+  "employment": {
+    "title": "Employment",
+    "subtitle": "Applications, onboarding, and payroll integration",
+    "selectPlaceholder": "Select…",
+    "tabs": {
+      "applications": "Applications",
+      "onboarding": "Onboarding",
+      "quickbooks": "QuickBooks"
+    },
+    "status": {
+      "new": "New",
+      "reviewing": "Reviewing",
+      "hired": "Hired",
+      "rejected": "Rejected"
+    },
+    "sections": {
+      "applicant": "Applicant",
+      "applicantDesc": "Basic contact information.",
+      "application": "Marvol Job Application",
+      "applicationDesc": "Tell us about yourself and your work history.",
+      "i9Employee": "Form I-9, Section 1 — Employee Information",
+      "i9EmployeeDesc": "Employment Eligibility Verification, completed by the employee.",
+      "w4Employee": "Form W-4 — Employee's Withholding Certificate",
+      "w4EmployeeDesc": "Federal income tax withholding information.",
+      "documents": "Documents",
+      "documentsDesc": "Upload your ID, work authorization, or resume (optional).",
+      "i9Employer": "Form I-9, Section 2 — Employer Review & Verification",
+      "i9EmployerDesc": "Completed by the employer after reviewing the employee's documents.",
+      "w4Employer": "Form W-4 — Employer Use Only",
+      "w4EmployerDesc": "Completed by the employer."
+    },
+    "fields": {
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "email": "Email",
+      "phone": "Phone",
+      "positionApplied": "Position Applied For",
+      "address": "Street Address",
+      "city": "City",
+      "state": "State",
+      "zip": "ZIP Code",
+      "desiredPay": "Desired Pay",
+      "employmentType": "Employment Type",
+      "availableStartDate": "Available Start Date",
+      "shiftPreference": "Shift Preference",
+      "legallyAuthorized": "I am legally authorized to work in the United States",
+      "over18": "I am 18 years of age or older",
+      "emergencyContactName": "Emergency Contact Name",
+      "emergencyContactPhone": "Emergency Contact Phone",
+      "previousEmployer": "Most Recent Employer",
+      "previousJobTitle": "Job Title",
+      "previousDuration": "Dates Employed",
+      "reasonForLeaving": "Reason for Leaving",
+      "education": "Education",
+      "skills": "Relevant Skills & Experience",
+      "references": "References",
+      "convictedFelony": "Have you ever been convicted of a felony?",
+      "felonyExplanation": "If yes, please explain",
+      "howHeard": "How did you hear about us?",
+      "middleInitial": "Middle Initial",
+      "otherNames": "Other Last Names Used (if any)",
+      "aptNumber": "Apt. Number",
+      "dateOfBirth": "Date of Birth",
+      "ssn": "Social Security Number",
+      "citizenshipStatus": "Citizenship / Immigration Status",
+      "uscisNumber": "USCIS / A-Number",
+      "i94Number": "Form I-94 Admission Number",
+      "passportNumber": "Foreign Passport Number",
+      "countryOfIssuance": "Country of Issuance",
+      "workAuthExpiration": "Work Authorization Expiration Date",
+      "signatureName": "Signature (type full name)",
+      "signatureDate": "Date",
+      "filingStatus": "Filing Status",
+      "multipleJobs": "Multiple jobs or spouse works",
+      "claimDependentsAmount": "Claim Dependents ($)",
+      "otherDependentsAmount": "Other Dependents ($)",
+      "otherIncome": "Other Income ($)",
+      "deductions": "Deductions ($)",
+      "extraWithholding": "Extra Withholding ($)",
+      "exempt": "I claim exemption from withholding",
+      "documentTitle": "Document Title",
+      "issuingAuthority": "Issuing Authority",
+      "documentNumber": "Document Number",
+      "expirationDate": "Expiration Date",
+      "firstDayEmployment": "First Day of Employment",
+      "employerName": "Employer / Authorized Rep. Name",
+      "employerTitle": "Title of Employer / Authorized Rep.",
+      "businessName": "Business / Organization Name",
+      "businessAddress": "Business / Organization Address",
+      "certificationDate": "Certification Date",
+      "employerAddress": "Employer Address",
+      "ein": "Employer Identification Number (EIN)",
+      "firstDateEmployment": "First Date of Employment"
+    },
+    "options": {
+      "employmentType": {
+        "fullTime": "Full-time",
+        "partTime": "Part-time",
+        "temporary": "Temporary"
+      },
+      "shiftPreference": {
+        "day": "Day",
+        "evening": "Evening",
+        "night": "Night",
+        "any": "Any"
+      },
+      "citizenshipStatus": {
+        "citizen": "U.S. Citizen",
+        "noncitizenNational": "Noncitizen National",
+        "permanentResident": "Lawful Permanent Resident",
+        "authorizedAlien": "Noncitizen Authorized to Work"
+      },
+      "filingStatus": {
+        "single": "Single or Married filing separately",
+        "married": "Married filing jointly",
+        "headOfHousehold": "Head of Household"
+      }
+    },
+    "apply": {
+      "title": "Employment Application",
+      "subtitle": "Marvol Facility Services",
+      "uploadPrompt": "Click to upload documents",
+      "uploadError": "Upload failed. Please try again.",
+      "nameRequired": "First and last name are required.",
+      "submitError": "Could not submit your application. Please try again.",
+      "submitButton": "Submit Application",
+      "confirmTitle": "Application Received",
+      "confirmBody": "Thank you for applying to Marvol. Our team will review your application and contact you soon."
+    },
+    "detail": {
+      "printPdf": "Print / PDF",
+      "saved": "Saved",
+      "status": "Status",
+      "noPosition": "No position specified"
+    },
+    "applications": {
+      "empty": "No applications yet."
+    },
+    "onboarding": {
+      "subtitle": "Track onboarding checklists for each new hire.",
+      "addHire": "Add Hire",
+      "confirmDelete": "Remove this hire and their checklist?",
+      "progress": "Progress",
+      "empty": "No hires in onboarding yet.",
+      "categories": {
+        "step": "Steps",
+        "document": "Documents",
+        "training": "Training",
+        "walkthrough": "Walkthrough"
+      }
+    },
+    "quickbooks": {
+      "title": "QuickBooks",
+      "subtitle": "Sync payroll and employee data with QuickBooks Online.",
+      "connectedBanner": "QuickBooks connected successfully.",
+      "errorBanner": "QuickBooks connection failed. Please try again.",
+      "notConfiguredTitle": "Not configured",
+      "notConfiguredBody": "QuickBooks credentials are not set up. Add the QuickBooks client ID and secret to enable this integration.",
+      "connected": "Connected to QuickBooks Online",
+      "companyId": "Company ID",
+      "disconnect": "Disconnect",
+      "connectPrompt": "Connect your QuickBooks Online account to sync employee and payroll data.",
+      "connectButton": "Connect to QuickBooks"
+    },
+    "pdf": {
+      "title": "Employment Application",
+      "generated": "Generated {{date}}",
+      "confidential": "Confidential employment record — Marvol Facility Services"
+    }
   }
 }

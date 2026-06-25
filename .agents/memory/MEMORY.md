@@ -1,0 +1,1 @@
+- [Marvol typecheck quirks](marvol-typecheck.md) — repo typecheck is red on master; orval query-options need queryKey, so prefer plain fetch fns over disabled-query hooks.

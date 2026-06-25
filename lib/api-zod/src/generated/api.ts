@@ -731,3 +731,290 @@ export const GetDashboardResponse = zod.object({
     }),
   ),
 });
+
+/**
+ * @summary List job applications (admin/supervisor)
+ */
+export const ListApplicationsQueryParams = zod.object({
+  status: zod.coerce.string().optional(),
+});
+
+export const ListApplicationsResponseItem = zod.object({
+  id: zod.number(),
+  status: zod.enum(["new", "reviewing", "hired", "rejected"]),
+  firstName: zod.string(),
+  lastName: zod.string(),
+  email: zod.string().nullish(),
+  phone: zod.string().nullish(),
+  positionApplied: zod.string().nullish(),
+  application: zod.record(zod.string(), zod.unknown()),
+  i9Employee: zod.record(zod.string(), zod.unknown()),
+  i9Employer: zod.record(zod.string(), zod.unknown()),
+  w4Employee: zod.record(zod.string(), zod.unknown()),
+  w4Employer: zod.record(zod.string(), zod.unknown()),
+  documents: zod.array(
+    zod.object({
+      name: zod.string(),
+      path: zod.string(),
+      contentType: zod.string().optional(),
+    }),
+  ),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+export const ListApplicationsResponse = zod.array(ListApplicationsResponseItem);
+
+/**
+ * @summary Submit a public job application (unauthenticated)
+ */
+export const SubmitApplicationBody = zod.object({
+  firstName: zod.string(),
+  lastName: zod.string(),
+  email: zod.string().nullish(),
+  phone: zod.string().nullish(),
+  positionApplied: zod.string().nullish(),
+  application: zod.record(zod.string(), zod.unknown()).optional(),
+  i9Employee: zod.record(zod.string(), zod.unknown()).optional(),
+  w4Employee: zod.record(zod.string(), zod.unknown()).optional(),
+  documents: zod
+    .array(
+      zod.object({
+        name: zod.string(),
+        path: zod.string(),
+        contentType: zod.string().optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * @summary Get a single application
+ */
+export const GetApplicationParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetApplicationResponse = zod.object({
+  id: zod.number(),
+  status: zod.enum(["new", "reviewing", "hired", "rejected"]),
+  firstName: zod.string(),
+  lastName: zod.string(),
+  email: zod.string().nullish(),
+  phone: zod.string().nullish(),
+  positionApplied: zod.string().nullish(),
+  application: zod.record(zod.string(), zod.unknown()),
+  i9Employee: zod.record(zod.string(), zod.unknown()),
+  i9Employer: zod.record(zod.string(), zod.unknown()),
+  w4Employee: zod.record(zod.string(), zod.unknown()),
+  w4Employer: zod.record(zod.string(), zod.unknown()),
+  documents: zod.array(
+    zod.object({
+      name: zod.string(),
+      path: zod.string(),
+      contentType: zod.string().optional(),
+    }),
+  ),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+
+/**
+ * @summary Update application status and employer-side fields
+ */
+export const UpdateApplicationParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateApplicationBody = zod.object({
+  status: zod.enum(["new", "reviewing", "hired", "rejected"]).optional(),
+  i9Employer: zod.record(zod.string(), zod.unknown()).optional(),
+  w4Employer: zod.record(zod.string(), zod.unknown()).optional(),
+});
+
+export const UpdateApplicationResponse = zod.object({
+  id: zod.number(),
+  status: zod.enum(["new", "reviewing", "hired", "rejected"]),
+  firstName: zod.string(),
+  lastName: zod.string(),
+  email: zod.string().nullish(),
+  phone: zod.string().nullish(),
+  positionApplied: zod.string().nullish(),
+  application: zod.record(zod.string(), zod.unknown()),
+  i9Employee: zod.record(zod.string(), zod.unknown()),
+  i9Employer: zod.record(zod.string(), zod.unknown()),
+  w4Employee: zod.record(zod.string(), zod.unknown()),
+  w4Employer: zod.record(zod.string(), zod.unknown()),
+  documents: zod.array(
+    zod.object({
+      name: zod.string(),
+      path: zod.string(),
+      contentType: zod.string().optional(),
+    }),
+  ),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+
+/**
+ * @summary List onboarding hires with progress
+ */
+export const ListOnboardingHiresResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  position: zod.string().nullish(),
+  applicationId: zod.number().nullish(),
+  createdAt: zod.string(),
+  items: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        hireId: zod.number(),
+        category: zod.enum(["step", "document", "training", "walkthrough"]),
+        title: zod.string(),
+        description: zod.string().nullish(),
+        completed: zod.boolean(),
+        completedAt: zod.string().nullish(),
+        sortOrder: zod.number(),
+        createdAt: zod.string(),
+      }),
+    )
+    .optional(),
+  totalItems: zod.number().optional(),
+  completedItems: zod.number().optional(),
+});
+export const ListOnboardingHiresResponse = zod.array(
+  ListOnboardingHiresResponseItem,
+);
+
+/**
+ * @summary Create an onboarding checklist for a new hire
+ */
+export const CreateOnboardingHireBody = zod.object({
+  name: zod.string(),
+  position: zod.string().nullish(),
+  applicationId: zod.number().nullish(),
+});
+
+/**
+ * @summary Get an onboarding hire with its checklist items
+ */
+export const GetOnboardingHireParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetOnboardingHireResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  position: zod.string().nullish(),
+  applicationId: zod.number().nullish(),
+  createdAt: zod.string(),
+  items: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        hireId: zod.number(),
+        category: zod.enum(["step", "document", "training", "walkthrough"]),
+        title: zod.string(),
+        description: zod.string().nullish(),
+        completed: zod.boolean(),
+        completedAt: zod.string().nullish(),
+        sortOrder: zod.number(),
+        createdAt: zod.string(),
+      }),
+    )
+    .optional(),
+  totalItems: zod.number().optional(),
+  completedItems: zod.number().optional(),
+});
+
+/**
+ * @summary Delete an onboarding hire
+ */
+export const DeleteOnboardingHireParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const DeleteOnboardingHireResponse = zod.object({
+  success: zod.boolean(),
+});
+
+/**
+ * @summary Add a checklist item to a hire
+ */
+export const CreateOnboardingItemParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const CreateOnboardingItemBody = zod.object({
+  category: zod
+    .enum(["step", "document", "training", "walkthrough"])
+    .optional(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  sortOrder: zod.number().optional(),
+});
+
+/**
+ * @summary Update a checklist item (completion or content)
+ */
+export const UpdateOnboardingItemParams = zod.object({
+  itemId: zod.coerce.number(),
+});
+
+export const UpdateOnboardingItemBody = zod.object({
+  completed: zod.boolean().optional(),
+  title: zod.string().optional(),
+  description: zod.string().nullish(),
+});
+
+export const UpdateOnboardingItemResponse = zod.object({
+  id: zod.number(),
+  hireId: zod.number(),
+  category: zod.enum(["step", "document", "training", "walkthrough"]),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  completed: zod.boolean(),
+  completedAt: zod.string().nullish(),
+  sortOrder: zod.number(),
+  createdAt: zod.string(),
+});
+
+/**
+ * @summary Delete a checklist item
+ */
+export const DeleteOnboardingItemParams = zod.object({
+  itemId: zod.coerce.number(),
+});
+
+export const DeleteOnboardingItemResponse = zod.object({
+  success: zod.boolean(),
+});
+
+/**
+ * @summary Get QuickBooks connection status
+ */
+export const GetQuickbooksStatusResponse = zod.object({
+  configured: zod.boolean(),
+  connected: zod.boolean(),
+  realmId: zod.string().nullish(),
+  companyName: zod.string().nullish(),
+  connectedAt: zod.string().nullish(),
+});
+
+/**
+ * @summary Get the Intuit OAuth authorize URL
+ */
+export const GetQuickbooksConnectUrlResponse = zod.object({
+  authorizeUrl: zod.string(),
+});
+
+/**
+ * @summary Disconnect the QuickBooks account
+ */
+export const DisconnectQuickbooksResponse = zod.object({
+  configured: zod.boolean(),
+  connected: zod.boolean(),
+  realmId: zod.string().nullish(),
+  companyName: zod.string().nullish(),
+  connectedAt: zod.string().nullish(),
+});

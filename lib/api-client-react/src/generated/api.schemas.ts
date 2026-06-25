@@ -333,6 +333,162 @@ export interface DeleteResponse {
   success: boolean;
 }
 
+export type JobApplicationStatus =
+  (typeof JobApplicationStatus)[keyof typeof JobApplicationStatus];
+
+export const JobApplicationStatus = {
+  new: "new",
+  reviewing: "reviewing",
+  hired: "hired",
+  rejected: "rejected",
+} as const;
+
+export type JobApplicationApplication = { [key: string]: unknown };
+
+export type JobApplicationI9Employee = { [key: string]: unknown };
+
+export type JobApplicationI9Employer = { [key: string]: unknown };
+
+export type JobApplicationW4Employee = { [key: string]: unknown };
+
+export type JobApplicationW4Employer = { [key: string]: unknown };
+
+export interface UploadedDocument {
+  name: string;
+  path: string;
+  contentType?: string;
+}
+
+export interface JobApplication {
+  id: number;
+  status: JobApplicationStatus;
+  firstName: string;
+  lastName: string;
+  email?: string | null;
+  phone?: string | null;
+  positionApplied?: string | null;
+  application: JobApplicationApplication;
+  i9Employee: JobApplicationI9Employee;
+  i9Employer: JobApplicationI9Employer;
+  w4Employee: JobApplicationW4Employee;
+  w4Employer: JobApplicationW4Employer;
+  documents: UploadedDocument[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type SubmitApplicationRequestApplication = { [key: string]: unknown };
+
+export type SubmitApplicationRequestI9Employee = { [key: string]: unknown };
+
+export type SubmitApplicationRequestW4Employee = { [key: string]: unknown };
+
+export interface SubmitApplicationRequest {
+  firstName: string;
+  lastName: string;
+  email?: string | null;
+  phone?: string | null;
+  positionApplied?: string | null;
+  application?: SubmitApplicationRequestApplication;
+  i9Employee?: SubmitApplicationRequestI9Employee;
+  w4Employee?: SubmitApplicationRequestW4Employee;
+  documents?: UploadedDocument[];
+}
+
+export type UpdateApplicationRequestStatus =
+  (typeof UpdateApplicationRequestStatus)[keyof typeof UpdateApplicationRequestStatus];
+
+export const UpdateApplicationRequestStatus = {
+  new: "new",
+  reviewing: "reviewing",
+  hired: "hired",
+  rejected: "rejected",
+} as const;
+
+export type UpdateApplicationRequestI9Employer = { [key: string]: unknown };
+
+export type UpdateApplicationRequestW4Employer = { [key: string]: unknown };
+
+export interface UpdateApplicationRequest {
+  status?: UpdateApplicationRequestStatus;
+  i9Employer?: UpdateApplicationRequestI9Employer;
+  w4Employer?: UpdateApplicationRequestW4Employer;
+}
+
+export type OnboardingItemCategory =
+  (typeof OnboardingItemCategory)[keyof typeof OnboardingItemCategory];
+
+export const OnboardingItemCategory = {
+  step: "step",
+  document: "document",
+  training: "training",
+  walkthrough: "walkthrough",
+} as const;
+
+export interface OnboardingItem {
+  id: number;
+  hireId: number;
+  category: OnboardingItemCategory;
+  title: string;
+  description?: string | null;
+  completed: boolean;
+  completedAt?: string | null;
+  sortOrder: number;
+  createdAt: string;
+}
+
+export interface OnboardingHire {
+  id: number;
+  name: string;
+  position?: string | null;
+  applicationId?: number | null;
+  createdAt: string;
+  items?: OnboardingItem[];
+  totalItems?: number;
+  completedItems?: number;
+}
+
+export interface CreateOnboardingHireRequest {
+  name: string;
+  position?: string | null;
+  applicationId?: number | null;
+}
+
+export type CreateOnboardingItemRequestCategory =
+  (typeof CreateOnboardingItemRequestCategory)[keyof typeof CreateOnboardingItemRequestCategory];
+
+export const CreateOnboardingItemRequestCategory = {
+  step: "step",
+  document: "document",
+  training: "training",
+  walkthrough: "walkthrough",
+} as const;
+
+export interface CreateOnboardingItemRequest {
+  category?: CreateOnboardingItemRequestCategory;
+  title: string;
+  description?: string | null;
+  sortOrder?: number;
+}
+
+export interface UpdateOnboardingItemRequest {
+  completed?: boolean;
+  title?: string;
+  description?: string | null;
+}
+
+export interface QuickbooksStatus {
+  configured: boolean;
+  connected: boolean;
+  realmId?: string | null;
+  companyName?: string | null;
+  connectedAt?: string | null;
+}
+
+export interface QuickbooksConnectUrl {
+  authorizeUrl: string;
+}
+
 export type ListTasksParams = {
   areaId?: number;
   date?: string;
@@ -369,4 +525,8 @@ export type ListNotificationsParams = {
 
 export type GetDashboardParams = {
   date?: string;
+};
+
+export type ListApplicationsParams = {
+  status?: string;
 };

@@ -774,6 +774,265 @@ paths:
               schema:
                 $ref: "#/components/schemas/DashboardStats"
 
+  /applications:
+    get:
+      operationId: listApplications
+      tags: [employment]
+      summary: List job applications (admin/supervisor)
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of applications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/JobApplication"
+    post:
+      operationId: submitApplication
+      tags: [employment]
+      summary: Submit a public job application (unauthenticated)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitApplicationRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobApplication"
+
+  /applications/{id}:
+    get:
+      operationId: getApplication
+      tags: [employment]
+      summary: Get a single application
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Application detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobApplication"
+    patch:
+      operationId: updateApplication
+      tags: [employment]
+      summary: Update application status and employer-side fields
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateApplicationRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobApplication"
+
+  /onboarding:
+    get:
+      operationId: listOnboardingHires
+      tags: [employment]
+      summary: List onboarding hires with progress
+      responses:
+        "200":
+          description: List of hires
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OnboardingHire"
+    post:
+      operationId: createOnboardingHire
+      tags: [employment]
+      summary: Create an onboarding checklist for a new hire
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOnboardingHireRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingHire"
+
+  /onboarding/{id}:
+    get:
+      operationId: getOnboardingHire
+      tags: [employment]
+      summary: Get an onboarding hire with its checklist items
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Hire detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingHire"
+    delete:
+      operationId: deleteOnboardingHire
+      tags: [employment]
+      summary: Delete an onboarding hire
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+
+  /onboarding/{id}/items:
+    post:
+      operationId: createOnboardingItem
+      tags: [employment]
+      summary: Add a checklist item to a hire
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOnboardingItemRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingItem"
+
+  /onboarding/items/{itemId}:
+    patch:
+      operationId: updateOnboardingItem
+      tags: [employment]
+      summary: Update a checklist item (completion or content)
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOnboardingItemRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingItem"
+    delete:
+      operationId: deleteOnboardingItem
+      tags: [employment]
+      summary: Delete a checklist item
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+
+  /quickbooks/status:
+    get:
+      operationId: getQuickbooksStatus
+      tags: [employment]
+      summary: Get QuickBooks connection status
+      responses:
+        "200":
+          description: Connection status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuickbooksStatus"
+
+  /quickbooks/connect:
+    get:
+      operationId: getQuickbooksConnectUrl
+      tags: [employment]
+      summary: Get the Intuit OAuth authorize URL
+      responses:
+        "200":
+          description: Authorize URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuickbooksConnectUrl"
+        "409":
+          description: Not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /quickbooks/disconnect:
+    post:
+      operationId: disconnectQuickbooks
+      tags: [employment]
+      summary: Disconnect the QuickBooks account
+      responses:
+        "200":
+          description: Disconnected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuickbooksStatus"
+
 components:
   schemas:
     HealthStatus:
@@ -1413,3 +1672,250 @@ components:
           type: boolean
       required:
         - success
+
+    JobApplication:
+      type: object
+      properties:
+        id:
+          type: integer
+        status:
+          type: string
+          enum: [new, reviewing, hired, rejected]
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        positionApplied:
+          type: string
+          nullable: true
+        application:
+          type: object
+          additionalProperties: true
+        i9Employee:
+          type: object
+          additionalProperties: true
+        i9Employer:
+          type: object
+          additionalProperties: true
+        w4Employee:
+          type: object
+          additionalProperties: true
+        w4Employer:
+          type: object
+          additionalProperties: true
+        documents:
+          type: array
+          items:
+            $ref: "#/components/schemas/UploadedDocument"
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - status
+        - firstName
+        - lastName
+        - application
+        - i9Employee
+        - i9Employer
+        - w4Employee
+        - w4Employer
+        - documents
+        - createdAt
+        - updatedAt
+
+    UploadedDocument:
+      type: object
+      properties:
+        name:
+          type: string
+        path:
+          type: string
+        contentType:
+          type: string
+      required:
+        - name
+        - path
+
+    SubmitApplicationRequest:
+      type: object
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        positionApplied:
+          type: string
+          nullable: true
+        application:
+          type: object
+          additionalProperties: true
+        i9Employee:
+          type: object
+          additionalProperties: true
+        w4Employee:
+          type: object
+          additionalProperties: true
+        documents:
+          type: array
+          items:
+            $ref: "#/components/schemas/UploadedDocument"
+      required:
+        - firstName
+        - lastName
+
+    UpdateApplicationRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [new, reviewing, hired, rejected]
+        i9Employer:
+          type: object
+          additionalProperties: true
+        w4Employer:
+          type: object
+          additionalProperties: true
+
+    OnboardingItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        hireId:
+          type: integer
+        category:
+          type: string
+          enum: [step, document, training, walkthrough]
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        completed:
+          type: boolean
+        completedAt:
+          type: string
+          nullable: true
+        sortOrder:
+          type: integer
+        createdAt:
+          type: string
+      required:
+        - id
+        - hireId
+        - category
+        - title
+        - completed
+        - sortOrder
+        - createdAt
+
+    OnboardingHire:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        position:
+          type: string
+          nullable: true
+        applicationId:
+          type: integer
+          nullable: true
+        createdAt:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OnboardingItem"
+        totalItems:
+          type: integer
+        completedItems:
+          type: integer
+      required:
+        - id
+        - name
+        - createdAt
+
+    CreateOnboardingHireRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        position:
+          type: string
+          nullable: true
+        applicationId:
+          type: integer
+          nullable: true
+      required:
+        - name
+
+    CreateOnboardingItemRequest:
+      type: object
+      properties:
+        category:
+          type: string
+          enum: [step, document, training, walkthrough]
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        sortOrder:
+          type: integer
+      required:
+        - title
+
+    UpdateOnboardingItemRequest:
+      type: object
+      properties:
+        completed:
+          type: boolean
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+
+    QuickbooksStatus:
+      type: object
+      properties:
+        configured:
+          type: boolean
+        connected:
+          type: boolean
+        realmId:
+          type: string
+          nullable: true
+        companyName:
+          type: string
+          nullable: true
+        connectedAt:
+          type: string
+          nullable: true
+      required:
+        - configured
+        - connected
+
+    QuickbooksConnectUrl:
+      type: object
+      properties:
+        authorizeUrl:
+          type: string
+      required:
+        - authorizeUrl
