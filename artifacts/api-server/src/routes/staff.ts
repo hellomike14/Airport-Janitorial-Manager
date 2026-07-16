@@ -155,7 +155,15 @@ router.put("/:id", async (req, res) => {
 
 router.delete("/:id", async (req, res) => {
   const { id } = DeleteStaffMemberParams.parse({ id: req.params.id });
-  await db.delete(staffTable).where(eq(staffTable.id, id));
+  const [updated] = await db
+    .update(staffTable)
+    .set({ active: false })
+    .where(eq(staffTable.id, id))
+    .returning();
+  if (!updated) {
+    res.status(404).json({ error: "Staff member not found" });
+    return;
+  }
   res.json({ success: true });
 });
 

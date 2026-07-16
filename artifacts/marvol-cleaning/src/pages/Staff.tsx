@@ -30,6 +30,7 @@ export default function Staff() {
   const deleteMutation = useDeleteStaffMember({
     mutation: {
       onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/staff"] }),
+      onError: () => alert(t("staff.removeFailed")),
     },
   });
 

@@ -267,7 +267,8 @@
     "switchRole": "Switch {{name}} to {{role}} role?",
     "switchToSupervisor": "Switch to Supervisor",
     "switchToStaff": "Switch to Staff",
-    "loadingDirectory": "Loading staff directory..."
+    "loadingDirectory": "Loading staff directory...",
+    "removeFailed": "Could not remove staff member. Please try again."
   },
   "areas": {
     "cleaningZones": "Cleaning Zones",

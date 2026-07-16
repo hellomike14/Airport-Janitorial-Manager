@@ -267,7 +267,8 @@
     "switchRole": "Changer {{name}} au rôle de {{role}} ?",
     "switchToSupervisor": "Passer à Superviseur",
     "switchToStaff": "Passer à Personnel",
-    "loadingDirectory": "Chargement du répertoire du personnel..."
+    "loadingDirectory": "Chargement du répertoire du personnel...",
+    "removeFailed": "Impossible de supprimer le membre du personnel. Veuillez réessayer."
   },
   "areas": {
     "cleaningZones": "Zones de Nettoyage",
