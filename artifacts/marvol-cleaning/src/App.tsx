@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -28,6 +29,7 @@ import SpecialRequests from "./pages/SpecialRequests";
 import Employment from "./pages/Employment";
 import Apply from "./pages/Apply";
 import Login from "./pages/Login";
+import { GateScreen } from "./components/GateScreen";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -37,6 +39,25 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+function GatedApp() {
+  const [gateState, setGateState] = useState<"checking" | "locked" | "open">("checking");
+
+  useEffect(() => {
+    const base = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+    fetch(`${base}/api/gate/status`)
+      .then((res) => setGateState(res.ok ? "open" : "locked"))
+      .catch(() => setGateState("locked"));
+  }, []);
+
+  if (gateState === "checking") {
+    return <div className="min-h-screen bg-slate-900" />;
+  }
+  if (gateState === "locked") {
+    return <GateScreen onUnlocked={() => setGateState("open")} />;
+  }
+  return <ProtectedRoutes />;
+}
 
 function ProtectedRoutes() {
   const { currentUser, effectiveRole } = useAuth();
@@ -133,7 +154,7 @@ function App() {
               <Switch>
                 <Route path="/apply" component={Apply} />
                 <Route>
-                  <ProtectedRoutes />
+                  <GatedApp />
                 </Route>
               </Switch>
             </WouterRouter>

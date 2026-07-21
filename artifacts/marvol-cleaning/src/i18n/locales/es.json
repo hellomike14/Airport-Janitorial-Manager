@@ -268,7 +268,12 @@
     "switchToSupervisor": "Cambiar a Supervisor",
     "switchToStaff": "Cambiar a Personal",
     "loadingDirectory": "Cargando directorio de personal...",
-    "removeFailed": "No se pudo eliminar al miembro del personal. Inténtelo de nuevo."
+    "removeFailed": "No se pudo eliminar al miembro del personal. Inténtelo de nuevo.",
+    "setPinPrompt": "Ingrese un nuevo código de 4 dígitos para {{name}}:",
+    "pinFormatError": "El código debe tener exactamente 4 dígitos.",
+    "pinSaved": "Código guardado para {{name}}.",
+    "pinSaveFailed": "No se pudo guardar el código. Inténtelo de nuevo.",
+    "adminPinPrompt": "Ingrese SU código de administrador para confirmar:"
   },
   "areas": {
     "cleaningZones": "Zonas de Limpieza",
@@ -721,5 +726,14 @@
       "generated": "Generado {{date}}",
       "confidential": "Registro de empleo confidencial — Marvol Facility Services"
     }
+  },
+  "gate": {
+    "title": "Acceso de empleados",
+    "subtitle": "Ingrese su código de acceso personal para entrar al portal de Marvol.",
+    "incorrectCode": "Código incorrecto. Inténtelo de nuevo.",
+    "tooManyAttempts": "Demasiados intentos. Espere 15 minutos e inténtelo de nuevo.",
+    "networkError": "Problema de conexión. Inténtelo de nuevo.",
+    "checking": "Verificando...",
+    "footer": "Marvol Facility Cleaning — solo empleados autorizados."
   }
 }

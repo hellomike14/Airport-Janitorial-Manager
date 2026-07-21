@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { staffTable } from "@workspace/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and, isNotNull } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import {
   CreateStaffMemberBody,
@@ -76,7 +76,7 @@ router.post("/verify-pin", async (req, res) => {
 });
 
 router.post("/set-pin", async (req, res) => {
-  const { staffId, pin, currentPin } = req.body;
+  const { staffId, pin, currentPin, adminReset, adminPin } = req.body;
   if (!staffId || !pin) {
     res.status(400).json({ error: "staffId and pin required" });
     return;
@@ -93,7 +93,28 @@ router.post("/set-pin", async (req, res) => {
     res.status(404).json({ error: "Staff not found" });
     return;
   }
-  if (staff.password) {
+  let adminVerified = false;
+  if (adminReset === true) {
+    if (typeof adminPin !== "string" || !PIN_REGEX.test(adminPin)) {
+      res.status(401).json({ error: "Admin PIN required for admin reset" });
+      return;
+    }
+    const admins = await db
+      .select({ password: staffTable.password })
+      .from(staffTable)
+      .where(and(eq(staffTable.role, "admin"), eq(staffTable.active, true), isNotNull(staffTable.password)));
+    for (const a of admins) {
+      if (a.password && (await verifyPin(adminPin, a.password))) {
+        adminVerified = true;
+        break;
+      }
+    }
+    if (!adminVerified) {
+      res.status(401).json({ error: "Admin PIN is incorrect" });
+      return;
+    }
+  }
+  if (staff.password && !adminVerified) {
     if (!currentPin) {
       res.status(401).json({ error: "Current PIN is required" });
       return;

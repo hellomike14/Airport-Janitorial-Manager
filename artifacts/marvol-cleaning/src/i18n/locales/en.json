@@ -268,7 +268,12 @@
     "switchToSupervisor": "Switch to Supervisor",
     "switchToStaff": "Switch to Staff",
     "loadingDirectory": "Loading staff directory...",
-    "removeFailed": "Could not remove staff member. Please try again."
+    "removeFailed": "Could not remove staff member. Please try again.",
+    "setPinPrompt": "Enter a new 4-digit passcode for {{name}}:",
+    "pinFormatError": "The passcode must be exactly 4 digits.",
+    "pinSaved": "Passcode saved for {{name}}.",
+    "pinSaveFailed": "Could not save the passcode. Please try again.",
+    "adminPinPrompt": "Enter YOUR admin PIN to confirm:"
   },
   "areas": {
     "cleaningZones": "Cleaning Zones",
@@ -721,5 +726,14 @@
       "generated": "Generated {{date}}",
       "confidential": "Confidential employment record — Marvol Facility Services"
     }
+  },
+  "gate": {
+    "title": "Employee Access",
+    "subtitle": "Enter your personal passcode to access the Marvol portal.",
+    "incorrectCode": "Incorrect passcode. Please try again.",
+    "tooManyAttempts": "Too many attempts. Please wait 15 minutes and try again.",
+    "networkError": "Connection problem. Please try again.",
+    "checking": "Checking...",
+    "footer": "Marvol Facility Cleaning — authorized employees only."
   }
 }

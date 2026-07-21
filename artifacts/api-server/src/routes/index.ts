@@ -16,9 +16,13 @@ import weeklyReportRouter from "./weeklyReport";
 import applicationsRouter from "./applications";
 import onboardingRouter from "./onboarding";
 import quickbooksRouter from "./quickbooks";
+import gateRouter from "./gate";
+import { gateMiddleware } from "../middlewares/gate";
 
 const router: IRouter = Router();
 
+router.use("/gate", gateRouter);
+router.use(gateMiddleware);
 router.use(healthRouter);
 router.use(dashboardRouter);
 router.use("/staff", staffRouter);

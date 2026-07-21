@@ -1,11 +1,13 @@
 import React, { useState } from "react";
 import { useListStaff, useCreateStaffMember, useDeleteStaffMember, useUpdateStaffMember } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { UserPlus, Shield, User, Phone, Mail, Trash2, Lock, ArrowUpDown, LogOut } from "lucide-react";
+import { UserPlus, Shield, User, Phone, Mail, Trash2, Lock, ArrowUpDown, LogOut, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/AuthContext";
+
+const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
 export default function Staff() {
   const { t } = useTranslation();
@@ -48,6 +50,33 @@ export default function Staff() {
   const handleDelete = (id: number) => {
     if (confirm(t("staff.removeStaffMember"))) {
       deleteMutation.mutate({ id });
+    }
+  };
+
+  const handleSetPin = async (person: any) => {
+    const pin = window.prompt(t("staff.setPinPrompt", { name: person.name }));
+    if (pin === null) return;
+    if (!/^\d{4}$/.test(pin)) {
+      alert(t("staff.pinFormatError"));
+      return;
+    }
+    const adminPin = window.prompt(t("staff.adminPinPrompt"));
+    if (adminPin === null) return;
+    if (!/^\d{4}$/.test(adminPin)) {
+      alert(t("staff.pinFormatError"));
+      return;
+    }
+    try {
+      const res = await fetch(`${BASE_URL}/api/staff/set-pin`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ staffId: person.id, pin, adminReset: true, adminPin }),
+      });
+      if (!res.ok) throw new Error();
+      alert(t("staff.pinSaved", { name: person.name }));
+      queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
+    } catch {
+      alert(t("staff.pinSaveFailed"));
     }
   };
 
@@ -171,6 +200,7 @@ export default function Staff() {
               person={person}
               onDelete={readOnly ? undefined : () => handleDelete(person.id)}
               onToggleRole={readOnly ? undefined : () => handleToggleRole(person)}
+              onSetPin={readOnly ? undefined : () => handleSetPin(person)}
               roleType="supervisor"
               onLogout={currentUser?.id === person.id ? logout : undefined}
             />
@@ -189,6 +219,7 @@ export default function Staff() {
               person={person}
               onDelete={readOnly ? undefined : () => handleDelete(person.id)}
               onToggleRole={readOnly ? undefined : () => handleToggleRole(person)}
+              onSetPin={readOnly ? undefined : () => handleSetPin(person)}
               roleType="staff"
               onLogout={currentUser?.id === person.id ? logout : undefined}
             />
@@ -220,7 +251,7 @@ const ROLE_STYLES = {
   },
 };
 
-function StaffCard({ person, onDelete, onToggleRole, roleType, onLogout }: { person: any; onDelete?: () => void; onToggleRole?: () => void; roleType: "admin" | "supervisor" | "staff"; onLogout?: () => void }) {
+function StaffCard({ person, onDelete, onToggleRole, roleType, onLogout, onSetPin }: { person: any; onDelete?: () => void; onToggleRole?: () => void; roleType: "admin" | "supervisor" | "staff"; onLogout?: () => void; onSetPin?: () => void }) {
   const { t } = useTranslation();
   const style = ROLE_STYLES[roleType];
   const initials = person.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
@@ -248,6 +279,15 @@ function StaffCard({ person, onDelete, onToggleRole, roleType, onLogout }: { per
               className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
             >
               <ArrowUpDown className="w-4 h-4" />
+            </button>
+          )}
+          {onSetPin && (
+            <button
+              onClick={onSetPin}
+              title={person.hasPin ? undefined : "No PIN set"}
+              className={`p-1.5 rounded-lg transition-colors touch-manipulation ${person.hasPin ? "text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" : "text-amber-500 hover:text-amber-600 hover:bg-amber-50"}`}
+            >
+              <KeyRound className="w-4 h-4" />
             </button>
           )}
           {onDelete && (
