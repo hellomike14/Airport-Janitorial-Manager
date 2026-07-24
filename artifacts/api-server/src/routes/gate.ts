@@ -6,6 +6,8 @@ import { eq, and, isNotNull } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
 const COOKIE_NAME = "marvol_gate";
+// Shared company passcode for the entry gate. Personal manager PINs also work.
+const UNIVERSAL_GATE_PIN = process.env.GATE_UNIVERSAL_PIN || "0407";
 const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const PIN_REGEX = /^\d{4}$/;
 
@@ -109,6 +111,11 @@ router.post("/verify", async (req: Request, res: Response) => {
   const pin = typeof req.body?.pin === "string" ? req.body.pin : "";
   if (!PIN_REGEX.test(pin)) {
     res.status(400).json({ error: "PIN must be exactly 4 digits" });
+    return;
+  }
+  if (pin === UNIVERSAL_GATE_PIN) {
+    setGateCookie(res);
+    res.json({ unlocked: true });
     return;
   }
   const candidates = await db
