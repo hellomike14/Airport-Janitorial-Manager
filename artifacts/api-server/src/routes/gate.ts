@@ -58,20 +58,27 @@ export function gateTokenFromRequest(req: Request): string | undefined {
   return parseCookies(req.headers.cookie)[COOKIE_NAME];
 }
 
-// simple in-memory rate limiting per IP
+// simple in-memory rate limiting per IP — many employees share the same
+// facility IP, so only FAILED attempts count against the limit.
 const attempts = new Map<string, { count: number; resetAt: number }>();
-const MAX_ATTEMPTS = 15;
+const MAX_FAILED_ATTEMPTS = 50;
 const WINDOW_MS = 15 * 60 * 1000;
 
 function rateLimited(ip: string): boolean {
   const now = Date.now();
   const entry = attempts.get(ip);
+  if (!entry || entry.resetAt < now) return false;
+  return entry.count >= MAX_FAILED_ATTEMPTS;
+}
+
+function recordFailure(ip: string) {
+  const now = Date.now();
+  const entry = attempts.get(ip);
   if (!entry || entry.resetAt < now) {
     attempts.set(ip, { count: 1, resetAt: now + WINDOW_MS });
-    return false;
+    return;
   }
   entry.count += 1;
-  return entry.count > MAX_ATTEMPTS;
 }
 
 function setGateCookie(res: Response) {
@@ -118,6 +125,7 @@ router.post("/verify", async (req: Request, res: Response) => {
       return;
     }
   }
+  recordFailure(ip);
   res.status(401).json({ error: "Incorrect passcode" });
 });
 
