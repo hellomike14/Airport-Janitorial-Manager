@@ -78,21 +78,13 @@ export default function Login() {
   };
 
   const handleLogin = (member: NonNullable<typeof staffList>[number]) => {
-    if (member.role !== "staff") {
-      setPinPrompt({ member });
-      const hasPin = (member as any).hasPin;
-      setPinMode(hasPin ? "enter" : "set");
-      resetPinState();
-      return;
-    }
-    setSelecting(member.id);
-    login({
-      id: member.id,
-      name: member.name,
-      role: member.role as UserRole,
-      phone: member.phone,
-      email: member.email,
-    });
+    // Every role authenticates with a personal PIN (set on first login).
+    // This is what establishes the server-side actor session used by
+    // identity-sensitive features like Messages.
+    setPinPrompt({ member });
+    const hasPin = (member as any).hasPin;
+    setPinMode(hasPin ? "enter" : "set");
+    resetPinState();
   };
 
   const completeLogin = (member: NonNullable<typeof staffList>[number]) => {
@@ -116,6 +108,7 @@ export default function Login() {
       try {
         const res = await fetch(`${BASE_URL}/api/staff/verify-pin`, {
           method: "POST",
+          credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ staffId: pinPrompt.member.id, pin }),
         });
@@ -152,11 +145,17 @@ export default function Login() {
       try {
         const res = await fetch(`${BASE_URL}/api/staff/set-pin`, {
           method: "POST",
+          credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ staffId: pinPrompt.member.id, pin }),
         });
         if (res.ok) {
           completeLogin(pinPrompt.member);
+        } else if (res.status === 403) {
+          setPinError(t("login.askAdminForPin"));
+          setPinMode("set");
+          setFirstPin("");
+          setPinDigits(["", "", "", ""]);
         } else {
           setPinError(t("layout.failedSetPin"));
           setPinMode("set");

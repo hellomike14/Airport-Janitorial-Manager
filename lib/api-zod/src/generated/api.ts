@@ -684,6 +684,99 @@ export const MarkAllNotificationsReadResponse = zod.object({
 });
 
 /**
+ * @summary List conversations for a staff member
+ */
+export const ListConversationsQueryParams = zod.object({
+  staffId: zod.coerce.number(),
+});
+
+export const ListConversationsResponseItem = zod.object({
+  id: zod.number(),
+  otherStaffId: zod.number(),
+  otherStaffName: zod.string(),
+  otherStaffRole: zod.string(),
+  lastMessage: zod.string().nullable(),
+  lastMessageAt: zod.string().nullable(),
+  unreadCount: zod.number(),
+  createdAt: zod.string(),
+});
+export const ListConversationsResponse = zod.array(
+  ListConversationsResponseItem,
+);
+
+/**
+ * @summary Start (or fetch) a conversation with an allowed recipient
+ */
+export const StartConversationBody = zod.object({
+  staffId: zod.number(),
+  recipientId: zod.number(),
+});
+
+export const StartConversationResponse = zod.object({
+  id: zod.number(),
+  otherStaffId: zod.number(),
+  otherStaffName: zod.string(),
+  otherStaffRole: zod.string(),
+  lastMessage: zod.string().nullable(),
+  lastMessageAt: zod.string().nullable(),
+  unreadCount: zod.number(),
+  createdAt: zod.string(),
+});
+
+/**
+ * @summary List messages in a conversation
+ */
+export const ListConversationMessagesParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListConversationMessagesQueryParams = zod.object({
+  staffId: zod.coerce.number(),
+});
+
+export const ListConversationMessagesResponseItem = zod.object({
+  id: zod.number(),
+  conversationId: zod.number(),
+  senderId: zod.number(),
+  senderName: zod.string(),
+  body: zod.string(),
+  isRead: zod.boolean(),
+  createdAt: zod.string(),
+});
+export const ListConversationMessagesResponse = zod.array(
+  ListConversationMessagesResponseItem,
+);
+
+/**
+ * @summary Send a message in a conversation
+ */
+export const SendConversationMessageParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const sendConversationMessageBodyBodyMax = 2000;
+
+export const SendConversationMessageBody = zod.object({
+  senderId: zod.number(),
+  body: zod.string().min(1).max(sendConversationMessageBodyBodyMax),
+});
+
+/**
+ * @summary Mark all messages in a conversation as read for a staff member
+ */
+export const MarkConversationReadParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const MarkConversationReadBody = zod.object({
+  staffId: zod.number(),
+});
+
+export const MarkConversationReadResponse = zod.object({
+  updated: zod.number(),
+});
+
+/**
  * @summary Request a presigned URL for file upload
  */
 

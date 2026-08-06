@@ -9,6 +9,7 @@ import {
   UpdateStaffMemberParams,
   DeleteStaffMemberParams,
 } from "@workspace/api-zod";
+import { setActorCookie, clearActorCookie, actorIdFromRequest } from "../lib/actorSession";
 
 const SALT_ROUNDS = 10;
 const PIN_REGEX = /^\d{4}$/;
@@ -72,11 +73,19 @@ router.post("/verify-pin", async (req, res) => {
     return;
   }
   const { password: _, ...rest } = staff;
+  setActorCookie(res, staff.id);
   res.json({ ...rest, createdAt: staff.createdAt.toISOString() });
 });
 
+// Clear the actor-session cookie on logout so a subsequent login at the same
+// browser cannot keep acting as the previous user.
+router.post("/logout", (_req, res) => {
+  clearActorCookie(res);
+  res.json({ success: true });
+});
+
 router.post("/set-pin", async (req, res) => {
-  const { staffId, pin, currentPin, adminReset, adminPin } = req.body;
+  const { staffId, pin, currentPin, adminReset } = req.body;
   if (!staffId || !pin) {
     res.status(400).json({ error: "staffId and pin required" });
     return;
@@ -95,22 +104,37 @@ router.post("/set-pin", async (req, res) => {
   }
   let adminVerified = false;
   if (adminReset === true) {
-    if (typeof adminPin !== "string" || !PIN_REGEX.test(adminPin)) {
-      res.status(401).json({ error: "Admin PIN required for admin reset" });
+    // Admin resets are authorized by the requester's authenticated actor
+    // session — a client-supplied admin PIN is NOT an acceptable credential.
+    const actorId = actorIdFromRequest(req);
+    if (actorId === null) {
+      res.status(401).json({ error: "Login session required" });
       return;
     }
-    const admins = await db
-      .select({ password: staffTable.password })
+    const [actor] = await db
+      .select()
       .from(staffTable)
-      .where(and(eq(staffTable.role, "admin"), eq(staffTable.active, true), isNotNull(staffTable.password)));
-    for (const a of admins) {
-      if (a.password && (await verifyPin(adminPin, a.password))) {
-        adminVerified = true;
-        break;
-      }
+      .where(eq(staffTable.id, actorId));
+    if (!actor || !actor.active || actor.role !== "admin") {
+      res.status(403).json({ error: "Only administrators can reset PINs" });
+      return;
     }
-    if (!adminVerified) {
-      res.status(401).json({ error: "Admin PIN is incorrect" });
+    adminVerified = true;
+  }
+  if (!staff.password && !adminVerified) {
+    // First-time PIN enrollment must be authorized by an admin (via the
+    // admin-reset path). Self-claiming an unclaimed account would let anyone
+    // take over that person's identity. The only exception is bootstrap:
+    // when no PIN-protected active admin exists yet, an admin may set their
+    // own first PIN.
+    const [protectedAdmin] = await db
+      .select({ id: staffTable.id })
+      .from(staffTable)
+      .where(and(eq(staffTable.role, "admin"), eq(staffTable.active, true), isNotNull(staffTable.password)))
+      .limit(1);
+    const bootstrap = !protectedAdmin && staff.role === "admin";
+    if (!bootstrap) {
+      res.status(403).json({ error: "ENROLLMENT_REQUIRED" });
       return;
     }
   }
@@ -134,6 +158,12 @@ router.post("/set-pin", async (req, res) => {
     .update(staffTable)
     .set({ password: hashed })
     .where(eq(staffTable.id, staffId));
+  // Successful PIN creation/change by the account holder counts as credential
+  // verification, so establish their actor session. Admin resets of someone
+  // else's PIN must NOT log the admin in as that person.
+  if (!adminVerified) {
+    setActorCookie(res, staff.id);
+  }
   res.json({ success: true });
 });
 

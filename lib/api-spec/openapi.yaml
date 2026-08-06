@@ -21,6 +21,8 @@ tags:
     description: Issue reporting
   - name: notifications
     description: In-app notifications
+  - name: messages
+    description: Direct messaging between roles
   - name: taskTypes
     description: Task type templates
   - name: Storage
@@ -694,6 +696,118 @@ paths:
       responses:
         "200":
           description: All marked read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchCompleteResponse"
+
+  /conversations:
+    get:
+      operationId: listConversations
+      tags: [messages]
+      summary: List conversations for a staff member
+      parameters:
+        - name: staffId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of conversations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConversationSummary"
+    post:
+      operationId: startConversation
+      tags: [messages]
+      summary: Start (or fetch) a conversation with an allowed recipient
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConversationStartInput"
+      responses:
+        "200":
+          description: Existing or newly created conversation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationSummary"
+
+  /conversations/{id}/messages:
+    get:
+      operationId: listConversationMessages
+      tags: [messages]
+      summary: List messages in a conversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: staffId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Messages, oldest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatMessage"
+    post:
+      operationId: sendConversationMessage
+      tags: [messages]
+      summary: Send a message in a conversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatMessageInput"
+      responses:
+        "201":
+          description: Sent message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessage"
+
+  /conversations/{id}/read:
+    post:
+      operationId: markConversationRead
+      tags: [messages]
+      summary: Mark all messages in a conversation as read for a staff member
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MarkAllReadRequest"
+      responses:
+        "200":
+          description: Marked read
           content:
             application/json:
               schema:
@@ -1482,6 +1596,85 @@ components:
         - message
         - isRead
         - createdAt
+
+    ConversationSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        otherStaffId:
+          type: integer
+        otherStaffName:
+          type: string
+        otherStaffRole:
+          type: string
+        lastMessage:
+          type: ["string", "null"]
+        lastMessageAt:
+          type: ["string", "null"]
+        unreadCount:
+          type: integer
+        createdAt:
+          type: string
+      required:
+        - id
+        - otherStaffId
+        - otherStaffName
+        - otherStaffRole
+        - lastMessage
+        - lastMessageAt
+        - unreadCount
+        - createdAt
+
+    ConversationStartInput:
+      type: object
+      properties:
+        staffId:
+          type: integer
+        recipientId:
+          type: integer
+      required:
+        - staffId
+        - recipientId
+
+    ChatMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+        conversationId:
+          type: integer
+        senderId:
+          type: integer
+        senderName:
+          type: string
+        body:
+          type: string
+        isRead:
+          type: boolean
+        createdAt:
+          type: string
+      required:
+        - id
+        - conversationId
+        - senderId
+        - senderName
+        - body
+        - isRead
+        - createdAt
+
+    ChatMessageInput:
+      type: object
+      properties:
+        senderId:
+          type: integer
+        body:
+          type: string
+          minLength: 1
+          maxLength: 2000
+      required:
+        - senderId
+        - body
 
     MarkAllReadRequest:
       type: object

@@ -240,6 +240,43 @@ export interface Notification {
   createdAt: string;
 }
 
+export interface ConversationSummary {
+  id: number;
+  otherStaffId: number;
+  otherStaffName: string;
+  otherStaffRole: string;
+  /** @nullable */
+  lastMessage: string | null;
+  /** @nullable */
+  lastMessageAt: string | null;
+  unreadCount: number;
+  createdAt: string;
+}
+
+export interface ConversationStartInput {
+  staffId: number;
+  recipientId: number;
+}
+
+export interface ChatMessage {
+  id: number;
+  conversationId: number;
+  senderId: number;
+  senderName: string;
+  body: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface ChatMessageInput {
+  senderId: number;
+  /**
+   * @minLength 1
+   * @maxLength 2000
+   */
+  body: string;
+}
+
 export interface MarkAllReadRequest {
   staffId: number;
 }
@@ -520,6 +557,14 @@ export type ListIssuesParams = {
 };
 
 export type ListNotificationsParams = {
+  staffId: number;
+};
+
+export type ListConversationsParams = {
+  staffId: number;
+};
+
+export type ListConversationMessagesParams = {
   staffId: number;
 };
 

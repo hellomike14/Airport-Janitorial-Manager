@@ -60,17 +60,13 @@ export default function Staff() {
       alert(t("staff.pinFormatError"));
       return;
     }
-    const adminPin = window.prompt(t("staff.adminPinPrompt"));
-    if (adminPin === null) return;
-    if (!/^\d{4}$/.test(adminPin)) {
-      alert(t("staff.pinFormatError"));
-      return;
-    }
     try {
+      // Authorization comes from the logged-in admin's actor-session cookie.
       const res = await fetch(`${BASE_URL}/api/staff/set-pin`, {
         method: "POST",
+        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ staffId: person.id, pin, adminReset: true, adminPin }),
+        body: JSON.stringify({ staffId: person.id, pin, adminReset: true }),
       });
       if (!res.ok) throw new Error();
       alert(t("staff.pinSaved", { name: person.name }));

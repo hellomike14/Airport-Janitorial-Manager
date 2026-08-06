@@ -99,6 +99,41 @@ async function seed() {
     sql`ALTER TABLE "areas" ADD COLUMN IF NOT EXISTS "archived" boolean NOT NULL DEFAULT false`
   );
 
+  // Startup-safe DDL guard for the in-app messaging tables. Idempotent.
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS "conversations" (
+      "id" serial PRIMARY KEY,
+      "participant_a_id" integer NOT NULL REFERENCES "staff"("id"),
+      "participant_b_id" integer NOT NULL REFERENCES "staff"("id"),
+      "created_at" timestamp NOT NULL DEFAULT now()
+    )
+  `);
+  await db.execute(sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS "conversations_participants_unique"
+      ON "conversations" ("participant_a_id", "participant_b_id")
+  `);
+  await db.execute(sql`
+    DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'conversations_participants_ordered'
+      ) THEN
+        ALTER TABLE "conversations"
+          ADD CONSTRAINT "conversations_participants_ordered"
+          CHECK ("participant_a_id" < "participant_b_id");
+      END IF;
+    END $$
+  `);
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS "messages" (
+      "id" serial PRIMARY KEY,
+      "conversation_id" integer NOT NULL REFERENCES "conversations"("id"),
+      "sender_id" integer NOT NULL REFERENCES "staff"("id"),
+      "body" text NOT NULL,
+      "is_read" boolean NOT NULL DEFAULT false,
+      "created_at" timestamp NOT NULL DEFAULT now()
+    )
+  `);
+
   const seedNames = new Set(SEED_STAFF.map((s) => s.name));
   const existingStaff = await db.select().from(staffTable);
   const existingNames = new Set(existingStaff.map((s) => s.name));

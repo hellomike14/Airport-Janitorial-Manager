@@ -72,7 +72,21 @@
     "photoShare": "Partage Photos",
     "weeklyReport": "Rapport Hebdomadaire",
     "specialRequests": "Demandes Spéciales",
-    "employment": "Emploi"
+    "employment": "Emploi",
+    "messages": "Messages"
+  },
+  "messages": {
+    "title": "Messages",
+    "subtitle": "Conversations directes avec votre équipe",
+    "newConversation": "Nouvelle conversation",
+    "noConversations": "Aucune conversation pour le moment",
+    "noMessagesYet": "Aucun message pour le moment",
+    "selectConversation": "Sélectionnez une conversation pour commencer à discuter",
+    "startOfConversation": "C'est le début de votre conversation",
+    "typeMessage": "Écrivez un message...",
+    "send": "Envoyer",
+    "noRecipients": "Personne n'est disponible pour la messagerie",
+    "sessionExpired": "Veuillez vous déconnecter puis vous reconnecter pour utiliser les messages."
   },
   "layout": {
     "logout": "Déconnexion",
@@ -129,7 +143,8 @@
       "inspector": "Saisir des informations sur les problèmes ouverts et voir les tâches terminées",
       "supervisor": "Tableau de bord, affectations, zones et suivi des problèmes",
       "staff": "Voir les tâches assignées et signaler les problèmes"
-    }
+    },
+    "askAdminForPin": "Un administrateur doit définir un code PIN pour votre compte avant que vous puissiez vous connecter. Veuillez contacter un administrateur."
   },
   "dashboard": {
     "facilityOverview": "Vue d'Ensemble de l'Installation",

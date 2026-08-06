@@ -28,6 +28,7 @@ import WeeklyReport from "./pages/WeeklyReport";
 import SpecialRequests from "./pages/SpecialRequests";
 import Employment from "./pages/Employment";
 import Apply from "./pages/Apply";
+import Messages from "./pages/Messages";
 import Login from "./pages/Login";
 import { GateScreen } from "./components/GateScreen";
 
@@ -88,6 +89,7 @@ function ProtectedRoutes() {
             <Route path="/weekly-report" component={WeeklyReport} />
             <Route path="/special-requests" component={SpecialRequests} />
             <Route path="/employment" component={Employment} />
+            <Route path="/messages" component={Messages} />
           </>
         )}
 
@@ -106,6 +108,7 @@ function ProtectedRoutes() {
             <Route path="/special-requests" component={SpecialRequests} />
             <Route path="/staff" component={Staff} />
             <Route path="/employment" component={Employment} />
+            <Route path="/messages" component={Messages} />
           </>
         )}
 
@@ -130,6 +133,7 @@ function ProtectedRoutes() {
             <Route path="/employee-portal" component={EmployeePortal} />
             <Route path="/photo-share" component={PhotoShare} />
             <Route path="/special-requests" component={SpecialRequests} />
+            <Route path="/messages" component={Messages} />
             <Route path="/"><Redirect to="/my-tasks" /></Route>
             <Route path="/areas"><Redirect to="/my-tasks" /></Route>
             <Route path="/areas/:areaId"><Redirect to="/my-tasks" /></Route>

@@ -1,1 +1,2 @@
 - [Marvol typecheck quirks](marvol-typecheck.md) — repo typecheck is red on master; orval query-options need queryKey, so prefer plain fetch fns over disabled-query hooks.
+- [Marvol actor sessions](marvol-actor-session.md) — signed HttpOnly actor cookie identifies the logged-in staff member; identity-sensitive endpoints must derive the actor from it, never from client-sent ids.

@@ -72,7 +72,21 @@
     "photoShare": "Photo Share",
     "weeklyReport": "Weekly Report",
     "specialRequests": "Special Requests",
-    "employment": "Employment"
+    "employment": "Employment",
+    "messages": "Messages"
+  },
+  "messages": {
+    "title": "Messages",
+    "subtitle": "Direct conversations with your team",
+    "newConversation": "New Conversation",
+    "noConversations": "No conversations yet",
+    "noMessagesYet": "No messages yet",
+    "selectConversation": "Select a conversation to start chatting",
+    "startOfConversation": "This is the start of your conversation",
+    "typeMessage": "Type a message...",
+    "send": "Send",
+    "noRecipients": "No one available to message",
+    "sessionExpired": "Please log out and log back in to use Messages."
   },
   "layout": {
     "logout": "Log out",
@@ -129,7 +143,8 @@
       "inspector": "Enter information on open issues and view completed tasks",
       "supervisor": "Dashboard, assignments, areas, and issue tracking",
       "staff": "View assigned tasks and report issues"
-    }
+    },
+    "askAdminForPin": "Your account needs a PIN set by an administrator before you can log in. Please ask an admin."
   },
   "dashboard": {
     "facilityOverview": "Facility Overview",

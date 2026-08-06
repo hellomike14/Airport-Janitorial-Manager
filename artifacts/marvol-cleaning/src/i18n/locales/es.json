@@ -72,7 +72,21 @@
     "photoShare": "Compartir Fotos",
     "weeklyReport": "Informe Semanal",
     "specialRequests": "Solicitudes Especiales",
-    "employment": "Empleo"
+    "employment": "Empleo",
+    "messages": "Mensajes"
+  },
+  "messages": {
+    "title": "Mensajes",
+    "subtitle": "Conversaciones directas con tu equipo",
+    "newConversation": "Nueva conversación",
+    "noConversations": "Aún no hay conversaciones",
+    "noMessagesYet": "Aún no hay mensajes",
+    "selectConversation": "Selecciona una conversación para empezar a chatear",
+    "startOfConversation": "Este es el comienzo de tu conversación",
+    "typeMessage": "Escribe un mensaje...",
+    "send": "Enviar",
+    "noRecipients": "No hay nadie disponible para enviar mensajes",
+    "sessionExpired": "Cierra sesión y vuelve a iniciar sesión para usar Mensajes."
   },
   "layout": {
     "logout": "Cerrar sesión",
@@ -129,7 +143,8 @@
       "inspector": "Ingresar información sobre problemas abiertos y ver tareas completadas",
       "supervisor": "Panel principal, asignaciones, áreas y seguimiento de problemas",
       "staff": "Ver tareas asignadas y reportar problemas"
-    }
+    },
+    "askAdminForPin": "Un administrador debe asignar un PIN a tu cuenta antes de que puedas iniciar sesión. Pide ayuda a un administrador."
   },
   "dashboard": {
     "facilityOverview": "Vista General de la Instalación",

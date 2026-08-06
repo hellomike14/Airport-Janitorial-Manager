@@ -29,6 +29,7 @@ import {
   BarChart3,
   Star,
   Briefcase,
+  MessageSquare,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useTranslation } from "react-i18next";
@@ -42,8 +43,9 @@ import {
   useMarkNotificationRead,
   useMarkAllNotificationsRead,
   useListStaff,
+  listConversations,
 } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 
 interface NavItemProps {
   href: string;
@@ -51,9 +53,10 @@ interface NavItemProps {
   label: string;
   isActive: boolean;
   onClick?: () => void;
+  badgeCount?: number;
 }
 
-const NavItem = ({ href, icon: Icon, label, isActive, onClick }: NavItemProps) => (
+const NavItem = ({ href, icon: Icon, label, isActive, onClick, badgeCount }: NavItemProps) => (
   <Link
     href={href}
     onClick={onClick}
@@ -65,6 +68,11 @@ const NavItem = ({ href, icon: Icon, label, isActive, onClick }: NavItemProps) =
   >
     <Icon className={`w-5 h-5 transition-transform duration-200 ${isActive ? "scale-110" : "group-hover:scale-110"}`} />
     <span>{label}</span>
+    {badgeCount != null && badgeCount > 0 && (
+      <span className="ml-auto min-w-[20px] h-5 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center px-1.5">
+        {badgeCount > 9 ? "9+" : badgeCount}
+      </span>
+    )}
     {isActive && (
       <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-white rounded-r-full" />
     )}
@@ -85,6 +93,7 @@ function useNavConfig() {
     admin: [
       { href: "/", icon: LayoutDashboard, label: t("nav.dashboard") },
       { href: "/tasks", icon: ListChecks, label: t("nav.taskManagement") },
+      { href: "/messages", icon: MessageSquare, label: t("nav.messages") },
       { href: "/task-types", icon: Layers, label: t("nav.taskTypeInventory") },
       { href: "/areas", icon: Map, label: t("nav.cleaningAreas") },
       { href: "/assignments", icon: ClipboardList, label: t("nav.assignments") },
@@ -101,6 +110,7 @@ function useNavConfig() {
     supervisor: [
       { href: "/", icon: LayoutDashboard, label: t("nav.dashboard") },
       { href: "/tasks", icon: ListChecks, label: t("nav.taskManagement") },
+      { href: "/messages", icon: MessageSquare, label: t("nav.messages") },
       { href: "/areas", icon: Map, label: t("nav.cleaningAreas") },
       { href: "/assignments", icon: ClipboardList, label: t("nav.assignments") },
       { href: "/staff", icon: Users, label: t("nav.staffDirectory") },
@@ -119,6 +129,7 @@ function useNavConfig() {
     ],
     staff: [
       { href: "/my-tasks", icon: CheckSquare, label: t("nav.myTasks") },
+      { href: "/messages", icon: MessageSquare, label: t("nav.messages") },
       { href: "/issues", icon: AlertTriangle, label: t("nav.myIssues") },
       { href: "/employee-portal", icon: Calendar, label: t("nav.mySchedule") },
       { href: "/photo-share", icon: Camera, label: t("nav.photoShare") },
@@ -276,6 +287,7 @@ function NotificationBell({ staffId }: { staffId: number }) {
     if (type === "supervisor_to_inspector") return <CheckCircle2 className="w-3.5 h-3.5 text-blue-500 shrink-0" />;
     if (type === "direct_alert") return <Megaphone className="w-3.5 h-3.5 text-orange-500 shrink-0" />;
     if (type === "photo_shared") return <Camera className="w-3.5 h-3.5 text-blue-500 shrink-0" />;
+    if (type === "new_message") return <MessageSquare className="w-3.5 h-3.5 text-emerald-500 shrink-0" />;
     return <AlertOctagon className="w-3.5 h-3.5 text-rose-500 shrink-0" />;
   };
 
@@ -680,6 +692,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const navItems = NAV_BY_ROLE[viewMode];
   const badge = ROLE_BADGE[viewMode];
+
+  // Unread direct-message count for the Messages nav badge; polls like the
+  // notification bell. Only relevant for roles that have a Messages page.
+  const { data: conversationList = [] } = useQuery({
+    queryKey: ["/api/conversations", currentUser?.id ?? 0],
+    queryFn: () => listConversations({ staffId: currentUser!.id }),
+    enabled: !!currentUser && viewMode !== "inspector",
+    refetchInterval: 15000,
+  });
+  const unreadMessages = conversationList.reduce((sum, c) => sum + c.unreadCount, 0);
   const canSwitchView = currentUser?.role === "admin";
 
   const getIsActive = (href: string) => {
@@ -752,6 +774,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               {...item}
               isActive={getIsActive(item.href)}
               onClick={closeMobile}
+              badgeCount={item.href === "/messages" ? unreadMessages : undefined}
             />
           ))}
         </div>

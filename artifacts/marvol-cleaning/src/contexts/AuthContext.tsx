@@ -56,6 +56,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setCurrentUser(null);
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(VIEW_MODE_KEY);
+    // Clear the server-side actor session so the next user at this browser
+    // cannot act as the previous one.
+    fetch(`${import.meta.env.BASE_URL}api/staff/logout`, {
+      method: "POST",
+      credentials: "same-origin",
+    }).catch(() => {});
   };
 
   const setViewMode = (mode: ViewMode) => {
