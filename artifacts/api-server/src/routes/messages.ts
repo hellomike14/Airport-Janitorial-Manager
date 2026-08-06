@@ -52,23 +52,40 @@ async function requireActor(req: Request, res: Response, claimedId: number): Pro
 }
 
 // Messaging is allowed between:
-//   - staff ↔ admin or supervisor
-//   - admin ↔ supervisor (and vice-versa)
+//   - staff      ↔ admin or supervisor
+//   - admin      ↔ supervisor
+//   - supervisor ↔ inspector
 function isAllowedPair(a: StaffRow, b: StaffRow): boolean {
   const isMgr = (s: StaffRow) => s.role === "admin" || s.role === "supervisor";
   if (a.role === "staff" && isMgr(b)) return true;
   if (b.role === "staff" && isMgr(a)) return true;
   if (isMgr(a) && isMgr(b)) return true;
+  if (
+    (a.role === "supervisor" && b.role === "inspector") ||
+    (a.role === "inspector" && b.role === "supervisor")
+  )
+    return true;
   return false;
 }
 
 // Starting rules:
-//   admin/supervisor → staff or the other manager role
-//   staff            → supervisor only
+//   admin      → staff, supervisor
+//   supervisor → staff, admin, inspector
+//   inspector  → supervisor
+//   staff      → supervisor
 function canStart(sender: StaffRow, recipient: StaffRow): boolean {
-  const isMgr = (s: StaffRow) => s.role === "admin" || s.role === "supervisor";
-  if (isMgr(sender)) {
-    return recipient.role === "staff" || isMgr(recipient);
+  if (sender.role === "admin") {
+    return recipient.role === "staff" || recipient.role === "supervisor";
+  }
+  if (sender.role === "supervisor") {
+    return (
+      recipient.role === "staff" ||
+      recipient.role === "admin" ||
+      recipient.role === "inspector"
+    );
+  }
+  if (sender.role === "inspector") {
+    return recipient.role === "supervisor";
   }
   if (sender.role === "staff") {
     return recipient.role === "supervisor";

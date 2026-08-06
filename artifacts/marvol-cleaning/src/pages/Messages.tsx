@@ -117,11 +117,15 @@ export default function Messages() {
   };
 
   // Recipient picker, filtered by the sender's real role:
-  // admin/supervisor → staff + the other manager role; staff → supervisors.
+  // admin      → staff, supervisor
+  // supervisor → staff, admin, inspector
+  // inspector  → supervisor
+  // staff      → supervisor
   const allowedRecipients = staffList.filter((s) => {
     if (s.id === staffId) return false;
     if (senderRole === "admin") return s.role === "staff" || s.role === "supervisor";
-    if (senderRole === "supervisor") return s.role === "staff" || s.role === "admin";
+    if (senderRole === "supervisor") return s.role === "staff" || s.role === "admin" || s.role === "inspector";
+    if (senderRole === "inspector") return s.role === "supervisor";
     if (senderRole === "staff") return s.role === "supervisor";
     return false;
   });
