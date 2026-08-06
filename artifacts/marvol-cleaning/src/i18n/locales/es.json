@@ -86,7 +86,20 @@
     "typeMessage": "Escribe un mensaje...",
     "send": "Enviar",
     "noRecipients": "No hay nadie disponible para enviar mensajes",
-    "sessionExpired": "Cierra sesión y vuelve a iniciar sesión para usar Mensajes."
+    "sessionExpired": "Cierra sesión y vuelve a iniciar sesión para usar Mensajes.",
+    "modeIndividual": "Individual",
+    "modeGroup": "Grupo",
+    "newGroup": "Nuevo mensaje grupal",
+    "groupName": "Nombre del grupo (opcional)",
+    "groupNamePlaceholder": "Ej. Supervisores e Inspectores",
+    "quickSelect": "Selección rápida",
+    "allStaff": "Todo el personal",
+    "allSupervisors": "Todos los supervisores",
+    "allInspectors": "Todos los inspectores",
+    "allAdmins": "Todos los administradores",
+    "orSelectPeople": "O elige individualmente",
+    "createGroup": "Crear grupo",
+    "groupMembersCount": "{{count}} miembros"
   },
   "layout": {
     "logout": "Cerrar sesión",

@@ -86,7 +86,20 @@
     "typeMessage": "Écrivez un message...",
     "send": "Envoyer",
     "noRecipients": "Personne n'est disponible pour la messagerie",
-    "sessionExpired": "Veuillez vous déconnecter puis vous reconnecter pour utiliser les messages."
+    "sessionExpired": "Veuillez vous déconnecter puis vous reconnecter pour utiliser les messages.",
+    "modeIndividual": "Individuel",
+    "modeGroup": "Groupe",
+    "newGroup": "Nouveau message de groupe",
+    "groupName": "Nom du groupe (optionnel)",
+    "groupNamePlaceholder": "Ex. Superviseurs et Inspecteurs",
+    "quickSelect": "Sélection rapide",
+    "allStaff": "Tout le personnel",
+    "allSupervisors": "Tous les superviseurs",
+    "allInspectors": "Tous les inspecteurs",
+    "allAdmins": "Tous les administrateurs",
+    "orSelectPeople": "Ou choisir individuellement",
+    "createGroup": "Créer le groupe",
+    "groupMembersCount": "{{count}} membres"
   },
   "layout": {
     "logout": "Déconnexion",

@@ -133,6 +133,25 @@ async function seed() {
       "created_at" timestamp NOT NULL DEFAULT now()
     )
   `);
+  // Group messaging additions: make 1:1 participant columns nullable, add
+  // is_group / group_name columns, and create the participants table.
+  await db.execute(sql`ALTER TABLE "conversations" ALTER COLUMN "participant_a_id" DROP NOT NULL`);
+  await db.execute(sql`ALTER TABLE "conversations" ALTER COLUMN "participant_b_id" DROP NOT NULL`);
+  await db.execute(sql`ALTER TABLE "conversations" ADD COLUMN IF NOT EXISTS "is_group" boolean NOT NULL DEFAULT false`);
+  await db.execute(sql`ALTER TABLE "conversations" ADD COLUMN IF NOT EXISTS "group_name" text`);
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS "conversation_participants" (
+      "id" serial PRIMARY KEY,
+      "conversation_id" integer NOT NULL REFERENCES "conversations"("id"),
+      "staff_id" integer NOT NULL REFERENCES "staff"("id"),
+      "last_read_at" timestamp,
+      "joined_at" timestamp NOT NULL DEFAULT now()
+    )
+  `);
+  await db.execute(sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS "conversation_participants_unique"
+      ON "conversation_participants" ("conversation_id", "staff_id")
+  `);
 
   const seedNames = new Set(SEED_STAFF.map((s) => s.name));
   const existingStaff = await db.select().from(staffTable);

@@ -4752,3 +4752,17 @@ export const useDisconnectQuickbooks = <
 > => {
   return useMutation(getDisconnectQuickbooksMutationOptions(options));
 };
+
+// ── Group conversation (custom, not orval-generated) ──────────────────────────
+import type { GroupConversationStartInput } from "./api.schemas";
+
+export const startGroupConversation = async (
+  input: GroupConversationStartInput,
+  options?: RequestInit
+): Promise<ConversationSummary> => {
+  return customFetch<ConversationSummary>(`/api/conversations/group`, {
+    method: "POST",
+    body: JSON.stringify(input),
+    ...options,
+  });
+};

@@ -86,7 +86,20 @@
     "typeMessage": "Type a message...",
     "send": "Send",
     "noRecipients": "No one available to message",
-    "sessionExpired": "Please log out and log back in to use Messages."
+    "sessionExpired": "Please log out and log back in to use Messages.",
+    "modeIndividual": "Individual",
+    "modeGroup": "Group",
+    "newGroup": "New Group Message",
+    "groupName": "Group name (optional)",
+    "groupNamePlaceholder": "e.g. Supervisors & Inspectors",
+    "quickSelect": "Quick select",
+    "allStaff": "All Staff",
+    "allSupervisors": "All Supervisors",
+    "allInspectors": "All Inspectors",
+    "allAdmins": "All Admins",
+    "orSelectPeople": "Or pick individually",
+    "createGroup": "Create Group",
+    "groupMembersCount": "{{count}} members"
   },
   "layout": {
     "logout": "Log out",

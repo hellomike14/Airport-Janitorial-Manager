@@ -242,6 +242,11 @@ export interface Notification {
 
 export interface ConversationSummary {
   id: number;
+  isGroup: boolean;
+  /** @nullable */
+  groupName: string | null;
+  participantCount: number;
+  participantNames: string[];
   otherStaffId: number;
   otherStaffName: string;
   otherStaffRole: string;
@@ -256,6 +261,12 @@ export interface ConversationSummary {
 export interface ConversationStartInput {
   staffId: number;
   recipientId: number;
+}
+
+export interface GroupConversationStartInput {
+  staffId: number;
+  recipientIds: number[];
+  groupName?: string;
 }
 
 export interface ChatMessage {
