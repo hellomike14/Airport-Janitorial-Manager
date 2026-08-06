@@ -51,17 +51,24 @@ async function requireActor(req: Request, res: Response, claimedId: number): Pro
   return actor;
 }
 
-// Messaging is allowed only between a staff member and a manager
-// (admin or supervisor). Staff↔staff and manager↔manager are not allowed.
+// Messaging is allowed between:
+//   - staff ↔ admin or supervisor
+//   - admin ↔ supervisor (and vice-versa)
 function isAllowedPair(a: StaffRow, b: StaffRow): boolean {
   const isMgr = (s: StaffRow) => s.role === "admin" || s.role === "supervisor";
-  return (a.role === "staff" && isMgr(b)) || (b.role === "staff" && isMgr(a));
+  if (a.role === "staff" && isMgr(b)) return true;
+  if (b.role === "staff" && isMgr(a)) return true;
+  if (isMgr(a) && isMgr(b)) return true;
+  return false;
 }
 
-// Starting rules: admin/supervisor → staff; staff → supervisor only.
+// Starting rules:
+//   admin/supervisor → staff or the other manager role
+//   staff            → supervisor only
 function canStart(sender: StaffRow, recipient: StaffRow): boolean {
-  if (sender.role === "admin" || sender.role === "supervisor") {
-    return recipient.role === "staff";
+  const isMgr = (s: StaffRow) => s.role === "admin" || s.role === "supervisor";
+  if (isMgr(sender)) {
+    return recipient.role === "staff" || isMgr(recipient);
   }
   if (sender.role === "staff") {
     return recipient.role === "supervisor";
