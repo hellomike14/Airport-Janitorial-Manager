@@ -466,6 +466,23 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
   });
 });
 
+router.delete("/conversations/:id/messages/:msgId", async (req: Request, res: Response) => {
+  const params = z.object({ id: z.coerce.number(), msgId: z.coerce.number() }).safeParse(req.params);
+  if (!params.success) { res.status(400).json({ error: "Invalid request" }); return; }
+  const query = StaffIdQuery.safeParse({ staffId: req.query.staffId });
+  if (!query.success) { res.status(400).json({ error: "staffId is required" }); return; }
+  const actor = await requireActor(req, res, query.data.staffId);
+  if (!actor) return;
+
+  const [msg] = await db.select().from(messagesTable).where(eq(messagesTable.id, params.data.msgId));
+  if (!msg) { res.status(404).json({ error: "Message not found" }); return; }
+  if (msg.senderId !== actor.id) { res.status(403).json({ error: "You can only delete your own messages" }); return; }
+  if (msg.conversationId !== params.data.id) { res.status(403).json({ error: "Message not in this conversation" }); return; }
+
+  await db.delete(messagesTable).where(eq(messagesTable.id, params.data.msgId));
+  res.json({ deleted: true });
+});
+
 router.post("/conversations/:id/read", async (req: Request, res: Response) => {
   const params = IdParams.safeParse({ id: req.params.id });
   if (!params.success) {

@@ -14,6 +14,7 @@ import {
   Users2,
   ClipboardList,
   ChevronRight,
+  Trash2,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -23,6 +24,7 @@ import {
   startGroupConversation,
   sendConversationMessage,
   markConversationRead,
+  deleteConversationMessage,
   listStaff,
   type ConversationSummary,
 } from "@workspace/api-client-react";
@@ -68,7 +70,8 @@ interface NewConvoDialogProps {
 function NewConvoDialog({ senderRole, staffId, onClose, onStarted }: NewConvoDialogProps) {
   const { t } = useTranslation();
   const canGroup = senderRole === "admin" || senderRole === "supervisor";
-  const [mode, setMode] = useState<DialogMode>("individual");
+  // Admins/supervisors land straight on the group/checkbox view
+  const [mode, setMode] = useState<DialogMode>(canGroup ? "group" : "individual");
   const [groupName, setGroupName] = useState("");
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
@@ -402,6 +405,21 @@ export default function Messages() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: ({ convoId, msgId }: { convoId: number; msgId: number }) =>
+      deleteConversationMessage(convoId, msgId, { staffId }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [CONVERSATIONS_KEY, selectedId, "messages"] });
+      qc.invalidateQueries({ queryKey: [CONVERSATIONS_KEY] });
+    },
+  });
+
+  const handleDelete = (msgId: number) => {
+    if (selectedId === null) return;
+    if (!window.confirm(t("messages.confirmDelete"))) return;
+    deleteMutation.mutate({ convoId: selectedId, msgId });
+  };
+
   const handleSend = () => {
     const body = draft.trim();
     if (!body || selectedId === null || sendMutation.isPending) return;
@@ -557,7 +575,18 @@ export default function Messages() {
                 {messages.map((m) => {
                   const mine = m.senderId === staffId;
                   return (
-                    <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+                    <div key={m.id} className={`flex items-end gap-1.5 group ${mine ? "justify-end" : "justify-start"}`}>
+                      {/* Delete button — only on own messages, appears on hover */}
+                      {mine && (
+                        <button
+                          onClick={() => handleDelete(m.id)}
+                          disabled={deleteMutation.isPending}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-slate-400 hover:text-red-500 shrink-0 mb-1"
+                          aria-label={t("messages.deleteMessage")}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                       <div
                         className={`max-w-[75%] rounded-2xl px-4 py-2.5 ${
                           mine

@@ -99,7 +99,9 @@
     "allAdmins": "Tous les administrateurs",
     "orSelectPeople": "Ou choisir individuellement",
     "createGroup": "Créer le groupe",
-    "groupMembersCount": "{{count}} membres"
+    "groupMembersCount": "{{count}} membres",
+    "confirmDelete": "Supprimer ce message ?",
+    "deleteMessage": "Supprimer le message"
   },
   "layout": {
     "logout": "Déconnexion",

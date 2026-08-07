@@ -99,7 +99,9 @@
     "allAdmins": "All Admins",
     "orSelectPeople": "Or pick individually",
     "createGroup": "Create Group",
-    "groupMembersCount": "{{count}} members"
+    "groupMembersCount": "{{count}} members",
+    "confirmDelete": "Delete this message?",
+    "deleteMessage": "Delete message"
   },
   "layout": {
     "logout": "Log out",

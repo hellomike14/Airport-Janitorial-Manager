@@ -4766,3 +4766,15 @@ export const startGroupConversation = async (
     ...options,
   });
 };
+
+export const deleteConversationMessage = async (
+  conversationId: number,
+  messageId: number,
+  params: { staffId: number },
+  options?: RequestInit
+): Promise<{ deleted: boolean }> => {
+  return customFetch<{ deleted: boolean }>(
+    `/api/conversations/${conversationId}/messages/${messageId}?staffId=${params.staffId}`,
+    { method: "DELETE", ...options }
+  );
+};
