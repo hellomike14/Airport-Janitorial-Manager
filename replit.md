@@ -63,14 +63,16 @@ A comprehensive janitorial cleaning management web app for Marvol Facility at MC
 - Key files: `src/lib/offlineStore.ts`, `src/lib/offlineQueue.ts`, `src/contexts/OfflineContext.tsx`, `src/hooks/useOnlineStatus.ts`, `src/hooks/useOfflineMutations.ts`, `src/hooks/useOfflineCache.ts`, `src/components/OfflineBanner.tsx`
 
 **Auth:**
-- Admin, Inspector, Supervisors require 4-digit PIN login (bcrypt-hashed, stored in `password` column)
-- First-time login prompts user to set a PIN; subsequent logins ask for the PIN
-- Staff login is tap-to-login (no PIN needed)
-- API: `POST /api/staff/verify-pin`, `POST /api/staff/set-pin`
-- Auth state stored in localStorage
+- Clerk email + password sign-in for all roles (`@clerk/react` on the client, `@clerk/express` on the API server)
+- Sign-in/sign-up routes at `/sign-in` and `/sign-up` (inside the facility gate); Clerk FAPI proxied at `/api/__clerk` in production
+- After sign-in, the server matches the Clerk account to a staff record by email (case-insensitive) via `GET /api/staff/me`; no match → "account not linked" screen
+- Server derives the acting staff member from the verified Clerk session (`actorStaffFromRequest` in `artifacts/api-server/src/lib/actorSession.ts`); identity-sensitive endpoints (messaging) trust only this
+- The facility gate accepts only the universal gate PIN (`GATE_UNIVERSAL_PIN`); personal PINs were removed entirely (no `password` column)
+- Migration flow: admin ensures each staff record has an email (Staff page flags missing ones); the employee then creates a Clerk account with that same email on the sign-up page and is matched automatically
+- View-mode preference stored in localStorage; auth session is Clerk's cookie
 
 **Pages:**
-- Login - Click-to-login with role-grouped staff list
+- Login - Clerk email/password sign-in and sign-up, branded to the app
 - Dashboard - Real-time overview, stats cards, area progress (admin/supervisor)
 - Cleaning Areas - List of all areas with progress (admin/supervisor)
 - Area Tasks - 15 daily tasks per area with checkbox completion + timestamps

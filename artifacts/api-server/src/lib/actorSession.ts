@@ -1,65 +1,60 @@
-import { createHmac, timingSafeEqual } from "crypto";
-import type { Request, Response } from "express";
-import { parseCookies } from "../routes/gate";
+import type { Request } from "express";
+import { getAuth, clerkClient } from "@clerk/express";
+import { db } from "@workspace/db";
+import { staffTable } from "@workspace/db/schema";
+import { sql } from "drizzle-orm";
 
-// Signed actor-session cookie identifying WHO is logged in (as opposed to the
-// gate cookie, which only proves the shared facility passcode was entered).
-// Minted on successful PIN verification (managers / staff with a PIN) and via
-// POST /staff/session for PIN-less staff logins — mirroring the app's existing
-// login trust model. Messaging endpoints require it so callers cannot act as
-// another staff member by forging staffId/senderId in requests.
+// The acting staff member is derived from the verified Clerk session
+// (session cookie verified by clerkMiddleware) and mapped to a staff record
+// by email (case-insensitive). Identity-sensitive endpoints (e.g. messaging)
+// must trust ONLY this server-derived identity — never client-sent staff ids.
 
-const COOKIE_NAME = "marvol_actor";
-const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+type StaffRow = typeof staffTable.$inferSelect;
 
-function secret(): string {
-  return (
-    process.env.GATE_SECRET ||
-    process.env.SESSION_SECRET ||
-    createHmac("sha256", "marvol-actor").update(process.env.DATABASE_URL || "dev").digest("hex")
-  );
-}
+// Small cache of Clerk userId -> primary email to avoid a Clerk API round
+// trip on every request. Entries expire so email changes propagate.
+const emailCache = new Map<string, { email: string | null; expiresAt: number }>();
+const EMAIL_CACHE_TTL_MS = 60 * 1000;
 
-function sign(payload: string): string {
-  return createHmac("sha256", secret()).update(payload).digest("hex");
-}
-
-export function createActorToken(staffId: number): string {
-  const expiry = Date.now() + TOKEN_TTL_MS;
-  const payload = `actor.${staffId}.${expiry}`;
-  return `${payload}.${sign(payload)}`;
-}
-
-export function setActorCookie(res: Response, staffId: number) {
-  const token = createActorToken(staffId);
-  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
-  res.append(
-    "Set-Cookie",
-    `${COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${Math.floor(TOKEN_TTL_MS / 1000)}${secure}`
-  );
-}
-
-export function clearActorCookie(res: Response) {
-  res.append("Set-Cookie", `${COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
-}
-
-/** Returns the authenticated staff id from the actor cookie, or null. */
-export function actorIdFromRequest(req: Request): number | null {
-  const token = parseCookies(req.headers.cookie)[COOKIE_NAME];
-  if (!token) return null;
-  const parts = token.split(".");
-  if (parts.length !== 4 || parts[0] !== "actor") return null;
-  const staffId = Number(parts[1]);
-  const expiry = Number(parts[2]);
-  if (!Number.isInteger(staffId) || staffId <= 0) return null;
-  if (!Number.isFinite(expiry) || expiry < Date.now()) return null;
-  const expected = sign(`actor.${parts[1]}.${parts[2]}`);
-  const given = parts[3];
-  if (expected.length !== given.length) return null;
+async function emailForClerkUser(userId: string): Promise<string | null> {
+  const cached = emailCache.get(userId);
+  if (cached && cached.expiresAt > Date.now()) return cached.email;
+  let email: string | null = null;
   try {
-    if (!timingSafeEqual(Buffer.from(expected), Buffer.from(given))) return null;
-  } catch {
+    const user = await clerkClient.users.getUser(userId);
+    email =
+      user.emailAddresses.find((e) => e.id === user.primaryEmailAddressId)?.emailAddress ??
+      user.emailAddresses[0]?.emailAddress ??
+      null;
+  } catch (err) {
+    console.error("Failed to fetch Clerk user for actor resolution:", err);
     return null;
   }
-  return staffId;
+  emailCache.set(userId, { email, expiresAt: Date.now() + EMAIL_CACHE_TTL_MS });
+  return email;
+}
+
+/**
+ * Resolves the authenticated staff member for this request from the verified
+ * Clerk session, matched to the staff table by email (case-insensitive).
+ * Returns null when there is no session, no email, or no matching active
+ * staff record.
+ */
+export async function actorStaffFromRequest(req: Request): Promise<StaffRow | null> {
+  const auth = getAuth(req);
+  if (!auth?.userId) return null;
+  const email = await emailForClerkUser(auth.userId);
+  if (!email) return null;
+  const [staff] = await db
+    .select()
+    .from(staffTable)
+    .where(sql`lower(${staffTable.email}) = ${email.toLowerCase()} AND ${staffTable.active} = true`)
+    .limit(1);
+  return staff ?? null;
+}
+
+/** Returns the authenticated staff id derived from the Clerk session, or null. */
+export async function actorIdFromRequest(req: Request): Promise<number | null> {
+  const staff = await actorStaffFromRequest(req);
+  return staff?.id ?? null;
 }

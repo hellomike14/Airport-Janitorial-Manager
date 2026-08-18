@@ -1,6 +1,9 @@
-import { useEffect, useState } from "react";
-import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
+import { Switch, Route, Router as WouterRouter, Redirect, useLocation } from "wouter";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
+import { ClerkProvider, useClerk, useUser } from "@clerk/react";
+import { publishableKeyFromHost } from "@clerk/react/internal";
+import { shadcn } from "@clerk/themes";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
@@ -29,7 +32,7 @@ import SpecialRequests from "./pages/SpecialRequests";
 import Employment from "./pages/Employment";
 import Apply from "./pages/Apply";
 import Messages from "./pages/Messages";
-import Login from "./pages/Login";
+import { SignInPage, SignUpPage, NoStaffMatch } from "./pages/Login";
 import { GateScreen } from "./components/GateScreen";
 
 const queryClient = new QueryClient({
@@ -41,12 +44,99 @@ const queryClient = new QueryClient({
   },
 });
 
+// REQUIRED — copy verbatim. Resolves the key from window.location.hostname so the
+// same build serves multiple Clerk custom domains.
+const clerkPubKey = publishableKeyFromHost(
+  window.location.hostname,
+  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
+);
+
+// REQUIRED — empty in dev (Clerk hits dev FAPI directly), auto-set in prod.
+const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
+
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+// Clerk passes full paths to routerPush/routerReplace, but wouter's
+// setLocation prepends the base — strip it to avoid doubling.
+function stripBase(path: string): string {
+  return basePath && path.startsWith(basePath)
+    ? path.slice(basePath.length) || "/"
+    : path;
+}
+
+if (!clerkPubKey) {
+  throw new Error("Missing VITE_CLERK_PUBLISHABLE_KEY");
+}
+
+const clerkAppearance = {
+  theme: shadcn,
+  cssLayerName: "clerk",
+  options: {
+    logoPlacement: "inside" as const,
+    logoLinkUrl: basePath || "/",
+    logoImageUrl: `${window.location.origin}${basePath}/logo-mark.png`,
+  },
+  variables: {
+    colorPrimary: "#059669",
+    colorForeground: "#0f172a",
+    colorMutedForeground: "#64748b",
+    colorDanger: "#e11d48",
+    colorBackground: "#ffffff",
+    colorInput: "#f8fafc",
+    colorInputForeground: "#0f172a",
+    colorNeutral: "#334155",
+    fontFamily: "'Plus Jakarta Sans', sans-serif",
+    borderRadius: "0.75rem",
+  },
+  elements: {
+    rootBox: "w-full flex justify-center",
+    cardBox: "bg-white rounded-2xl w-[420px] max-w-full overflow-hidden shadow-2xl shadow-black/30",
+    card: "!shadow-none !border-0 !bg-transparent !rounded-none",
+    footer: "!shadow-none !border-0 !bg-transparent !rounded-none",
+    headerTitle: "text-slate-900 font-bold",
+    headerSubtitle: "text-slate-500",
+    formFieldLabel: "text-slate-700 font-semibold",
+    footerActionLink: "text-emerald-700 hover:text-emerald-800 font-semibold",
+    footerActionText: "text-slate-500",
+    dividerText: "text-slate-400",
+    identityPreviewEditButton: "text-emerald-700",
+    formFieldSuccessText: "text-emerald-600",
+    alertText: "text-slate-700",
+    socialButtonsBlockButtonText: "text-slate-700",
+    socialButtonsBlockButton: "border-slate-200",
+    formButtonPrimary: "bg-emerald-600 hover:bg-emerald-700 text-white font-semibold",
+    formFieldInput: "border-slate-200 focus:border-emerald-500",
+    dividerLine: "bg-slate-200",
+    otpCodeFieldInput: "border-slate-300 text-slate-900",
+  },
+};
+
+// Keeps the query cache from leaking data between users when the signed-in
+// Clerk user changes.
+function ClerkQueryClientCacheInvalidator() {
+  const { addListener } = useClerk();
+  const qc = useQueryClient();
+  const prevUserIdRef = useRef<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    const unsubscribe = addListener(({ user }) => {
+      const userId = user?.id ?? null;
+      if (prevUserIdRef.current !== undefined && prevUserIdRef.current !== userId) {
+        qc.clear();
+      }
+      prevUserIdRef.current = userId;
+    });
+    return unsubscribe;
+  }, [addListener, qc]);
+
+  return null;
+}
+
 function GatedApp() {
   const [gateState, setGateState] = useState<"checking" | "locked" | "open">("checking");
 
   useEffect(() => {
-    const base = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
-    fetch(`${base}/api/gate/status`)
+    fetch(`${basePath}/api/gate/status`)
       .then((res) => setGateState(res.ok ? "open" : "locked"))
       .catch(() => setGateState("locked"));
   }, []);
@@ -57,14 +147,37 @@ function GatedApp() {
   if (gateState === "locked") {
     return <GateScreen onUnlocked={() => setGateState("open")} />;
   }
-  return <ProtectedRoutes />;
+  return (
+    <Switch>
+      {/* REQUIRED — "/sign-in/*?" and "/sign-up/*?" verbatim: the /*? optional
+          wildcard also matches Clerk's OAuth/verification sub-paths. */}
+      <Route path="/sign-in/*?" component={SignInPage} />
+      <Route path="/sign-up/*?" component={SignUpPage} />
+      <Route>
+        <ProtectedRoutes />
+      </Route>
+    </Switch>
+  );
 }
 
 function ProtectedRoutes() {
-  const { currentUser, effectiveRole } = useAuth();
+  const { isLoaded, isSignedIn } = useUser();
+  const { currentUser, staffStatus, effectiveRole } = useAuth();
 
-  if (!currentUser) {
-    return <Login />;
+  if (!isLoaded || (isSignedIn && staffStatus === "loading")) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-green-900 to-emerald-950 flex items-center justify-center">
+        <span className="animate-spin text-3xl text-emerald-300">&#8635;</span>
+      </div>
+    );
+  }
+
+  if (!isSignedIn) {
+    return <Redirect to="/sign-in" />;
+  }
+
+  if (staffStatus === "nomatch" || !currentUser) {
+    return <NoStaffMatch />;
   }
 
   return (
@@ -148,25 +261,58 @@ function ProtectedRoutes() {
   );
 }
 
-function App() {
+function ClerkProviderWithRoutes() {
+  const [, setLocation] = useLocation();
+
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <OfflineProvider>
-          <AuthProvider>
-            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+    <ClerkProvider
+      publishableKey={clerkPubKey}
+      proxyUrl={clerkProxyUrl}
+      appearance={clerkAppearance}
+      signInUrl={`${basePath}/sign-in`}
+      signUpUrl={`${basePath}/sign-up`}
+      localization={{
+        signIn: {
+          start: {
+            title: "Welcome back",
+            subtitle: "Sign in with your work email",
+          },
+        },
+        signUp: {
+          start: {
+            title: "Create your account",
+            subtitle: "Use the email registered with your staff profile",
+          },
+        },
+      }}
+      routerPush={(to) => setLocation(stripBase(to))}
+      routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
+    >
+      <QueryClientProvider client={queryClient}>
+        <ClerkQueryClientCacheInvalidator />
+        <TooltipProvider>
+          <OfflineProvider>
+            <AuthProvider>
               <Switch>
                 <Route path="/apply" component={Apply} />
                 <Route>
                   <GatedApp />
                 </Route>
               </Switch>
-            </WouterRouter>
-          </AuthProvider>
-        </OfflineProvider>
-        <Toaster />
-      </TooltipProvider>
-    </QueryClientProvider>
+            </AuthProvider>
+          </OfflineProvider>
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ClerkProvider>
+  );
+}
+
+function App() {
+  return (
+    <WouterRouter base={basePath}>
+      <ClerkProviderWithRoutes />
+    </WouterRouter>
   );
 }
 

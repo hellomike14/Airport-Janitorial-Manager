@@ -3,8 +3,8 @@ name: Marvol actor sessions
 description: How caller identity is authenticated server-side and why client-sent staffId must never be trusted.
 ---
 
-The gate cookie only proves the shared facility passcode; it does not identify WHO is calling. A signed HttpOnly `marvol_actor` cookie identifies the logged-in staff member and is minted only after credential verification: PIN verify, or a PIN change proven with the current PIN. First-time PIN enrollment requires an authenticated ADMIN actor session (client-supplied admin PINs are not an authorization credential); the sole exception is bootstrap when no PIN-protected active admin exists. Admin resets of someone else's PIN never mint a session for the admin. Logout clears the cookie server-side.
+The gate cookie only proves the shared facility passcode; it does not identify WHO is calling. Caller identity comes from the verified Clerk session: `actorStaffFromRequest` (api-server `lib/actorSession.ts`) resolves the Clerk userId → primary email (short in-memory TTL cache) → active staff record matched case-insensitively by email. PIN login and the signed `marvol_actor` cookie were removed entirely.
 
-**Why:** Identity-sensitive features (messaging) must not trust client-sent staff ids, and unauthenticated "account claiming" of PIN-less profiles is an identity takeover.
+**Why:** Identity-sensitive features (messaging) must not trust client-sent staff ids; email is the join key between Clerk accounts and staff records.
 
-**How to apply:** Any endpoint returning or mutating per-person data must resolve the actor via `actorIdFromRequest` (api-server `lib/actorSession.ts`) and reject mismatched client-supplied ids. Never issue an identity from an unverified id.
+**How to apply:** Any endpoint returning or mutating per-person data must resolve the actor via `actorStaffFromRequest` (async) and reject mismatched client-supplied ids. Never issue an identity from an unverified id. Staff without an email on file cannot authenticate.

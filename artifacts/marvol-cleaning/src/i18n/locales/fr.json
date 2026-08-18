@@ -159,7 +159,9 @@
       "supervisor": "Tableau de bord, affectations, zones et suivi des problèmes",
       "staff": "Voir les tâches assignées et signaler les problèmes"
     },
-    "askAdminForPin": "Un administrateur doit définir un code PIN pour votre compte avant que vous puissiez vous connecter. Veuillez contacter un administrateur."
+    "askAdminForPin": "Un administrateur doit définir un code PIN pour votre compte avant que vous puissiez vous connecter. Veuillez contacter un administrateur.",
+    "noStaffMatchTitle": "Compte non lié à une fiche employé",
+    "noStaffMatchBody": "Vous êtes connecté, mais aucune fiche employé n'utilise cette adresse e-mail. Demandez à un administrateur d'ajouter cet e-mail à votre profil, puis reconnectez-vous."
   },
   "dashboard": {
     "facilityOverview": "Vue d'Ensemble de l'Installation",
@@ -303,7 +305,14 @@
     "pinFormatError": "Le code doit comporter exactement 4 chiffres.",
     "pinSaved": "Code enregistré pour {{name}}.",
     "pinSaveFailed": "Impossible d'enregistrer le code. Veuillez réessayer.",
-    "adminPinPrompt": "Entrez VOTRE code administrateur pour confirmer :"
+    "adminPinPrompt": "Entrez VOTRE code administrateur pour confirmer :",
+    "setEmailPrompt": "E-mail de connexion pour {{name}} :",
+    "emailFormatError": "Veuillez saisir une adresse e-mail valide.",
+    "emailRequired": "E-mail (utilisé pour se connecter)",
+    "missingEmailBanner": "{{count}} membre(s) du personnel n'ont pas d'e-mail et ne peuvent pas se connecter.",
+    "migrationHint": "Le personnel se connecte avec son compte e-mail. Ajoutez un e-mail à chaque profil, puis demandez à l'employé de créer son compte avec ce même e-mail sur la page d'inscription.",
+    "canLogIn": "Peut se connecter avec cet e-mail",
+    "noEmailCannotLogIn": "Pas d'e-mail — connexion impossible. Ajoutez-en un."
   },
   "areas": {
     "cleaningZones": "Zones de Nettoyage",
@@ -759,7 +768,7 @@
   },
   "gate": {
     "title": "Accès employés",
-    "subtitle": "Entrez votre code d'accès personnel pour accéder au portail Marvol.",
+    "subtitle": "Saisissez le code d'accès de l'entreprise pour accéder au portail Marvol.",
     "incorrectCode": "Code incorrect. Veuillez réessayer.",
     "tooManyAttempts": "Trop de tentatives. Veuillez attendre 15 minutes et réessayer.",
     "networkError": "Problème de connexion. Veuillez réessayer.",

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { useUser, useClerk } from "@clerk/react";
 
 export type UserRole = "admin" | "supervisor" | "staff" | "inspector";
 export type ViewMode = "admin" | "supervisor" | "staff" | "inspector";
@@ -11,10 +12,18 @@ export interface CurrentUser {
   email?: string | null;
 }
 
+/**
+ * - "signedOut": no Clerk session
+ * - "loading":   Clerk session present, staff match in flight
+ * - "nomatch":   Clerk account has no matching active staff record
+ * - "ok":        staff record resolved
+ */
+export type StaffStatus = "signedOut" | "loading" | "nomatch" | "ok";
+
 interface AuthContextValue {
   currentUser: CurrentUser | null;
+  staffStatus: StaffStatus;
   viewMode: ViewMode;
-  login: (user: CurrentUser) => void;
   logout: () => void;
   setViewMode: (mode: ViewMode) => void;
   effectiveRole: ViewMode;
@@ -22,18 +31,15 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const STORAGE_KEY = "marvol_current_user";
 const VIEW_MODE_KEY = "marvol_view_mode";
+const BASE = import.meta.env.BASE_URL;
+const basePath = BASE.replace(/\/$/, "");
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      return stored ? JSON.parse(stored) : null;
-    } catch {
-      return null;
-    }
-  });
+  const { isLoaded, isSignedIn } = useUser();
+  const { signOut } = useClerk();
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [staffStatus, setStaffStatus] = useState<StaffStatus>("loading");
 
   const [viewMode, setViewModeState] = useState<ViewMode>(() => {
     try {
@@ -44,24 +50,66 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   });
 
-  const login = (user: CurrentUser) => {
-    setCurrentUser(user);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-    const defaultMode = user.role as ViewMode;
-    setViewModeState(defaultMode);
-    localStorage.setItem(VIEW_MODE_KEY, defaultMode);
-  };
+  // Resolve (and keep fresh) the staff record matching the signed-in Clerk
+  // account. The server derives the match from the verified Clerk session.
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (!isSignedIn) {
+      setCurrentUser(null);
+      setStaffStatus("signedOut");
+      return;
+    }
+
+    let cancelled = false;
+    const resolveStaff = async () => {
+      try {
+        const res = await fetch(`${BASE}api/staff/me`, { credentials: "same-origin" });
+        if (cancelled) return;
+        if (res.ok) {
+          const s = await res.json();
+          if (cancelled) return;
+          const user: CurrentUser = {
+            id: s.id,
+            name: s.name,
+            role: s.role,
+            phone: s.phone,
+            email: s.email,
+          };
+          setCurrentUser((prev) => {
+            if (!prev || prev.role !== user.role) {
+              setViewModeState(user.role as ViewMode);
+              localStorage.setItem(VIEW_MODE_KEY, user.role);
+            }
+            return user;
+          });
+          setStaffStatus("ok");
+        } else if (res.status === 404) {
+          setCurrentUser(null);
+          setStaffStatus("nomatch");
+        }
+        // other statuses (e.g. gate 401, network blips): keep current state
+      } catch {
+        // ignore network errors
+      }
+    };
+
+    setStaffStatus((prev) => (prev === "ok" ? prev : "loading"));
+    resolveStaff();
+    const interval = setInterval(resolveStaff, 20000);
+    const onFocus = () => resolveStaff();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [isLoaded, isSignedIn]);
 
   const logout = () => {
-    setCurrentUser(null);
-    localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(VIEW_MODE_KEY);
-    // Clear the server-side actor session so the next user at this browser
-    // cannot act as the previous one.
-    fetch(`${import.meta.env.BASE_URL}api/staff/logout`, {
-      method: "POST",
-      credentials: "same-origin",
-    }).catch(() => {});
+    setCurrentUser(null);
+    // Clerk owns the browser session — sign out through the client SDK.
+    signOut({ redirectUrl: basePath || "/" });
   };
 
   const setViewMode = (mode: ViewMode) => {
@@ -69,55 +117,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem(VIEW_MODE_KEY, mode);
   };
 
-  useEffect(() => {
-    if (!currentUser) return;
-
-    const refreshProfile = async () => {
-      try {
-        const res = await fetch(`${import.meta.env.BASE_URL}api/staff`);
-        if (!res.ok) return;
-        const list = await res.json();
-        const fresh = Array.isArray(list) ? list.find((s: any) => s.id === currentUser.id) : null;
-        if (!fresh) return;
-        const changed =
-          fresh.role !== currentUser.role ||
-          fresh.name !== currentUser.name ||
-          (fresh.phone || null) !== (currentUser.phone || null) ||
-          (fresh.email || null) !== (currentUser.email || null);
-        if (changed) {
-          const updated: CurrentUser = {
-            id: fresh.id,
-            name: fresh.name,
-            role: fresh.role,
-            phone: fresh.phone,
-            email: fresh.email,
-          };
-          setCurrentUser(updated);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-          if (fresh.role !== currentUser.role) {
-            setViewModeState(fresh.role as ViewMode);
-            localStorage.setItem(VIEW_MODE_KEY, fresh.role);
-          }
-        }
-      } catch {
-        // ignore network errors
-      }
-    };
-
-    refreshProfile();
-    const interval = setInterval(refreshProfile, 20000);
-    const onFocus = () => refreshProfile();
-    window.addEventListener("focus", onFocus);
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener("focus", onFocus);
-    };
-  }, [currentUser?.id, currentUser?.role, currentUser?.name, currentUser?.phone, currentUser?.email]);
-
   const effectiveRole = viewMode;
 
   return (
-    <AuthContext.Provider value={{ currentUser, viewMode, login, logout, setViewMode, effectiveRole }}>
+    <AuthContext.Provider
+      value={{ currentUser, staffStatus, viewMode, logout, setViewMode, effectiveRole }}
+    >
       {children}
     </AuthContext.Provider>
   );

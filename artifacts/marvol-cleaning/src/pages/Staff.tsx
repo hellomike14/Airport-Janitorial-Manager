@@ -1,13 +1,11 @@
 import React, { useState } from "react";
 import { useListStaff, useCreateStaffMember, useDeleteStaffMember, useUpdateStaffMember } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { UserPlus, Shield, User, Phone, Mail, Trash2, Lock, ArrowUpDown, LogOut, KeyRound } from "lucide-react";
+import { UserPlus, Shield, User, Phone, Mail, Trash2, Lock, ArrowUpDown, LogOut, MailWarning, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/AuthContext";
-
-const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
 export default function Staff() {
   const { t } = useTranslation();
@@ -26,6 +24,8 @@ export default function Staff() {
         setIsAdding(false);
         setFormData({ name: "", role: "staff", phone: "", email: "" });
       },
+      onError: (err: any) =>
+        alert(err?.data?.error ?? err?.message ?? t("staff.saveFailed", "Could not save the staff member.")),
     },
   });
 
@@ -39,6 +39,8 @@ export default function Staff() {
   const updateMutation = useUpdateStaffMember({
     mutation: {
       onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/staff"] }),
+      onError: (err: any) =>
+        alert(err?.data?.error ?? err?.message ?? t("staff.saveFailed", "Could not save the staff member.")),
     },
   });
 
@@ -53,27 +55,18 @@ export default function Staff() {
     }
   };
 
-  const handleSetPin = async (person: any) => {
-    const pin = window.prompt(t("staff.setPinPrompt", { name: person.name }));
-    if (pin === null) return;
-    if (!/^\d{4}$/.test(pin)) {
-      alert(t("staff.pinFormatError"));
+  const handleSetEmail = (person: any) => {
+    const email = window.prompt(
+      t("staff.setEmailPrompt", "Login email for {{name}}:", { name: person.name }),
+      person.email ?? ""
+    );
+    if (email === null) return;
+    const trimmed = email.trim();
+    if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      alert(t("staff.emailFormatError", "Please enter a valid email address."));
       return;
     }
-    try {
-      // Authorization comes from the logged-in admin's actor-session cookie.
-      const res = await fetch(`${BASE_URL}/api/staff/set-pin`, {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ staffId: person.id, pin, adminReset: true }),
-      });
-      if (!res.ok) throw new Error();
-      alert(t("staff.pinSaved", { name: person.name }));
-      queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
-    } catch {
-      alert(t("staff.pinSaveFailed"));
-    }
+    updateMutation.mutate({ id: person.id, data: { email: trimmed } as any });
   };
 
   const handleToggleRole = (person: any) => {
@@ -89,6 +82,7 @@ export default function Staff() {
   const admins = staff?.filter((s) => s.role === "admin") || [];
   const supervisors = staff?.filter((s) => s.role === "supervisor") || [];
   const regularStaff = staff?.filter((s) => s.role === "staff") || [];
+  const missingEmailCount = (staff ?? []).filter((s) => !s.email).length;
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto pb-12">
@@ -108,6 +102,23 @@ export default function Staff() {
           </Button>
         )}
       </div>
+
+      {missingEmailCount > 0 && (
+        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-4">
+          <MailWarning className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="text-sm text-amber-800">
+            <p className="font-semibold">
+              {t("staff.missingEmailBanner", "{{count}} staff member(s) have no email on file and cannot sign in.", { count: missingEmailCount })}
+            </p>
+            <p className="mt-1 text-amber-700">
+              {t(
+                "staff.migrationHint",
+                "Staff sign in with their email account. Add an email to each profile below, then have the employee create their account with that same email on the sign-up page."
+              )}
+            </p>
+          </div>
+        </div>
+      )}
 
       {!readOnly && isAdding && (
         <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-md">
@@ -145,9 +156,12 @@ export default function Staff() {
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">{t("staff.emailOptional")}</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">
+                {t("staff.emailRequired", "Email (used to sign in)")}
+              </label>
               <input
                 type="email"
+                required
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
@@ -177,6 +191,7 @@ export default function Staff() {
                 key={person.id}
                 person={person}
                 onDelete={readOnly ? undefined : () => handleDelete(person.id)}
+                onSetEmail={readOnly ? undefined : () => handleSetEmail(person)}
                 roleType="admin"
                 onLogout={currentUser?.id === person.id ? logout : undefined}
               />
@@ -196,7 +211,7 @@ export default function Staff() {
               person={person}
               onDelete={readOnly ? undefined : () => handleDelete(person.id)}
               onToggleRole={readOnly ? undefined : () => handleToggleRole(person)}
-              onSetPin={readOnly ? undefined : () => handleSetPin(person)}
+              onSetEmail={readOnly ? undefined : () => handleSetEmail(person)}
               roleType="supervisor"
               onLogout={currentUser?.id === person.id ? logout : undefined}
             />
@@ -215,7 +230,7 @@ export default function Staff() {
               person={person}
               onDelete={readOnly ? undefined : () => handleDelete(person.id)}
               onToggleRole={readOnly ? undefined : () => handleToggleRole(person)}
-              onSetPin={readOnly ? undefined : () => handleSetPin(person)}
+              onSetEmail={readOnly ? undefined : () => handleSetEmail(person)}
               roleType="staff"
               onLogout={currentUser?.id === person.id ? logout : undefined}
             />
@@ -247,10 +262,11 @@ const ROLE_STYLES = {
   },
 };
 
-function StaffCard({ person, onDelete, onToggleRole, roleType, onLogout, onSetPin }: { person: any; onDelete?: () => void; onToggleRole?: () => void; roleType: "admin" | "supervisor" | "staff"; onLogout?: () => void; onSetPin?: () => void }) {
+function StaffCard({ person, onDelete, onToggleRole, roleType, onLogout, onSetEmail }: { person: any; onDelete?: () => void; onToggleRole?: () => void; roleType: "admin" | "supervisor" | "staff"; onLogout?: () => void; onSetEmail?: () => void }) {
   const { t } = useTranslation();
   const style = ROLE_STYLES[roleType];
   const initials = person.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
+  const hasEmail = !!person.email;
 
   return (
     <div className={`bg-white rounded-2xl p-5 border shadow-sm relative group overflow-hidden ${style.border}`}>
@@ -277,15 +293,6 @@ function StaffCard({ person, onDelete, onToggleRole, roleType, onLogout, onSetPi
               <ArrowUpDown className="w-4 h-4" />
             </button>
           )}
-          {onSetPin && (
-            <button
-              onClick={onSetPin}
-              title={person.hasPin ? undefined : "No PIN set"}
-              className={`p-1.5 rounded-lg transition-colors touch-manipulation ${person.hasPin ? "text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" : "text-amber-500 hover:text-amber-600 hover:bg-amber-50"}`}
-            >
-              <KeyRound className="w-4 h-4" />
-            </button>
-          )}
           {onDelete && (
             <button
               onClick={onDelete}
@@ -305,6 +312,21 @@ function StaffCard({ person, onDelete, onToggleRole, roleType, onLogout, onSetPi
           <Mail className="w-4 h-4 text-slate-400 shrink-0" />
           {person.email || t("staff.noEmailAdded")}
         </div>
+        {hasEmail ? (
+          <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-600">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            {t("staff.canLogIn", "Can sign in with this email")}
+          </div>
+        ) : (
+          <button
+            onClick={onSetEmail}
+            disabled={!onSetEmail}
+            className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1 hover:bg-amber-100 transition-colors disabled:cursor-default disabled:hover:bg-amber-50"
+          >
+            <MailWarning className="w-3.5 h-3.5" />
+            {t("staff.noEmailCannotLogIn", "No email — cannot sign in. Add one.")}
+          </button>
+        )}
       </div>
       {onToggleRole && (
         <button

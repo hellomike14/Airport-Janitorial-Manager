@@ -1,5 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+@layer theme, base, clerk, components, utilities;
 @import "tailwindcss";
+@import '@clerk/themes/shadcn.css';
 
 @theme inline {
   --font-sans: 'Plus Jakarta Sans', sans-serif;

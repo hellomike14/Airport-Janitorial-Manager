@@ -1,12 +1,9 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { createHmac, timingSafeEqual } from "crypto";
-import { db } from "@workspace/db";
-import { staffTable } from "@workspace/db/schema";
-import { eq, and, isNotNull } from "drizzle-orm";
-import bcrypt from "bcryptjs";
 
 const COOKIE_NAME = "marvol_gate";
-// Shared company passcode for the entry gate. Personal manager PINs also work.
+// Shared company passcode for the entry gate. Only this universal passcode
+// unlocks the facility — personal credentials are handled by Clerk sign-in.
 const UNIVERSAL_GATE_PIN = process.env.GATE_UNIVERSAL_PIN || "0407";
 const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const PIN_REGEX = /^\d{4}$/;
@@ -102,7 +99,7 @@ router.get("/status", (req: Request, res: Response) => {
   res.status(401).json({ unlocked: false });
 });
 
-router.post("/verify", async (req: Request, res: Response) => {
+router.post("/verify", (req: Request, res: Response) => {
   const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.ip || "unknown";
   if (rateLimited(ip)) {
     res.status(429).json({ error: "Too many attempts. Try again later." });
@@ -117,20 +114,6 @@ router.post("/verify", async (req: Request, res: Response) => {
     setGateCookie(res);
     res.json({ unlocked: true });
     return;
-  }
-  const candidates = await db
-    .select({ id: staffTable.id, password: staffTable.password })
-    .from(staffTable)
-    .where(and(eq(staffTable.active, true), isNotNull(staffTable.password)));
-
-  for (const c of candidates) {
-    if (!c.password) continue;
-    const ok = c.password.startsWith("$2") ? await bcrypt.compare(pin, c.password) : pin === c.password;
-    if (ok) {
-      setGateCookie(res);
-      res.json({ unlocked: true });
-      return;
-    }
   }
   recordFailure(ip);
   res.status(401).json({ error: "Incorrect passcode" });

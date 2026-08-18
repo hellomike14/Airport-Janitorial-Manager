@@ -21,7 +21,6 @@ import {
   FileText,
   ClipboardCheck,
   Navigation,
-  Lock,
   Send,
   Megaphone,
   Calendar,
@@ -42,7 +41,6 @@ import {
   useListNotifications,
   useMarkNotificationRead,
   useMarkAllNotificationsRead,
-  useListStaff,
   listConversations,
 } from "@workspace/api-client-react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
@@ -367,183 +365,6 @@ function NotificationBell({ staffId }: { staffId: number }) {
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
-function SetPinModal({ staffId, hasExistingPin, onClose }: { staffId: number; hasExistingPin: boolean; onClose: () => void }) {
-  const { t } = useTranslation();
-  const [currentPinDigits, setCurrentPinDigits] = useState<string[]>(["", "", "", ""]);
-  const [pinDigits, setPinDigits] = useState<string[]>(["", "", "", ""]);
-  const [confirmDigits, setConfirmDigits] = useState<string[]>(["", "", "", ""]);
-  const [step, setStep] = useState<"current" | "new" | "confirm">(hasExistingPin ? "current" : "new");
-  const [verifiedCurrentPin, setVerifiedCurrentPin] = useState("");
-  const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
-
-  useEffect(() => {
-    setTimeout(() => inputRefs.current[0]?.focus(), 50);
-  }, [step]);
-
-  const getStepDigits = (): [string[], React.Dispatch<React.SetStateAction<string[]>>] => {
-    if (step === "current") return [currentPinDigits, setCurrentPinDigits];
-    if (step === "new") return [pinDigits, setPinDigits];
-    return [confirmDigits, setConfirmDigits];
-  };
-
-  const handleDigitChange = (index: number, value: string) => {
-    if (saving) return;
-    const [digits, setDigits] = getStepDigits();
-    const digit = value.replace(/\D/g, "").slice(-1);
-    const newDigits = [...digits];
-    newDigits[index] = digit;
-    setDigits(newDigits);
-    setError("");
-    if (digit && index < 3) {
-      inputRefs.current[index + 1]?.focus();
-    }
-    if (digit && index === 3 && newDigits.every((d) => d !== "")) {
-      const pin = newDigits.join("");
-      if (step === "current") {
-        verifyCurrentPin(pin);
-      } else if (step === "new") {
-        setStep("confirm");
-        setConfirmDigits(["", "", "", ""]);
-      } else {
-        const newPin = pinDigits.join("");
-        if (pin !== newPin) {
-          setError(t("layout.pinsNoMatch"));
-          setStep("new");
-          setPinDigits(["", "", "", ""]);
-          setConfirmDigits(["", "", "", ""]);
-          return;
-        }
-        submitPin(pin);
-      }
-    }
-  };
-
-  const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
-    const [digits, setDigits] = getStepDigits();
-    if (e.key === "Backspace" && !digits[index] && index > 0) {
-      const newDigits = [...digits];
-      newDigits[index - 1] = "";
-      setDigits(newDigits);
-      inputRefs.current[index - 1]?.focus();
-    }
-  };
-
-  const verifyCurrentPin = async (pin: string) => {
-    setSaving(true);
-    try {
-      const res = await fetch(`${BASE_URL}/api/staff/verify-pin`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ staffId, pin }),
-      });
-      if (res.ok) {
-        setVerifiedCurrentPin(pin);
-        setStep("new");
-        setPinDigits(["", "", "", ""]);
-      } else {
-        setError(t("layout.incorrectCurrentPin"));
-        setCurrentPinDigits(["", "", "", ""]);
-        setTimeout(() => inputRefs.current[0]?.focus(), 50);
-      }
-    } catch {
-      setError(t("common.networkError"));
-      setCurrentPinDigits(["", "", "", ""]);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const submitPin = async (pin: string) => {
-    setSaving(true);
-    try {
-      const res = await fetch(`${BASE_URL}/api/staff/set-pin`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ staffId, pin, ...(verifiedCurrentPin ? { currentPin: verifiedCurrentPin } : {}) }),
-      });
-      if (res.ok) {
-        setSuccess(true);
-        setTimeout(onClose, 1500);
-      } else {
-        const data = await res.json().catch(() => ({}));
-        setError(data.error || t("layout.failedSetPin"));
-        setStep("new");
-        setPinDigits(["", "", "", ""]);
-        setConfirmDigits(["", "", "", ""]);
-      }
-    } catch {
-      setError(t("common.networkError"));
-      setStep("new");
-      setPinDigits(["", "", "", ""]);
-      setConfirmDigits(["", "", "", ""]);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const [currentDigits] = getStepDigits();
-  const stepLabel = step === "current" ? t("layout.enterCurrentPin") : step === "new" ? t("layout.enterNewPin") : t("layout.confirmNewPin");
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-emerald-700 flex items-center justify-center">
-              <Lock className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <p className="font-semibold text-slate-800">{hasExistingPin ? t("layout.changePin") : t("layout.setPin")}</p>
-              <p className="text-xs text-slate-500">{stepLabel}</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {success ? (
-          <div className="text-center py-6">
-            <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
-            <p className="font-semibold text-slate-800">{hasExistingPin ? t("layout.pinUpdatedSuccess") : t("layout.pinSetSuccess")}</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="flex justify-center gap-3">
-              {currentDigits.map((digit, i) => (
-                <input
-                  key={`${step}-${i}`}
-                  ref={(el) => { inputRefs.current[i] = el; }}
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={1}
-                  value={digit}
-                  onChange={(e) => handleDigitChange(i, e.target.value)}
-                  onKeyDown={(e) => handleKeyDown(i, e)}
-                  disabled={saving}
-                  className={`w-14 h-16 text-center text-2xl font-bold rounded-xl border-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all ${
-                    error ? "border-red-300 bg-red-50" : digit ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-white"
-                  } disabled:opacity-50`}
-                />
-              ))}
-            </div>
-            {error && <p className="text-red-500 text-xs text-center font-medium">{error}</p>}
-            {saving && (
-              <div className="flex items-center justify-center gap-2 text-emerald-600 text-sm">
-                <span className="animate-spin">&#8635;</span>
-                <span>{step === "current" ? t("layout.verifying") : t("layout.settingPin")}</span>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function SendAlertModal({ staffId, staffRole, onClose }: { staffId: number; staffRole: string; onClose: () => void }) {
   const { t } = useTranslation();
   const [message, setMessage] = useState("");
@@ -679,12 +500,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [viewDropdownOpen, setViewDropdownOpen] = useState(false);
-  const [showSetPin, setShowSetPin] = useState(false);
   const [showSendAlert, setShowSendAlert] = useState(false);
   const { currentUser, viewMode, setViewMode, logout } = useAuth();
-  const { data: staffList } = useListStaff();
-  const currentStaffData = staffList?.find((s) => s.id === currentUser?.id);
-  const hasExistingPin = !!(currentStaffData as any)?.hasPin;
 
   const { VIEW_MODES, NAV_BY_ROLE, ROLE_BADGE } = useNavConfig();
 
@@ -805,25 +622,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <LogOut className="w-3.5 h-3.5" />
             {t("layout.logout")}
           </button>
-          {currentUser?.role !== "staff" && (
-            <button
-              onClick={() => setShowSetPin(true)}
-              className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-medium bg-sidebar-accent/80 hover:bg-sidebar-accent text-sidebar-foreground/70 hover:text-sidebar-foreground transition-colors"
-            >
-              <Lock className="w-3.5 h-3.5" />
-              {hasExistingPin ? t("layout.changePin") : t("layout.setPin")}
-            </button>
-          )}
         </div>
       </aside>
-
-      {showSetPin && currentUser && (
-        <SetPinModal
-          staffId={currentUser.id}
-          hasExistingPin={hasExistingPin}
-          onClose={() => setShowSetPin(false)}
-        />
-      )}
 
       {showSendAlert && currentUser && (
         <SendAlertModal

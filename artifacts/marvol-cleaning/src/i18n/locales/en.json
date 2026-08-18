@@ -159,7 +159,9 @@
       "supervisor": "Dashboard, assignments, areas, and issue tracking",
       "staff": "View assigned tasks and report issues"
     },
-    "askAdminForPin": "Your account needs a PIN set by an administrator before you can log in. Please ask an admin."
+    "askAdminForPin": "Your account needs a PIN set by an administrator before you can log in. Please ask an admin.",
+    "noStaffMatchTitle": "Account not linked to a staff record",
+    "noStaffMatchBody": "You signed in successfully, but no staff record uses this email address. Ask an administrator to add this email to your staff profile, then sign in again."
   },
   "dashboard": {
     "facilityOverview": "Facility Overview",
@@ -303,7 +305,14 @@
     "pinFormatError": "The passcode must be exactly 4 digits.",
     "pinSaved": "Passcode saved for {{name}}.",
     "pinSaveFailed": "Could not save the passcode. Please try again.",
-    "adminPinPrompt": "Enter YOUR admin PIN to confirm:"
+    "adminPinPrompt": "Enter YOUR admin PIN to confirm:",
+    "setEmailPrompt": "Login email for {{name}}:",
+    "emailFormatError": "Please enter a valid email address.",
+    "emailRequired": "Email (used to sign in)",
+    "missingEmailBanner": "{{count}} staff member(s) have no email on file and cannot sign in.",
+    "migrationHint": "Staff sign in with their email account. Add an email to each profile below, then have the employee create their account with that same email on the sign-up page.",
+    "canLogIn": "Can sign in with this email",
+    "noEmailCannotLogIn": "No email — cannot sign in. Add one."
   },
   "areas": {
     "cleaningZones": "Cleaning Zones",
@@ -759,7 +768,7 @@
   },
   "gate": {
     "title": "Employee Access",
-    "subtitle": "Enter your personal passcode to access the Marvol portal.",
+    "subtitle": "Enter the company passcode to access the Marvol portal.",
     "incorrectCode": "Incorrect passcode. Please try again.",
     "tooManyAttempts": "Too many attempts. Please wait 15 minutes and try again.",
     "networkError": "Connection problem. Please try again.",

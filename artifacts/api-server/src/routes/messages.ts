@@ -9,7 +9,7 @@ import {
 } from "@workspace/db/schema";
 import { eq, and, or, desc, asc, ne, count, gt, inArray } from "drizzle-orm";
 import { z } from "zod";
-import { actorIdFromRequest } from "../lib/actorSession";
+import { actorStaffFromRequest } from "../lib/actorSession";
 
 const router: IRouter = Router();
 
@@ -34,23 +34,19 @@ async function getStaff(id: number): Promise<StaffRow | undefined> {
 
 /**
  * Resolves the authenticated actor for messaging endpoints. The caller's
- * identity comes ONLY from the signed actor-session cookie — client-supplied
- * staffId/senderId values are accepted for API-shape compatibility but must
- * match the authenticated actor, otherwise the request is rejected.
+ * identity comes ONLY from the verified Clerk session (mapped to a staff
+ * record by email) — client-supplied staffId/senderId values are accepted
+ * for API-shape compatibility but must match the authenticated actor,
+ * otherwise the request is rejected.
  */
 async function requireActor(req: Request, res: Response, claimedId: number): Promise<StaffRow | null> {
-  const actorId = actorIdFromRequest(req);
-  if (actorId === null) {
+  const actor = await actorStaffFromRequest(req);
+  if (!actor) {
     res.status(401).json({ error: "Login session required" });
     return null;
   }
-  if (actorId !== claimedId) {
+  if (actor.id !== claimedId) {
     res.status(403).json({ error: "You can only act as yourself" });
-    return null;
-  }
-  const actor = await getStaff(actorId);
-  if (!actor || !actor.active) {
-    res.status(401).json({ error: "Login session required" });
     return null;
   }
   return actor;

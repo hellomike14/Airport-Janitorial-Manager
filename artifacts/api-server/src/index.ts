@@ -153,6 +153,28 @@ async function seed() {
       ON "conversation_participants" ("conversation_id", "staff_id")
   `);
 
+  // Clerk migration: personal PINs are gone — drop the legacy hash column so
+  // no PIN hashes linger in any environment (dev or production).
+  await db.execute(sql`ALTER TABLE "staff" DROP COLUMN IF EXISTS "password"`);
+
+  // Email is the join key between Clerk accounts and staff records, so it
+  // must be unambiguous among active staff. Clear duplicate emails first
+  // (keep the lowest id; the others are flagged as "no email" in the admin
+  // Staff page), then enforce case-insensitive uniqueness going forward.
+  await db.execute(sql`
+    UPDATE "staff" s SET "email" = NULL
+    WHERE s."active" = true AND s."email" IS NOT NULL
+      AND EXISTS (
+        SELECT 1 FROM "staff" o
+        WHERE o."active" = true AND o."email" IS NOT NULL
+          AND lower(o."email") = lower(s."email") AND o."id" < s."id"
+      )
+  `);
+  await db.execute(sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS "staff_email_active_unique"
+      ON "staff" (lower("email")) WHERE "email" IS NOT NULL AND "active" = true
+  `);
+
   const seedNames = new Set(SEED_STAFF.map((s) => s.name));
   const existingStaff = await db.select().from(staffTable);
   const existingNames = new Set(existingStaff.map((s) => s.name));
@@ -165,7 +187,6 @@ async function seed() {
         role: s.role,
         phone: s.phone ?? null,
         email: s.email ?? null,
-        password: null,
         active: true,
       }))
     );
@@ -190,8 +211,7 @@ async function seed() {
   // when another row already had that name, leaving two identical tiles on
   // the login screen. For each seeded admin/inspector/supervisor name, find
   // all active rows with that exact name; if more than one, pick a single
-  // survivor (prefer the row with a non-null password — i.e. PIN set —
-  // breaking ties by lowest id), re-point every staff FK on every loser
+  // survivor (lowest id), re-point every staff FK on every loser
   // row at the survivor, then delete the loser rows. Wrapped in a single
   // transaction so the merge either fully completes or rolls back.
   const MGMT_ROLES = new Set(["admin", "inspector", "supervisor"]);
@@ -203,12 +223,7 @@ async function seed() {
       );
       if (dupes.length < 2) continue;
 
-      const survivor = [...dupes].sort((a, b) => {
-        const aHas = a.password ? 1 : 0;
-        const bHas = b.password ? 1 : 0;
-        if (aHas !== bHas) return bHas - aHas;
-        return a.id - b.id;
-      })[0]!;
+      const survivor = [...dupes].sort((a, b) => a.id - b.id)[0]!;
       const losers = dupes.filter((d) => d.id !== survivor.id);
 
       for (const loser of losers) {
@@ -228,21 +243,14 @@ async function seed() {
         console.log(`Merged duplicate ${survivor.role} "${survivor.name}": kept id=${survivor.id}, merged from id=${loser.id}`);
       }
 
-      // Keep the in-memory snapshot in sync so subsequent loops (rename,
-      // password clear) don't try to touch a row that no longer exists.
+      // Keep the in-memory snapshot in sync so subsequent loops (rename)
+      // don't try to touch a row that no longer exists.
       for (const loser of losers) {
         const idx = existingStaff.findIndex((s) => s.id === loser.id);
         if (idx >= 0) existingStaff.splice(idx, 1);
       }
     }
   });
-
-  // NOTE: a previous version of this seed cleared every manager's PIN on
-  // every startup ("will set PIN on next login"). That was a debug-only
-  // helper and directly conflicts with the requirement that the merge
-  // survivor (e.g. Marcell Sutherland) keep the PIN they already set in
-  // production, so it has been removed. Manager PINs now persist across
-  // restarts the same way staff PINs do.
 
   // Re-fetch the staff table so the rename loop below sees the post-insert,
   // post-merge state of the world. The original `existingStaff` snapshot

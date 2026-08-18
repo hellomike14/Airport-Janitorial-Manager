@@ -159,7 +159,9 @@
       "supervisor": "Panel principal, asignaciones, áreas y seguimiento de problemas",
       "staff": "Ver tareas asignadas y reportar problemas"
     },
-    "askAdminForPin": "Un administrador debe asignar un PIN a tu cuenta antes de que puedas iniciar sesión. Pide ayuda a un administrador."
+    "askAdminForPin": "Un administrador debe asignar un PIN a tu cuenta antes de que puedas iniciar sesión. Pide ayuda a un administrador.",
+    "noStaffMatchTitle": "La cuenta no está vinculada a un registro de personal",
+    "noStaffMatchBody": "Iniciaste sesión correctamente, pero ningún registro de personal usa este correo. Pide a un administrador que agregue este correo a tu perfil y vuelve a iniciar sesión."
   },
   "dashboard": {
     "facilityOverview": "Vista General de la Instalación",
@@ -303,7 +305,14 @@
     "pinFormatError": "El código debe tener exactamente 4 dígitos.",
     "pinSaved": "Código guardado para {{name}}.",
     "pinSaveFailed": "No se pudo guardar el código. Inténtelo de nuevo.",
-    "adminPinPrompt": "Ingrese SU código de administrador para confirmar:"
+    "adminPinPrompt": "Ingrese SU código de administrador para confirmar:",
+    "setEmailPrompt": "Correo de inicio de sesión para {{name}}:",
+    "emailFormatError": "Ingresa un correo electrónico válido.",
+    "emailRequired": "Correo (usado para iniciar sesión)",
+    "missingEmailBanner": "{{count}} miembro(s) del personal no tienen correo y no pueden iniciar sesión.",
+    "migrationHint": "El personal inicia sesión con su cuenta de correo. Agrega un correo a cada perfil y pide al empleado que cree su cuenta con ese mismo correo en la página de registro.",
+    "canLogIn": "Puede iniciar sesión con este correo",
+    "noEmailCannotLogIn": "Sin correo — no puede iniciar sesión. Agrega uno."
   },
   "areas": {
     "cleaningZones": "Zonas de Limpieza",
@@ -759,7 +768,7 @@
   },
   "gate": {
     "title": "Acceso de empleados",
-    "subtitle": "Ingrese su código de acceso personal para entrar al portal de Marvol.",
+    "subtitle": "Ingresa el código de la empresa para acceder al portal Marvol.",
     "incorrectCode": "Código incorrecto. Inténtelo de nuevo.",
     "tooManyAttempts": "Demasiados intentos. Espere 15 minutos e inténtelo de nuevo.",
     "networkError": "Problema de conexión. Inténtelo de nuevo.",
