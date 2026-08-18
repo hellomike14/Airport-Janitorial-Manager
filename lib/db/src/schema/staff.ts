@@ -19,7 +19,7 @@ export const staffTable = pgTable(
   (t) => [
     uniqueIndex("staff_email_active_unique")
       .on(sql`lower(${t.email})`)
-      .where(sql`${t.email} IS NOT NULL AND ${t.active} = true`),
+      .where(sql`${t.email} IS NOT NULL AND ${t.email} != '' AND ${t.active} = true`),
   ],
 );
 
