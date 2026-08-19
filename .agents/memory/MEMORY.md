@@ -1,3 +1,4 @@
 - [Marvol typecheck quirks](marvol-typecheck.md) — repo typecheck is red on master; orval query-options need queryKey, so prefer plain fetch fns over disabled-query hooks.
 - [Marvol actor sessions](marvol-actor-session.md) — signed HttpOnly actor cookie identifies the logged-in staff member; identity-sensitive endpoints must derive the actor from it, never from client-sent ids.
 - [Marvol artifact routing](marvol-routing.md) — web previews at "/", API at "/api" on the shared proxy; /marvol-cleaning/api/... returns SPA HTML, not the API.
+- [Marvol email-only sign-in](marvol-email-signin.md) — social login is hidden in the app; disabling its provider entirely requires Clerk tenant access per environment.

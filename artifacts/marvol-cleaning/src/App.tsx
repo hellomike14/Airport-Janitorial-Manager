@@ -101,8 +101,11 @@ const clerkAppearance = {
     identityPreviewEditButton: "text-emerald-700",
     formFieldSuccessText: "text-emerald-600",
     alertText: "text-slate-700",
+    // Google sign-in is not offered in this employee portal. Hide Clerk's
+    // social-login controls so authentication begins with the work email form.
     socialButtonsBlockButtonText: "text-slate-700",
-    socialButtonsBlockButton: "border-slate-200",
+    socialButtonsBlockButton: "hidden",
+    dividerRow: "hidden",
     formButtonPrimary: "bg-emerald-600 hover:bg-emerald-700 text-white font-semibold",
     formFieldInput: "border-slate-200 focus:border-emerald-500",
     dividerLine: "bg-slate-200",
