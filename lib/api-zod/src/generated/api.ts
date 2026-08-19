@@ -21,8 +21,11 @@ export const ListStaffResponseItem = zod.object({
   id: zod.number(),
   name: zod.string(),
   role: zod.enum(["staff", "supervisor", "admin", "inspector"]),
-  phone: zod.string().nullish(),
-  email: zod.string().nullish(),
+  hasEmail: zod
+    .boolean()
+    .describe(
+      "Whether the staff member has a configured sign-in email. The email address itself is never returned.",
+    ),
   active: zod.boolean(),
   createdAt: zod.string(),
 });
@@ -57,8 +60,11 @@ export const UpdateStaffMemberResponse = zod.object({
   id: zod.number(),
   name: zod.string(),
   role: zod.enum(["staff", "supervisor", "admin", "inspector"]),
-  phone: zod.string().nullish(),
-  email: zod.string().nullish(),
+  hasEmail: zod
+    .boolean()
+    .describe(
+      "Whether the staff member has a configured sign-in email. The email address itself is never returned.",
+    ),
   active: zod.boolean(),
   createdAt: zod.string(),
 });
@@ -692,6 +698,10 @@ export const ListConversationsQueryParams = zod.object({
 
 export const ListConversationsResponseItem = zod.object({
   id: zod.number(),
+  isGroup: zod.boolean(),
+  groupName: zod.string().nullable(),
+  participantCount: zod.number(),
+  participantNames: zod.array(zod.string()),
   otherStaffId: zod.number(),
   otherStaffName: zod.string(),
   otherStaffRole: zod.string(),
@@ -714,6 +724,10 @@ export const StartConversationBody = zod.object({
 
 export const StartConversationResponse = zod.object({
   id: zod.number(),
+  isGroup: zod.boolean(),
+  groupName: zod.string().nullable(),
+  participantCount: zod.number(),
+  participantNames: zod.array(zod.string()),
   otherStaffId: zod.number(),
   otherStaffName: zod.string(),
   otherStaffRole: zod.string(),

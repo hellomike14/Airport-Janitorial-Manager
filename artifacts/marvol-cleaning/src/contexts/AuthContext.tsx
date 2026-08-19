@@ -8,8 +8,6 @@ export interface CurrentUser {
   id: number;
   name: string;
   role: UserRole;
-  phone?: string | null;
-  email?: string | null;
 }
 
 /**
@@ -72,8 +70,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             id: s.id,
             name: s.name,
             role: s.role,
-            phone: s.phone,
-            email: s.email,
           };
           setCurrentUser((prev) => {
             if (!prev || prev.role !== user.role) {

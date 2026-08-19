@@ -1167,12 +1167,9 @@ components:
         role:
           type: string
           enum: [staff, supervisor, admin, inspector]
-        phone:
-          type: string
-          nullable: true
-        email:
-          type: string
-          nullable: true
+        hasEmail:
+          type: boolean
+          description: Whether the staff member has a configured sign-in email. The email address itself is never returned.
         active:
           type: boolean
         createdAt:
@@ -1181,6 +1178,7 @@ components:
         - id
         - name
         - role
+        - hasEmail
         - active
         - createdAt
 
@@ -1602,6 +1600,16 @@ components:
       properties:
         id:
           type: integer
+        isGroup:
+          type: boolean
+        groupName:
+          type: ["string", "null"]
+        participantCount:
+          type: integer
+        participantNames:
+          type: array
+          items:
+            type: string
         otherStaffId:
           type: integer
         otherStaffName:
@@ -1618,6 +1626,10 @@ components:
           type: string
       required:
         - id
+        - isGroup
+        - groupName
+        - participantCount
+        - participantNames
         - otherStaffId
         - otherStaffName
         - otherStaffRole
@@ -1636,6 +1648,34 @@ components:
       required:
         - staffId
         - recipientId
+
+    GroupConversationStartInput:
+      type: object
+      properties:
+        staffId:
+          type: integer
+        recipientIds:
+          type: array
+          items:
+            type: integer
+        groupName:
+          type: string
+      required:
+        - staffId
+        - recipientIds
+
+    UpdateChatMessageInput:
+      type: object
+      properties:
+        senderId:
+          type: integer
+        body:
+          type: string
+          minLength: 1
+          maxLength: 2000
+      required:
+        - senderId
+        - body
 
     ChatMessage:
       type: object

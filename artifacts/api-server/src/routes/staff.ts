@@ -13,18 +13,24 @@ import { requireStaffRole } from "../middlewares/requireStaffRole";
 
 const router: IRouter = Router();
 
+function toPublicStaff(staff: typeof staffTable.$inferSelect) {
+  return {
+    id: staff.id,
+    name: staff.name,
+    role: staff.role,
+    hasEmail: Boolean(staff.email),
+    active: staff.active,
+    createdAt: staff.createdAt.toISOString(),
+  };
+}
+
 router.get("/", async (_req, res) => {
   const staff = await db
     .select()
     .from(staffTable)
     .where(eq(staffTable.active, true))
     .orderBy(staffTable.role, staffTable.name);
-  res.json(
-    staff.map((s) => ({
-      ...s,
-      createdAt: s.createdAt.toISOString(),
-    }))
-  );
+  res.json(staff.map(toPublicStaff));
 });
 
 // Resolves the acting staff member from the verified Clerk session (matched
@@ -35,7 +41,7 @@ router.get("/me", async (req, res) => {
     res.status(404).json({ error: "NO_STAFF_MATCH" });
     return;
   }
-  res.json({ ...staff, createdAt: staff.createdAt.toISOString() });
+  res.json(toPublicStaff(staff));
 });
 
 // Email is the Clerk↔staff join key: it must be unique (case-insensitive)
@@ -74,7 +80,7 @@ router.post("/", requireStaffRole("admin"), async (req, res) => {
       email,
     })
     .returning();
-  res.status(201).json({ ...created, createdAt: created.createdAt.toISOString() });
+  res.status(201).json(toPublicStaff(created));
 });
 
 router.put("/:id", requireStaffRole("admin"), async (req, res) => {
@@ -103,7 +109,7 @@ router.put("/:id", requireStaffRole("admin"), async (req, res) => {
     res.status(404).json({ error: "Staff member not found" });
     return;
   }
-  res.json({ ...updated, createdAt: updated.createdAt.toISOString() });
+  res.json(toPublicStaff(updated));
 });
 
 router.delete("/:id", requireStaffRole("admin"), async (req, res) => {

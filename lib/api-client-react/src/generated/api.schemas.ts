@@ -23,8 +23,8 @@ export interface StaffMember {
   id: number;
   name: string;
   role: StaffMemberRole;
-  phone?: string | null;
-  email?: string | null;
+  /** Whether the staff member has a configured sign-in email. The email address itself is never returned. */
+  hasEmail: boolean;
   active: boolean;
   createdAt: string;
 }
@@ -269,6 +269,15 @@ export interface GroupConversationStartInput {
   groupName?: string;
 }
 
+export interface UpdateChatMessageInput {
+  senderId: number;
+  /**
+   * @minLength 1
+   * @maxLength 2000
+   */
+  body: string;
+}
+
 export interface ChatMessage {
   id: number;
   conversationId: number;
@@ -280,15 +289,6 @@ export interface ChatMessage {
 }
 
 export interface ChatMessageInput {
-  senderId: number;
-  /**
-   * @minLength 1
-   * @maxLength 2000
-   */
-  body: string;
-}
-
-export interface UpdateChatMessageInput {
   senderId: number;
   /**
    * @minLength 1

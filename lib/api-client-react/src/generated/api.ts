@@ -66,7 +66,6 @@ import type {
   Task,
   TaskType,
   UpdateApplicationRequest,
-  UpdateChatMessageInput,
   UpdateIssueImagesRequest,
   UpdateOnboardingItemRequest,
   UpdateStaffMemberRequest,
@@ -4752,47 +4751,4 @@ export const useDisconnectQuickbooks = <
   TContext
 > => {
   return useMutation(getDisconnectQuickbooksMutationOptions(options));
-};
-
-// ── Group conversation (custom, not orval-generated) ──────────────────────────
-import type { GroupConversationStartInput } from "./api.schemas";
-
-export const startGroupConversation = async (
-  input: GroupConversationStartInput,
-  options?: RequestInit
-): Promise<ConversationSummary> => {
-  return customFetch<ConversationSummary>(`/api/conversations/group`, {
-    method: "POST",
-    body: JSON.stringify(input),
-    ...options,
-  });
-};
-
-export const deleteConversationMessage = async (
-  conversationId: number,
-  messageId: number,
-  params: { staffId: number },
-  options?: RequestInit
-): Promise<{ deleted: boolean }> => {
-  return customFetch<{ deleted: boolean }>(
-    `/api/conversations/${conversationId}/messages/${messageId}?staffId=${params.staffId}`,
-    { method: "DELETE", ...options }
-  );
-};
-
-export const updateConversationMessage = async (
-  conversationId: number,
-  messageId: number,
-  input: UpdateChatMessageInput,
-  options?: RequestInit
-): Promise<ChatMessage> => {
-  return customFetch<ChatMessage>(
-    `/api/conversations/${conversationId}/messages/${messageId}`,
-    {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", ...options?.headers },
-      body: JSON.stringify(input),
-      ...options,
-    }
-  );
 };

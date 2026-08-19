@@ -11,8 +11,8 @@ export interface StaffMember {
   id: number;
   name: string;
   role: StaffMemberRole;
-  phone?: string | null;
-  email?: string | null;
+  /** Whether the staff member has a configured sign-in email. The email address itself is never returned. */
+  hasEmail: boolean;
   active: boolean;
   createdAt: string;
 }

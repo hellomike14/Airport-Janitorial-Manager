@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useListStaff, useCreateStaffMember, useDeleteStaffMember, useUpdateStaffMember } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { UserPlus, Shield, User, Phone, Mail, Trash2, Lock, ArrowUpDown, LogOut, MailWarning, CheckCircle2 } from "lucide-react";
+import { UserPlus, Shield, User, Trash2, Lock, ArrowUpDown, LogOut, MailWarning, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useTranslation } from "react-i18next";
@@ -58,7 +58,7 @@ export default function Staff() {
   const handleSetEmail = (person: any) => {
     const email = window.prompt(
       t("staff.setEmailPrompt", "Login email for {{name}}:", { name: person.name }),
-      person.email ?? ""
+      ""
     );
     if (email === null) return;
     const trimmed = email.trim();
@@ -82,7 +82,7 @@ export default function Staff() {
   const admins = staff?.filter((s) => s.role === "admin") || [];
   const supervisors = staff?.filter((s) => s.role === "supervisor") || [];
   const regularStaff = staff?.filter((s) => s.role === "staff") || [];
-  const missingEmailCount = (staff ?? []).filter((s) => !s.email).length;
+  const missingEmailCount = (staff ?? []).filter((s) => !s.hasEmail).length;
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto pb-12">
@@ -266,7 +266,7 @@ function StaffCard({ person, onDelete, onToggleRole, roleType, onLogout, onSetEm
   const { t } = useTranslation();
   const style = ROLE_STYLES[roleType];
   const initials = person.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
-  const hasEmail = !!person.email;
+  const hasEmail = Boolean(person.hasEmail);
 
   return (
     <div className={`bg-white rounded-2xl p-5 border shadow-sm relative group overflow-hidden ${style.border}`}>
@@ -304,14 +304,6 @@ function StaffCard({ person, onDelete, onToggleRole, roleType, onLogout, onSetEm
         </div>
       </div>
       <div className="space-y-2 text-sm text-slate-500">
-        <div className="flex items-center gap-2">
-          <Phone className="w-4 h-4 text-slate-400" />
-          {person.phone || t("staff.noPhoneAdded")}
-        </div>
-        <div className="flex items-center gap-2 truncate">
-          <Mail className="w-4 h-4 text-slate-400 shrink-0" />
-          {person.email || t("staff.noEmailAdded")}
-        </div>
         {hasEmail ? (
           <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-600">
             <CheckCircle2 className="w-3.5 h-3.5" />
