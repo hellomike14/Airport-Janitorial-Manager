@@ -5,6 +5,11 @@ import { MapPin, ChevronRight } from "lucide-react";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useTranslation } from "react-i18next";
 
+const TERMINAL_HEADINGS: Record<string, string> = {
+  "Terminal A - East": "Terminal A East",
+  "Terminal B - East": "Terminal B East",
+};
+
 export default function AreasList() {
   const { t } = useTranslation();
   const { data: areas, isLoading } = useListAreas();
@@ -31,7 +36,9 @@ export default function AreasList() {
           <div key={terminal} className="animate-fade-in-up">
             <div className="flex items-center gap-3 mb-4 border-b border-slate-200 pb-2">
               <MapPin className="w-5 h-5 text-accent" />
-              <h2 className="text-xl font-display font-bold text-slate-800">{terminal}</h2>
+              <h2 className="text-xl font-display font-bold text-slate-800">
+                {TERMINAL_HEADINGS[terminal] ?? terminal}
+              </h2>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {terminalAreas.map((area: any) => (
