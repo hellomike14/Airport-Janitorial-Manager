@@ -17,6 +17,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import humanTraffickingFlyer from "@assets/MCO_Human_Trafficing_1787144155521.jpeg";
 import {
   listConversations,
   listConversationMessages,
@@ -88,11 +89,15 @@ function NewConvoDialog({ senderRole, staffId, onClose, onStarted }: NewConvoDia
     if (senderRole === "staff") return s.role === "supervisor";
     return false;
   });
+  // Group conversations may include every active staff member, while
+  // one-to-one conversations keep the existing role-based permissions.
+  const groupRecipients =
+    canGroup ? staffList.filter((s) => s.id !== staffId) : allowedRecipients;
 
-  const staffGroup = allowedRecipients.filter((s) => s.role === "staff");
-  const supervisorGroup = allowedRecipients.filter((s) => s.role === "supervisor");
-  const inspectorGroup = allowedRecipients.filter((s) => s.role === "inspector");
-  const adminGroup = allowedRecipients.filter((s) => s.role === "admin");
+  const staffGroup = groupRecipients.filter((s) => s.role === "staff");
+  const supervisorGroup = groupRecipients.filter((s) => s.role === "supervisor");
+  const inspectorGroup = groupRecipients.filter((s) => s.role === "inspector");
+  const adminGroup = groupRecipients.filter((s) => s.role === "admin");
 
   const individualMutation = useMutation({
     mutationFn: (recipientId: number) => startConversation({ staffId, recipientId }),
@@ -230,8 +235,28 @@ function NewConvoDialog({ senderRole, staffId, onClose, onStarted }: NewConvoDia
                   {t("messages.quickSelect")}
                 </p>
                 <div className="flex flex-wrap gap-2">
+                  {groupRecipients.length > 0 && (
+                    <button
+                      type="button"
+                      data-testid="button-select-everyone"
+                      onClick={() => {
+                        const ids = groupRecipients.map((s) => s.id);
+                        const allOn = ids.every((id) => selected.has(id));
+                        quickSelect(ids);
+                        if (!allOn && !groupName.trim()) setGroupName(t("messages.everyone"));
+                      }}
+                      className={`text-xs px-3 py-1.5 rounded-full border font-semibold transition-colors ${
+                        groupRecipients.every((s) => selected.has(s.id))
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "border-blue-300 text-blue-700 hover:border-blue-500 hover:bg-blue-50"
+                      }`}
+                    >
+                      {t("messages.everyone")} ({groupRecipients.length})
+                    </button>
+                  )}
                   {staffGroup.length > 0 && (
                     <button
+                      type="button"
                       onClick={() => quickSelect(staffGroup.map((s) => s.id))}
                       className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${
                         staffGroup.every((s) => selected.has(s.id))
@@ -244,6 +269,7 @@ function NewConvoDialog({ senderRole, staffId, onClose, onStarted }: NewConvoDia
                   )}
                   {supervisorGroup.length > 0 && (
                     <button
+                      type="button"
                       onClick={() => quickSelect(supervisorGroup.map((s) => s.id))}
                       className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${
                         supervisorGroup.every((s) => selected.has(s.id))
@@ -256,6 +282,7 @@ function NewConvoDialog({ senderRole, staffId, onClose, onStarted }: NewConvoDia
                   )}
                   {inspectorGroup.length > 0 && (
                     <button
+                      type="button"
                       onClick={() => quickSelect(inspectorGroup.map((s) => s.id))}
                       className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${
                         inspectorGroup.every((s) => selected.has(s.id))
@@ -268,6 +295,7 @@ function NewConvoDialog({ senderRole, staffId, onClose, onStarted }: NewConvoDia
                   )}
                   {adminGroup.length > 0 && (
                     <button
+                      type="button"
                       onClick={() => quickSelect(adminGroup.map((s) => s.id))}
                       className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${
                         adminGroup.every((s) => selected.has(s.id))
@@ -287,7 +315,7 @@ function NewConvoDialog({ senderRole, staffId, onClose, onStarted }: NewConvoDia
                   {t("messages.orSelectPeople")}
                 </p>
                 <div className="space-y-1">
-                  {allowedRecipients.map((s) => (
+                  {groupRecipients.map((s) => (
                     <label
                       key={s.id}
                       className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-slate-50 cursor-pointer"
@@ -350,6 +378,7 @@ export default function Messages() {
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showNewConvo, setShowNewConvo] = useState(false);
+  const [showFlyer, setShowFlyer] = useState(false);
   const [draft, setDraft] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -455,6 +484,44 @@ export default function Messages() {
           </button>
         )}
       </div>
+
+      <section
+        data-testid="card-human-trafficking-announcement"
+        className="mb-4 rounded-2xl border border-sky-100 bg-gradient-to-r from-sky-50 via-white to-amber-50 overflow-hidden shrink-0"
+        aria-labelledby="human-trafficking-announcement-title"
+      >
+        <div className="flex items-center gap-4 p-3 sm:p-4">
+          <button
+            type="button"
+            data-testid="button-view-human-trafficking-flyer"
+            onClick={() => setShowFlyer(true)}
+            className="relative w-20 sm:w-24 md:w-28 shrink-0 rounded-xl overflow-hidden shadow-sm ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            aria-label="View the MCO Cares Human Trafficking Awareness flyer"
+          >
+            <img
+              data-testid="img-human-trafficking-flyer"
+              src={humanTraffickingFlyer}
+              alt="MCO Cares Human Trafficking Awareness event flyer"
+              className="block aspect-[3/4] w-full object-cover object-top"
+            />
+            <span className="absolute inset-x-1 bottom-1 rounded-md bg-slate-900/75 px-1 py-1 text-center text-[10px] font-semibold text-white">
+              View flyer
+            </span>
+          </button>
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-sky-700">MCO Cares</p>
+            <h2 id="human-trafficking-announcement-title" className="mt-0.5 text-sm sm:text-base font-bold text-slate-800">
+              Human Trafficking Awareness
+            </h2>
+            <p className="mt-1 text-xs sm:text-sm font-semibold text-slate-700">
+              Thursday, August 20, 2026 · 2:00–3:00 PM · Virtual
+            </p>
+            <p className="mt-1 hidden text-xs text-slate-500 sm:block">
+              Join MCO Cares to learn how to recognize the signs and respond safely.
+            </p>
+          </div>
+        </div>
+      </section>
 
       <div className="flex-1 min-h-0 flex gap-4">
         {/* Conversation list */}
@@ -647,6 +714,36 @@ export default function Messages() {
           onClose={() => setShowNewConvo(false)}
           onStarted={handleStarted}
         />
+      )}
+
+      {showFlyer && (
+        <div
+          data-testid="dialog-human-trafficking-flyer"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="MCO Cares Human Trafficking Awareness flyer"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setShowFlyer(false);
+          }}
+        >
+          <div className="relative max-h-full max-w-3xl rounded-2xl bg-white p-2 shadow-2xl">
+            <button
+              type="button"
+              data-testid="button-close-human-trafficking-flyer"
+              onClick={() => setShowFlyer(false)}
+              className="absolute right-3 top-3 z-10 rounded-full bg-slate-900/75 p-2 text-white transition-colors hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              aria-label="Close flyer"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <img
+              src={humanTraffickingFlyer}
+              alt="MCO Cares Human Trafficking Awareness event flyer"
+              className="max-h-[calc(100vh-2rem)] w-auto max-w-full rounded-xl object-contain"
+            />
+          </div>
+        </div>
       )}
     </div>
   );

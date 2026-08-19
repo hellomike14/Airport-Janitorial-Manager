@@ -93,6 +93,7 @@
     "groupName": "Group name (optional)",
     "groupNamePlaceholder": "e.g. Supervisors & Inspectors",
     "quickSelect": "Quick select",
+    "everyone": "Everyone",
     "allStaff": "All Staff",
     "allSupervisors": "All Supervisors",
     "allInspectors": "All Inspectors",

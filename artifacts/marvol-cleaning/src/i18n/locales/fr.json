@@ -93,6 +93,7 @@
     "groupName": "Nom du groupe (optionnel)",
     "groupNamePlaceholder": "Ex. Superviseurs et Inspecteurs",
     "quickSelect": "Sélection rapide",
+    "everyone": "Tout le monde",
     "allStaff": "Tout le personnel",
     "allSupervisors": "Tous les superviseurs",
     "allInspectors": "Tous les inspecteurs",
