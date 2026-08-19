@@ -102,7 +102,14 @@
     "createGroup": "Crear grupo",
     "groupMembersCount": "{{count}} miembros",
     "confirmDelete": "¿Eliminar este mensaje?",
-    "deleteMessage": "Eliminar mensaje"
+    "deleteMessage": "Eliminar mensaje",
+    "editMessage": "Editar mensaje",
+    "editMessagePlaceholder": "Actualiza tu mensaje...",
+    "save": "Guardar",
+    "saving": "Guardando...",
+    "cancel": "Cancelar",
+    "editRequired": "El mensaje no puede estar vacío.",
+    "editFailed": "No se pudo actualizar tu mensaje. Inténtalo de nuevo."
   },
   "layout": {
     "logout": "Cerrar sesión",

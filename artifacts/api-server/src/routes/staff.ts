@@ -9,6 +9,7 @@ import {
   DeleteStaffMemberParams,
 } from "@workspace/api-zod";
 import { actorStaffFromRequest } from "../lib/actorSession";
+import { requireStaffRole } from "../middlewares/requireStaffRole";
 
 const router: IRouter = Router();
 
@@ -53,7 +54,7 @@ async function emailTakenByOther(email: string, excludeId?: number): Promise<boo
   return !!existing;
 }
 
-router.post("/", async (req, res) => {
+router.post("/", requireStaffRole("admin"), async (req, res) => {
   const body = CreateStaffMemberBody.parse(req.body);
   const email = body.email?.trim();
   if (!email) {
@@ -76,7 +77,7 @@ router.post("/", async (req, res) => {
   res.status(201).json({ ...created, createdAt: created.createdAt.toISOString() });
 });
 
-router.put("/:id", async (req, res) => {
+router.put("/:id", requireStaffRole("admin"), async (req, res) => {
   const { id } = UpdateStaffMemberParams.parse({ id: req.params.id });
   const body = UpdateStaffMemberBody.parse(req.body);
   const updateData: Partial<typeof staffTable.$inferInsert> = {};
@@ -105,7 +106,7 @@ router.put("/:id", async (req, res) => {
   res.json({ ...updated, createdAt: updated.createdAt.toISOString() });
 });
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requireStaffRole("admin"), async (req, res) => {
   const { id } = DeleteStaffMemberParams.parse({ id: req.params.id });
   const [updated] = await db
     .update(staffTable)

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Switch, Route, Router as WouterRouter, Redirect, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { ClerkProvider, useClerk, useUser } from "@clerk/react";
@@ -33,7 +33,6 @@ import Employment from "./pages/Employment";
 import Apply from "./pages/Apply";
 import Messages from "./pages/Messages";
 import { SignInPage, SignUpPage, NoStaffMatch } from "./pages/Login";
-import { GateScreen } from "./components/GateScreen";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -132,21 +131,7 @@ function ClerkQueryClientCacheInvalidator() {
   return null;
 }
 
-function GatedApp() {
-  const [gateState, setGateState] = useState<"checking" | "locked" | "open">("checking");
-
-  useEffect(() => {
-    fetch(`${basePath}/api/gate/status`)
-      .then((res) => setGateState(res.ok ? "open" : "locked"))
-      .catch(() => setGateState("locked"));
-  }, []);
-
-  if (gateState === "checking") {
-    return <div className="min-h-screen bg-slate-900" />;
-  }
-  if (gateState === "locked") {
-    return <GateScreen onUnlocked={() => setGateState("open")} />;
-  }
+function AppRoutes() {
   return (
     <Switch>
       {/* REQUIRED — "/sign-in/*?" and "/sign-up/*?" verbatim: the /*? optional
@@ -296,7 +281,7 @@ function ClerkProviderWithRoutes() {
               <Switch>
                 <Route path="/apply" component={Apply} />
                 <Route>
-                  <GatedApp />
+                  <AppRoutes />
                 </Route>
               </Switch>
             </AuthProvider>

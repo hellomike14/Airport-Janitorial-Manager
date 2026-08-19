@@ -17,13 +17,12 @@ import weeklyReportRouter from "./weeklyReport";
 import applicationsRouter from "./applications";
 import onboardingRouter from "./onboarding";
 import quickbooksRouter from "./quickbooks";
-import gateRouter from "./gate";
-import { gateMiddleware } from "../middlewares/gate";
+import { requireStaffSession } from "../middlewares/requireStaffSession";
+import { requireStaffRole } from "../middlewares/requireStaffRole";
 
 const router: IRouter = Router();
 
-router.use("/gate", gateRouter);
-router.use(gateMiddleware);
+router.use(requireStaffSession);
 router.use(healthRouter);
 router.use(dashboardRouter);
 router.use("/staff", staffRouter);
@@ -38,9 +37,9 @@ router.use(storageRouter);
 router.use(locationsRouter);
 router.use("/schedules", schedulesRouter);
 router.use("/shared-photos", sharedPhotosRouter);
-router.use("/weekly-report", weeklyReportRouter);
+router.use("/weekly-report", requireStaffRole("admin"), weeklyReportRouter);
 router.use("/applications", applicationsRouter);
-router.use("/onboarding", onboardingRouter);
-router.use("/quickbooks", quickbooksRouter);
+router.use("/onboarding", requireStaffRole("admin", "supervisor"), onboardingRouter);
+router.use("/quickbooks", requireStaffRole("admin"), quickbooksRouter);
 
 export default router;

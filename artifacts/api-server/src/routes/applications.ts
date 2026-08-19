@@ -3,13 +3,14 @@ import { db } from "@workspace/db";
 import { jobApplicationsTable } from "@workspace/db/schema";
 import { SubmitApplicationBody, UpdateApplicationBody } from "@workspace/api-zod";
 import { eq, desc } from "drizzle-orm";
+import { requireStaffRole } from "../middlewares/requireStaffRole";
 
 const router: IRouter = Router();
 
 /**
  * GET /applications — list submissions (admin/supervisor, gated client-side).
  */
-router.get("/", async (req: Request, res: Response) => {
+router.get("/", requireStaffRole("admin", "supervisor"), async (req: Request, res: Response) => {
   try {
     const status = typeof req.query.status === "string" ? req.query.status : undefined;
     const rows = await db
@@ -64,7 +65,7 @@ router.post("/", async (req: Request, res: Response) => {
 /**
  * GET /applications/:id — single application detail.
  */
-router.get("/:id", async (req: Request, res: Response) => {
+router.get("/:id", requireStaffRole("admin", "supervisor"), async (req: Request, res: Response) => {
   const id = Number(req.params.id);
   if (Number.isNaN(id)) {
     res.status(400).json({ error: "Invalid id" });
@@ -90,7 +91,7 @@ router.get("/:id", async (req: Request, res: Response) => {
 /**
  * PATCH /applications/:id — update status and employer-side I-9/W-4 fields.
  */
-router.patch("/:id", async (req: Request, res: Response) => {
+router.patch("/:id", requireStaffRole("admin", "supervisor"), async (req: Request, res: Response) => {
   const id = Number(req.params.id);
   if (Number.isNaN(id)) {
     res.status(400).json({ error: "Invalid id" });

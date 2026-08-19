@@ -21,8 +21,12 @@ const GroupStartBody = z.object({
   recipientIds: z.array(z.number()).min(1).max(50),
   groupName: z.string().max(100).optional(),
 });
-const SendBody = z.object({ senderId: z.number(), body: z.string().min(1).max(2000) });
+const MessageBody = z.object({
+  senderId: z.number(),
+  body: z.string().trim().min(1).max(2000),
+});
 const ReadBody = z.object({ staffId: z.coerce.number() });
+const MessageParams = z.object({ id: z.coerce.number(), msgId: z.coerce.number() });
 
 type StaffRow = typeof staffTable.$inferSelect;
 type ConversationRow = typeof conversationsTable.$inferSelect;
@@ -387,7 +391,7 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
     res.status(400).json({ error: "Invalid request" });
     return;
   }
-  const body = SendBody.safeParse(req.body);
+  const body = MessageBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: "Invalid request" });
     return;
@@ -462,8 +466,72 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
   });
 });
 
+router.patch("/conversations/:id/messages/:msgId", async (req: Request, res: Response) => {
+  const params = MessageParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: "Invalid request" });
+    return;
+  }
+  const body = MessageBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: "Message must be between 1 and 2000 characters" });
+    return;
+  }
+  const actor = await requireActor(req, res, body.data.senderId);
+  if (!actor) return;
+
+  const result = await loadConversationForParticipant(params.data.id, actor.id);
+  if (result.status !== undefined) {
+    sendConvoError(res, result.status);
+    return;
+  }
+
+  const [existing] = await db
+    .select()
+    .from(messagesTable)
+    .where(eq(messagesTable.id, params.data.msgId));
+  if (!existing) {
+    res.status(404).json({ error: "Message not found" });
+    return;
+  }
+  if (existing.conversationId !== params.data.id) {
+    res.status(403).json({ error: "Message not in this conversation" });
+    return;
+  }
+  if (existing.senderId !== actor.id) {
+    res.status(403).json({ error: "You can only edit your own messages" });
+    return;
+  }
+
+  const [updated] = await db
+    .update(messagesTable)
+    .set({ body: body.data.body })
+    .where(
+      and(
+        eq(messagesTable.id, existing.id),
+        eq(messagesTable.conversationId, params.data.id),
+        eq(messagesTable.senderId, actor.id)
+      )
+    )
+    .returning();
+  if (!updated) {
+    res.status(404).json({ error: "Message not found" });
+    return;
+  }
+
+  res.json({
+    id: updated.id,
+    conversationId: updated.conversationId,
+    senderId: updated.senderId,
+    senderName: actor.name,
+    body: updated.body,
+    isRead: updated.isRead,
+    createdAt: updated.createdAt.toISOString(),
+  });
+});
+
 router.delete("/conversations/:id/messages/:msgId", async (req: Request, res: Response) => {
-  const params = z.object({ id: z.coerce.number(), msgId: z.coerce.number() }).safeParse(req.params);
+  const params = MessageParams.safeParse(req.params);
   if (!params.success) { res.status(400).json({ error: "Invalid request" }); return; }
   const query = StaffIdQuery.safeParse({ staffId: req.query.staffId });
   if (!query.success) { res.status(400).json({ error: "staffId is required" }); return; }

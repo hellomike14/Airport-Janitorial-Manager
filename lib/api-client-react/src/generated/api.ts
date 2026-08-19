@@ -66,6 +66,7 @@ import type {
   Task,
   TaskType,
   UpdateApplicationRequest,
+  UpdateChatMessageInput,
   UpdateIssueImagesRequest,
   UpdateOnboardingItemRequest,
   UpdateStaffMemberRequest,
@@ -4776,5 +4777,22 @@ export const deleteConversationMessage = async (
   return customFetch<{ deleted: boolean }>(
     `/api/conversations/${conversationId}/messages/${messageId}?staffId=${params.staffId}`,
     { method: "DELETE", ...options }
+  );
+};
+
+export const updateConversationMessage = async (
+  conversationId: number,
+  messageId: number,
+  input: UpdateChatMessageInput,
+  options?: RequestInit
+): Promise<ChatMessage> => {
+  return customFetch<ChatMessage>(
+    `/api/conversations/${conversationId}/messages/${messageId}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(input),
+      ...options,
+    }
   );
 };

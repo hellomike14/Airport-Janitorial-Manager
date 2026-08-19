@@ -288,6 +288,15 @@ export interface ChatMessageInput {
   body: string;
 }
 
+export interface UpdateChatMessageInput {
+  senderId: number;
+  /**
+   * @minLength 1
+   * @maxLength 2000
+   */
+  body: string;
+}
+
 export interface MarkAllReadRequest {
   staffId: number;
 }

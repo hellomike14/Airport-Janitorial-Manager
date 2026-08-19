@@ -299,7 +299,7 @@ export async function customFetch<T = unknown>(
 
   const requestInfo = { method, url: resolveUrl(input) };
 
-  // Send cookies (gate + actor session) explicitly. The web and API artifacts
+  // Send cookies (including the Clerk session) explicitly. The web and API artifacts
   // are served same-origin behind one path-routed proxy, so "same-origin"
   // covers all requests; callers may override via init.credentials.
   const response = await fetch(input, {

@@ -15,6 +15,7 @@ import {
   ClipboardList,
   ChevronRight,
   Trash2,
+  Pencil,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import humanTraffickingFlyer from "@assets/MCO_Human_Trafficing_1787144155521.jpeg";
@@ -26,6 +27,7 @@ import {
   sendConversationMessage,
   markConversationRead,
   deleteConversationMessage,
+  updateConversationMessage,
   listStaff,
   type ConversationSummary,
 } from "@workspace/api-client-react";
@@ -380,6 +382,9 @@ export default function Messages() {
   const [showNewConvo, setShowNewConvo] = useState(false);
   const [showFlyer, setShowFlyer] = useState(false);
   const [draft, setDraft] = useState("");
+  const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  const [editError, setEditError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const { data: conversations = [], isLoading: convosLoading, error: convosError } = useQuery({
@@ -426,6 +431,12 @@ export default function Messages() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length, selectedId]);
 
+  useEffect(() => {
+    setEditingMessageId(null);
+    setEditDraft("");
+    setEditError(null);
+  }, [selectedId]);
+
   const sendMutation = useMutation({
     mutationFn: (body: string) => sendConversationMessage(selectedId!, { senderId: staffId, body }),
     onSuccess: () => {
@@ -443,6 +454,21 @@ export default function Messages() {
     },
   });
 
+  const editMutation = useMutation({
+    mutationFn: ({ convoId, msgId, body }: { convoId: number; msgId: number; body: string }) =>
+      updateConversationMessage(convoId, msgId, { senderId: staffId, body }),
+    onSuccess: () => {
+      setEditingMessageId(null);
+      setEditDraft("");
+      setEditError(null);
+      qc.invalidateQueries({ queryKey: [CONVERSATIONS_KEY, selectedId, "messages"] });
+      qc.invalidateQueries({ queryKey: [CONVERSATIONS_KEY] });
+    },
+    onError: () => {
+      setEditError(t("messages.editFailed"));
+    },
+  });
+
   const handleDelete = (msgId: number) => {
     if (selectedId === null) return;
     if (!window.confirm(t("messages.confirmDelete"))) return;
@@ -453,6 +479,30 @@ export default function Messages() {
     const body = draft.trim();
     if (!body || selectedId === null || sendMutation.isPending) return;
     sendMutation.mutate(body);
+  };
+
+  const handleStartEdit = (msgId: number, body: string) => {
+    setEditingMessageId(msgId);
+    setEditDraft(body);
+    setEditError(null);
+  };
+
+  const handleCancelEdit = () => {
+    if (editMutation.isPending) return;
+    setEditingMessageId(null);
+    setEditDraft("");
+    setEditError(null);
+  };
+
+  const handleSaveEdit = () => {
+    const body = editDraft.trim();
+    if (!body) {
+      setEditError(t("messages.editRequired"));
+      return;
+    }
+    if (selectedId === null || editingMessageId === null || editMutation.isPending) return;
+    setEditError(null);
+    editMutation.mutate({ convoId: selectedId, msgId: editingMessageId, body });
   };
 
   const handleStarted = (convo: ConversationSummary) => {
@@ -641,18 +691,30 @@ export default function Messages() {
                 )}
                 {messages.map((m) => {
                   const mine = m.senderId === staffId;
+                  const isEditing = editingMessageId === m.id;
                   return (
                     <div key={m.id} className={`flex items-end gap-1.5 group ${mine ? "justify-end" : "justify-start"}`}>
-                      {/* Delete button — only on own messages, appears on hover */}
-                      {mine && (
-                        <button
-                          onClick={() => handleDelete(m.id)}
-                          disabled={deleteMutation.isPending}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-slate-400 hover:text-red-500 shrink-0 mb-1"
-                          aria-label={t("messages.deleteMessage")}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                      {mine && !isEditing && (
+                        <div className="flex items-center gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0 mb-1">
+                          <button
+                            type="button"
+                            onClick={() => handleStartEdit(m.id, m.body)}
+                            disabled={editMutation.isPending || deleteMutation.isPending}
+                            className="p-1 text-slate-400 hover:text-emerald-600 disabled:opacity-50"
+                            aria-label={t("messages.editMessage")}
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(m.id)}
+                            disabled={deleteMutation.isPending || editMutation.isPending}
+                            className="p-1 text-slate-400 hover:text-red-500 disabled:opacity-50"
+                            aria-label={t("messages.deleteMessage")}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       )}
                       <div
                         className={`max-w-[75%] rounded-2xl px-4 py-2.5 ${
@@ -664,7 +726,59 @@ export default function Messages() {
                         {!mine && (
                           <p className="text-[11px] font-semibold text-emerald-700 mb-0.5">{m.senderName}</p>
                         )}
-                        <p className="text-sm whitespace-pre-wrap break-words">{m.body}</p>
+                        {isEditing ? (
+                          <div className="space-y-2">
+                            <textarea
+                              autoFocus
+                              value={editDraft}
+                              onChange={(e) => {
+                                setEditDraft(e.target.value);
+                                if (editError) setEditError(null);
+                              }}
+                              onKeyDown={(e) => {
+                                if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                                  e.preventDefault();
+                                  handleSaveEdit();
+                                }
+                                if (e.key === "Escape") {
+                                  e.preventDefault();
+                                  handleCancelEdit();
+                                }
+                              }}
+                              disabled={editMutation.isPending}
+                              rows={3}
+                              maxLength={2000}
+                              aria-label={t("messages.editMessage")}
+                              placeholder={t("messages.editMessagePlaceholder")}
+                              className="w-full resize-y rounded-lg border border-emerald-200 bg-white px-2.5 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-300 disabled:opacity-60"
+                            />
+                            {editError && (
+                              <p role="alert" className="text-xs text-rose-100">
+                                {editError}
+                              </p>
+                            )}
+                            <div className="flex justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={handleCancelEdit}
+                                disabled={editMutation.isPending}
+                                className="rounded-lg bg-emerald-700/80 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                              >
+                                {t("messages.cancel")}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleSaveEdit}
+                                disabled={!editDraft.trim() || editMutation.isPending}
+                                className="rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+                              >
+                                {editMutation.isPending ? t("messages.saving") : t("messages.save")}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm whitespace-pre-wrap break-words">{m.body}</p>
+                        )}
                         <p className={`text-[10px] mt-1 ${mine ? "text-emerald-100" : "text-slate-400"}`}>
                           {format(new Date(m.createdAt), "MMM d, h:mm a")}
                         </p>
