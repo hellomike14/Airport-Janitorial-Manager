@@ -1,5 +1,6 @@
 export const SEED_STAFF: { name: string; role: "admin" | "inspector" | "supervisor" | "staff"; phone?: string; email?: string }[] = [
   { name: "Marcell Sutherland", role: "admin", phone: "407-555-0001", email: "msutherland@marvolenterprises.com" },
+  { name: "Michael", role: "admin", email: "michael@massifkroo.com" },
   { name: "MCO Inspector", role: "inspector", phone: "407-555-0099", email: "raquel.santana@goaa.org" },
   { name: "Priscila Rosero", role: "supervisor", email: "Priscilarosero27@gmail.com" },
   { name: "Reynaldo Hernandez Suarez", role: "supervisor", email: "Cnuevo986@gmail.co" },
