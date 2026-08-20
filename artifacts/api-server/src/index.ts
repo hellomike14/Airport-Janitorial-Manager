@@ -1,6 +1,6 @@
 import app from "./app";
 import { db } from "@workspace/db";
-import { staffTable, areasTable, taskTypesTable, notificationsTable, staffLocationsTable, tasksTable, taskExclusionsTable, assignmentsTable, schedulesTable, issuesTable, sharedPhotosTable } from "@workspace/db/schema";
+import { staffTable, areasTable, taskTypesTable, notificationsTable, staffLocationsTable, tasksTable, taskExclusionsTable, assignmentsTable, schedulesTable, issuesTable, sharedPhotosTable, conversationsTable, messagesTable, conversationParticipantsTable } from "@workspace/db/schema";
 import { eq, and, count, inArray, or, gte, like, sql } from "drizzle-orm";
 import { renameSharedAreaName, AREA_RENAME_MAP } from "./area-renames";
 import { AREAS_REPLACING_DEFAULTS } from "./area-tasks";
@@ -249,6 +249,119 @@ async function seed() {
         const idx = existingStaff.findIndex((s) => s.id === loser.id);
         if (idx >= 0) existingStaff.splice(idx, 1);
       }
+    }
+  });
+
+  // One earlier seed used "Jeanfranco Perez" rather than the canonical
+  // "JeanFranco Perez", creating two active records in production. Keep the
+  // canonical profile (and its Clerk email) while moving all historical
+  // references from the typo row before removing it.
+  await db.transaction(async (tx) => {
+    const [canonical] = await tx
+      .select()
+      .from(staffTable)
+      .where(and(eq(staffTable.name, "JeanFranco Perez"), eq(staffTable.active, true)))
+      .limit(1);
+    if (!canonical) return;
+
+    const typoRows = await tx
+      .select()
+      .from(staffTable)
+      .where(and(eq(staffTable.name, "Jeanfranco Perez"), eq(staffTable.active, true)));
+
+    for (const typoRow of typoRows) {
+      const directConversations = await tx
+        .select()
+        .from(conversationsTable)
+        .where(
+          or(
+            eq(conversationsTable.participantAId, typoRow.id),
+            eq(conversationsTable.participantBId, typoRow.id),
+          ),
+        );
+
+      for (const conversation of directConversations) {
+        const otherParticipantId =
+          conversation.participantAId === typoRow.id
+            ? conversation.participantBId
+            : conversation.participantAId;
+        if (otherParticipantId === null || otherParticipantId === canonical.id) {
+          throw new Error(`Cannot safely merge self-referencing conversation ${conversation.id}`);
+        }
+
+        const participantAId = Math.min(canonical.id, otherParticipantId);
+        const participantBId = Math.max(canonical.id, otherParticipantId);
+        const [existingConversation] = await tx
+          .select({ id: conversationsTable.id })
+          .from(conversationsTable)
+          .where(
+            and(
+              eq(conversationsTable.participantAId, participantAId),
+              eq(conversationsTable.participantBId, participantBId),
+              ne(conversationsTable.id, conversation.id),
+            ),
+          )
+          .limit(1);
+
+        if (existingConversation) {
+          await tx
+            .update(messagesTable)
+            .set({ conversationId: existingConversation.id })
+            .where(eq(messagesTable.conversationId, conversation.id));
+          await tx
+            .delete(conversationParticipantsTable)
+            .where(eq(conversationParticipantsTable.conversationId, conversation.id));
+          await tx.delete(conversationsTable).where(eq(conversationsTable.id, conversation.id));
+        } else {
+          await tx
+            .update(conversationsTable)
+            .set({ participantAId, participantBId })
+            .where(eq(conversationsTable.id, conversation.id));
+        }
+      }
+
+      const groupParticipations = await tx
+        .select()
+        .from(conversationParticipantsTable)
+        .where(eq(conversationParticipantsTable.staffId, typoRow.id));
+      for (const participation of groupParticipations) {
+        const [canonicalParticipation] = await tx
+          .select({ id: conversationParticipantsTable.id })
+          .from(conversationParticipantsTable)
+          .where(
+            and(
+              eq(conversationParticipantsTable.conversationId, participation.conversationId),
+              eq(conversationParticipantsTable.staffId, canonical.id),
+            ),
+          )
+          .limit(1);
+        if (canonicalParticipation) {
+          await tx
+            .delete(conversationParticipantsTable)
+            .where(eq(conversationParticipantsTable.id, participation.id));
+        } else {
+          await tx
+            .update(conversationParticipantsTable)
+            .set({ staffId: canonical.id })
+            .where(eq(conversationParticipantsTable.id, participation.id));
+        }
+      }
+
+      await tx.update(tasksTable).set({ completedById: canonical.id }).where(eq(tasksTable.completedById, typoRow.id));
+      await tx.update(tasksTable).set({ assignedToId: canonical.id }).where(eq(tasksTable.assignedToId, typoRow.id));
+      await tx.update(tasksTable).set({ createdById: canonical.id }).where(eq(tasksTable.createdById, typoRow.id));
+      await tx.update(taskExclusionsTable).set({ createdById: canonical.id }).where(eq(taskExclusionsTable.createdById, typoRow.id));
+      await tx.update(schedulesTable).set({ staffId: canonical.id }).where(eq(schedulesTable.staffId, typoRow.id));
+      await tx.update(issuesTable).set({ reportedById: canonical.id }).where(eq(issuesTable.reportedById, typoRow.id));
+      await tx.update(issuesTable).set({ assignedToId: canonical.id }).where(eq(issuesTable.assignedToId, typoRow.id));
+      await tx.update(sharedPhotosTable).set({ staffId: canonical.id }).where(eq(sharedPhotosTable.staffId, typoRow.id));
+      await tx.update(staffLocationsTable).set({ staffId: canonical.id }).where(eq(staffLocationsTable.staffId, typoRow.id));
+      await tx.update(assignmentsTable).set({ staffId: canonical.id }).where(eq(assignmentsTable.staffId, typoRow.id));
+      await tx.update(assignmentsTable).set({ assignedById: canonical.id }).where(eq(assignmentsTable.assignedById, typoRow.id));
+      await tx.update(notificationsTable).set({ staffId: canonical.id }).where(eq(notificationsTable.staffId, typoRow.id));
+      await tx.update(messagesTable).set({ senderId: canonical.id }).where(eq(messagesTable.senderId, typoRow.id));
+      await tx.delete(staffTable).where(eq(staffTable.id, typoRow.id));
+      console.log(`Merged typo staff record "${typoRow.name}" into "${canonical.name}"`);
     }
   });
 
