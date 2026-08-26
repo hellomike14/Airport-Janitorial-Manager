@@ -537,13 +537,23 @@ router.delete("/conversations/:id/messages/:msgId", async (req: Request, res: Re
   if (!query.success) { res.status(400).json({ error: "staffId is required" }); return; }
   const actor = await requireActor(req, res, query.data.staffId);
   if (!actor) return;
+  if (actor.role !== "admin") {
+    res.status(403).json({ error: "Only administrators can delete messages" });
+    return;
+  }
 
   const [msg] = await db.select().from(messagesTable).where(eq(messagesTable.id, params.data.msgId));
   if (!msg) { res.status(404).json({ error: "Message not found" }); return; }
-  if (msg.senderId !== actor.id) { res.status(403).json({ error: "You can only delete your own messages" }); return; }
   if (msg.conversationId !== params.data.id) { res.status(403).json({ error: "Message not in this conversation" }); return; }
 
-  await db.delete(messagesTable).where(eq(messagesTable.id, params.data.msgId));
+  await db
+    .delete(messagesTable)
+    .where(
+      and(
+        eq(messagesTable.id, params.data.msgId),
+        eq(messagesTable.conversationId, params.data.id),
+      ),
+    );
   res.json({ deleted: true });
 });
 

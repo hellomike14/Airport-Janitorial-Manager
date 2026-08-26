@@ -692,30 +692,38 @@ export default function Messages() {
                 {messages.map((m) => {
                   const mine = m.senderId === staffId;
                   const isEditing = editingMessageId === m.id;
+                  const canDelete = senderRole === "admin";
+                  const messageActions = !isEditing && (mine || canDelete) && (
+                    <div className="flex items-center gap-0.5 shrink-0 mb-1">
+                      {mine && (
+                        <button
+                          type="button"
+                          onClick={() => handleStartEdit(m.id, m.body)}
+                          disabled={editMutation.isPending || deleteMutation.isPending}
+                          className="p-1 text-slate-400 hover:text-emerald-600 disabled:opacity-50"
+                          aria-label={t("messages.editMessage")}
+                          title={t("messages.editMessage")}
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(m.id)}
+                          disabled={deleteMutation.isPending || editMutation.isPending}
+                          className="p-1 text-slate-400 hover:text-red-500 disabled:opacity-50"
+                          aria-label={t("messages.deleteMessage")}
+                          title={t("messages.deleteMessage")}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  );
                   return (
                     <div key={m.id} className={`flex items-end gap-1.5 group ${mine ? "justify-end" : "justify-start"}`}>
-                      {mine && !isEditing && (
-                        <div className="flex items-center gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0 mb-1">
-                          <button
-                            type="button"
-                            onClick={() => handleStartEdit(m.id, m.body)}
-                            disabled={editMutation.isPending || deleteMutation.isPending}
-                            className="p-1 text-slate-400 hover:text-emerald-600 disabled:opacity-50"
-                            aria-label={t("messages.editMessage")}
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(m.id)}
-                            disabled={deleteMutation.isPending || editMutation.isPending}
-                            className="p-1 text-slate-400 hover:text-red-500 disabled:opacity-50"
-                            aria-label={t("messages.deleteMessage")}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      )}
+                      {mine && messageActions}
                       <div
                         className={`max-w-[75%] rounded-2xl px-4 py-2.5 ${
                           mine
@@ -783,6 +791,7 @@ export default function Messages() {
                           {format(new Date(m.createdAt), "MMM d, h:mm a")}
                         </p>
                       </div>
+                      {!mine && messageActions}
                     </div>
                   );
                 })}
