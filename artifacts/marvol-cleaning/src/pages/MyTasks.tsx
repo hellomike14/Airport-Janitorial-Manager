@@ -4,12 +4,12 @@ import { useTranslation } from "react-i18next";
 import { getDateLocale } from "@/i18n/dateLocale";
 import {
   useListTasks,
-  useListAssignments,
+  listAssignments,
   useListAreas,
   useCompleteTask,
   useUncompleteTask,
 } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOfflineCompleteTask, useOfflineUncompleteTask } from "@/hooks/useOfflineMutations";
 import {
@@ -48,9 +48,15 @@ export default function MyTasks() {
   const today = format(new Date(), "yyyy-MM-dd");
   const qc = useQueryClient();
 
-  const { data: assignments, isLoading: loadingAssignments } = useListAssignments({
-    date: today,
-    staffId: currentUser?.id,
+  const { data: assignments, isLoading: loadingAssignments } = useQuery({
+    queryKey: ["/api/assignments", today, currentUser?.id],
+    queryFn: () => listAssignments({
+      date: today,
+      staffId: currentUser!.id,
+    }),
+    enabled: currentUser != null,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   const { data: allAreas } = useListAreas();
@@ -81,36 +87,29 @@ export default function MyTasks() {
     return `${part}, ${name.split(" ")[0]}`;
   };
 
-  const myTerminals = useMemo(() => {
-    const terminals = new Set<string>();
-    for (const a of assignments ?? []) {
-      const terminal = (a as any)?.terminal;
-      if (terminal) terminals.add(terminal);
-    }
-    return terminals;
-  }, [assignments]);
+  // Assignments are area-specific. Do not expand an assignment to every area
+  // in the same terminal, otherwise a staff member assigned to one level sees
+  // the full terminal's task list.
+  const assignedAreaIds = useMemo(
+    () => [...new Set((assignments ?? []).map((assignment) => assignment.areaId))],
+    [assignments],
+  );
 
-  const expandedAreaIds = useMemo(() => {
-    if (myTerminals.size === 0 || !allAreas) return [] as number[];
-    return allAreas
-      .filter((a) => myTerminals.has(a.terminal))
-      .sort((a, b) => a.sortOrder - b.sortOrder)
-      .map((a) => a.id);
-  }, [myTerminals, allAreas]);
+  // The assignment response is authoritative, including for an area that was
+  // archived after the shift was assigned and is no longer in useListAreas().
+  const myAreaIds = assignedAreaIds;
 
   useEffect(() => {
-    if (expandedAreaIds.length === 0) return;
+    if (myAreaIds.length === 0) return;
     const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
     Promise.all(
-      expandedAreaIds.map((aId) =>
+      myAreaIds.map((aId) =>
         fetch(`${BASE_URL}/api/tasks?date=${today}&areaId=${aId}`).catch(() => {})
       )
     ).then(() => {
       qc.invalidateQueries({ queryKey: ["/api/tasks"] });
     });
-  }, [expandedAreaIds.join(","), today]);
-
-  const myAreaIds = expandedAreaIds.length > 0 ? expandedAreaIds : (assignments ?? []).map((a) => a.areaId);
+  }, [myAreaIds.join(","), today]);
 
   const areaGroups = useMemo(() => {
     return myAreaIds.map((areaId) => {
