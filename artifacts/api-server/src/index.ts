@@ -90,6 +90,16 @@ const SEED_TASK_TYPES = [
   { taskName: "Clean/remove cigarette butts in terminal", taskOrder: 13 },
 ];
 
+const LEGACY_STAFF_RENAMES = [
+  {
+    oldName: "Reynaldo Hernandez Suarez",
+    oldEmail: "Cnuevo986@gmail.co",
+    name: "Reynaldo Hernandez",
+    role: "supervisor" as const,
+    email: "cnuevo986@gmail.com",
+  },
+];
+
 
 
 async function seed() {
@@ -174,6 +184,35 @@ async function seed() {
     CREATE UNIQUE INDEX IF NOT EXISTS "staff_email_active_unique"
       ON "staff" (lower("email")) WHERE "email" IS NOT NULL AND "active" = true
   `);
+
+  // Preserve existing staff history when a seeded management profile is
+  // corrected after it has already been inserted in an environment.
+  for (const legacy of LEGACY_STAFF_RENAMES) {
+    const [canonical] = await db
+      .select({ id: staffTable.id })
+      .from(staffTable)
+      .where(eq(staffTable.name, legacy.name))
+      .limit(1);
+    if (canonical) continue;
+
+    const [existing] = await db
+      .select({ id: staffTable.id })
+      .from(staffTable)
+      .where(or(eq(staffTable.name, legacy.oldName), eq(staffTable.email, legacy.oldEmail)))
+      .limit(1);
+    if (!existing) continue;
+
+    await db
+      .update(staffTable)
+      .set({
+        name: legacy.name,
+        role: legacy.role,
+        email: legacy.email,
+        active: true,
+      })
+      .where(eq(staffTable.id, existing.id));
+    console.log(`Updated legacy staff profile "${legacy.oldName}" → "${legacy.name}"`);
+  }
 
   const seedNames = new Set(SEED_STAFF.map((s) => s.name));
   const existingStaff = await db.select().from(staffTable);

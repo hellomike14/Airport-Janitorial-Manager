@@ -3,7 +3,7 @@ export const SEED_STAFF: { name: string; role: "admin" | "inspector" | "supervis
   { name: "Michael", role: "admin", email: "michael@massifkroo.com" },
   { name: "MCO Inspector", role: "inspector", phone: "407-555-0099", email: "raquel.santana@goaa.org" },
   { name: "Priscila Rosero", role: "supervisor", email: "Priscilarosero27@gmail.com" },
-  { name: "Reynaldo Hernandez Suarez", role: "supervisor", email: "Cnuevo986@gmail.co" },
+  { name: "Reynaldo Hernandez", role: "supervisor", email: "cnuevo986@gmail.com" },
 
   { name: "Edner Jules", role: "staff" },
   { name: "Ivan Serrano", role: "staff" },
