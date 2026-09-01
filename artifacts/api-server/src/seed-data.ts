@@ -5,8 +5,6 @@ export const SEED_STAFF: { name: string; role: "admin" | "inspector" | "supervis
   { name: "Priscila Rosero", role: "supervisor", email: "Priscilarosero27@gmail.com" },
   { name: "Reynaldo Hernandez", role: "supervisor", email: "cnuevo986@gmail.com" },
 
-  { name: "Edner Jules", role: "staff" },
-  { name: "Ivan Serrano", role: "staff" },
   { name: "Jason Delgado", role: "staff" },
   { name: "Jean Gardy Rigueur", role: "staff" },
   { name: "Jose Camargo", role: "staff" },
@@ -20,4 +18,11 @@ export const SEED_STAFF: { name: string; role: "admin" | "inspector" | "supervis
   { name: "JeanFranco Perez", role: "staff", email: "jeanfranco985@gmail.com" },
 ];
 
-export const REMOVED_STAFF_NAMES = ["Floraima Pinero Valdez", "Ashandre Longmore", "Marie Ingrid Daniel", "Jose Altagracia Maria"];
+export const REMOVED_STAFF_NAMES = [
+  "Floraima Pinero Valdez",
+  "Ashandre Longmore",
+  "Marie Ingrid Daniel",
+  "Jose Altagracia Maria",
+  "Edner Jules",
+  "Ivan Serrano",
+];
