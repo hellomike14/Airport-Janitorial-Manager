@@ -10,10 +10,22 @@ Approved production identities currently reconciled at API startup:
 
 | Staff member | Production login email |
 | --- | --- |
+| Michael | `michael@massifkroo.com` |
 | MCO Inspector | `inspector@marvolenterprises.com` |
+| Priscila Rosero | `priscilarosero27@gmail.com` |
 | Reynaldo Hernandez Suarez | `cnuevo986@gmail.com` |
 | Ivan Serrano | `ivanserrano737@gmail.com` |
 | Kevin Gonzalez Fernandez | `kevingonzalez2015830@gmail.com` |
+| Steeve Alphonse | `steevealphonse86@gmail.com` |
+| John Nelson Louis | `louiszya3@gmail.com` |
+| Diego Moreno Velez | `diegomoreno198419@gmail.com` |
+| Luis Garcia | `kikeyuli1112@gmail.com` |
+| Alexis Moron | `alexismoron733@gmail.com` |
+| JeanFranco Perez | `jeanfranco985@gmail.com` |
+
+Edner Jules, Jason Delgado, Jean Gardy Rigueur, Jose Camargo, and Juan Carlos
+Zurita Blacio cannot be granted email-based access until their email addresses
+are added to the roster.
 
 `msutherland@marvolenterprises.com` is **notification-only**. The API explicitly denies that address, deactivates/disables any legacy Marcell staff row at startup, and prevents an administrator from assigning the address to a login-enabled staff record.
 

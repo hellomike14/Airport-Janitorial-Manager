@@ -19,14 +19,13 @@ export const SEED_STAFF: { name: string; role: "admin" | "inspector" | "supervis
   { name: "JeanFranco Perez", role: "staff", email: "jeanfranco985@gmail.com" },
 ];
 
-// These are launch-approved production identities confirmed by operations.
-// Startup repairs both their exact email and their ability to sign in; other
-// seeded employees can still be deliberately deactivated by an administrator.
-export const REQUIRED_PRODUCTION_LOGIN_NAMES = new Set([
-  "MCO Inspector",
-  "Reynaldo Hernandez Suarez",
-  "Ivan Serrano",
-  "Kevin Gonzalez Fernandez",
-]);
+// Operations requires every current roster member with a known email to have
+// app access. Startup repairs their exact email and restores both active/login
+// flags. Email-less rows remain unavailable until an administrator supplies a
+// verified address; guessing an identity would risk granting the wrong person
+// access. The notification-only recipient is intentionally not in SEED_STAFF.
+export const REQUIRED_PRODUCTION_LOGIN_NAMES = new Set(
+  SEED_STAFF.filter((staff) => Boolean(staff.email)).map((staff) => staff.name),
+);
 
 export const REMOVED_STAFF_NAMES = ["Floraima Pinero Valdez", "Ashandre Longmore", "Marie Ingrid Daniel", "Jose Altagracia Maria"];

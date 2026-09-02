@@ -70,21 +70,22 @@ test("only a verified primary Clerk address can identify a staff member", () => 
   );
 });
 
-test("production sign-in seed identities contain the approved addresses", () => {
+test("every seeded identity with an email is restored for production sign-in", () => {
   const emailFor = (name: string) => SEED_STAFF.find((staff) => staff.name === name)?.email;
 
   assert.equal(emailFor("MCO Inspector"), "inspector@marvolenterprises.com");
   assert.equal(emailFor("Reynaldo Hernandez Suarez"), "cnuevo986@gmail.com");
   assert.equal(emailFor("Kevin Gonzalez Fernandez"), "kevingonzalez2015830@gmail.com");
   assert.equal(emailFor("Ivan Serrano"), "ivanserrano737@gmail.com");
+  const staffWithEmail = SEED_STAFF.filter((staff) => staff.email);
+  const staffWithoutEmail = SEED_STAFF.filter((staff) => !staff.email);
   assert.deepEqual(
     [...REQUIRED_PRODUCTION_LOGIN_NAMES].sort(),
-    [
-      "Ivan Serrano",
-      "Kevin Gonzalez Fernandez",
-      "MCO Inspector",
-      "Reynaldo Hernandez Suarez",
-    ],
+    staffWithEmail.map((staff) => staff.name).sort(),
+  );
+  assert.equal(
+    staffWithoutEmail.some((staff) => REQUIRED_PRODUCTION_LOGIN_NAMES.has(staff.name)),
+    false,
   );
   assert.equal(
     SEED_STAFF.some((staff) => staff.email === "msutherland@marvolenterprises.com"),
