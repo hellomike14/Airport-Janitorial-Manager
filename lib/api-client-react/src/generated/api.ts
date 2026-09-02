@@ -19,6 +19,7 @@ import type {
 import type {
   AddAreaTaskExclusionRequest,
   AreaEffectiveTask,
+  AssignInspectorMessageInput,
   AssignIssueRequest,
   Assignment,
   BatchCompleteResponse,
@@ -28,6 +29,8 @@ import type {
   CompleteAllTasksRequest,
   CompleteIssueRequest,
   CompleteTaskRequest,
+  ConversationArchiveInput,
+  ConversationArchiveResult,
   ConversationStartInput,
   ConversationSummary,
   CreateAssignmentRequest,
@@ -42,6 +45,8 @@ import type {
   ErrorEnvelope,
   GetDashboardParams,
   HealthStatus,
+  InspectorConversationStartInput,
+  InspectorMessageAssignment,
   Issue,
   JobApplication,
   ListApplicationsParams,
@@ -3009,6 +3014,184 @@ export const useStartConversation = <
 };
 
 /**
+ * @summary Open the dedicated inspector@marvolenterprises.com conversation
+ */
+export const getStartInspectorConversationUrl = () => {
+  return `/api/conversations/inspector-channel`;
+};
+
+export const startInspectorConversation = async (
+  inspectorConversationStartInput: InspectorConversationStartInput,
+  options?: RequestInit,
+): Promise<ConversationSummary> => {
+  return customFetch<ConversationSummary>(getStartInspectorConversationUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(inspectorConversationStartInput),
+  });
+};
+
+export const getStartInspectorConversationMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof startInspectorConversation>>,
+    TError,
+    { data: BodyType<InspectorConversationStartInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof startInspectorConversation>>,
+  TError,
+  { data: BodyType<InspectorConversationStartInput> },
+  TContext
+> => {
+  const mutationKey = ["startInspectorConversation"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof startInspectorConversation>>,
+    { data: BodyType<InspectorConversationStartInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return startInspectorConversation(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type StartInspectorConversationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof startInspectorConversation>>
+>;
+export type StartInspectorConversationMutationBody =
+  BodyType<InspectorConversationStartInput>;
+export type StartInspectorConversationMutationError = ErrorType<void>;
+
+/**
+ * @summary Open the dedicated inspector@marvolenterprises.com conversation
+ */
+export const useStartInspectorConversation = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof startInspectorConversation>>,
+    TError,
+    { data: BodyType<InspectorConversationStartInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof startInspectorConversation>>,
+  TError,
+  { data: BodyType<InspectorConversationStartInput> },
+  TContext
+> => {
+  return useMutation(getStartInspectorConversationMutationOptions(options));
+};
+
+/**
+ * @summary Archive or restore a conversation for the authenticated staff member
+ */
+export const getSetConversationArchivedUrl = (id: number) => {
+  return `/api/conversations/${id}/archive`;
+};
+
+export const setConversationArchived = async (
+  id: number,
+  conversationArchiveInput: ConversationArchiveInput,
+  options?: RequestInit,
+): Promise<ConversationArchiveResult> => {
+  return customFetch<ConversationArchiveResult>(
+    getSetConversationArchivedUrl(id),
+    {
+      ...options,
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(conversationArchiveInput),
+    },
+  );
+};
+
+export const getSetConversationArchivedMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setConversationArchived>>,
+    TError,
+    { id: number; data: BodyType<ConversationArchiveInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setConversationArchived>>,
+  TError,
+  { id: number; data: BodyType<ConversationArchiveInput> },
+  TContext
+> => {
+  const mutationKey = ["setConversationArchived"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setConversationArchived>>,
+    { id: number; data: BodyType<ConversationArchiveInput> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return setConversationArchived(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetConversationArchivedMutationResult = NonNullable<
+  Awaited<ReturnType<typeof setConversationArchived>>
+>;
+export type SetConversationArchivedMutationBody =
+  BodyType<ConversationArchiveInput>;
+export type SetConversationArchivedMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Archive or restore a conversation for the authenticated staff member
+ */
+export const useSetConversationArchived = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setConversationArchived>>,
+    TError,
+    { id: number; data: BodyType<ConversationArchiveInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof setConversationArchived>>,
+  TError,
+  { id: number; data: BodyType<ConversationArchiveInput> },
+  TContext
+> => {
+  return useMutation(getSetConversationArchivedMutationOptions(options));
+};
+
+/**
  * @summary List messages in a conversation
  */
 export const getListConversationMessagesUrl = (
@@ -3149,7 +3332,7 @@ export const sendConversationMessage = async (
 };
 
 export const getSendConversationMessageMutationOptions = <
-  TError = ErrorType<unknown>,
+  TError = ErrorType<void>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -3190,13 +3373,13 @@ export type SendConversationMessageMutationResult = NonNullable<
   Awaited<ReturnType<typeof sendConversationMessage>>
 >;
 export type SendConversationMessageMutationBody = BodyType<ChatMessageInput>;
-export type SendConversationMessageMutationError = ErrorType<unknown>;
+export type SendConversationMessageMutationError = ErrorType<void>;
 
 /**
  * @summary Send a message in a conversation
  */
 export const useSendConversationMessage = <
-  TError = ErrorType<unknown>,
+  TError = ErrorType<void>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -3213,6 +3396,98 @@ export const useSendConversationMessage = <
   TContext
 > => {
   return useMutation(getSendConversationMessageMutationOptions(options));
+};
+
+/**
+ * @summary Triage an authenticated inspector email into an urgent special assignment
+ */
+export const getAssignInspectorMessageUrl = (id: number, msgId: number) => {
+  return `/api/conversations/${id}/messages/${msgId}/assign-special`;
+};
+
+export const assignInspectorMessage = async (
+  id: number,
+  msgId: number,
+  assignInspectorMessageInput: AssignInspectorMessageInput,
+  options?: RequestInit,
+): Promise<InspectorMessageAssignment> => {
+  return customFetch<InspectorMessageAssignment>(
+    getAssignInspectorMessageUrl(id, msgId),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(assignInspectorMessageInput),
+    },
+  );
+};
+
+export const getAssignInspectorMessageMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assignInspectorMessage>>,
+    TError,
+    { id: number; msgId: number; data: BodyType<AssignInspectorMessageInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assignInspectorMessage>>,
+  TError,
+  { id: number; msgId: number; data: BodyType<AssignInspectorMessageInput> },
+  TContext
+> => {
+  const mutationKey = ["assignInspectorMessage"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assignInspectorMessage>>,
+    { id: number; msgId: number; data: BodyType<AssignInspectorMessageInput> }
+  > = (props) => {
+    const { id, msgId, data } = props ?? {};
+
+    return assignInspectorMessage(id, msgId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssignInspectorMessageMutationResult = NonNullable<
+  Awaited<ReturnType<typeof assignInspectorMessage>>
+>;
+export type AssignInspectorMessageMutationBody =
+  BodyType<AssignInspectorMessageInput>;
+export type AssignInspectorMessageMutationError = ErrorType<void>;
+
+/**
+ * @summary Triage an authenticated inspector email into an urgent special assignment
+ */
+export const useAssignInspectorMessage = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assignInspectorMessage>>,
+    TError,
+    { id: number; msgId: number; data: BodyType<AssignInspectorMessageInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof assignInspectorMessage>>,
+  TError,
+  { id: number; msgId: number; data: BodyType<AssignInspectorMessageInput> },
+  TContext
+> => {
+  return useMutation(getAssignInspectorMessageMutationOptions(options));
 };
 
 /**
@@ -3303,7 +3578,7 @@ export const useMarkConversationRead = <
 };
 
 /**
- * @summary Request a presigned URL for file upload
+ * @summary Request a short-lived verified URL for file upload
  */
 export const getRequestUploadUrlUrl = () => {
   return `/api/storage/uploads/request-url`;
@@ -3366,7 +3641,7 @@ export type RequestUploadUrlMutationBody = BodyType<UploadUrlRequest>;
 export type RequestUploadUrlMutationError = ErrorType<ErrorEnvelope>;
 
 /**
- * @summary Request a presigned URL for file upload
+ * @summary Request a short-lived verified URL for file upload
  */
 export const useRequestUploadUrl = <
   TError = ErrorType<ErrorEnvelope>,

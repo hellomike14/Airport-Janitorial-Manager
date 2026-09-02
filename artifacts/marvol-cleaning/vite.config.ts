@@ -38,27 +38,16 @@ export default defineConfig({
       includeAssets: ["favicon.svg", "logo-mark.png", "logo.png"],
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {
-            urlPattern: /\/api\/(tasks|assignments|areas|issues)/,
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "api-cache",
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24,
-              },
-              networkTimeoutSeconds: 5,
-              cacheableResponse: {
-                statuses: [0, 200],
-              },
-            },
-          },
-          {
-            urlPattern: /\/api\/storage\//,
+            // Only explicitly public objects are safe to share through an
+            // origin-wide runtime cache. Authenticated API responses and
+            // private object URLs must never survive an account change.
+            urlPattern: /\/api\/storage\/public-objects\//,
             handler: "CacheFirst",
             options: {
-              cacheName: "photo-cache",
+              cacheName: "public-photo-cache",
               expiration: {
                 maxEntries: 100,
                 maxAgeSeconds: 60 * 60 * 24 * 7,

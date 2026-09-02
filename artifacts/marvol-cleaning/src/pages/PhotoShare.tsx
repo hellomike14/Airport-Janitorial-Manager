@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -52,11 +52,18 @@ function imageUrl(objectPath: string) {
   return `${BASE_URL}/api/storage${objectPath}`;
 }
 
-async function requestPresignedUrl(file: File): Promise<{ uploadURL: string; objectPath: string }> {
+async function requestPresignedUrl(
+  file: File,
+): Promise<{ uploadURL: string; objectPath: string }> {
   const res = await fetch(`${BASE_URL}/api/storage/uploads/request-url`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+    body: JSON.stringify({
+      name: file.name,
+      size: file.size,
+      contentType: file.type,
+      purpose: "staff-photo",
+    }),
   });
   if (!res.ok) throw new Error("Failed to get upload URL");
   return res.json();
@@ -86,77 +93,111 @@ function getGPSPosition(): Promise<GeoPosition> {
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+      (pos) =>
+        resolve({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+        }),
       (err) => reject(err),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
     );
   });
 }
 
-function stampPhoto(file: File, position: GeoPosition | null, timestamp: Date): Promise<File> {
+function stampPhoto(
+  file: File,
+  position: GeoPosition | null,
+  timestamp: Date,
+): Promise<File> {
   return new Promise((resolve) => {
     const img = new window.Image();
+    const sourceUrl = URL.createObjectURL(file);
     img.onload = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext("2d")!;
-      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(sourceUrl);
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve(file);
+          return;
+        }
+        ctx.drawImage(img, 0, 0);
 
-      const fontSize = Math.max(14, Math.round(img.width / 40));
-      const padding = Math.round(fontSize * 0.6);
-      const lineHeight = fontSize * 1.4;
+        const fontSize = Math.max(14, Math.round(img.width / 40));
+        const padding = Math.round(fontSize * 0.6);
+        const lineHeight = fontSize * 1.4;
 
-      const timeStr = format(timestamp, "yyyy-MM-dd HH:mm:ss");
-      const coordStr = position ? formatCoords(position.latitude, position.longitude) : null;
-      const locLabel = "KMCO - MCO International Airport";
+        const timeStr = format(timestamp, "yyyy-MM-dd HH:mm:ss");
+        const coordStr = position
+          ? formatCoords(position.latitude, position.longitude)
+          : null;
+        const locLabel = "KMCO - MCO International Airport";
 
-      const lines = [timeStr];
-      if (coordStr) lines.push(`GPS: ${coordStr}`);
-      lines.push(locLabel);
+        const lines = [timeStr];
+        if (coordStr) lines.push(`GPS: ${coordStr}`);
+        lines.push(locLabel);
 
-      ctx.font = `bold ${fontSize}px monospace`;
-      const maxTextWidth = Math.max(...lines.map((l) => ctx.measureText(l).width));
-      const boxWidth = maxTextWidth + padding * 2;
-      const boxHeight = lines.length * lineHeight + padding * 2;
+        ctx.font = `bold ${fontSize}px monospace`;
+        const maxTextWidth = Math.max(
+          ...lines.map((l) => ctx.measureText(l).width),
+        );
+        const boxWidth = maxTextWidth + padding * 2;
+        const boxHeight = lines.length * lineHeight + padding * 2;
 
-      const x = img.width - boxWidth - padding;
-      const y = img.height - boxHeight - padding;
+        const x = img.width - boxWidth - padding;
+        const y = img.height - boxHeight - padding;
 
-      ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
-      ctx.beginPath();
-      const r = fontSize * 0.4;
-      ctx.moveTo(x + r, y);
-      ctx.lineTo(x + boxWidth - r, y);
-      ctx.quadraticCurveTo(x + boxWidth, y, x + boxWidth, y + r);
-      ctx.lineTo(x + boxWidth, y + boxHeight - r);
-      ctx.quadraticCurveTo(x + boxWidth, y + boxHeight, x + boxWidth - r, y + boxHeight);
-      ctx.lineTo(x + r, y + boxHeight);
-      ctx.quadraticCurveTo(x, y + boxHeight, x, y + boxHeight - r);
-      ctx.lineTo(x, y + r);
-      ctx.quadraticCurveTo(x, y, x + r, y);
-      ctx.fill();
+        ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
+        ctx.beginPath();
+        const r = fontSize * 0.4;
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + boxWidth - r, y);
+        ctx.quadraticCurveTo(x + boxWidth, y, x + boxWidth, y + r);
+        ctx.lineTo(x + boxWidth, y + boxHeight - r);
+        ctx.quadraticCurveTo(
+          x + boxWidth,
+          y + boxHeight,
+          x + boxWidth - r,
+          y + boxHeight,
+        );
+        ctx.lineTo(x + r, y + boxHeight);
+        ctx.quadraticCurveTo(x, y + boxHeight, x, y + boxHeight - r);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.fill();
 
-      ctx.fillStyle = "#ffffff";
-      ctx.font = `bold ${fontSize}px monospace`;
-      ctx.textBaseline = "top";
-      lines.forEach((line, i) => {
-        ctx.fillText(line, x + padding, y + padding + i * lineHeight);
-      });
+        ctx.fillStyle = "#ffffff";
+        ctx.font = `bold ${fontSize}px monospace`;
+        ctx.textBaseline = "top";
+        lines.forEach((line, i) => {
+          ctx.fillText(line, x + padding, y + padding + i * lineHeight);
+        });
 
-      canvas.toBlob(
-        (blob) => {
-          if (blob) {
-            resolve(new File([blob], file.name, { type: "image/jpeg" }));
-          } else {
-            resolve(file);
-          }
-        },
-        "image/jpeg",
-        0.92
-      );
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(new File([blob], file.name, { type: "image/jpeg" }));
+            } else {
+              resolve(file);
+            }
+          },
+          "image/jpeg",
+          0.92,
+        );
+      } catch {
+        // Some mobile browsers cannot allocate a canvas for very large or
+        // uncommon library formats. Preserve the original rather than leave
+        // the picker stuck in its preparing state.
+        resolve(file);
+      }
     };
-    img.src = URL.createObjectURL(file);
+    img.onerror = () => {
+      URL.revokeObjectURL(sourceUrl);
+      resolve(file);
+    };
+    img.src = sourceUrl;
   });
 }
 
@@ -171,7 +212,8 @@ export default function PhotoShare() {
   const { t, i18n } = useTranslation();
   const { currentUser, effectiveRole } = useAuth();
   const qc = useQueryClient();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const libraryInputRef = useRef<HTMLInputElement>(null);
   const dateLocale = getDateLocale(i18n.language);
 
   const [preview, setPreview] = useState<string | null>(null);
@@ -179,11 +221,19 @@ export default function PhotoShare() {
   const [caption, setCaption] = useState("");
   const [areaId, setAreaId] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [isPreparing, setIsPreparing] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [geoPosition, setGeoPosition] = useState<GeoPosition | null>(null);
   const [geoError, setGeoError] = useState(false);
   const [photoTimestamp, setPhotoTimestamp] = useState<Date | null>(null);
   const lastUpdatedRef = useRef<Date>(new Date());
+
+  useEffect(() => {
+    return () => {
+      if (preview) URL.revokeObjectURL(preview);
+    };
+  }, [preview]);
 
   const { data: photos = [], isLoading } = useQuery<SharedPhoto[]>({
     queryKey: ["/api/shared-photos"],
@@ -204,36 +254,54 @@ export default function PhotoShare() {
 
   const deletePhoto = useMutation({
     mutationFn: async (id: number) => {
-      const res = await fetch(`${BASE_URL}/api/shared-photos/${id}`, { method: "DELETE" });
+      const res = await fetch(`${BASE_URL}/api/shared-photos/${id}`, {
+        method: "DELETE",
+      });
       if (!res.ok) throw new Error("Failed to delete");
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/shared-photos"] }),
   });
 
-  const handleFileSelect = useCallback(async (file: File) => {
-    if (!file.type.startsWith("image/")) return;
+  const handleFileSelect = useCallback(
+    async (file: File) => {
+      if (!file.type.startsWith("image/")) {
+        setPhotoError(t("photoShare.unsupportedImage"));
+        return;
+      }
 
-    const now = new Date();
-    setPhotoTimestamp(now);
+      setIsPreparing(true);
+      setPhotoError(null);
 
-    let pos: GeoPosition | null = null;
-    try {
-      pos = await getGPSPosition();
-      setGeoPosition(pos);
-      setGeoError(false);
-    } catch {
-      setGeoPosition(null);
-      setGeoError(true);
-    }
+      const now = new Date();
+      setPhotoTimestamp(now);
 
-    const stamped = await stampPhoto(file, pos, now);
-    setSelectedFile(stamped);
-    setPreview(URL.createObjectURL(stamped));
-  }, []);
+      let pos: GeoPosition | null = null;
+      try {
+        pos = await getGPSPosition();
+        setGeoPosition(pos);
+        setGeoError(false);
+      } catch {
+        setGeoPosition(null);
+        setGeoError(true);
+      }
+
+      try {
+        const stamped = await stampPhoto(file, pos, now);
+        setSelectedFile(stamped);
+        setPreview(URL.createObjectURL(stamped));
+      } catch {
+        setPhotoError(t("photoShare.processingFailed"));
+      } finally {
+        setIsPreparing(false);
+      }
+    },
+    [t],
+  );
 
   const handleSubmit = async () => {
     if (!selectedFile || !currentUser) return;
     setUploading(true);
+    setPhotoError(null);
     try {
       const objectPath = await uploadFile(selectedFile);
       const res = await fetch(`${BASE_URL}/api/shared-photos`, {
@@ -260,6 +328,7 @@ export default function PhotoShare() {
       qc.invalidateQueries({ queryKey: ["/api/shared-photos"] });
     } catch (err) {
       console.error(err);
+      setPhotoError(t("photoShare.shareFailed"));
     } finally {
       setUploading(false);
     }
@@ -273,6 +342,7 @@ export default function PhotoShare() {
     setGeoPosition(null);
     setGeoError(false);
     setPhotoTimestamp(null);
+    setPhotoError(null);
   };
 
   const isManager = effectiveRole === "admin" || effectiveRole === "supervisor";
@@ -287,7 +357,9 @@ export default function PhotoShare() {
             </div>
             {t("photoShare.title")}
           </h1>
-          <p className="text-slate-500 text-sm mt-1">{t("photoShare.subtitle")}</p>
+          <p className="text-slate-500 text-sm mt-1">
+            {t("photoShare.subtitle")}
+          </p>
         </div>
         <RefreshButton
           compact
@@ -302,7 +374,11 @@ export default function PhotoShare() {
       <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
         {preview ? (
           <div className="relative rounded-xl overflow-hidden border border-slate-200 aspect-video bg-slate-50">
-            <img src={preview} alt="Preview" className="w-full h-full object-cover" />
+            <img
+              src={preview}
+              alt="Preview"
+              className="w-full h-full object-cover"
+            />
             {uploading && (
               <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                 <Loader2 className="w-8 h-8 text-white animate-spin" />
@@ -318,20 +394,58 @@ export default function PhotoShare() {
             )}
           </div>
         ) : (
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="w-full rounded-xl border-2 border-dashed border-slate-200 hover:border-blue-400 bg-slate-50 hover:bg-blue-50/50 text-slate-400 hover:text-blue-500 transition-all aspect-video flex flex-col items-center justify-center gap-2"
-          >
-            <Camera className="w-10 h-10" />
-            <span className="text-sm font-medium">{t("photoShare.tapToCapture")}</span>
-          </button>
+          <div className="w-full rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 aspect-video flex flex-col items-center justify-center gap-4 p-5">
+            {isPreparing ? (
+              <>
+                <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
+                <span className="text-sm font-medium text-slate-500">
+                  {t("photoShare.preparingPhoto")}
+                </span>
+              </>
+            ) : (
+              <>
+                <Image className="w-10 h-10 text-slate-300" />
+                <div className="w-full max-w-sm grid gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="min-h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-colors flex items-center justify-center gap-2 px-4"
+                  >
+                    <Camera className="w-5 h-5" />
+                    {t("photoShare.takePhoto")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => libraryInputRef.current?.click()}
+                    className="min-h-12 rounded-xl border border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 text-slate-700 font-semibold text-sm transition-colors flex items-center justify-center gap-2 px-4"
+                  >
+                    <Image className="w-5 h-5 text-blue-500" />
+                    {t("photoShare.chooseFromLibrary")}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         )}
 
         <input
-          ref={fileInputRef}
+          ref={cameraInputRef}
           type="file"
           accept="image/*"
           capture="environment"
+          aria-label={t("photoShare.takePhoto")}
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) handleFileSelect(f);
+            e.target.value = "";
+          }}
+        />
+        <input
+          ref={libraryInputRef}
+          type="file"
+          accept="image/*"
+          aria-label={t("photoShare.chooseFromLibrary")}
           className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0];
@@ -340,6 +454,12 @@ export default function PhotoShare() {
           }}
         />
 
+        {photoError && (
+          <p role="alert" className="text-sm text-rose-600 text-center">
+            {photoError}
+          </p>
+        )}
+
         {preview && (
           <>
             {(geoPosition || geoError || photoTimestamp) && (
@@ -347,13 +467,20 @@ export default function PhotoShare() {
                 {photoTimestamp && (
                   <div className="flex items-center gap-2 text-xs text-slate-600">
                     <Clock className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                    <span className="font-mono">{format(photoTimestamp, "yyyy-MM-dd HH:mm:ss")}</span>
+                    <span className="font-mono">
+                      {format(photoTimestamp, "yyyy-MM-dd HH:mm:ss")}
+                    </span>
                   </div>
                 )}
                 {geoPosition && (
                   <div className="flex items-center gap-2 text-xs text-slate-600">
                     <Navigation className="w-3.5 h-3.5 text-green-500 shrink-0" />
-                    <span className="font-mono">{formatCoords(geoPosition.latitude, geoPosition.longitude)}</span>
+                    <span className="font-mono">
+                      {formatCoords(
+                        geoPosition.latitude,
+                        geoPosition.longitude,
+                      )}
+                    </span>
                   </div>
                 )}
                 {geoPosition && (
@@ -381,12 +508,16 @@ export default function PhotoShare() {
 
             <select
               value={areaId ?? ""}
-              onChange={(e) => setAreaId(e.target.value ? Number(e.target.value) : null)}
+              onChange={(e) =>
+                setAreaId(e.target.value ? Number(e.target.value) : null)
+              }
               className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none bg-white"
             >
               <option value="">{t("photoShare.noArea")}</option>
               {areas.map((a) => (
-                <option key={a.id} value={a.id}>{a.terminal} - {a.name}</option>
+                <option key={a.id} value={a.id}>
+                  {a.terminal} - {a.name}
+                </option>
               ))}
             </select>
 
@@ -418,7 +549,9 @@ export default function PhotoShare() {
         </h2>
 
         {isLoading ? (
-          <div className="text-center py-12 text-slate-400">{t("common.loading")}</div>
+          <div className="text-center py-12 text-slate-400">
+            {t("common.loading")}
+          </div>
         ) : photos.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-2xl border border-slate-200">
             <Camera className="w-12 h-12 text-slate-200 mx-auto mb-3" />
@@ -426,16 +559,28 @@ export default function PhotoShare() {
           </div>
         ) : (
           photos.map((photo) => (
-            <div key={photo.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden group">
+            <div
+              key={photo.id}
+              className="bg-white rounded-2xl border border-slate-200 overflow-hidden group"
+            >
               <div className="p-4 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center text-white text-sm font-bold shrink-0">
-                  {photo.staffName?.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase() ?? "?"}
+                  {photo.staffName
+                    ?.split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .slice(0, 2)
+                    .toUpperCase() ?? "?"}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="font-semibold text-slate-800 text-sm truncate">{photo.staffName}</p>
+                    <p className="font-semibold text-slate-800 text-sm truncate">
+                      {photo.staffName}
+                    </p>
                     {photo.staffRole && (
-                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full capitalize ${ROLE_COLORS[photo.staffRole] ?? "bg-slate-100 text-slate-600"}`}>
+                      <span
+                        className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full capitalize ${ROLE_COLORS[photo.staffRole] ?? "bg-slate-100 text-slate-600"}`}
+                      >
                         {photo.staffRole}
                       </span>
                     )}
@@ -443,7 +588,10 @@ export default function PhotoShare() {
                   <div className="flex items-center gap-3 text-xs text-slate-400">
                     <span className="flex items-center gap-1">
                       <Clock className="w-3 h-3" />
-                      {formatDistanceToNow(new Date(photo.createdAt), { addSuffix: true, locale: dateLocale })}
+                      {formatDistanceToNow(new Date(photo.createdAt), {
+                        addSuffix: true,
+                        locale: dateLocale,
+                      })}
                     </span>
                     {photo.areaName && (
                       <span className="flex items-center gap-1">
@@ -468,7 +616,9 @@ export default function PhotoShare() {
               </div>
 
               {photo.caption && (
-                <p className="px-4 pb-2 text-sm text-slate-600">{photo.caption}</p>
+                <p className="px-4 pb-2 text-sm text-slate-600">
+                  {photo.caption}
+                </p>
               )}
 
               {(photo.takenAt || photo.latitude != null) && (

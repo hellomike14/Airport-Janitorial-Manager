@@ -1,6 +1,10 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { cacheApiResponse, getAllCachedResponses } from "@/lib/offlineStore";
+import {
+  cacheApiResponse,
+  getAllCachedResponses,
+  isOfflineDataGenerationCurrent,
+} from "@/lib/offlineStore";
 
 const CACHE_KEY_PREFIXES = [
   "/api/tasks",
@@ -17,7 +21,7 @@ function matchesCachePrefix(keyStr: string): boolean {
   return CACHE_KEY_PREFIXES.some((prefix) => keyStr.includes(prefix));
 }
 
-export function useHydrateFromOfflineCache() {
+export function useHydrateFromOfflineCache(dataGeneration: number) {
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -26,9 +30,10 @@ export function useHydrateFromOfflineCache() {
     async function hydrate() {
       try {
         const cached = await getAllCachedResponses();
-        if (!mounted) return;
+        if (!mounted || !isOfflineDataGenerationCurrent(dataGeneration)) return;
 
         for (const entry of cached) {
+          if (!isOfflineDataGenerationCurrent(dataGeneration)) return;
           if (entry.data != null) {
             try {
               const queryKey = JSON.parse(entry.url);
@@ -51,10 +56,10 @@ export function useHydrateFromOfflineCache() {
     return () => {
       mounted = false;
     };
-  }, [queryClient]);
+  }, [dataGeneration, queryClient]);
 }
 
-export function useCacheApiResponses() {
+export function useCacheApiResponses(dataGeneration: number) {
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -66,12 +71,12 @@ export function useCacheApiResponses() {
         if (matchesCachePrefix(serialized)) {
           const data = event.query.state.data;
           if (data != null) {
-            cacheApiResponse(serialized, data).catch(() => {});
+            cacheApiResponse(serialized, data, dataGeneration).catch(() => {});
           }
         }
       }
     });
 
     return unsubscribe;
-  }, [queryClient]);
+  }, [dataGeneration, queryClient]);
 }

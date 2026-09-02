@@ -13,4 +13,6 @@ export interface ChatMessageInput {
    * @maxLength 2000
    */
   body: string;
+  /** Generated once per compose/send action and reused for retries. */
+  clientRequestId: string;
 }

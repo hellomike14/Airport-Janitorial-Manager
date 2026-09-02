@@ -34,8 +34,29 @@ interface OfflineDB extends DBSchema {
 
 const DB_NAME = "marvol-offline";
 const DB_VERSION = 1;
+const LEGACY_PRIVATE_RUNTIME_CACHES = ["api-cache", "photo-cache"];
 
 let dbPromise: Promise<IDBPDatabase<OfflineDB>> | null = null;
+let privateDataGeneration = 0;
+const beforePurgeHandlers = new Set<() => void>();
+
+/**
+ * Lets active synchronizers stop network work before a private-data purge.
+ * The callback is synchronous by design: abort signals must fire before the
+ * IndexedDB clear transaction begins.
+ */
+export function registerBeforeOfflinePurge(handler: () => void): () => void {
+  beforePurgeHandlers.add(handler);
+  return () => beforePurgeHandlers.delete(handler);
+}
+
+export function getOfflineDataGeneration(): number {
+  return privateDataGeneration;
+}
+
+export function isOfflineDataGenerationCurrent(generation: number): boolean {
+  return generation === privateDataGeneration;
+}
 
 function getDB(): Promise<IDBPDatabase<OfflineDB>> {
   if (!dbPromise) {
@@ -60,8 +81,13 @@ function getDB(): Promise<IDBPDatabase<OfflineDB>> {
   return dbPromise;
 }
 
-export async function cacheApiResponse(url: string, data: unknown): Promise<void> {
+export async function cacheApiResponse(
+  url: string,
+  data: unknown,
+  generation = privateDataGeneration,
+): Promise<void> {
   const db = await getDB();
+  if (generation !== privateDataGeneration) return;
   await db.put("apiCache", { url, data, timestamp: Date.now() });
 }
 
@@ -83,6 +109,45 @@ export async function clearApiCache(): Promise<void> {
   await db.clear("apiCache");
 }
 
+/**
+ * Removes all browser-persisted data that can belong to a signed-in user.
+ * Call this before completing sign-out and whenever the Clerk account changes.
+ * Photo blobs are cleared with their queued mutations so no orphaned private
+ * files remain on a shared device. Legacy Workbox caches are removed because
+ * older production service workers stored authenticated API responses there.
+ */
+export async function purgeOfflineUserData(): Promise<void> {
+  privateDataGeneration++;
+  for (const handler of beforePurgeHandlers) {
+    try {
+      handler();
+    } catch (error) {
+      console.warn("[OfflineStore] Failed to stop work before purge:", error);
+    }
+  }
+
+  const db = await getDB();
+  const transaction = db.transaction(
+    ["apiCache", "offlineQueue", "photoBlobs"],
+    "readwrite",
+  );
+
+  await Promise.all([
+    transaction.objectStore("apiCache").clear(),
+    transaction.objectStore("offlineQueue").clear(),
+    transaction.objectStore("photoBlobs").clear(),
+  ]);
+  await transaction.done;
+
+  if ("caches" in globalThis) {
+    await Promise.all(
+      LEGACY_PRIVATE_RUNTIME_CACHES.map((cacheName) =>
+        globalThis.caches.delete(cacheName),
+      ),
+    );
+  }
+}
+
 export interface QueuedAction {
   id?: number;
   method: string;
@@ -92,8 +157,12 @@ export interface QueuedAction {
   createdAt: number;
 }
 
-export async function enqueueAction(action: Omit<QueuedAction, "id" | "createdAt">): Promise<number> {
+export async function enqueueAction(
+  action: Omit<QueuedAction, "id" | "createdAt">,
+  generation = privateDataGeneration,
+): Promise<number> {
   const db = await getDB();
+  if (generation !== privateDataGeneration) return 0;
   const id = await db.add("offlineQueue", {
     ...action,
     createdAt: Date.now(),
@@ -122,7 +191,9 @@ export async function storePhotoBlob(
   fileName: string,
   contentType: string
 ): Promise<void> {
+  const generation = privateDataGeneration;
   const db = await getDB();
+  if (generation !== privateDataGeneration) return;
   await db.put("photoBlobs", { key, blob, fileName, contentType });
 }
 

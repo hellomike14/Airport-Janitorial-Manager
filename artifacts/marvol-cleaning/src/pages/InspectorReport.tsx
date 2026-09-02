@@ -122,6 +122,12 @@ function buildIssuePDF(issue: any, t: (key: string, opts?: any) => string): stri
     </div>`;
 
   const severityDesc = issue.severity === 'high' ? t("issuePdf.urgentAttention") : issue.severity === 'medium' ? t("issuePdf.needsAttention") : t("issuePdf.routineIssue");
+  const severityLabel =
+    issue.severity === "high"
+      ? t("inspectorReport.high")
+      : issue.severity === "medium"
+        ? t("inspectorReport.medium")
+        : t("inspectorReport.low");
 
   return `<!DOCTYPE html>
 <html>
@@ -163,7 +169,7 @@ function buildIssuePDF(issue: any, t: (key: string, opts?: any) => string): stri
     <!-- Severity banner -->
     <div style="background:${sev.color}15;border-bottom:3px solid ${sev.color};padding:12px 32px;display:flex;align-items:center;justify-content:space-between;">
       <div style="display:flex;align-items:center;gap:10px;">
-        <span style="background:${sev.color};color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;padding:3px 10px;border-radius:20px;">${t("issuePdf.priority", { level: sev.label })}</span>
+        <span style="background:${sev.color};color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;padding:3px 10px;border-radius:20px;">${t("issuePdf.priority", { level: severityLabel })}</span>
         <span style="font-size:12px;font-weight:600;color:${sev.color};">${severityDesc}</span>
       </div>
       <span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:${issue.resolved ? '#d1fae5' : '#dbeafe'};color:${issue.resolved ? '#065f46' : '#1d4ed8'};">${issue.resolved ? t("issuePdf.resolvedLabel") : t("issuePdf.openLabel")}</span>

@@ -23,8 +23,15 @@ export interface StaffMember {
   id: number;
   name: string;
   role: StaffMemberRole;
-  /** Whether the staff member has a configured sign-in email. The email address itself is never returned. */
+  /** Whether the staff member has a configured sign-in email. */
   hasEmail: boolean;
+  /**
+   * Exact normalized login email; included only for authenticated administrators.
+   * @nullable
+   */
+  email?: string | null;
+  /** Whether this staff identity may authenticate; included only for authenticated administrators. */
+  loginEnabled?: boolean;
   active: boolean;
   createdAt: string;
 }
@@ -72,6 +79,24 @@ export interface CleaningArea {
   sortOrder: number;
 }
 
+/**
+ * Present on completion; accepted means SendGrid accepted the inspector email, not mailbox delivery.
+ */
+export type TaskCompletionEmailStatus =
+  | (typeof TaskCompletionEmailStatus)[keyof typeof TaskCompletionEmailStatus]
+  | null;
+
+export const TaskCompletionEmailStatus = {
+  not_applicable: "not_applicable",
+  pending: "pending",
+  sending: "sending",
+  retrying: "retrying",
+  accepted: "accepted",
+  disabled: "disabled",
+  not_configured: "not_configured",
+  failed: "failed",
+} as const;
+
 export interface Task {
   id: number;
   areaId: number;
@@ -90,7 +115,32 @@ export interface Task {
   assignedToActive?: boolean | null;
   isSpecial: boolean;
   notes?: string | null;
+  /** Present on completion; accepted means SendGrid accepted the inspector email, not mailbox delivery. */
+  completionEmailStatus?: TaskCompletionEmailStatus;
 }
+
+export type SpecialTaskAssignmentMethod =
+  | (typeof SpecialTaskAssignmentMethod)[keyof typeof SpecialTaskAssignmentMethod]
+  | null;
+
+export const SpecialTaskAssignmentMethod = {
+  fresh_gps: "fresh_gps",
+  area_roster_workload: "area_roster_workload",
+} as const;
+
+/**
+ * Present when a special request is created; inspector requests attempt external email delivery.
+ */
+export type SpecialTaskEmailNotificationStatus =
+  (typeof SpecialTaskEmailNotificationStatus)[keyof typeof SpecialTaskEmailNotificationStatus];
+
+export const SpecialTaskEmailNotificationStatus = {
+  not_applicable: "not_applicable",
+  sent: "sent",
+  disabled: "disabled",
+  not_configured: "not_configured",
+  failed: "failed",
+} as const;
 
 export interface SpecialTask {
   id: number;
@@ -111,6 +161,15 @@ export interface SpecialTask {
   createdByActive?: boolean | null;
   createdAt: string;
   notes?: string | null;
+  assignedToId?: number | null;
+  assignedToName?: string | null;
+  assignedToActive?: boolean | null;
+  sourceMessageId?: number | null;
+  dueAt?: string | null;
+  escalatedAt?: string | null;
+  assignmentMethod?: SpecialTaskAssignmentMethod;
+  /** Present when a special request is created; inspector requests attempt external email delivery. */
+  emailNotificationStatus?: SpecialTaskEmailNotificationStatus;
 }
 
 export interface CreateSpecialTaskRequest {
@@ -141,6 +200,7 @@ export interface Assignment {
   staffName: string;
   areaId: number;
   areaName: string;
+  terminal: string;
   assignmentDate: string;
   assignedById: number;
   assignedByName: string;
@@ -255,7 +315,17 @@ export interface ConversationSummary {
   /** @nullable */
   lastMessageAt: string | null;
   unreadCount: number;
+  archived: boolean;
   createdAt: string;
+}
+
+export interface ConversationArchiveInput {
+  staffId: number;
+  archived: boolean;
+}
+
+export interface ConversationArchiveResult {
+  archived: boolean;
 }
 
 export interface ConversationStartInput {
@@ -269,6 +339,46 @@ export interface GroupConversationStartInput {
   groupName?: string;
 }
 
+export interface InspectorConversationStartInput {
+  staffId: number;
+}
+
+export interface AssignInspectorMessageInput {
+  staffId: number;
+  areaId: number;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  taskDate?: string;
+}
+
+export type InspectorMessageAssignmentStatus =
+  (typeof InspectorMessageAssignmentStatus)[keyof typeof InspectorMessageAssignmentStatus];
+
+export const InspectorMessageAssignmentStatus = {
+  assigned: "assigned",
+  already_assigned: "already_assigned",
+} as const;
+
+export type InspectorMessageAssignmentAssignmentMethod =
+  (typeof InspectorMessageAssignmentAssignmentMethod)[keyof typeof InspectorMessageAssignmentAssignmentMethod];
+
+export const InspectorMessageAssignmentAssignmentMethod = {
+  fresh_gps: "fresh_gps",
+  area_roster_workload: "area_roster_workload",
+} as const;
+
+export interface InspectorMessageAssignment {
+  status: InspectorMessageAssignmentStatus;
+  taskId: number;
+  assignedStaffId: number;
+  assignedStaffName: string;
+  areaId: number;
+  areaName: string;
+  taskDate: string;
+  dueAt: string;
+  assignmentMethod: InspectorMessageAssignmentAssignmentMethod;
+  distanceMeters: number | null;
+}
+
 export interface UpdateChatMessageInput {
   senderId: number;
   /**
@@ -278,6 +388,32 @@ export interface UpdateChatMessageInput {
   body: string;
 }
 
+/**
+ * SendGrid handoff state; accepted means SendGrid accepted the request, not mailbox delivery.
+ */
+export type ChatMessageEmailDeliveryStatus =
+  (typeof ChatMessageEmailDeliveryStatus)[keyof typeof ChatMessageEmailDeliveryStatus];
+
+export const ChatMessageEmailDeliveryStatus = {
+  not_applicable: "not_applicable",
+  pending: "pending",
+  sending: "sending",
+  retrying: "retrying",
+  accepted: "accepted",
+  disabled: "disabled",
+  not_configured: "not_configured",
+  failed: "failed",
+} as const;
+
+export type ChatMessageSpecialTaskAssignmentMethod =
+  | (typeof ChatMessageSpecialTaskAssignmentMethod)[keyof typeof ChatMessageSpecialTaskAssignmentMethod]
+  | null;
+
+export const ChatMessageSpecialTaskAssignmentMethod = {
+  fresh_gps: "fresh_gps",
+  area_roster_workload: "area_roster_workload",
+} as const;
+
 export interface ChatMessage {
   id: number;
   conversationId: number;
@@ -285,6 +421,18 @@ export interface ChatMessage {
   senderName: string;
   body: string;
   isRead: boolean;
+  clientRequestId: string | null;
+  /** SendGrid handoff state; accepted means SendGrid accepted the request, not mailbox delivery. */
+  emailDeliveryStatus: ChatMessageEmailDeliveryStatus;
+  isInboundEmail: boolean;
+  specialTaskId: number | null;
+  specialTaskDueAt: string | null;
+  specialTaskEscalatedAt: string | null;
+  specialTaskCompleted: boolean | null;
+  specialTaskAssignedStaffId: number | null;
+  specialTaskAssignedStaffName: string | null;
+  specialTaskAreaName: string | null;
+  specialTaskAssignmentMethod: ChatMessageSpecialTaskAssignmentMethod;
   createdAt: string;
 }
 
@@ -295,19 +443,40 @@ export interface ChatMessageInput {
    * @maxLength 2000
    */
   body: string;
+  /** Generated once per compose/send action and reused for retries. */
+  clientRequestId: string;
 }
 
 export interface MarkAllReadRequest {
   staffId: number;
 }
 
+/**
+ * Binds the upload to its authorization and serving policy.
+ */
+export type UploadUrlRequestPurpose =
+  (typeof UploadUrlRequestPurpose)[keyof typeof UploadUrlRequestPurpose];
+
+export const UploadUrlRequestPurpose = {
+  "staff-photo": "staff-photo",
+  "application-document": "application-document",
+} as const;
+
 export interface UploadUrlRequest {
-  /** @minLength 1 */
+  /**
+   * @minLength 1
+   * @maxLength 255
+   */
   name: string;
-  /** @minimum 1 */
+  /**
+   * @minimum 1
+   * @maximum 12582912
+   */
   size: number;
   /** @minLength 1 */
   contentType: string;
+  /** Binds the upload to its authorization and serving policy. */
+  purpose: UploadUrlRequestPurpose;
 }
 
 export interface UploadUrlResponse {
@@ -582,6 +751,7 @@ export type ListNotificationsParams = {
 
 export type ListConversationsParams = {
   staffId: number;
+  archived?: boolean;
 };
 
 export type ListConversationMessagesParams = {

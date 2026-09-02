@@ -39,6 +39,7 @@ import { useAuth, ViewMode } from "@/contexts/AuthContext";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import {
   useListNotifications,
+  getListNotificationsQueryKey,
   useMarkNotificationRead,
   useMarkAllNotificationsRead,
   listConversations,
@@ -122,6 +123,7 @@ function useNavConfig() {
     inspector: [
       { href: "/issues", icon: AlertTriangle, label: t("nav.openIssues") },
       { href: "/completed-jobs", icon: CheckCircle2, label: t("nav.completedTasks") },
+      { href: "/messages", icon: MessageSquare, label: t("nav.messages") },
       { href: "/photo-share", icon: Camera, label: t("nav.photoShare") },
       { href: "/special-requests", icon: Star, label: t("nav.specialRequests") },
     ],
@@ -226,7 +228,12 @@ function NotificationBell({ staffId }: { staffId: number }) {
 
   const { data: notifications = [] } = useListNotifications(
     { staffId },
-    { query: { refetchInterval: 15000 } }
+    {
+      query: {
+        queryKey: getListNotificationsQueryKey({ staffId }),
+        refetchInterval: 15000,
+      },
+    }
   );
 
   const markRead = useMarkNotificationRead({
@@ -515,7 +522,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const { data: conversationList = [] } = useQuery({
     queryKey: ["/api/conversations", currentUser?.id ?? 0],
     queryFn: () => listConversations({ staffId: currentUser!.id }),
-    enabled: !!currentUser && viewMode !== "inspector",
+    enabled: !!currentUser,
     refetchInterval: 15000,
   });
   const unreadMessages = conversationList.reduce((sum, c) => sum + c.unreadCount, 0);

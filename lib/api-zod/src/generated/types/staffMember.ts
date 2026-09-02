@@ -11,8 +11,15 @@ export interface StaffMember {
   id: number;
   name: string;
   role: StaffMemberRole;
-  /** Whether the staff member has a configured sign-in email. The email address itself is never returned. */
+  /** Whether the staff member has a configured sign-in email. */
   hasEmail: boolean;
+  /**
+   * Exact normalized login email; included only for authenticated administrators.
+   * @nullable
+   */
+  email?: string | null;
+  /** Whether this staff identity may authenticate; included only for authenticated administrators. */
+  loginEnabled?: boolean;
   active: boolean;
   createdAt: string;
 }

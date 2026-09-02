@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { taskTypesTable } from "@workspace/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { z } from "zod";
+import { requireStaffRole } from "../middlewares/requireStaffRole";
 
 const router: IRouter = Router();
 
@@ -55,7 +56,7 @@ function fmt(t: any) {
   return { ...t, createdAt: t.createdAt.toISOString() };
 }
 
-router.get("/task-types", async (req: Request, res: Response) => {
+router.get("/task-types", requireStaffRole("admin"), async (req: Request, res: Response) => {
   await ensureSeeded();
   const types = await db
     .select()
@@ -64,7 +65,7 @@ router.get("/task-types", async (req: Request, res: Response) => {
   res.json(types.map(fmt));
 });
 
-router.post("/task-types", async (req: Request, res: Response) => {
+router.post("/task-types", requireStaffRole("admin"), async (req: Request, res: Response) => {
   const body = CreateBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: "Invalid input" });
@@ -86,7 +87,7 @@ router.post("/task-types", async (req: Request, res: Response) => {
   res.status(201).json(fmt(created));
 });
 
-router.put("/task-types/:id", async (req: Request, res: Response) => {
+router.put("/task-types/:id", requireStaffRole("admin"), async (req: Request, res: Response) => {
   const params = IdParams.safeParse({ id: req.params.id });
   const body = UpdateBody.safeParse(req.body);
   if (!params.success || !body.success) {
@@ -113,7 +114,7 @@ router.put("/task-types/:id", async (req: Request, res: Response) => {
   res.json(fmt(updated));
 });
 
-router.delete("/task-types/:id", async (req: Request, res: Response) => {
+router.delete("/task-types/:id", requireStaffRole("admin"), async (req: Request, res: Response) => {
   const params = IdParams.safeParse({ id: req.params.id });
   if (!params.success) {
     res.status(400).json({ error: "Invalid id" });
@@ -133,7 +134,7 @@ router.delete("/task-types/:id", async (req: Request, res: Response) => {
   res.json({ success: true });
 });
 
-router.post("/task-types/reorder", async (req: Request, res: Response) => {
+router.post("/task-types/reorder", requireStaffRole("admin"), async (req: Request, res: Response) => {
   const body = ReorderBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: "orderedIds is required" });

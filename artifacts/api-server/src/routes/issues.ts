@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db } from "@workspace/db";
 import { issuesTable, staffTable, areasTable, notificationsTable, assignmentsTable } from "@workspace/db/schema";
-import { eq, and, gte, lte, inArray } from "drizzle-orm";
+import { eq, and, gte, lte, inArray, or } from "drizzle-orm";
 import {
   ListIssuesQueryParams,
   CreateIssueBody,
@@ -10,6 +10,8 @@ import {
   UpdateIssueImagesBody,
 } from "@workspace/api-zod";
 import { z } from "zod";
+import { actorStaffFromRequest, type StaffRow } from "../lib/actorSession";
+import { sendInspectorRequestEmail } from "../lib/inspectorRequestEmail";
 
 const router: IRouter = Router();
 
@@ -30,6 +32,60 @@ const ListIssuesWithAssignedQuery = z.object({
   areaId: z.coerce.number().optional(),
   assignedToId: z.coerce.number().optional(),
 });
+
+type IssueAccessRow = {
+  areaId: number;
+  assignedToId: number | null;
+};
+
+function isManager(actor: StaffRow): boolean {
+  return actor.role === "admin" || actor.role === "supervisor";
+}
+
+async function requireIssueActor(req: Request, res: Response): Promise<StaffRow | null> {
+  const actor =
+    (res.locals.staffActor as StaffRow | undefined) ??
+    (await actorStaffFromRequest(req));
+  if (!actor) {
+    res.status(401).json({ error: "Login session required" });
+    return null;
+  }
+  return actor;
+}
+
+function claimedActorMatches(
+  res: Response,
+  actor: StaffRow,
+  claimedId: number | undefined,
+  action: string,
+): boolean {
+  if (claimedId === undefined || claimedId === actor.id) return true;
+  res.status(403).json({ error: `Cannot ${action} as another staff member` });
+  return false;
+}
+
+function todayIsoDate(): string {
+  return new Date().toISOString().split("T")[0];
+}
+
+async function currentAssignedAreaIds(staffId: number): Promise<number[]> {
+  const assignments = await db
+    .select({ areaId: assignmentsTable.areaId })
+    .from(assignmentsTable)
+    .where(
+      and(
+        eq(assignmentsTable.staffId, staffId),
+        eq(assignmentsTable.assignmentDate, todayIsoDate()),
+      ),
+    );
+  return [...new Set(assignments.map((assignment) => assignment.areaId))];
+}
+
+async function canStaffWorkOnIssue(actor: StaffRow, issue: IssueAccessRow): Promise<boolean> {
+  if (issue.assignedToId === actor.id) return true;
+  const assignedAreaIds = await currentAssignedAreaIds(actor.id);
+  return assignedAreaIds.includes(issue.areaId);
+}
 
 async function fetchFullIssue(id: number) {
   const rows = await db
@@ -128,6 +184,9 @@ async function notifySupervisors(message: string, issueId: number, excludeId?: n
 }
 
 router.get("/", async (req: Request, res: Response) => {
+  const actor = await requireIssueActor(req, res);
+  if (!actor) return;
+
   const query = ListIssuesWithAssignedQuery.parse({
     date: req.query.date,
     from: req.query.from,
@@ -135,6 +194,17 @@ router.get("/", async (req: Request, res: Response) => {
     areaId: req.query.areaId,
     assignedToId: req.query.assignedToId,
   });
+
+  const staffAreaIds = actor.role === "staff" ? await currentAssignedAreaIds(actor.id) : [];
+  const staffScope =
+    actor.role !== "staff"
+      ? undefined
+      : staffAreaIds.length > 0
+        ? or(
+            eq(issuesTable.assignedToId, actor.id),
+            inArray(issuesTable.areaId, staffAreaIds),
+          )
+        : eq(issuesTable.assignedToId, actor.id);
 
   const rows = await db
     .select({
@@ -165,7 +235,8 @@ router.get("/", async (req: Request, res: Response) => {
         query.from ? gte(issuesTable.issueDate, query.from) : undefined,
         query.to ? lte(issuesTable.issueDate, query.to) : undefined,
         query.areaId ? eq(issuesTable.areaId, query.areaId) : undefined,
-        query.assignedToId ? eq(issuesTable.assignedToId, query.assignedToId) : undefined
+        query.assignedToId ? eq(issuesTable.assignedToId, query.assignedToId) : undefined,
+        staffScope,
       )
     )
     .orderBy(issuesTable.createdAt);
@@ -194,13 +265,17 @@ router.get("/", async (req: Request, res: Response) => {
 
 router.post("/", async (req: Request, res: Response) => {
   const body = CreateIssueBody.parse(req.body);
-  const today = new Date().toISOString().split("T")[0];
+  const actor = await requireIssueActor(req, res);
+  if (!actor) return;
+  if (!claimedActorMatches(res, actor, body.reportedById, "report an issue")) return;
+
+  const today = todayIsoDate();
 
   const [created] = await db
     .insert(issuesTable)
     .values({
       areaId: body.areaId,
-      reportedById: body.reportedById,
+      reportedById: actor.id,
       issueDate: today,
       description: body.description,
       severity: body.severity,
@@ -210,20 +285,16 @@ router.post("/", async (req: Request, res: Response) => {
     .returning();
 
   const [area] = await db.select({ name: areasTable.name }).from(areasTable).where(eq(areasTable.id, created.areaId));
-  const [reporter] = await db
-    .select({ name: staffTable.name, active: staffTable.active })
-    .from(staffTable)
-    .where(eq(staffTable.id, created.reportedById));
 
   const areaName = area?.name ?? "Unknown area";
-  const reporterName = reporter?.name ?? "Unknown";
-  const reporterActive = reporter?.active ?? false;
+  const reporterName = actor.name;
+  const reporterActive = actor.active;
   const severityLabel = body.severity.charAt(0).toUpperCase() + body.severity.slice(1);
 
   await notifySupervisors(
     `[${severityLabel}] Issue reported in ${areaName} by ${reporterName}: "${body.description.slice(0, 80)}${body.description.length > 80 ? "…" : ""}"`,
     created.id,
-    body.reportedById
+    actor.id
   );
 
   res.status(201).json(formatIssueRow({
@@ -244,6 +315,14 @@ router.patch("/:id/assign", async (req: Request, res: Response) => {
     res.status(400).json({ error: "Invalid input" });
     return;
   }
+
+  const actor = await requireIssueActor(req, res);
+  if (!actor) return;
+  if (!isManager(actor)) {
+    res.status(403).json({ error: "Only administrators and supervisors can assign issues" });
+    return;
+  }
+  if (!claimedActorMatches(res, actor, body.data.assignedById, "assign an issue")) return;
 
   if (body.data.assignedToId != null) {
     const [target] = await db
@@ -270,12 +349,11 @@ router.patch("/:id/assign", async (req: Request, res: Response) => {
   const issue = await fetchFullIssue(params.data.id);
 
   if (updated.assignedToId) {
-    const [assigner] = await db.select({ name: staffTable.name }).from(staffTable).where(eq(staffTable.id, body.data.assignedById));
     await db.insert(notificationsTable).values({
       staffId: updated.assignedToId,
       issueId: updated.id,
       type: "issue_assigned",
-      message: `${assigner?.name ?? "Supervisor"} assigned you an issue in ${issue?.areaName ?? "an area"}: "${updated.description.slice(0, 60)}${updated.description.length > 60 ? "…" : ""}"`,
+      message: `${actor.name} assigned you an issue in ${issue?.areaName ?? "an area"}: "${updated.description.slice(0, 60)}${updated.description.length > 60 ? "…" : ""}"`,
     });
   }
 
@@ -290,13 +368,21 @@ router.patch("/:id/assign-area", async (req: Request, res: Response) => {
     return;
   }
 
+  const actor = await requireIssueActor(req, res);
+  if (!actor) return;
+  if (!isManager(actor)) {
+    res.status(403).json({ error: "Only administrators and supervisors can assign issues" });
+    return;
+  }
+  if (!claimedActorMatches(res, actor, body.data.assignedById, "assign an issue")) return;
+
   const [issue] = await db.select().from(issuesTable).where(eq(issuesTable.id, params.data.id));
   if (!issue) {
     res.status(404).json({ error: "Issue not found" });
     return;
   }
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayIsoDate();
 
   const rawAreaAssignments = await db
     .select({ staffId: assignmentsTable.staffId, staffName: staffTable.name })
@@ -315,7 +401,6 @@ router.patch("/:id/assign-area", async (req: Request, res: Response) => {
   });
 
   const [area] = await db.select({ name: areasTable.name }).from(areasTable).where(eq(areasTable.id, issue.areaId));
-  const [assigner] = await db.select({ name: staffTable.name }).from(staffTable).where(eq(staffTable.id, body.data.assignedById));
 
   await db.update(issuesTable).set({ assignedToId: null }).where(eq(issuesTable.id, params.data.id));
 
@@ -325,7 +410,7 @@ router.patch("/:id/assign-area", async (req: Request, res: Response) => {
         staffId: a.staffId,
         issueId: params.data.id,
         type: "issue_assigned" as const,
-        message: `${assigner?.name ?? "Supervisor"} assigned an issue in ${area?.name ?? "your area"} to your team: "${issue.description.slice(0, 60)}${issue.description.length > 60 ? "…" : ""}"`,
+        message: `${actor.name} assigned an issue in ${area?.name ?? "your area"} to your team: "${issue.description.slice(0, 60)}${issue.description.length > 60 ? "…" : ""}"`,
       }))
     );
   }
@@ -339,6 +424,27 @@ router.patch("/:id/complete", async (req: Request, res: Response) => {
   const body = CompleteIssueBody.safeParse(req.body);
   if (!params.success || !body.success) {
     res.status(400).json({ error: "Invalid input" });
+    return;
+  }
+
+  const actor = await requireIssueActor(req, res);
+  if (!actor) return;
+  if (actor.role !== "staff" && actor.role !== "admin") {
+    res.status(403).json({ error: "Only assigned staff can complete issues" });
+    return;
+  }
+  if (!claimedActorMatches(res, actor, body.data.completedById, "complete an issue")) return;
+
+  const [existingIssue] = await db
+    .select({ areaId: issuesTable.areaId, assignedToId: issuesTable.assignedToId })
+    .from(issuesTable)
+    .where(eq(issuesTable.id, params.data.id));
+  if (!existingIssue) {
+    res.status(404).json({ error: "Issue not found" });
+    return;
+  }
+  if (actor.role === "staff" && !(await canStaffWorkOnIssue(actor, existingIssue))) {
+    res.status(403).json({ error: "This issue is not assigned to your current area" });
     return;
   }
 
@@ -358,9 +464,8 @@ router.patch("/:id/complete", async (req: Request, res: Response) => {
   }
 
   const issue = await fetchFullIssue(params.data.id);
-  const [completedBy] = await db.select({ name: staffTable.name }).from(staffTable).where(eq(staffTable.id, body.data.completedById));
 
-  const completionMsg = `Issue in ${issue?.areaName ?? "an area"} marked complete by ${completedBy?.name ?? "Staff"}: "${updated.description.slice(0, 60)}${updated.description.length > 60 ? "…" : ""}"`;
+  const completionMsg = `Issue in ${issue?.areaName ?? "an area"} marked complete by ${actor.name}: "${updated.description.slice(0, 60)}${updated.description.length > 60 ? "…" : ""}"`;
 
   const supervisorsAndAdmins = await db
     .select({ id: staffTable.id })
@@ -368,7 +473,7 @@ router.patch("/:id/complete", async (req: Request, res: Response) => {
     .where(and(inArray(staffTable.role, ["supervisor", "admin", "inspector"]), eq(staffTable.active, true)));
 
   const completionRecipients = supervisorsAndAdmins
-    .filter((s) => s.id !== body.data.completedById)
+    .filter((s) => s.id !== actor.id)
     .map((s) => s.id);
 
   if (completionRecipients.length > 0) {
@@ -388,6 +493,22 @@ router.patch("/:id/complete", async (req: Request, res: Response) => {
 router.patch("/:id/images", async (req: Request, res: Response) => {
   const { id } = UpdateIssueImagesParams.parse({ id: req.params.id });
   const body = UpdateIssueImagesBody.parse(req.body);
+
+  const actor = await requireIssueActor(req, res);
+  if (!actor) return;
+
+  const [existingIssue] = await db
+    .select({ areaId: issuesTable.areaId, assignedToId: issuesTable.assignedToId })
+    .from(issuesTable)
+    .where(eq(issuesTable.id, id));
+  if (!existingIssue) {
+    res.status(404).json({ error: "Issue not found" });
+    return;
+  }
+  if (actor.role === "staff" && !(await canStaffWorkOnIssue(actor, existingIssue))) {
+    res.status(403).json({ error: "This issue is not assigned to your current area" });
+    return;
+  }
 
   const updateValues: Record<string, any> = {};
   if (body.beforeImagePath !== undefined) updateValues.beforeImagePath = body.beforeImagePath;
@@ -411,6 +532,13 @@ router.patch("/:id/images", async (req: Request, res: Response) => {
 router.post("/:id/resolve", async (req: Request, res: Response) => {
   const { id } = ResolveIssueParams.parse({ id: req.params.id });
 
+  const actor = await requireIssueActor(req, res);
+  if (!actor) return;
+  if (!isManager(actor)) {
+    res.status(403).json({ error: "Only administrators and supervisors can resolve issues" });
+    return;
+  }
+
   const [updated] = await db
     .update(issuesTable)
     .set({ resolved: true, resolvedAt: new Date() })
@@ -428,7 +556,7 @@ router.post("/:id/resolve", async (req: Request, res: Response) => {
 
 const SendToSupervisorBody = z.object({
   issueId: z.number(),
-  senderId: z.number(),
+  senderId: z.number().optional(),
   message: z.string().optional(),
 });
 
@@ -439,14 +567,21 @@ router.post("/send-to-supervisor", async (req: Request, res: Response) => {
     return;
   }
 
+  const sender = await requireIssueActor(req, res);
+  if (!sender) return;
+  if (!claimedActorMatches(res, sender, body.data.senderId, "send an inspector request")) return;
+  if (sender.role !== "inspector") {
+    res.status(403).json({ error: "Only an inspector can send an inspector request" });
+    return;
+  }
+
   const issue = await fetchFullIssue(body.data.issueId);
   if (!issue) {
     res.status(404).json({ error: "Issue not found" });
     return;
   }
 
-  const sender = await db.select().from(staffTable).where(eq(staffTable.id, body.data.senderId)).then(r => r[0]);
-  const senderName = sender?.name ?? "Inspector";
+  const senderName = sender.name;
 
   const supervisors = await db
     .select()
@@ -469,12 +604,27 @@ router.post("/send-to-supervisor", async (req: Request, res: Response) => {
     await db.insert(notificationsTable).values(notifs);
   }
 
-  res.json({ sent: notifs.length });
+  const emailResult = await sendInspectorRequestEmail({
+    requesterName: senderName,
+    areaName: issue.areaName,
+    requestedDate: issue.issueDate,
+    details: `${issue.description}${body.data.message ? `\n\nInspector note: ${body.data.message}` : ""}`,
+  });
+  if (emailResult.status !== "sent") {
+    const log = emailResult.status === "failed" ? console.error : console.warn;
+    log("[inspector-request-email] issue notification was not sent", {
+      issueId: issue.id,
+      status: emailResult.status,
+      error: emailResult.error,
+    });
+  }
+
+  res.json({ sent: notifs.length, emailNotificationStatus: emailResult.status });
 });
 
 const SendToInspectorBody = z.object({
   issueId: z.number(),
-  senderId: z.number(),
+  senderId: z.number().optional(),
   message: z.string().optional(),
 });
 
@@ -485,14 +635,21 @@ router.post("/send-to-inspector", async (req: Request, res: Response) => {
     return;
   }
 
+  const sender = await requireIssueActor(req, res);
+  if (!sender) return;
+  if (!claimedActorMatches(res, sender, body.data.senderId, "notify inspectors")) return;
+  if (sender.role !== "admin" && sender.role !== "supervisor") {
+    res.status(403).json({ error: "Only administrators and supervisors can notify inspectors" });
+    return;
+  }
+
   const issue = await fetchFullIssue(body.data.issueId);
   if (!issue) {
     res.status(404).json({ error: "Issue not found" });
     return;
   }
 
-  const sender = await db.select().from(staffTable).where(eq(staffTable.id, body.data.senderId)).then(r => r[0]);
-  const senderName = sender?.name ?? "Supervisor";
+  const senderName = sender.name;
 
   const inspectors = await db
     .select()

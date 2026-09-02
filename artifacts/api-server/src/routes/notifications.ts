@@ -3,6 +3,13 @@ import { db } from "@workspace/db";
 import { notificationsTable, staffTable } from "@workspace/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { z } from "zod";
+import type { StaffRow } from "../lib/actorSession";
+import {
+  alertRecipientRoles,
+  requestedStaffIdMatchesActor,
+  type AlertTargetRole,
+  type StaffActor,
+} from "../lib/staffAuthorization";
 
 const router: IRouter = Router();
 
@@ -32,10 +39,16 @@ router.get("/notifications", async (req: Request, res: Response) => {
     return;
   }
 
+  const actor = res.locals.staffActor as StaffRow;
+  if (!requestedStaffIdMatchesActor(actor as StaffActor, query.data.staffId)) {
+    res.status(403).json({ error: "Cannot access another staff member's notifications" });
+    return;
+  }
+
   const notifications = await db
     .select()
     .from(notificationsTable)
-    .where(eq(notificationsTable.staffId, query.data.staffId))
+    .where(eq(notificationsTable.staffId, actor.id))
     .orderBy(desc(notificationsTable.createdAt))
     .limit(50);
 
@@ -49,10 +62,17 @@ router.patch("/notifications/:id/read", async (req: Request, res: Response) => {
     return;
   }
 
+  const actor = res.locals.staffActor as StaffRow;
+
   const [updated] = await db
     .update(notificationsTable)
     .set({ isRead: true })
-    .where(eq(notificationsTable.id, params.data.id))
+    .where(
+      and(
+        eq(notificationsTable.id, params.data.id),
+        eq(notificationsTable.staffId, actor.id),
+      ),
+    )
     .returning();
 
   if (!updated) {
@@ -70,12 +90,18 @@ router.post("/notifications/mark-all-read", async (req: Request, res: Response) 
     return;
   }
 
+  const actor = res.locals.staffActor as StaffRow;
+  if (!requestedStaffIdMatchesActor(actor as StaffActor, body.data.staffId)) {
+    res.status(403).json({ error: "Cannot update another staff member's notifications" });
+    return;
+  }
+
   const result = await db
     .update(notificationsTable)
     .set({ isRead: true })
     .where(
       and(
-        eq(notificationsTable.staffId, body.data.staffId),
+        eq(notificationsTable.staffId, actor.id),
         eq(notificationsTable.isRead, false)
       )
     )
@@ -97,42 +123,29 @@ router.post("/notifications/send-alert", async (req: Request, res: Response) => 
     return;
   }
 
-  const sender = await db
-    .select()
-    .from(staffTable)
-    .where(eq(staffTable.id, body.data.senderId))
-    .then((r) => r[0]);
-
-  if (!sender) {
-    res.status(404).json({ error: "Sender not found" });
-    return;
-  }
-
-  const senderRole = sender.role;
-  const allowedSenderRoles = ["inspector", "supervisor", "staff", "admin"];
-  if (!allowedSenderRoles.includes(senderRole)) {
-    res.status(403).json({ error: "Not authorized to send alerts" });
+  const sender = res.locals.staffActor as StaffRow;
+  if (!requestedStaffIdMatchesActor(sender as StaffActor, body.data.senderId)) {
+    res.status(403).json({ error: "Cannot send an alert as another staff member" });
     return;
   }
 
   const allActive = await db
     .select()
     .from(staffTable)
-    .where(eq(staffTable.active, true));
+    .where(
+      and(
+        eq(staffTable.active, true),
+        eq(staffTable.loginEnabled, true),
+      ),
+    );
 
-  let recipients: typeof allActive = [];
-
-  if (senderRole === "inspector" || senderRole === "admin") {
-    if (body.data.targetRole === "supervisor") {
-      recipients = allActive.filter((s) => (s.role === "supervisor" || s.role === "admin") && s.id !== sender.id);
-    } else if (body.data.targetRole === "staff") {
-      recipients = allActive.filter((s) => s.role === "staff");
-    } else {
-      recipients = allActive.filter((s) => (s.role === "supervisor" || s.role === "admin" || s.role === "staff") && s.id !== sender.id);
-    }
-  } else if (senderRole === "supervisor" || senderRole === "staff") {
-    recipients = allActive.filter((s) => (s.role === "supervisor" || s.role === "admin") && s.id !== sender.id);
-  }
+  const recipientRoles = alertRecipientRoles(
+    sender as StaffActor,
+    body.data.targetRole as AlertTargetRole,
+  );
+  const recipients = allActive.filter(
+    (staff) => recipientRoles.includes(staff.role) && staff.id !== sender.id,
+  );
 
   if (recipients.length === 0) {
     res.json({ sent: 0 });

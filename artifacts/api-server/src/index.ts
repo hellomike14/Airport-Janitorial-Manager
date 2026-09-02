@@ -1,10 +1,22 @@
 import app from "./app";
-import { db } from "@workspace/db";
-import { staffTable, areasTable, taskTypesTable, notificationsTable, staffLocationsTable, tasksTable, taskExclusionsTable, assignmentsTable, schedulesTable, issuesTable, sharedPhotosTable, conversationsTable, messagesTable, conversationParticipantsTable } from "@workspace/db/schema";
+import { db, pool } from "@workspace/db";
+import { staffTable, areasTable, taskTypesTable, notificationsTable, staffLocationsTable, tasksTable, assignmentsTable, schedulesTable, issuesTable, sharedPhotosTable } from "@workspace/db/schema";
 import { eq, and, count, inArray, or, gte, like, sql } from "drizzle-orm";
 import { renameSharedAreaName, AREA_RENAME_MAP } from "./area-renames";
 import { AREAS_REPLACING_DEFAULTS } from "./area-tasks";
-import { SEED_STAFF, REMOVED_STAFF_NAMES } from "./seed-data";
+import {
+  SEED_STAFF,
+  REMOVED_STAFF_NAMES,
+  REQUIRED_PRODUCTION_LOGIN_NAMES,
+} from "./seed-data";
+import { normalizeLoginEmail } from "./lib/loginIdentity";
+import { startMessageEmailOutboxWorker } from "./lib/messageEmailOutbox";
+import { startInspectorAssignmentEscalationWorker } from "./lib/inspectorTaskWorkflow";
+import {
+  STARTUP_ADVISORY_LOCK_NAME,
+  withPostgresAdvisoryLock,
+} from "./lib/startupAdvisoryLock";
+import { selectCanonicalStaffRecord } from "./lib/startupStaffReconciliation";
 
 const rawPort = process.env["PORT"];
 
@@ -152,10 +164,102 @@ async function seed() {
     CREATE UNIQUE INDEX IF NOT EXISTS "conversation_participants_unique"
       ON "conversation_participants" ("conversation_id", "staff_id")
   `);
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS "conversation_archives" (
+      "conversation_id" integer NOT NULL REFERENCES "conversations"("id") ON DELETE CASCADE,
+      "staff_id" integer NOT NULL REFERENCES "staff"("id") ON DELETE CASCADE,
+      "archived_at" timestamp NOT NULL DEFAULT now()
+    )
+  `);
+  await db.execute(sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS "conversation_archives_unique"
+      ON "conversation_archives" ("conversation_id", "staff_id")
+  `);
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS "inbound_email_messages" (
+      "provider_message_id" text PRIMARY KEY,
+      "conversation_id" integer NOT NULL REFERENCES "conversations"("id") ON DELETE CASCADE,
+      "sender_id" integer NOT NULL REFERENCES "staff"("id"),
+      "message_id" integer REFERENCES "messages"("id") ON DELETE SET NULL,
+      "received_at" timestamp NOT NULL DEFAULT now()
+    )
+  `);
+  await db.execute(sql`
+    ALTER TABLE "messages"
+      ADD COLUMN IF NOT EXISTS "client_request_id" text
+  `);
+  await db.execute(sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS "messages_sender_client_request_unique"
+      ON "messages" ("sender_id", "client_request_id")
+  `);
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS "message_email_outbox" (
+      "id" serial PRIMARY KEY,
+      "message_id" integer NOT NULL UNIQUE REFERENCES "messages"("id") ON DELETE CASCADE,
+      "conversation_id" integer NOT NULL,
+      "inspector_id" integer NOT NULL,
+      "supervisor_id" integer NOT NULL,
+      "inspector_email" text NOT NULL,
+      "inspector_name" text NOT NULL,
+      "supervisor_name" text NOT NULL,
+      "message_body" text NOT NULL,
+      "status" text NOT NULL DEFAULT 'pending'
+        CHECK ("status" IN ('pending', 'sending', 'retrying', 'accepted', 'disabled', 'not_configured', 'failed')),
+      "attempt_count" integer NOT NULL DEFAULT 0 CHECK ("attempt_count" >= 0),
+      "next_attempt_at" timestamp NOT NULL DEFAULT now(),
+      "locked_at" timestamp,
+      "lock_token" text,
+      "last_error" text,
+      "accepted_at" timestamp,
+      "created_at" timestamp NOT NULL DEFAULT now(),
+      "updated_at" timestamp NOT NULL DEFAULT now()
+    )
+  `);
+  await db.execute(sql`
+    CREATE INDEX IF NOT EXISTS "message_email_outbox_ready_idx"
+      ON "message_email_outbox" ("status", "next_attempt_at")
+  `);
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS "inspector_task_links" (
+      "task_id" integer PRIMARY KEY REFERENCES "tasks"("id") ON DELETE CASCADE,
+      "source_message_id" integer NOT NULL UNIQUE REFERENCES "messages"("id") ON DELETE RESTRICT,
+      "conversation_id" integer NOT NULL REFERENCES "conversations"("id") ON DELETE RESTRICT,
+      "inspector_id" integer NOT NULL REFERENCES "staff"("id") ON DELETE RESTRICT,
+      "supervisor_id" integer NOT NULL REFERENCES "staff"("id") ON DELETE RESTRICT,
+      "assignment_method" text NOT NULL
+        CHECK ("assignment_method" IN ('fresh_gps', 'area_roster_workload')),
+      "target_latitude" double precision,
+      "target_longitude" double precision,
+      "due_at" timestamp NOT NULL,
+      "escalated_at" timestamp,
+      "escalation_staff_id" integer REFERENCES "staff"("id") ON DELETE SET NULL,
+      "completion_message_id" integer UNIQUE REFERENCES "messages"("id") ON DELETE SET NULL,
+      "created_at" timestamp NOT NULL DEFAULT now()
+    )
+  `);
+  await db.execute(sql`
+    CREATE INDEX IF NOT EXISTS "inspector_task_links_due_idx"
+      ON "inspector_task_links" ("due_at")
+      WHERE "escalated_at" IS NULL
+  `);
 
   // Clerk migration: personal PINs are gone — drop the legacy hash column so
   // no PIN hashes linger in any environment (dev or production).
   await db.execute(sql`ALTER TABLE "staff" DROP COLUMN IF EXISTS "password"`);
+  await db.execute(sql`
+    ALTER TABLE "staff"
+      ADD COLUMN IF NOT EXISTS "login_enabled" boolean NOT NULL DEFAULT true
+  `);
+
+  // This address is an email-only notification recipient, never an app user.
+  // Match both its historical staff name and address so the revocation is
+  // idempotent across databases with partially edited legacy data.
+  await db.execute(sql`
+    UPDATE "staff"
+      SET "active" = false, "login_enabled" = false
+    WHERE lower(btrim(coalesce("email", ''))) = 'msutherland@marvolenterprises.com'
+       OR lower(btrim("name")) = 'marcell sutherland'
+  `);
 
   // Email is the join key between Clerk accounts and staff records, so it
   // must be unambiguous among active staff. Clear duplicate emails first
@@ -163,19 +267,27 @@ async function seed() {
   // Staff page), then enforce case-insensitive uniqueness going forward.
   await db.execute(sql`
     UPDATE "staff" s SET "email" = NULL
-    WHERE s."active" = true AND s."email" IS NOT NULL
+    WHERE s."active" = true AND s."login_enabled" = true
+      AND s."email" IS NOT NULL AND btrim(s."email") != ''
       AND EXISTS (
         SELECT 1 FROM "staff" o
-        WHERE o."active" = true AND o."email" IS NOT NULL
-          AND lower(o."email") = lower(s."email") AND o."id" < s."id"
+        WHERE o."active" = true AND o."login_enabled" = true
+          AND o."email" IS NOT NULL AND btrim(o."email") != ''
+          AND lower(btrim(o."email")) = lower(btrim(s."email")) AND o."id" < s."id"
       )
   `);
+  // Replace the legacy index: it did not trim addresses or distinguish
+  // disabled login identities from staff who are allowed into the app.
   await db.execute(sql`
-    CREATE UNIQUE INDEX IF NOT EXISTS "staff_email_active_unique"
-      ON "staff" (lower("email")) WHERE "email" IS NOT NULL AND "active" = true
+    DROP INDEX IF EXISTS "staff_email_active_unique"
+  `);
+  await db.execute(sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS "staff_login_email_unique"
+      ON "staff" (lower(btrim("email")))
+      WHERE "email" IS NOT NULL AND btrim("email") != ''
+        AND "active" = true AND "login_enabled" = true
   `);
 
-  const seedNames = new Set(SEED_STAFF.map((s) => s.name));
   const existingStaff = await db.select().from(staffTable);
   const existingNames = new Set(existingStaff.map((s) => s.name));
 
@@ -206,199 +318,138 @@ async function seed() {
     }
   }
 
-  // Merge duplicate management rows. The seed-rename logic below has, in
+  // Reconcile duplicate management rows. The seed-rename logic below has, in
   // the past, renamed an existing admin/inspector row to a seeded name even
   // when another row already had that name, leaving two identical tiles on
-  // the login screen. For each seeded admin/inspector/supervisor name, find
-  // all active rows with that exact name; if more than one, pick a single
-  // survivor (lowest id), re-point every staff FK on every loser
-  // row at the survivor, then delete the loser rows. Wrapped in a single
-  // transaction so the merge either fully completes or rolls back.
+  // the login screen. Hard-merging these rows is unsafe: a staff id can be
+  // present in direct/group conversations, message senders, per-user archive
+  // state, inbound-email idempotency, and an in-flight email outbox item. A
+  // collision in any of those unique relationships can make startup fail or
+  // corrupt conversation history. Instead, deterministically retain one
+  // canonical login and deactivate every extra profile. All historical FKs
+  // and outbox rows remain referentially intact because no id is deleted or
+  // rewritten.
   const MGMT_ROLES = new Set(["admin", "inspector", "supervisor"]);
-  const mgmtSeedNames = SEED_STAFF.filter((s) => MGMT_ROLES.has(s.role)).map((s) => s.name);
+  const mgmtSeeds = SEED_STAFF.filter((staff) => MGMT_ROLES.has(staff.role));
+  const canonicalManagementStaffIds = new Map<string, number>();
   await db.transaction(async (tx) => {
-    for (const seedName of mgmtSeedNames) {
-      const dupes = existingStaff.filter(
-        (s) => s.name === seedName && s.active && MGMT_ROLES.has(s.role)
+    const liveStaff = await tx.select().from(staffTable);
+    for (const seedEntry of mgmtSeeds) {
+      const activeCandidates = liveStaff.filter(
+        (staff) =>
+          staff.name === seedEntry.name &&
+          staff.active &&
+          MGMT_ROLES.has(staff.role),
       );
-      if (dupes.length < 2) continue;
+      if (activeCandidates.length < 2) continue;
 
-      const survivor = [...dupes].sort((a, b) => a.id - b.id)[0]!;
-      const losers = dupes.filter((d) => d.id !== survivor.id);
+      const survivor = selectCanonicalStaffRecord(
+        activeCandidates,
+        seedEntry.email,
+      )!;
+      const duplicateIds = activeCandidates
+        .filter((candidate) => candidate.id !== survivor.id)
+        .map((candidate) => candidate.id);
 
-      for (const loser of losers) {
-        await tx.update(tasksTable).set({ completedById: survivor.id }).where(eq(tasksTable.completedById, loser.id));
-        await tx.update(tasksTable).set({ assignedToId: survivor.id }).where(eq(tasksTable.assignedToId, loser.id));
-        await tx.update(tasksTable).set({ createdById: survivor.id }).where(eq(tasksTable.createdById, loser.id));
-        await tx.update(taskExclusionsTable).set({ createdById: survivor.id }).where(eq(taskExclusionsTable.createdById, loser.id));
-        await tx.update(schedulesTable).set({ staffId: survivor.id }).where(eq(schedulesTable.staffId, loser.id));
-        await tx.update(issuesTable).set({ reportedById: survivor.id }).where(eq(issuesTable.reportedById, loser.id));
-        await tx.update(issuesTable).set({ assignedToId: survivor.id }).where(eq(issuesTable.assignedToId, loser.id));
-        await tx.update(sharedPhotosTable).set({ staffId: survivor.id }).where(eq(sharedPhotosTable.staffId, loser.id));
-        await tx.update(staffLocationsTable).set({ staffId: survivor.id }).where(eq(staffLocationsTable.staffId, loser.id));
-        await tx.update(assignmentsTable).set({ staffId: survivor.id }).where(eq(assignmentsTable.staffId, loser.id));
-        await tx.update(assignmentsTable).set({ assignedById: survivor.id }).where(eq(assignmentsTable.assignedById, loser.id));
-        await tx.update(notificationsTable).set({ staffId: survivor.id }).where(eq(notificationsTable.staffId, loser.id));
-        await tx.delete(staffTable).where(eq(staffTable.id, loser.id));
-        console.log(`Merged duplicate ${survivor.role} "${survivor.name}": kept id=${survivor.id}, merged from id=${loser.id}`);
-      }
-
-      // Keep the in-memory snapshot in sync so subsequent loops (rename)
-      // don't try to touch a row that no longer exists.
-      for (const loser of losers) {
-        const idx = existingStaff.findIndex((s) => s.id === loser.id);
-        if (idx >= 0) existingStaff.splice(idx, 1);
-      }
+      await tx
+        .update(staffTable)
+        .set({ active: false, loginEnabled: false })
+        .where(inArray(staffTable.id, duplicateIds));
+      canonicalManagementStaffIds.set(seedEntry.name, survivor.id);
+      console.log(
+        `Reconciled duplicate ${survivor.role} "${survivor.name}": kept login id=${survivor.id}, deactivated ids=${duplicateIds.join(",")}`,
+      );
     }
   });
 
   // One earlier seed used "Jeanfranco Perez" rather than the canonical
-  // "JeanFranco Perez", creating two active records in production. Keep the
-  // canonical profile (and its Clerk email) while moving all historical
-  // references from the typo row before removing it.
-  await db.transaction(async (tx) => {
-    const [canonical] = await tx
-      .select()
-      .from(staffTable)
-      .where(and(eq(staffTable.name, "JeanFranco Perez"), eq(staffTable.active, true)))
-      .limit(1);
-    if (!canonical) return;
-
-    const typoRows = await tx
-      .select()
-      .from(staffTable)
-      .where(and(eq(staffTable.name, "Jeanfranco Perez"), eq(staffTable.active, true)));
-
-    for (const typoRow of typoRows) {
-      const directConversations = await tx
-        .select()
-        .from(conversationsTable)
-        .where(
-          or(
-            eq(conversationsTable.participantAId, typoRow.id),
-            eq(conversationsTable.participantBId, typoRow.id),
-          ),
-        );
-
-      for (const conversation of directConversations) {
-        const otherParticipantId =
-          conversation.participantAId === typoRow.id
-            ? conversation.participantBId
-            : conversation.participantAId;
-        if (otherParticipantId === null || otherParticipantId === canonical.id) {
-          throw new Error(`Cannot safely merge self-referencing conversation ${conversation.id}`);
-        }
-
-        const participantAId = Math.min(canonical.id, otherParticipantId);
-        const participantBId = Math.max(canonical.id, otherParticipantId);
-        const [existingConversation] = await tx
-          .select({ id: conversationsTable.id })
-          .from(conversationsTable)
-          .where(
-            and(
-              eq(conversationsTable.participantAId, participantAId),
-              eq(conversationsTable.participantBId, participantBId),
-              ne(conversationsTable.id, conversation.id),
-            ),
-          )
-          .limit(1);
-
-        if (existingConversation) {
-          await tx
-            .update(messagesTable)
-            .set({ conversationId: existingConversation.id })
-            .where(eq(messagesTable.conversationId, conversation.id));
-          await tx
-            .delete(conversationParticipantsTable)
-            .where(eq(conversationParticipantsTable.conversationId, conversation.id));
-          await tx.delete(conversationsTable).where(eq(conversationsTable.id, conversation.id));
-        } else {
-          await tx
-            .update(conversationsTable)
-            .set({ participantAId, participantBId })
-            .where(eq(conversationsTable.id, conversation.id));
-        }
-      }
-
-      const groupParticipations = await tx
-        .select()
-        .from(conversationParticipantsTable)
-        .where(eq(conversationParticipantsTable.staffId, typoRow.id));
-      for (const participation of groupParticipations) {
-        const [canonicalParticipation] = await tx
-          .select({ id: conversationParticipantsTable.id })
-          .from(conversationParticipantsTable)
-          .where(
-            and(
-              eq(conversationParticipantsTable.conversationId, participation.conversationId),
-              eq(conversationParticipantsTable.staffId, canonical.id),
-            ),
-          )
-          .limit(1);
-        if (canonicalParticipation) {
-          await tx
-            .delete(conversationParticipantsTable)
-            .where(eq(conversationParticipantsTable.id, participation.id));
-        } else {
-          await tx
-            .update(conversationParticipantsTable)
-            .set({ staffId: canonical.id })
-            .where(eq(conversationParticipantsTable.id, participation.id));
-        }
-      }
-
-      await tx.update(tasksTable).set({ completedById: canonical.id }).where(eq(tasksTable.completedById, typoRow.id));
-      await tx.update(tasksTable).set({ assignedToId: canonical.id }).where(eq(tasksTable.assignedToId, typoRow.id));
-      await tx.update(tasksTable).set({ createdById: canonical.id }).where(eq(tasksTable.createdById, typoRow.id));
-      await tx.update(taskExclusionsTable).set({ createdById: canonical.id }).where(eq(taskExclusionsTable.createdById, typoRow.id));
-      await tx.update(schedulesTable).set({ staffId: canonical.id }).where(eq(schedulesTable.staffId, typoRow.id));
-      await tx.update(issuesTable).set({ reportedById: canonical.id }).where(eq(issuesTable.reportedById, typoRow.id));
-      await tx.update(issuesTable).set({ assignedToId: canonical.id }).where(eq(issuesTable.assignedToId, typoRow.id));
-      await tx.update(sharedPhotosTable).set({ staffId: canonical.id }).where(eq(sharedPhotosTable.staffId, typoRow.id));
-      await tx.update(staffLocationsTable).set({ staffId: canonical.id }).where(eq(staffLocationsTable.staffId, typoRow.id));
-      await tx.update(assignmentsTable).set({ staffId: canonical.id }).where(eq(assignmentsTable.staffId, typoRow.id));
-      await tx.update(assignmentsTable).set({ assignedById: canonical.id }).where(eq(assignmentsTable.assignedById, typoRow.id));
-      await tx.update(notificationsTable).set({ staffId: canonical.id }).where(eq(notificationsTable.staffId, typoRow.id));
-      await tx.update(messagesTable).set({ senderId: canonical.id }).where(eq(messagesTable.senderId, typoRow.id));
-      await tx.delete(staffTable).where(eq(staffTable.id, typoRow.id));
-      console.log(`Merged typo staff record "${typoRow.name}" into "${canonical.name}"`);
-    }
-  });
-
-  // Re-fetch the staff table so the rename loop below sees the post-insert,
-  // post-merge state of the world. The original `existingStaff` snapshot
-  // was loaded before new seed rows were inserted, so a stale snapshot
-  // could let the rename block rename a row to a name that already exists
-  // in DB (re-introducing the very duplicate we just merged).
-  const currentStaff = await db.select().from(staffTable);
-
-  for (const existing of currentStaff) {
-    let seedEntry = SEED_STAFF.find((s) => s.name === existing.name);
-    if (!seedEntry && (existing.role === "admin" || existing.role === "inspector")) {
-      seedEntry = SEED_STAFF.find((s) => s.role === existing.role);
-    }
-    if (seedEntry && seedEntry.name !== existing.name) {
-      const targetExists = currentStaff.some(
-        (s) => s.id !== existing.id && s.name === seedEntry!.name
+  // "JeanFranco Perez", creating two active records in production. Apply the
+  // same non-destructive policy used for management duplicates: retain all
+  // historical references and disable the typo profile once the canonical
+  // profile exists.
+  const [canonicalJeanFranco] = await db
+    .select({ id: staffTable.id })
+    .from(staffTable)
+    .where(and(eq(staffTable.name, "JeanFranco Perez"), eq(staffTable.active, true)))
+    .limit(1);
+  if (canonicalJeanFranco) {
+    const deactivatedTypoRows = await db
+      .update(staffTable)
+      .set({ active: false, loginEnabled: false })
+      .where(and(eq(staffTable.name, "Jeanfranco Perez"), eq(staffTable.active, true)))
+      .returning({ id: staffTable.id });
+    if (deactivatedTypoRows.length > 0) {
+      console.log(
+        `Deactivated typo staff profiles for JeanFranco Perez: ids=${deactivatedTypoRows.map((row) => row.id).join(",")}`,
       );
-      if (targetExists) {
-        console.log(`Skipped renaming ${existing.name} → ${seedEntry.name}: another staff row already has the target name`);
-      } else {
-        const previousName = existing.name;
-        await db.update(staffTable).set({ name: seedEntry.name }).where(eq(staffTable.id, existing.id));
-        existing.name = seedEntry.name;
-        console.log(`Renamed ${previousName} → ${seedEntry.name}`);
-      }
-    }
-    if (seedEntry && seedEntry.role !== existing.role) {
-      await db.update(staffTable).set({ role: seedEntry.role }).where(eq(staffTable.id, existing.id));
-      console.log(`Updated role for ${existing.name}: ${existing.role} → ${seedEntry.role}`);
-    }
-    if (seedEntry && seedEntry.email && seedEntry.email !== existing.email) {
-      await db.update(staffTable).set({ email: seedEntry.email }).where(eq(staffTable.id, existing.id));
-      console.log(`Updated ${existing.name}: email`);
     }
   }
+
+  // Re-fetch the staff table so identity reconciliation sees the post-insert,
+  // post-merge state of the world. The original `existingStaff` snapshot was
+  // loaded before new seed rows were inserted and duplicate rows were merged.
+  const currentStaff = await db.select().from(staffTable);
+
+  for (const seedEntry of SEED_STAFF) {
+    const sameName = currentStaff.filter(
+      (staff) => staff.name === seedEntry.name,
+    );
+    const mappedCanonicalId = canonicalManagementStaffIds.get(seedEntry.name);
+    const existing =
+      (mappedCanonicalId === undefined
+        ? undefined
+        : sameName.find((staff) => staff.id === mappedCanonicalId)) ??
+      selectCanonicalStaffRecord(
+        sameName.filter((staff) => staff.active),
+        seedEntry.email,
+      ) ??
+      selectCanonicalStaffRecord(sameName, seedEntry.email);
+    if (!existing) continue;
+
+    const updates: Partial<typeof staffTable.$inferInsert> = {};
+    if (seedEntry.role !== existing.role) updates.role = seedEntry.role;
+    if (REQUIRED_PRODUCTION_LOGIN_NAMES.has(seedEntry.name)) {
+      if (!existing.active) updates.active = true;
+      if (!existing.loginEnabled) updates.loginEnabled = true;
+    }
+    if (seedEntry.email) {
+      const email = normalizeLoginEmail(seedEntry.email);
+      const collision = currentStaff.find(
+        (staff) =>
+          staff.id !== existing.id &&
+          staff.active &&
+          staff.loginEnabled &&
+          staff.email !== null &&
+          normalizeLoginEmail(staff.email) === email,
+      );
+      if (collision) {
+        throw new Error(
+          `Cannot assign login email ${email} to ${existing.name}; it is already used by ${collision.name} (staff #${collision.id})`,
+        );
+      }
+      if (email !== existing.email) updates.email = email;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      await db.update(staffTable).set(updates).where(eq(staffTable.id, existing.id));
+      if (updates.role) existing.role = updates.role;
+      if (updates.email !== undefined) existing.email = updates.email;
+      if (updates.active !== undefined) existing.active = updates.active;
+      if (updates.loginEnabled !== undefined) {
+        existing.loginEnabled = updates.loginEnabled;
+      }
+      console.log(`Updated seeded staff identity: ${existing.name}`);
+    }
+  }
+
+  // Defense in depth: a later seed/admin edit must not accidentally restore
+  // application access to the notification-only recipient.
+  await db.execute(sql`
+    UPDATE "staff"
+      SET "active" = false, "login_enabled" = false
+    WHERE lower(btrim(coalesce("email", ''))) = 'msutherland@marvolenterprises.com'
+       OR lower(btrim("name")) = 'marcell sutherland'
+  `);
 
   // Run the rename + merge + archive cleanup in a single transaction so
   // either every reference is re-pointed and every duplicate cleared, or
@@ -707,7 +758,25 @@ async function seed() {
   }
 }
 
-app.listen(port, async () => {
-  console.log(`Server listening on port ${port}`);
-  await seed().catch((err) => console.error("Seed error:", err));
+async function start() {
+  // Do not report healthy or accept authenticated traffic against a partially
+  // migrated database. Replit autoscale can boot multiple instances at once,
+  // so pin one PostgreSQL connection and hold a session advisory lock across
+  // the complete DDL, seed, and reconciliation routine. A failed migration
+  // still fails the deployment before the HTTP listener or outbox worker starts.
+  await withPostgresAdvisoryLock(
+    pool,
+    STARTUP_ADVISORY_LOCK_NAME,
+    async () => seed(),
+  );
+  startMessageEmailOutboxWorker();
+  startInspectorAssignmentEscalationWorker();
+  app.listen(port, () => {
+    console.log(`Server listening on port ${port}`);
+  });
+}
+
+start().catch((err) => {
+  console.error("Server startup failed:", err);
+  process.exit(1);
 });

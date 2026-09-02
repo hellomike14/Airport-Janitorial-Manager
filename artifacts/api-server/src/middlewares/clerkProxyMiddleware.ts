@@ -26,6 +26,48 @@ import { createProxyMiddleware } from 'http-proxy-middleware';
 const CLERK_FAPI = 'https://frontend-api.clerk.dev';
 export const CLERK_PROXY_PATH = '/api/__clerk';
 
+type ProxyRequestMetadata = {
+  headers: IncomingHttpHeaders;
+};
+
+function firstHeaderValue(value: string | string[] | undefined): string | undefined {
+  const raw = Array.isArray(value) ? value[0] : value;
+  return raw?.split(',')[0]?.trim() || undefined;
+}
+
+/**
+ * Accept only a hostname (with an optional port). URL delimiters, credentials,
+ * whitespace, and control characters are rejected before the value is placed
+ * into a Clerk header or used for publishable-key selection.
+ */
+function sanitizeHost(value: string | undefined): string | undefined {
+  if (
+    !value ||
+    value.length > 255 ||
+    /[\u0000-\u0020\u007f]/.test(value) ||
+    /[\\/?#@]/.test(value)
+  ) {
+    return undefined;
+  }
+
+  try {
+    const parsed = new URL(`https://${value}`);
+    if (
+      !parsed.hostname ||
+      parsed.username ||
+      parsed.password ||
+      parsed.pathname !== '/' ||
+      parsed.search ||
+      parsed.hash
+    ) {
+      return undefined;
+    }
+    return parsed.host;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * Returns the first effective public hostname for the given request,
  * preferring x-forwarded-host over the Host header so callers behind a
@@ -43,13 +85,27 @@ export const CLERK_PROXY_PATH = '/api/__clerk';
  * hostname is canonical — otherwise multi-domain/custom-domain flows
  * break.
  */
-export function getClerkProxyHost(req: {
-  headers: IncomingHttpHeaders;
-}): string | undefined {
+export function getClerkProxyHost(req: ProxyRequestMetadata): string | undefined {
   const forwarded = req.headers['x-forwarded-host'];
-  const raw = Array.isArray(forwarded) ? forwarded[0] : forwarded;
-  const firstHop = raw?.split(',')[0]?.trim();
-  return firstHop || req.headers.host?.trim() || undefined;
+  const forwardedHost = firstHeaderValue(forwarded);
+  // When a proxy supplied this header, an invalid value must fail closed rather
+  // than silently falling back to a different host and creating split-host
+  // behavior. Replit's comma-delimited chain remains supported via first hop.
+  if (forwardedHost) return sanitizeHost(forwardedHost);
+  return sanitizeHost(firstHeaderValue(req.headers.host));
+}
+
+/** Returns a header-safe public protocol for proxy and same-origin checks. */
+export function getClerkProxyProtocol(
+  req: ProxyRequestMetadata,
+): 'http' | 'https' | undefined {
+  const forwardedProtocol = firstHeaderValue(req.headers['x-forwarded-proto'])?.toLowerCase();
+  if (forwardedProtocol) {
+    return forwardedProtocol === 'http' || forwardedProtocol === 'https'
+      ? forwardedProtocol
+      : undefined;
+  }
+  return process.env.NODE_ENV === 'production' ? 'https' : 'http';
 }
 
 export function clerkProxyMiddleware(): RequestHandler {
@@ -58,12 +114,14 @@ export function clerkProxyMiddleware(): RequestHandler {
     return (_req, _res, next) => next();
   }
 
-  const secretKey = process.env.CLERK_SECRET_KEY;
+  const secretKey = process.env.CLERK_SECRET_KEY?.trim();
   if (!secretKey) {
-    return (_req, _res, next) => next();
+    throw new Error(
+      'CLERK_SECRET_KEY is required in production; refusing to start an unauthenticated Clerk proxy.',
+    );
   }
 
-  return createProxyMiddleware({
+  const proxy = createProxyMiddleware({
     target: CLERK_FAPI,
     changeOrigin: true,
     // Take over the response so it can be re-sent with a Content-Length (see
@@ -73,8 +131,15 @@ export function clerkProxyMiddleware(): RequestHandler {
       path.replace(new RegExp(`^${CLERK_PROXY_PATH}`), ''),
     on: {
       proxyReq: (proxyReq, req) => {
-        const protocol = req.headers['x-forwarded-proto'] || 'https';
-        const host = getClerkProxyHost(req) || '';
+        const protocol = getClerkProxyProtocol(req);
+        const host = getClerkProxyHost(req);
+        // The wrapper below validates these before the request reaches the
+        // proxy. Keep this guard in case the proxy library invokes the hook with
+        // a different request object in a future release.
+        if (!protocol || !host) {
+          proxyReq.destroy(new Error('Invalid public host or protocol for Clerk proxy request'));
+          return;
+        }
         const proxyUrl = `${protocol}://${host}${CLERK_PROXY_PATH}`;
 
         proxyReq.setHeader('Clerk-Proxy-Url', proxyUrl);
@@ -143,4 +208,12 @@ export function clerkProxyMiddleware(): RequestHandler {
       },
     },
   }) as RequestHandler;
+
+  return (req, res, next) => {
+    if (!getClerkProxyHost(req) || !getClerkProxyProtocol(req)) {
+      res.status(400).json({ error: 'Invalid request host or protocol' });
+      return;
+    }
+    proxy(req, res, next);
+  };
 }

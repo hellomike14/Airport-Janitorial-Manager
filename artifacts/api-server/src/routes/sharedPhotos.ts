@@ -3,6 +3,12 @@ import { db } from "@workspace/db";
 import { sharedPhotosTable, staffTable, areasTable, notificationsTable, schedulesTable } from "@workspace/db/schema";
 import { eq, desc, ne, and, lte, gte, inArray } from "drizzle-orm";
 import { z } from "zod";
+import type { StaffRow } from "../lib/actorSession";
+import {
+  canDeleteSharedPhoto,
+  requestedStaffIdMatchesActor,
+  type StaffActor,
+} from "../lib/staffAuthorization";
 
 const router: IRouter = Router();
 
@@ -53,11 +59,17 @@ router.post("/", async (req: Request, res: Response) => {
     return;
   }
 
+  const actor = res.locals.staffActor as StaffRow;
+  if (!requestedStaffIdMatchesActor(actor as StaffActor, body.data.staffId)) {
+    res.status(403).json({ error: "Cannot share a photo as another staff member" });
+    return;
+  }
+
   try {
     const [photo] = await db
       .insert(sharedPhotosTable)
       .values({
-        staffId: body.data.staffId,
+        staffId: actor.id,
         imagePath: body.data.imagePath,
         caption: body.data.caption ?? null,
         areaId: body.data.areaId ?? null,
@@ -70,7 +82,7 @@ router.post("/", async (req: Request, res: Response) => {
     const sender = await db
       .select({ name: staffTable.name })
       .from(staffTable)
-      .where(eq(staffTable.id, body.data.staffId))
+      .where(eq(staffTable.id, actor.id))
       .limit(1);
 
     const senderName = sender[0]?.name ?? "Someone";
@@ -88,19 +100,26 @@ router.post("/", async (req: Request, res: Response) => {
           eq(schedulesTable.dayOfWeek, dayOfWeek),
           lte(schedulesTable.startTime, currentTime),
           gte(schedulesTable.endTime, currentTime),
-          ne(schedulesTable.staffId, body.data.staffId),
-          eq(staffTable.active, true)
+          ne(schedulesTable.staffId, actor.id),
+          eq(staffTable.active, true),
+          eq(staffTable.loginEnabled, true),
         )
       );
 
     const adminsAndSupervisors = await db
       .select({ id: staffTable.id })
       .from(staffTable)
-      .where(and(inArray(staffTable.role, ["admin", "supervisor"]), eq(staffTable.active, true)));
+      .where(
+        and(
+          inArray(staffTable.role, ["admin", "supervisor"]),
+          eq(staffTable.active, true),
+          eq(staffTable.loginEnabled, true),
+        ),
+      );
 
     const onShiftIds = new Set(onShiftStaff.map((s) => s.staffId));
     for (const mgr of adminsAndSupervisors) {
-      if (mgr.id !== body.data.staffId) {
+      if (mgr.id !== actor.id) {
         onShiftIds.add(mgr.id);
       }
     }
@@ -131,7 +150,25 @@ router.delete("/:id", async (req: Request, res: Response) => {
     return;
   }
 
+  const actor = res.locals.staffActor as StaffRow;
+
   try {
+    const [photo] = await db
+      .select({ staffId: sharedPhotosTable.staffId })
+      .from(sharedPhotosTable)
+      .where(eq(sharedPhotosTable.id, id))
+      .limit(1);
+
+    if (!photo) {
+      res.status(404).json({ error: "Photo not found" });
+      return;
+    }
+
+    if (!canDeleteSharedPhoto(actor as StaffActor, photo.staffId)) {
+      res.status(403).json({ error: "Not authorized to delete this shared photo" });
+      return;
+    }
+
     const [deleted] = await db
       .delete(sharedPhotosTable)
       .where(eq(sharedPhotosTable.id, id))

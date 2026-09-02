@@ -12,12 +12,9 @@ import {
   MapPin,
   Filter,
   Calendar,
-  BarChart3,
   User,
   Star,
-  Camera,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { TaskPhotoThumbnails, TaskPhotoToggle } from "@/components/TaskPhotos";
 import { StaffName } from "@/components/StaffName";
 
@@ -35,9 +32,7 @@ export default function CompletedJobs() {
     [tasks]
   );
 
-  const totalTasks = (tasks ?? []).length;
   const totalCompleted = completedTasks.length;
-  const pct = totalTasks > 0 ? Math.round((totalCompleted / totalTasks) * 100) : 0;
 
   const groupedByArea = useMemo(() => {
     const areaList = areas ?? [];
@@ -91,13 +86,7 @@ export default function CompletedJobs() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl border border-slate-200 px-5 py-4 shadow-sm">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-            {t("completedJobs.totalTasks")}
-          </p>
-          <p className="text-3xl font-bold text-slate-800 mt-1">{totalTasks}</p>
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="bg-emerald-50 rounded-2xl border border-emerald-200 px-5 py-4 shadow-sm">
           <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide">
             {t("completedJobs.completed")}
@@ -106,35 +95,6 @@ export default function CompletedJobs() {
             {totalCompleted}
           </p>
         </div>
-        <div className="bg-amber-50 rounded-2xl border border-amber-200 px-5 py-4 shadow-sm">
-          <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide">
-            {t("completedJobs.pending")}
-          </p>
-          <p className="text-3xl font-bold text-amber-700 mt-1">
-            {totalTasks - totalCompleted}
-          </p>
-        </div>
-        <div className="bg-blue-50 rounded-2xl border border-blue-200 px-5 py-4 shadow-sm">
-          <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide">
-            {t("completedJobs.completion")}
-          </p>
-          <p className="text-3xl font-bold text-blue-700 mt-1">{pct}%</p>
-        </div>
-      </div>
-
-      <div className="bg-white border border-slate-200 rounded-2xl px-5 py-3 flex items-center gap-4 shadow-sm">
-        <BarChart3 className="w-4 h-4 text-slate-400 shrink-0" />
-        <div className="flex-1 h-2.5 bg-slate-100 rounded-full overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all duration-700 ${
-              pct === 100 ? "bg-emerald-500" : "bg-blue-500"
-            }`}
-            style={{ width: `${pct}%` }}
-          />
-        </div>
-        <span className="text-sm font-bold text-slate-600 shrink-0 min-w-[40px] text-right">
-          {pct}%
-        </span>
       </div>
 
       {isLoading ? (
@@ -159,55 +119,22 @@ export default function CompletedJobs() {
       ) : (
         <div className="space-y-4">
           {groupedByArea.map(({ area, tasks: areaTasks }) => {
-            const totalForArea = (tasks ?? []).filter(
-              (t) => t.areaId === area.id
-            ).length;
-            const areaPct =
-              totalForArea > 0
-                ? Math.round((areaTasks.length / totalForArea) * 100)
-                : 0;
-            const allDone = areaPct === 100;
-
             return (
               <div
                 key={area.id}
-                className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${
-                  allDone ? "border-emerald-200" : "border-slate-200"
-                }`}
+                className="bg-white rounded-2xl border border-emerald-200 shadow-sm overflow-hidden"
               >
-                <div
-                  className={`flex items-center gap-4 px-5 py-4 ${
-                    allDone ? "bg-emerald-50/60" : ""
-                  }`}
-                >
-                  <div
-                    className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                      allDone ? "bg-emerald-500" : "bg-blue-500"
-                    }`}
-                  >
+                <div className="flex items-center gap-4 px-5 py-4 bg-emerald-50/60">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-emerald-500">
                     <MapPin className="w-4 h-4 text-white" />
                   </div>
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 flex-wrap">
                       <h2 className="font-bold text-slate-800">{area.name}</h2>
-                      {allDone && (
-                        <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> {t("completedJobs.allDone")}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3 mt-1">
-                      <div className="flex-1 max-w-[200px] h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-500 ${
-                            allDone ? "bg-emerald-500" : "bg-blue-500"
-                          }`}
-                          style={{ width: `${areaPct}%` }}
-                        />
-                      </div>
-                      <span className="text-xs text-slate-500 font-medium">
-                        {areaTasks.length}/{totalForArea} · {areaPct}%
+                      <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        {areaTasks.length} · {t("completedJobs.completed")}
                       </span>
                     </div>
                   </div>

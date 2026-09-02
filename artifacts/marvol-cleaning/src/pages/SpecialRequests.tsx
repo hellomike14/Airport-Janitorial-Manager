@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { format, type Locale } from "date-fns";
 import { useTranslation, Trans } from "react-i18next";
 import { getDateLocale } from "@/i18n/dateLocale";
@@ -26,10 +26,12 @@ import {
   ChevronUp,
   User,
   AlertTriangle,
+  MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import RefreshButton from "@/components/RefreshButton";
 import { StaffName } from "@/components/StaffName";
+import { MessagesView } from "./Messages";
 
 export default function SpecialRequests() {
   const { t, i18n } = useTranslation();
@@ -39,11 +41,16 @@ export default function SpecialRequests() {
   const today = format(new Date(), "yyyy-MM-dd");
   const [selectedDate, setSelectedDate] = useState(today);
   const [isCreating, setIsCreating] = useState(false);
+  const [activeSection, setActiveSection] = useState<"requests" | "messages">("requests");
   const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [emailDeliveryStatus, setEmailDeliveryStatus] = useState<
+    SpecialTask["emailNotificationStatus"] | null
+  >(null);
 
   const isStaff = effectiveRole === "staff";
   const canCreate = effectiveRole === "admin" || effectiveRole === "supervisor" || effectiveRole === "inspector";
   const canRespond = effectiveRole === "staff" || effectiveRole === "supervisor" || effectiveRole === "admin";
+  const canUseInspectorMessages = effectiveRole === "supervisor";
 
   const { data: areas } = useListAreas();
   const { data: dateAssignments = [] } = useListAssignments({ date: selectedDate });
@@ -56,15 +63,14 @@ export default function SpecialRequests() {
     return ids.length > 0 ? ids : undefined;
   }, [isStaff, currentUser, dateAssignments]);
 
+  // The server applies task ownership and area-assignment visibility. Avoid an
+  // area filter here so a directly assigned request still reaches staff who do
+  // not otherwise have an area assignment for the selected date.
   const { data: specialTasks = [], isLoading } = useListSpecialTasks({
     date: selectedDate,
-    ...(isStaff && staffAreaIds?.length === 1 ? { areaId: staffAreaIds[0] } : {}),
   });
 
-  const filteredTasks = useMemo(() => {
-    if (!isStaff || !staffAreaIds) return specialTasks;
-    return specialTasks.filter((t) => staffAreaIds.includes(t.areaId));
-  }, [specialTasks, isStaff, staffAreaIds]);
+  const filteredTasks = specialTasks;
 
   const pendingSpecial = filteredTasks.filter((t) => !t.completed);
   const completedSpecial = filteredTasks.filter((t) => t.completed);
@@ -73,9 +79,10 @@ export default function SpecialRequests() {
 
   const createMutation = useCreateSpecialTask({
     mutation: {
-      onSuccess: () => {
+      onSuccess: (created) => {
         qc.invalidateQueries({ queryKey: getListSpecialTasksQueryKey() });
         qc.invalidateQueries({ queryKey: ["/api/tasks"] });
+        setEmailDeliveryStatus(created.emailNotificationStatus ?? null);
         setIsCreating(false);
         setFormData({ areaId: "", notes: "" });
       },
@@ -100,7 +107,62 @@ export default function SpecialRequests() {
     setLastUpdated(new Date());
   };
 
-  if (isStaff && !staffAreaIds) {
+  const inspectorTabs = canUseInspectorMessages ? (
+    <div
+      className="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm"
+      role="tablist"
+      aria-label={t("specialRequests.inspectorWorkspace")}
+    >
+      <button
+        type="button"
+        role="tab"
+        aria-selected={activeSection === "requests"}
+        onClick={() => setActiveSection("requests")}
+        className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+          activeSection === "requests"
+            ? "bg-blue-600 text-white"
+            : "text-slate-600 hover:bg-slate-50"
+        }`}
+      >
+        <ClipboardList className="mr-1.5 inline h-4 w-4" />
+        {t("specialRequests.requestsTab")}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={activeSection === "messages"}
+        onClick={() => setActiveSection("messages")}
+        className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+          activeSection === "messages"
+            ? "bg-emerald-600 text-white"
+            : "text-slate-600 hover:bg-slate-50"
+        }`}
+      >
+        <MessageSquare className="mr-1.5 inline h-4 w-4" />
+        {t("specialRequests.inspectorMessagesTab")}
+      </button>
+    </div>
+  ) : null;
+
+  if (canUseInspectorMessages && activeSection === "messages") {
+    return (
+      <div className="space-y-4 max-w-6xl mx-auto pb-12">
+        <div>
+          <h1 className="text-3xl font-display font-bold text-slate-900 flex items-center gap-3">
+            <Star className="w-8 h-8 text-amber-500" />
+            {t("specialRequests.title")}
+          </h1>
+          <p className="text-slate-500 mt-1 font-medium">
+            {t("specialRequests.subtitle")}
+          </p>
+        </div>
+        {inspectorTabs}
+        <MessagesView inspectorChannel embedded />
+      </div>
+    );
+  }
+
+  if (isStaff && !staffAreaIds && !isLoading && specialTasks.length === 0) {
     return (
       <div className="space-y-8 max-w-4xl mx-auto pb-12">
         <div>
@@ -154,6 +216,32 @@ export default function SpecialRequests() {
           <RefreshButton compact lastUpdated={lastUpdated} onRefresh={handleRefresh} />
         </div>
       </div>
+
+      {inspectorTabs}
+
+      {emailDeliveryStatus && emailDeliveryStatus !== "not_applicable" && (
+        <div
+          role="status"
+          className={`rounded-2xl border px-4 py-3 flex items-start gap-3 text-sm ${
+            emailDeliveryStatus === "sent"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+              : "border-amber-200 bg-amber-50 text-amber-900"
+          }`}
+        >
+          {emailDeliveryStatus === "sent" ? (
+            <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />
+          ) : (
+            <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+          )}
+          <span>
+            {t(
+              emailDeliveryStatus === "sent"
+                ? "specialRequests.emailNotificationSent"
+                : "specialRequests.emailNotificationNotSent",
+            )}
+          </span>
+        </div>
+      )}
 
       {isCreating && canCreate && (
         <div className="bg-blue-50 rounded-3xl p-6 border border-blue-100 shadow-sm animate-fade-in-up">
@@ -290,12 +378,25 @@ function RequestCard({ task, canRespond, dateLocale }: { task: SpecialTask; canR
   const { currentUser } = useAuth();
   const qc = useQueryClient();
   const [expanded, setExpanded] = useState(false);
+  const [completionEmailStatus, setCompletionEmailStatus] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!task.dueAt || task.completed) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 15_000);
+    return () => window.clearInterval(timer);
+  }, [task.dueAt, task.completed]);
+
+  const dueAtMs = task.dueAt ? new Date(task.dueAt).getTime() : null;
+  const minutesRemaining =
+    dueAtMs === null ? null : Math.max(0, Math.ceil((dueAtMs - now) / 60_000));
 
   const completeMutation = useCompleteTask({
     mutation: {
-      onSuccess: () => {
+      onSuccess: (completedTask) => {
         qc.invalidateQueries({ queryKey: getListSpecialTasksQueryKey() });
         qc.invalidateQueries({ queryKey: ["/api/tasks"] });
+        setCompletionEmailStatus(completedTask.completionEmailStatus ?? null);
         setExpanded(false);
       },
     },
@@ -392,7 +493,48 @@ function RequestCard({ task, canRespond, dateLocale }: { task: SpecialTask; canR
                 />
               </span>
             )}
+            {task.assignedToName && (
+              <span className="flex items-center gap-1 font-medium text-amber-700">
+                <User className="w-3 h-3" />
+                {t("specialRequests.assignedTo", { name: task.assignedToName })}
+              </span>
+            )}
           </div>
+
+          {!task.completed && dueAtMs !== null && (
+            <div
+              className={`mt-3 flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold ${
+                task.escalatedAt || dueAtMs <= now
+                  ? "border-rose-200 bg-rose-50 text-rose-800"
+                  : minutesRemaining !== null && minutesRemaining <= 5
+                    ? "border-orange-200 bg-orange-50 text-orange-800"
+                    : "border-amber-200 bg-amber-50 text-amber-800"
+              }`}
+            >
+              {task.escalatedAt || dueAtMs <= now ? (
+                <AlertTriangle className="h-4 w-4" />
+              ) : (
+                <Clock className="h-4 w-4" />
+              )}
+              {task.escalatedAt || dueAtMs <= now
+                ? t("specialRequests.slaEscalated")
+                : t("specialRequests.slaRemaining", { minutes: minutesRemaining })}
+            </div>
+          )}
+          {completionEmailStatus && completionEmailStatus !== "not_applicable" && (
+            <p
+              role="status"
+              className={`mt-2 text-xs font-semibold ${
+                completionEmailStatus === "accepted"
+                  ? "text-emerald-700"
+                  : "text-amber-700"
+              }`}
+            >
+              {completionEmailStatus === "accepted"
+                ? t("specialRequests.completionEmailAccepted")
+                : t("specialRequests.completionEmailPending")}
+            </p>
+          )}
         </div>
       </div>
 

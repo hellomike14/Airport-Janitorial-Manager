@@ -4,8 +4,11 @@ import { jobApplicationsTable } from "@workspace/db/schema";
 import { SubmitApplicationBody, UpdateApplicationBody } from "@workspace/api-zod";
 import { eq, desc } from "drizzle-orm";
 import { requireStaffRole } from "../middlewares/requireStaffRole";
+import { ObjectStorageService } from "../lib/objectStorage";
+import { normalizeContentType } from "../lib/secureUpload";
 
 const router: IRouter = Router();
+const objectStorageService = new ObjectStorageService();
 
 /**
  * GET /applications — list submissions (admin/supervisor, gated client-side).
@@ -37,6 +40,41 @@ router.post("/", async (req: Request, res: Response) => {
 
   try {
     const data = parsed.data;
+    if ((data.documents?.length ?? 0) > 10) {
+      res.status(400).json({ error: "A maximum of 10 documents may be attached" });
+      return;
+    }
+
+    const documentPaths = new Set(data.documents?.map((document) => document.path) ?? []);
+    if (documentPaths.size !== (data.documents?.length ?? 0)) {
+      res.status(400).json({ error: "Duplicate document uploads are not allowed" });
+      return;
+    }
+
+    const verifiedDocuments = await Promise.all(
+      (data.documents ?? []).map(async (document) => {
+        const inspected = await objectStorageService.inspectObjectEntity(document.path);
+        const record = inspected.verifiedRecord;
+        const claimedType = document.contentType
+          ? normalizeContentType(document.contentType)
+          : null;
+        if (
+          !record ||
+          record.purpose !== "application-document" ||
+          record.objectPath !== document.path ||
+          record.name !== document.name ||
+          (claimedType !== null && claimedType !== record.contentType)
+        ) {
+          throw new InvalidApplicationDocumentError();
+        }
+        return {
+          name: record.name,
+          path: record.objectPath,
+          contentType: record.contentType,
+        };
+      }),
+    );
+
     const [created] = await db
       .insert(jobApplicationsTable)
       .values({
@@ -51,16 +89,29 @@ router.post("/", async (req: Request, res: Response) => {
         i9Employer: {},
         w4Employee: (data.w4Employee ?? {}) as Record<string, unknown>,
         w4Employer: {},
-        documents: (data.documents ?? []) as { name: string; path: string; contentType?: string }[],
+        documents: verifiedDocuments,
       })
       .returning();
 
     res.status(201).json(created);
   } catch (err) {
+    if (err instanceof InvalidApplicationDocumentError) {
+      res.status(400).json({ error: "An attached document is invalid or was not uploaded for this application" });
+      return;
+    }
+    // Missing objects and storage metadata mismatches are applicant input
+    // errors, not server failures. Avoid accepting a path the applicant did
+    // not obtain through the application-document upload flow.
+    if ((err as { name?: string }).name === "ObjectNotFoundError") {
+      res.status(400).json({ error: "An attached document upload could not be found" });
+      return;
+    }
     console.error("Error submitting application:", err);
     res.status(500).json({ error: "Failed to submit application" });
   }
 });
+
+class InvalidApplicationDocumentError extends Error {}
 
 /**
  * GET /applications/:id — single application detail.

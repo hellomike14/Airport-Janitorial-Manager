@@ -5,6 +5,7 @@
  * Marvol Facility Cleaning Management API
  * OpenAPI spec version: 0.1.0
  */
+import type { TaskCompletionEmailStatus } from "./taskCompletionEmailStatus";
 
 export interface Task {
   id: number;
@@ -24,4 +25,6 @@ export interface Task {
   assignedToActive?: boolean | null;
   isSpecial: boolean;
   notes?: string | null;
+  /** Present on completion; accepted means SendGrid accepted the inspector email, not mailbox delivery. */
+  completionEmailStatus?: TaskCompletionEmailStatus;
 }

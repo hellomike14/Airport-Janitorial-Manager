@@ -5,12 +5,21 @@
  * Marvol Facility Cleaning Management API
  * OpenAPI spec version: 0.1.0
  */
+import type { UploadUrlRequestPurpose } from "./uploadUrlRequestPurpose";
 
 export interface UploadUrlRequest {
-  /** @minLength 1 */
+  /**
+   * @minLength 1
+   * @maxLength 255
+   */
   name: string;
-  /** @minimum 1 */
+  /**
+   * @minimum 1
+   * @maximum 12582912
+   */
   size: number;
   /** @minLength 1 */
   contentType: string;
+  /** Binds the upload to its authorization and serving policy. */
+  purpose: UploadUrlRequestPurpose;
 }

@@ -21,5 +21,6 @@ export interface ConversationSummary {
   /** @nullable */
   lastMessageAt: string | null;
   unreadCount: number;
+  archived: boolean;
   createdAt: string;
 }
