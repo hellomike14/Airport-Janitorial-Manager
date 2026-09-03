@@ -4,10 +4,11 @@ import { tasksTable, areasTable, issuesTable, assignmentsTable, staffTable } fro
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { GetDashboardQueryParams } from "@workspace/api-zod";
 import { ensureTasksForDate } from "../lib/ensureTasksForDate";
+import { requireStaffRole } from "../middlewares/requireStaffRole";
 
 const router: IRouter = Router();
 
-router.get("/dashboard", async (req, res) => {
+router.get("/dashboard", requireStaffRole("admin", "supervisor"), async (req, res) => {
   const query = GetDashboardQueryParams.parse({ date: req.query.date });
   const today = new Date().toISOString().split("T")[0];
   const date = query.date ?? today;

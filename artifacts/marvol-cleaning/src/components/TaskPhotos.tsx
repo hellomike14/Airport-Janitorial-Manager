@@ -11,7 +11,12 @@ async function requestPresignedUrl(file: File): Promise<{ uploadURL: string; obj
   const res = await fetch(`${BASE_URL}/api/storage/uploads/request-url`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+    body: JSON.stringify({
+      name: file.name,
+      size: file.size,
+      contentType: file.type,
+      purpose: "staff-photo",
+    }),
   });
   if (!res.ok) throw new Error("Failed to get upload URL");
   return res.json();

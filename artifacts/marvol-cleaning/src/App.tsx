@@ -1,7 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Switch, Route, Router as WouterRouter, Redirect, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
-import { ClerkProvider, useClerk, useUser } from "@clerk/react";
+import { ClerkProvider, useUser } from "@clerk/react";
 import { publishableKeyFromHost } from "@clerk/react/internal";
 import { shadcn } from "@clerk/themes";
 import { Toaster } from "@/components/ui/toaster";
@@ -11,6 +11,7 @@ import { AppLayout } from "./components/layout/AppLayout";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { OfflineProvider } from "./contexts/OfflineContext";
 import { OfflineBanner } from "./components/OfflineBanner";
+import { purgeOfflineUserData } from "./lib/offlineStore";
 import "./i18n";
 
 import Dashboard from "./pages/Dashboard";
@@ -32,7 +33,7 @@ import SpecialRequests from "./pages/SpecialRequests";
 import Employment from "./pages/Employment";
 import Apply from "./pages/Apply";
 import Messages from "./pages/Messages";
-import { SignInPage, SignUpPage, NoStaffMatch } from "./pages/Login";
+import { SignInPage, SignUpPage, NoStaffMatch, StaffLookupError } from "./pages/Login";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -54,6 +55,8 @@ const clerkPubKey = publishableKeyFromHost(
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+const OFFLINE_IDENTITY_KEY = "marvol_offline_identity_v1";
+const LEGACY_CLERK_USER_KEY = "marvol_last_clerk_user";
 
 // Clerk passes full paths to routerPush/routerReplace, but wouter's
 // setLocation prepends the base — strip it to avoid doubling.
@@ -113,25 +116,139 @@ const clerkAppearance = {
   },
 };
 
-// Keeps the query cache from leaking data between users when the signed-in
-// Clerk user changes.
-function ClerkQueryClientCacheInvalidator() {
-  const { addListener } = useClerk();
+/**
+ * Do not expose or synchronize persisted data until both identity layers have
+ * resolved. Including the staff row (and role) catches a server-side remap or
+ * role downgrade even when the Clerk user itself did not change.
+ */
+function SecureOfflineSessionBoundary({ children }: { children: ReactNode }) {
+  const { isLoaded, isSignedIn, user: clerkUser } = useUser();
+  const { currentUser, staffStatus } = useAuth();
   const qc = useQueryClient();
-  const prevUserIdRef = useRef<string | null | undefined>(undefined);
+  const [reconciledIdentity, setReconciledIdentity] = useState<
+    string | null | undefined
+  >(undefined);
+  const [failedReconciliation, setFailedReconciliation] = useState<{
+    identity: string | null;
+  } | null>(null);
+  const [clerkLoadTimedOut, setClerkLoadTimedOut] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = addListener(({ user }) => {
-      const userId = user?.id ?? null;
-      if (prevUserIdRef.current !== undefined && prevUserIdRef.current !== userId) {
-        qc.clear();
-      }
-      prevUserIdRef.current = userId;
-    });
-    return unsubscribe;
-  }, [addListener, qc]);
+    if (isLoaded) {
+      setClerkLoadTimedOut(false);
+      return;
+    }
+    const timeout = window.setTimeout(() => setClerkLoadTimedOut(true), 15_000);
+    return () => window.clearTimeout(timeout);
+  }, [isLoaded]);
 
-  return null;
+  let desiredIdentity: string | null | undefined;
+  if (!isLoaded || (isSignedIn && staffStatus === "loading")) {
+    desiredIdentity = undefined;
+  } else if (
+    isSignedIn &&
+    clerkUser?.id &&
+    staffStatus === "ok" &&
+    currentUser
+  ) {
+    desiredIdentity = JSON.stringify([
+      "v1",
+      clerkUser.id,
+      currentUser.id,
+      currentUser.role,
+    ]);
+  } else {
+    desiredIdentity = null;
+  }
+
+  useEffect(() => {
+    if (desiredIdentity === undefined) return;
+
+    let cancelled = false;
+
+    const reconcileIdentity = async () => {
+      setFailedReconciliation(null);
+
+      try {
+        let previousIdentity: string | null = null;
+        try {
+          previousIdentity = localStorage.getItem(OFFLINE_IDENTITY_KEY);
+        } catch {
+          // Treat inaccessible storage as unknown and take the safe purge path.
+        }
+
+        // Signed-out/denied sessions are always purged. Authenticated sessions
+        // can retain data only when the fully resolved identity is unchanged.
+        if (desiredIdentity === null || previousIdentity !== desiredIdentity) {
+          await qc.cancelQueries();
+          if (cancelled) return;
+
+          qc.clear();
+          await purgeOfflineUserData();
+          if (cancelled) return;
+        }
+
+        try {
+          localStorage.removeItem(LEGACY_CLERK_USER_KEY);
+          if (desiredIdentity === null) {
+            localStorage.removeItem(OFFLINE_IDENTITY_KEY);
+          } else {
+            localStorage.setItem(OFFLINE_IDENTITY_KEY, desiredIdentity);
+          }
+        } catch {
+          // The current in-memory session can still proceed. A later reload
+          // will treat the unavailable identity marker as unknown and purge.
+        }
+
+        if (!cancelled) setReconciledIdentity(desiredIdentity);
+      } catch (error) {
+        console.error("[Auth] Failed to prepare secure offline session:", error);
+        if (!cancelled) setFailedReconciliation({ identity: desiredIdentity });
+      }
+    };
+
+    void reconcileIdentity();
+    return () => {
+      cancelled = true;
+    };
+  }, [desiredIdentity, qc]);
+
+  if (desiredIdentity === undefined || reconciledIdentity !== desiredIdentity) {
+    const failed =
+      failedReconciliation?.identity === desiredIdentity ||
+      (!isLoaded && clerkLoadTimedOut);
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-green-900 to-emerald-950 flex flex-col items-center justify-center gap-4 px-6 text-center">
+        {failed ? (
+          <>
+            <p className="max-w-md text-sm font-medium text-white">
+              {!isLoaded && clerkLoadTimedOut
+                ? "Sign-in services did not finish loading. Check your connection, then reload the app."
+                : "We could not safely prepare this session. Reload the app to try again."}
+            </p>
+            <button
+              type="button"
+              className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-emerald-900"
+              onClick={() => window.location.reload()}
+            >
+              Reload app
+            </button>
+          </>
+        ) : (
+          <>
+            <span className="animate-spin text-3xl text-emerald-300">&#8635;</span>
+            <p className="text-sm font-medium text-emerald-50">
+              Preparing your secure session&hellip;
+            </p>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  return desiredIdentity === null ? children : (
+    <OfflineProvider key={desiredIdentity}>{children}</OfflineProvider>
+  );
 }
 
 function AppRoutes() {
@@ -150,7 +267,7 @@ function AppRoutes() {
 
 function ProtectedRoutes() {
   const { isLoaded, isSignedIn } = useUser();
-  const { currentUser, staffStatus, effectiveRole } = useAuth();
+  const { currentUser, staffStatus, staffError, effectiveRole, retryStaff, logout } = useAuth();
 
   if (!isLoaded || (isSignedIn && staffStatus === "loading")) {
     return (
@@ -162,6 +279,10 @@ function ProtectedRoutes() {
 
   if (!isSignedIn) {
     return <Redirect to="/sign-in" />;
+  }
+
+  if (staffStatus === "error") {
+    return <StaffLookupError reason={staffError} onRetry={retryStaff} onSignOut={logout} />;
   }
 
   if (staffStatus === "nomatch" || !currentUser) {
@@ -220,6 +341,7 @@ function ProtectedRoutes() {
             <Route path="/completed-jobs" component={CompletedJobs} />
             <Route path="/photo-share" component={PhotoShare} />
             <Route path="/special-requests" component={SpecialRequests} />
+            <Route path="/messages" component={Messages} />
             <Route path="/"><Redirect to="/issues" /></Route>
             <Route path="/staff"><Redirect to="/issues" /></Route>
             <Route path="/assignments"><Redirect to="/issues" /></Route>
@@ -277,18 +399,17 @@ function ClerkProviderWithRoutes() {
       routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
     >
       <QueryClientProvider client={queryClient}>
-        <ClerkQueryClientCacheInvalidator />
         <TooltipProvider>
-          <OfflineProvider>
-            <AuthProvider>
+          <AuthProvider>
+            <SecureOfflineSessionBoundary>
               <Switch>
                 <Route path="/apply" component={Apply} />
                 <Route>
                   <AppRoutes />
                 </Route>
               </Switch>
-            </AuthProvider>
-          </OfflineProvider>
+            </SecureOfflineSessionBoundary>
+          </AuthProvider>
           <Toaster />
         </TooltipProvider>
       </QueryClientProvider>

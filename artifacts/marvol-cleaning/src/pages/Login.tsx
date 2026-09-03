@@ -1,8 +1,9 @@
 import React from "react";
-import { SignIn, SignUp, useClerk, useUser } from "@clerk/react";
+import { SignIn, SignUp, useUser } from "@clerk/react";
 import { useTranslation } from "react-i18next";
-import { MailWarning, LogOut } from "lucide-react";
+import { MailWarning, LogOut, RefreshCw, UserPlus, WifiOff } from "lucide-react";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { useAuth, type StaffErrorReason } from "@/contexts/AuthContext";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -49,8 +50,11 @@ function AuthShell({ children }: { children: React.ReactNode }) {
 export function SignInPage() {
   return (
     <AuthShell>
-      {/* path must be the full browser path — Clerk reads window.location.pathname directly */}
-      <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} />
+      <div className="w-full flex flex-col items-center gap-3">
+        <FirstTimeAccountNotice />
+        {/* path must be the full browser path — Clerk reads window.location.pathname directly */}
+        <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} />
+      </div>
     </AuthShell>
   );
 }
@@ -58,7 +62,10 @@ export function SignInPage() {
 export function SignUpPage() {
   return (
     <AuthShell>
-      <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} />
+      <div className="w-full flex flex-col items-center gap-3">
+        <FirstTimeAccountNotice onSignUpPage />
+        <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} />
+      </div>
     </AuthShell>
   );
 }
@@ -70,7 +77,7 @@ export function SignUpPage() {
  */
 export function NoStaffMatch() {
   const { t } = useTranslation();
-  const { signOut } = useClerk();
+  const { logout } = useAuth();
   const { user } = useUser();
   const email =
     user?.primaryEmailAddress?.emailAddress ?? user?.emailAddresses?.[0]?.emailAddress;
@@ -96,12 +103,92 @@ export function NoStaffMatch() {
           </p>
         )}
         <button
-          onClick={() => signOut({ redirectUrl: basePath || "/" })}
+          onClick={logout}
           className="mt-6 w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-sm transition-colors"
         >
           <LogOut className="w-4 h-4" />
           {t("layout.logout", "Log out")}
         </button>
+      </div>
+    </AuthShell>
+  );
+}
+
+function FirstTimeAccountNotice({ onSignUpPage = false }: { onSignUpPage?: boolean }) {
+  const { t } = useTranslation();
+  return (
+    <div className="w-full max-w-[420px] rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-950 shadow-sm">
+      <div className="flex items-start gap-3">
+        <UserPlus className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+        <div className="min-w-0 text-sm">
+          <p className="font-bold">{t("login.firstTimeAccountTitle")}</p>
+          <p className="mt-1 text-xs leading-relaxed text-amber-800">
+            {t(onSignUpPage ? "login.firstTimeSignUpBody" : "login.firstTimeSignInBody")}
+          </p>
+          {!onSignUpPage && (
+            <a
+              href={`${basePath}/sign-up`}
+              className="inline-flex mt-2 font-bold text-amber-900 underline underline-offset-2 hover:text-amber-700"
+            >
+              {t("login.createProductionAccount")}
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function StaffLookupError({
+  reason,
+  onRetry,
+  onSignOut,
+}: {
+  reason: StaffErrorReason | null;
+  onRetry: () => void;
+  onSignOut: () => void;
+}) {
+  const { t } = useTranslation();
+  const bodyKey =
+    reason === "session"
+      ? "login.staffLookupSessionError"
+      : reason === "forbidden"
+        ? "login.staffLookupForbiddenError"
+        : reason === "network"
+          ? "login.staffLookupNetworkError"
+          : "login.staffLookupServerError";
+
+  return (
+    <AuthShell>
+      <div
+        role="alert"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 text-center"
+      >
+        <div className="mx-auto w-14 h-14 rounded-2xl bg-amber-100 flex items-center justify-center mb-4">
+          <WifiOff className="w-7 h-7 text-amber-600" />
+        </div>
+        <h1 className="text-xl font-bold text-slate-900">
+          {t("login.staffLookupErrorTitle")}
+        </h1>
+        <p className="text-sm text-slate-500 mt-3">{t(bodyKey)}</p>
+        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={onRetry}
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            {t("login.retryStaffLookup")}
+          </button>
+          <button
+            type="button"
+            onClick={onSignOut}
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-sm transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            {t("layout.logout")}
+          </button>
+        </div>
       </div>
     </AuthShell>
   );

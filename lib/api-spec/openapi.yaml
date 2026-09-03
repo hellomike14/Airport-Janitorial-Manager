@@ -712,6 +712,12 @@ paths:
           required: true
           schema:
             type: integer
+        - name: archived
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
       responses:
         "200":
           description: List of conversations
@@ -738,6 +744,52 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ConversationSummary"
+
+  /conversations/inspector-channel:
+    post:
+      operationId: startInspectorConversation
+      tags: [messages]
+      summary: Open the dedicated inspector@marvolenterprises.com conversation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InspectorConversationStartInput"
+      responses:
+        "200":
+          description: Dedicated inspector conversation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationSummary"
+        "503":
+          description: Inspector email channel is unavailable
+
+  /conversations/{id}/archive:
+    patch:
+      operationId: setConversationArchived
+      tags: [messages]
+      summary: Archive or restore a conversation for the authenticated staff member
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConversationArchiveInput"
+      responses:
+        "200":
+          description: Per-user archive state updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationArchiveResult"
 
   /conversations/{id}/messages:
     get:
@@ -781,12 +833,58 @@ paths:
             schema:
               $ref: "#/components/schemas/ChatMessageInput"
       responses:
+        "200":
+          description: Existing message returned for an exact idempotent replay
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessage"
         "201":
           description: Sent message
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ChatMessage"
+        "409":
+          description: The client request id was already used for a different message
+
+  /conversations/{id}/messages/{msgId}/assign-special:
+    post:
+      operationId: assignInspectorMessage
+      tags: [messages]
+      summary: Triage an authenticated inspector email into an urgent special assignment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: msgId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignInspectorMessageInput"
+      responses:
+        "200":
+          description: The source message was already assigned; existing task returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InspectorMessageAssignment"
+        "201":
+          description: Urgent special assignment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InspectorMessageAssignment"
+        "409":
+          description: No eligible active staff member is assigned to the selected area/date
 
   /conversations/{id}/read:
     post:
@@ -817,7 +915,7 @@ paths:
     post:
       tags: [Storage]
       operationId: requestUploadUrl
-      summary: Request a presigned URL for file upload
+      summary: Request a short-lived verified URL for file upload
       requestBody:
         required: true
         content:
@@ -826,7 +924,7 @@ paths:
               $ref: '#/components/schemas/UploadUrlRequest'
       responses:
         '200':
-          description: Presigned upload URL generated.
+          description: Signed application upload URL generated.
           content:
             application/json:
               schema:
@@ -1169,7 +1267,13 @@ components:
           enum: [staff, supervisor, admin, inspector]
         hasEmail:
           type: boolean
-          description: Whether the staff member has a configured sign-in email. The email address itself is never returned.
+          description: Whether the staff member has a configured sign-in email.
+        email:
+          type: ["string", "null"]
+          description: Exact normalized login email; included only for authenticated administrators.
+        loginEnabled:
+          type: boolean
+          description: Whether this staff identity may authenticate; included only for authenticated administrators.
         active:
           type: boolean
         createdAt:
@@ -1280,6 +1384,11 @@ components:
         notes:
           type: string
           nullable: true
+        completionEmailStatus:
+          type: string
+          nullable: true
+          enum: [not_applicable, pending, sending, retrying, accepted, disabled, not_configured, failed]
+          description: Present on completion; accepted means SendGrid accepted the inspector email, not mailbox delivery.
       required:
         - id
         - areaId
@@ -1334,6 +1443,32 @@ components:
         notes:
           type: string
           nullable: true
+        assignedToId:
+          type: integer
+          nullable: true
+        assignedToName:
+          type: string
+          nullable: true
+        assignedToActive:
+          type: boolean
+          nullable: true
+        sourceMessageId:
+          type: integer
+          nullable: true
+        dueAt:
+          type: string
+          nullable: true
+        escalatedAt:
+          type: string
+          nullable: true
+        assignmentMethod:
+          type: string
+          nullable: true
+          enum: [fresh_gps, area_roster_workload]
+        emailNotificationStatus:
+          type: string
+          enum: [not_applicable, sent, disabled, not_configured, failed]
+          description: Present when a special request is created; inspector requests attempt external email delivery.
       required:
         - id
         - areaId
@@ -1405,6 +1540,8 @@ components:
           type: integer
         areaName:
           type: string
+        terminal:
+          type: string
         assignmentDate:
           type: string
         assignedById:
@@ -1424,6 +1561,7 @@ components:
         - staffName
         - areaId
         - areaName
+        - terminal
         - assignmentDate
         - assignedById
         - assignedByName
@@ -1622,6 +1760,8 @@ components:
           type: ["string", "null"]
         unreadCount:
           type: integer
+        archived:
+          type: boolean
         createdAt:
           type: string
       required:
@@ -1636,7 +1776,27 @@ components:
         - lastMessage
         - lastMessageAt
         - unreadCount
+        - archived
         - createdAt
+
+    ConversationArchiveInput:
+      type: object
+      properties:
+        staffId:
+          type: integer
+        archived:
+          type: boolean
+      required:
+        - staffId
+        - archived
+
+    ConversationArchiveResult:
+      type: object
+      properties:
+        archived:
+          type: boolean
+      required:
+        - archived
 
     ConversationStartInput:
       type: object
@@ -1663,6 +1823,66 @@ components:
       required:
         - staffId
         - recipientIds
+
+    InspectorConversationStartInput:
+      type: object
+      properties:
+        staffId:
+          type: integer
+      required:
+        - staffId
+
+    AssignInspectorMessageInput:
+      type: object
+      properties:
+        staffId:
+          type: integer
+        areaId:
+          type: integer
+        taskDate:
+          type: string
+          pattern: '^\d{4}-\d{2}-\d{2}$'
+      required:
+        - staffId
+        - areaId
+
+    InspectorMessageAssignment:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [assigned, already_assigned]
+        taskId:
+          type: integer
+        assignedStaffId:
+          type: integer
+        assignedStaffName:
+          type: string
+        areaId:
+          type: integer
+        areaName:
+          type: string
+        taskDate:
+          type: string
+        dueAt:
+          type: string
+        assignmentMethod:
+          type: string
+          enum: [fresh_gps, area_roster_workload]
+        distanceMeters:
+          type: integer
+          nullable: true
+      required:
+        - status
+        - taskId
+        - assignedStaffId
+        - assignedStaffName
+        - areaId
+        - areaName
+        - taskDate
+        - dueAt
+        - assignmentMethod
+        - distanceMeters
 
     UpdateChatMessageInput:
       type: object
@@ -1692,6 +1912,49 @@ components:
           type: string
         isRead:
           type: boolean
+        clientRequestId:
+          type: string
+          format: uuid
+          nullable: true
+        emailDeliveryStatus:
+          type: string
+          enum:
+            - not_applicable
+            - pending
+            - sending
+            - retrying
+            - accepted
+            - disabled
+            - not_configured
+            - failed
+          description: SendGrid handoff state; accepted means SendGrid accepted the request, not mailbox delivery.
+        isInboundEmail:
+          type: boolean
+        specialTaskId:
+          type: integer
+          nullable: true
+        specialTaskDueAt:
+          type: string
+          nullable: true
+        specialTaskEscalatedAt:
+          type: string
+          nullable: true
+        specialTaskCompleted:
+          type: boolean
+          nullable: true
+        specialTaskAssignedStaffId:
+          type: integer
+          nullable: true
+        specialTaskAssignedStaffName:
+          type: string
+          nullable: true
+        specialTaskAreaName:
+          type: string
+          nullable: true
+        specialTaskAssignmentMethod:
+          type: string
+          nullable: true
+          enum: [fresh_gps, area_roster_workload]
         createdAt:
           type: string
       required:
@@ -1701,6 +1964,17 @@ components:
         - senderName
         - body
         - isRead
+        - clientRequestId
+        - emailDeliveryStatus
+        - isInboundEmail
+        - specialTaskId
+        - specialTaskDueAt
+        - specialTaskEscalatedAt
+        - specialTaskCompleted
+        - specialTaskAssignedStaffId
+        - specialTaskAssignedStaffName
+        - specialTaskAreaName
+        - specialTaskAssignmentMethod
         - createdAt
 
     ChatMessageInput:
@@ -1712,9 +1986,14 @@ components:
           type: string
           minLength: 1
           maxLength: 2000
+        clientRequestId:
+          type: string
+          format: uuid
+          description: Generated once per compose/send action and reused for retries.
       required:
         - senderId
         - body
+        - clientRequestId
 
     MarkAllReadRequest:
       type: object
@@ -1726,17 +2005,23 @@ components:
 
     UploadUrlRequest:
       type: object
-      required: [name, size, contentType]
+      required: [name, size, contentType, purpose]
       properties:
         name:
           type: string
           minLength: 1
+          maxLength: 255
         size:
           type: integer
           minimum: 1
+          maximum: 12582912
         contentType:
           type: string
           minLength: 1
+        purpose:
+          type: string
+          enum: [staff-photo, application-document]
+          description: Binds the upload to its authorization and serving policy.
 
     UploadUrlResponse:
       type: object

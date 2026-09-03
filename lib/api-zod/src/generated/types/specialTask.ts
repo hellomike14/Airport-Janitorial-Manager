@@ -5,6 +5,8 @@
  * Marvol Facility Cleaning Management API
  * OpenAPI spec version: 0.1.0
  */
+import type { SpecialTaskAssignmentMethod } from "./specialTaskAssignmentMethod";
+import type { SpecialTaskEmailNotificationStatus } from "./specialTaskEmailNotificationStatus";
 
 export interface SpecialTask {
   id: number;
@@ -25,4 +27,13 @@ export interface SpecialTask {
   createdByActive?: boolean | null;
   createdAt: string;
   notes?: string | null;
+  assignedToId?: number | null;
+  assignedToName?: string | null;
+  assignedToActive?: boolean | null;
+  sourceMessageId?: number | null;
+  dueAt?: string | null;
+  escalatedAt?: string | null;
+  assignmentMethod?: SpecialTaskAssignmentMethod;
+  /** Present when a special request is created; inspector requests attempt external email delivery. */
+  emailNotificationStatus?: SpecialTaskEmailNotificationStatus;
 }

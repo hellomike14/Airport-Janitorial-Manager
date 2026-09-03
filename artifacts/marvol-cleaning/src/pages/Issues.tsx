@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { getDateLocale } from "@/i18n/dateLocale";
 import {
   useListIssues,
+  getListIssuesQueryKey,
   useCreateIssue,
   useResolveIssue,
   useUpdateIssueImages,
@@ -44,7 +45,12 @@ async function requestPresignedUrl(file: File): Promise<{ uploadURL: string; obj
   const res = await fetch(`${BASE_URL}/api/storage/uploads/request-url`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+    body: JSON.stringify({
+      name: file.name,
+      size: file.size,
+      contentType: file.type,
+      purpose: "staff-photo",
+    }),
   });
   if (!res.ok) throw new Error("Failed to get upload URL");
   return res.json();
@@ -270,7 +276,7 @@ function AssignAreaButton({
   );
 }
 
-function StaffCompletionPanel({ issue }: { issue: { id: number; afterImagePath?: string | null; [key: string]: unknown } }) {
+function StaffCompletionPanel({ issue }: { issue: { id: number; afterImagePath?: string | null } }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const { currentUser } = useAuth();
@@ -435,12 +441,13 @@ export default function Issues() {
     ? todayAssignments.find((a) => a.staffId === currentUser?.id)?.areaId ?? null
     : null;
 
-  const { data: issues, isLoading } = useListIssues(
-    isStaff
-      ? staffAreaId != null ? { areaId: staffAreaId } : {}
-      : {},
-    { query: { enabled: !isStaff || staffAreaId != null } }
-  );
+  const issueParams = isStaff && staffAreaId != null ? { areaId: staffAreaId } : {};
+  const { data: issues, isLoading } = useListIssues(issueParams, {
+    query: {
+      queryKey: getListIssuesQueryKey(issueParams),
+      enabled: !isStaff || staffAreaId != null,
+    },
+  });
   const { data: areas } = useListAreas();
   const { data: staffList = [] } = useListStaff();
 

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useListStaff, useCreateStaffMember, useDeleteStaffMember, useUpdateStaffMember } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { UserPlus, Shield, User, Trash2, Lock, ArrowUpDown, LogOut, MailWarning, CheckCircle2 } from "lucide-react";
+import { UserPlus, Shield, User, Trash2, Lock, ArrowUpDown, LogOut, Mail, MailWarning, CheckCircle2, ClipboardCheck, ShieldOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useTranslation } from "react-i18next";
@@ -13,6 +13,7 @@ export default function Staff() {
   const readOnly = effectiveRole === "supervisor";
   const { data: staff, isLoading } = useListStaff();
   const { currentUser, logout } = useAuth();
+  const canSeeLoginDetails = currentUser?.role === "admin" && !readOnly;
   const queryClient = useQueryClient();
   const [isAdding, setIsAdding] = useState(false);
   const [formData, setFormData] = useState({ name: "", role: "staff", phone: "", email: "" });
@@ -58,7 +59,7 @@ export default function Staff() {
   const handleSetEmail = (person: any) => {
     const email = window.prompt(
       t("staff.setEmailPrompt", "Login email for {{name}}:", { name: person.name }),
-      ""
+      person.email ?? ""
     );
     if (email === null) return;
     const trimmed = email.trim();
@@ -80,6 +81,7 @@ export default function Staff() {
   if (isLoading) return <div className="p-8 animate-pulse text-slate-500">{t("staff.loadingDirectory")}</div>;
 
   const admins = staff?.filter((s) => s.role === "admin") || [];
+  const inspectors = staff?.filter((s) => s.role === "inspector") || [];
   const supervisors = staff?.filter((s) => s.role === "supervisor") || [];
   const regularStaff = staff?.filter((s) => s.role === "staff") || [];
   const missingEmailCount = (staff ?? []).filter((s) => !s.hasEmail).length;
@@ -143,6 +145,7 @@ export default function Staff() {
               >
                 <option value="staff">{t("roles.cleaningStaff")}</option>
                 <option value="supervisor">{t("roles.supervisor")}</option>
+                <option value="inspector">{t("roles.inspector")}</option>
                 <option value="admin">{t("roles.administrator")}</option>
               </select>
             </div>
@@ -193,6 +196,28 @@ export default function Staff() {
                 onDelete={readOnly ? undefined : () => handleDelete(person.id)}
                 onSetEmail={readOnly ? undefined : () => handleSetEmail(person)}
                 roleType="admin"
+                showLoginDetails={canSeeLoginDetails}
+                onLogout={currentUser?.id === person.id ? logout : undefined}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {inspectors.length > 0 && (
+        <div>
+          <h2 className="text-xl font-display font-bold text-slate-800 mb-4 flex items-center gap-2 border-b border-slate-200 pb-2">
+            <ClipboardCheck className="w-5 h-5 text-blue-500" /> {t("staff.inspectors")} ({inspectors.length})
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {inspectors.map((person) => (
+              <StaffCard
+                key={person.id}
+                person={person}
+                onDelete={readOnly ? undefined : () => handleDelete(person.id)}
+                onSetEmail={readOnly ? undefined : () => handleSetEmail(person)}
+                roleType="inspector"
+                showLoginDetails={canSeeLoginDetails}
                 onLogout={currentUser?.id === person.id ? logout : undefined}
               />
             ))}
@@ -213,6 +238,7 @@ export default function Staff() {
               onToggleRole={readOnly ? undefined : () => handleToggleRole(person)}
               onSetEmail={readOnly ? undefined : () => handleSetEmail(person)}
               roleType="supervisor"
+              showLoginDetails={canSeeLoginDetails}
               onLogout={currentUser?.id === person.id ? logout : undefined}
             />
           ))}
@@ -232,6 +258,7 @@ export default function Staff() {
               onToggleRole={readOnly ? undefined : () => handleToggleRole(person)}
               onSetEmail={readOnly ? undefined : () => handleSetEmail(person)}
               roleType="staff"
+              showLoginDetails={canSeeLoginDetails}
               onLogout={currentUser?.id === person.id ? logout : undefined}
             />
           ))}
@@ -254,6 +281,12 @@ const ROLE_STYLES = {
     avatar: "bg-indigo-100 text-indigo-700",
     badge: "info" as const,
   },
+  inspector: {
+    border: "border-blue-100 shadow-blue-500/5",
+    bar: "from-blue-500 to-cyan-500",
+    avatar: "bg-blue-100 text-blue-700",
+    badge: "info" as const,
+  },
   staff: {
     border: "border-slate-200",
     bar: "from-emerald-400 to-teal-500",
@@ -262,7 +295,7 @@ const ROLE_STYLES = {
   },
 };
 
-function StaffCard({ person, onDelete, onToggleRole, roleType, onLogout, onSetEmail }: { person: any; onDelete?: () => void; onToggleRole?: () => void; roleType: "admin" | "supervisor" | "staff"; onLogout?: () => void; onSetEmail?: () => void }) {
+function StaffCard({ person, onDelete, onToggleRole, roleType, onLogout, onSetEmail, showLoginDetails }: { person: any; onDelete?: () => void; onToggleRole?: () => void; roleType: "admin" | "supervisor" | "inspector" | "staff"; onLogout?: () => void | Promise<void>; onSetEmail?: () => void; showLoginDetails?: boolean }) {
   const { t } = useTranslation();
   const style = ROLE_STYLES[roleType];
   const initials = person.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
@@ -304,7 +337,29 @@ function StaffCard({ person, onDelete, onToggleRole, roleType, onLogout, onSetEm
         </div>
       </div>
       <div className="space-y-2 text-sm text-slate-500">
-        {hasEmail ? (
+        {showLoginDetails && person.loginEnabled === false ? (
+          <div className="flex items-start gap-1.5 text-xs font-semibold text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-2 py-1.5">
+            <ShieldOff className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+            <span>
+              {t("staff.loginDisabled")}
+              {person.email && <span className="block font-mono break-all mt-0.5">{person.email}</span>}
+            </span>
+          </div>
+        ) : showLoginDetails && person.email ? (
+          <button
+            type="button"
+            onClick={onSetEmail}
+            disabled={!onSetEmail}
+            className="w-full flex items-start gap-1.5 text-left text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2 py-1.5 hover:bg-emerald-100 transition-colors disabled:cursor-default disabled:hover:bg-emerald-50"
+            title={onSetEmail ? t("staff.editLoginEmail") : undefined}
+          >
+            <Mail className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+            <span>
+              <span className="block font-mono break-all">{person.email}</span>
+              {onSetEmail && <span className="block text-[10px] text-emerald-600 mt-0.5">{t("staff.editLoginEmail")}</span>}
+            </span>
+          </button>
+        ) : hasEmail ? (
           <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-600">
             <CheckCircle2 className="w-3.5 h-3.5" />
             {t("staff.canLogIn", "Can sign in with this email")}

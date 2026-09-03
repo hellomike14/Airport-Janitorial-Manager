@@ -5,6 +5,7 @@ export * from "./assignments";
 export * from "./issues";
 export * from "./notifications";
 export * from "./messages";
+export * from "./inspectorAssignments";
 export * from "./locations";
 export * from "./schedules";
 export * from "./sharedPhotos";

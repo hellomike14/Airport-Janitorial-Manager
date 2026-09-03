@@ -11,8 +11,12 @@ const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
 export type ActionResult = "success" | "retry" | "discard";
 
-async function uploadPhotoBlob(blobKey: string): Promise<string | null> {
+async function uploadPhotoBlob(
+  blobKey: string,
+  signal?: AbortSignal,
+): Promise<string | null> {
   const photoData = await getPhotoBlob(blobKey);
+  if (signal?.aborted) return null;
   if (!photoData) return null;
 
   const file = new File([photoData.blob], photoData.fileName, {
@@ -26,7 +30,9 @@ async function uploadPhotoBlob(blobKey: string): Promise<string | null> {
       name: file.name,
       size: file.size,
       contentType: file.type,
+      purpose: "staff-photo",
     }),
+    signal,
   });
 
   if (!presignRes.ok) throw new Error("Failed to get presigned URL");
@@ -37,6 +43,7 @@ async function uploadPhotoBlob(blobKey: string): Promise<string | null> {
     method: "PUT",
     headers: { "Content-Type": file.type },
     body: file,
+    signal,
   });
 
   if (!putRes.ok) throw new Error("Failed to upload photo");
@@ -52,16 +59,23 @@ async function cleanupPhotoBlobsForAction(action: QueuedAction): Promise<void> {
   }
 }
 
-async function executeAction(action: QueuedAction): Promise<ActionResult> {
+async function executeAction(
+  action: QueuedAction,
+  signal?: AbortSignal,
+): Promise<ActionResult> {
   try {
+    if (signal?.aborted) return "retry";
+
     let payload = action.payload as Record<string, unknown> | undefined;
 
     if (action.photoBlobKeys && action.photoBlobKeys.length > 0) {
       payload = { ...payload };
       for (const blobKey of action.photoBlobKeys) {
+        if (signal?.aborted) return "retry";
         const parts = blobKey.split(":");
         const fieldName = parts[0];
-        const objectPath = await uploadPhotoBlob(blobKey);
+        const objectPath = await uploadPhotoBlob(blobKey, signal);
+        if (signal?.aborted) return "retry";
         if (objectPath && payload) {
           payload[fieldName] = objectPath;
         }
@@ -71,6 +85,7 @@ async function executeAction(action: QueuedAction): Promise<ActionResult> {
     const fetchOptions: RequestInit = {
       method: action.method,
       headers: { "Content-Type": "application/json" },
+      signal,
     };
 
     if (payload && action.method !== "GET") {
@@ -103,6 +118,7 @@ async function executeAction(action: QueuedAction): Promise<ActionResult> {
 
     return "discard";
   } catch (err) {
+    if (signal?.aborted) return "retry";
     console.warn("[OfflineQueue] Network error executing action:", err);
     return "retry";
   }
@@ -111,7 +127,8 @@ async function executeAction(action: QueuedAction): Promise<ActionResult> {
 export type SyncProgressCallback = (processed: number, total: number) => void;
 
 export async function processQueue(
-  onProgress?: SyncProgressCallback
+  onProgress?: SyncProgressCallback,
+  signal?: AbortSignal,
 ): Promise<{ processed: number; failed: number; discarded: number; total: number }> {
   const actions = await getQueuedActions();
   const total = actions.length;
@@ -120,7 +137,13 @@ export async function processQueue(
   let discarded = 0;
 
   for (const action of actions) {
-    const result = await executeAction(action);
+    if (signal?.aborted) break;
+
+    const result = await executeAction(action, signal);
+    // Account changes abort the old provider before the new identity is
+    // reconciled. Do not continue, clean up, or dequeue under a new session.
+    if (signal?.aborted) break;
+
     if (result === "success" || result === "discard") {
       await cleanupPhotoBlobsForAction(action);
       await removeQueuedAction(action.id!);
@@ -139,9 +162,13 @@ export async function queueMutation(
   method: string,
   endpoint: string,
   payload?: unknown,
-  photoBlobKeys?: string[]
+  photoBlobKeys?: string[],
+  dataGeneration?: number,
 ): Promise<number> {
-  return enqueueAction({ method, endpoint, payload, photoBlobKeys });
+  return enqueueAction(
+    { method, endpoint, payload, photoBlobKeys },
+    dataGeneration,
+  );
 }
 
 export { getQueuedActions, getQueueSize } from "./offlineStore";

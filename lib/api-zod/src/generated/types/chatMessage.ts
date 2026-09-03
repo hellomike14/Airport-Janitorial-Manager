@@ -5,6 +5,8 @@
  * Marvol Facility Cleaning Management API
  * OpenAPI spec version: 0.1.0
  */
+import type { ChatMessageEmailDeliveryStatus } from "./chatMessageEmailDeliveryStatus";
+import type { ChatMessageSpecialTaskAssignmentMethod } from "./chatMessageSpecialTaskAssignmentMethod";
 
 export interface ChatMessage {
   id: number;
@@ -13,5 +15,17 @@ export interface ChatMessage {
   senderName: string;
   body: string;
   isRead: boolean;
+  clientRequestId: string | null;
+  /** SendGrid handoff state; accepted means SendGrid accepted the request, not mailbox delivery. */
+  emailDeliveryStatus: ChatMessageEmailDeliveryStatus;
+  isInboundEmail: boolean;
+  specialTaskId: number | null;
+  specialTaskDueAt: string | null;
+  specialTaskEscalatedAt: string | null;
+  specialTaskCompleted: boolean | null;
+  specialTaskAssignedStaffId: number | null;
+  specialTaskAssignedStaffName: string | null;
+  specialTaskAreaName: string | null;
+  specialTaskAssignmentMethod: ChatMessageSpecialTaskAssignmentMethod;
   createdAt: string;
 }

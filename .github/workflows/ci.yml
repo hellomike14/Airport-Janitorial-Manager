@@ -1,0 +1,50 @@
+name: Verify application
+
+on:
+  pull_request:
+  push:
+    branches: [master, main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PORT: "3000"
+      BASE_PATH: "/"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Audit production dependencies
+        run: pnpm audit --prod
+
+      - name: Verify peer dependencies
+        run: pnpm peers check
+
+      - name: Verify generated API contracts
+        run: |
+          pnpm --filter @workspace/api-spec run codegen
+          git diff --exit-code -- lib/api-client-react/src/generated lib/api-zod/src/generated
+
+      - name: Run API tests
+        run: pnpm --filter @workspace/api-server test
+
+      - name: Typecheck and build every artifact
+        run: pnpm run build

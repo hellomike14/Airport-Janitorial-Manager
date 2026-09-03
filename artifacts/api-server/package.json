@@ -4,14 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "NODE_ENV=development tsx ./src/index.ts",
+    "dev": "tsx ./src/index.ts",
     "build": "tsx ./build.ts",
+    "test": "tsx --test ./src/lib/loginIdentity.test.ts ./src/lib/conversationArchive.test.ts ./src/lib/inspectorRequestEmail.test.ts ./src/lib/inspectorAssignmentPolicy.test.ts ./src/lib/staffAuthorization.test.ts ./src/lib/operationsPolicy.test.ts ./src/lib/uploadRequestPolicy.test.ts ./src/lib/secureUpload.test.ts ./src/lib/storedObjectAccess.test.ts ./src/lib/messageRecipientPolicy.test.ts ./src/lib/messageEmailDeliveryPolicy.test.ts ./src/lib/sendgridEmailBridge.test.ts ./src/lib/startupAdvisoryLock.test.ts ./src/lib/startupStaffReconciliation.test.ts ./src/middlewares/requireStaffSession.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@clerk/express": "^2.1.57",
     "@clerk/shared": "^4.29.1",
-    "@google-cloud/storage": "^7.19.0",
+    "@google-cloud/storage": "^7.22.0",
     "@workspace/api-zod": "workspace:*",
     "@workspace/db": "workspace:*",
     "cookie-parser": "^1.4.7",
@@ -20,12 +21,14 @@
     "express": "^5",
     "google-auth-library": "^10.6.2",
     "http-proxy-middleware": "^4.2.0",
+    "multer": "^2.3.0",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@types/multer": "^2.2.0",
     "@types/node": "catalog:",
     "esbuild": "^0.27.3",
     "tsx": "catalog:"

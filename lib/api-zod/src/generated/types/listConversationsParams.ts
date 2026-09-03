@@ -8,4 +8,5 @@
 
 export type ListConversationsParams = {
   staffId: number;
+  archived?: boolean;
 };

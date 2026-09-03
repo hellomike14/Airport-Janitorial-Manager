@@ -1,8 +1,14 @@
 import React, { createContext, useContext, useEffect, useCallback, useState, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useOnlineStatus, type SyncState } from "@/hooks/useOnlineStatus";
-import { processQueue } from "@/lib/offlineQueue";
-import { cacheApiResponse, getCachedApiResponse, getQueueSize } from "@/lib/offlineStore";
+import { processQueue, queueMutation } from "@/lib/offlineQueue";
+import {
+  cacheApiResponse,
+  getCachedApiResponse,
+  getOfflineDataGeneration,
+  getQueueSize,
+  registerBeforeOfflinePurge,
+} from "@/lib/offlineStore";
 import { useHydrateFromOfflineCache, useCacheApiResponses } from "@/hooks/useOfflineCache";
 
 interface OfflineContextValue {
@@ -26,33 +32,51 @@ const RETRY_DELAYS = [5000, 15000, 30000, 60000];
 export function OfflineProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
   const { isOnline, syncState, markSyncing, markSynced, markSyncError } = useOnlineStatus();
+  const dataGenerationRef = useRef(getOfflineDataGeneration());
+  const dataGeneration = dataGenerationRef.current;
   const [pendingCount, setPendingCount] = useState(0);
+  const isActiveRef = useRef(true);
   const isSyncingRef = useRef(false);
+  const syncAbortRef = useRef<AbortController | null>(null);
   const retryCountRef = useRef(0);
-  const retryTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  useHydrateFromOfflineCache();
-  useCacheApiResponses();
+  useHydrateFromOfflineCache(dataGeneration);
+  useCacheApiResponses(dataGeneration);
 
   const refreshPendingCount = useCallback(async () => {
     const count = await getQueueSize();
-    setPendingCount(count);
+    if (isActiveRef.current) setPendingCount(count);
+  }, []);
+
+  const cancelSync = useCallback(() => {
+    syncAbortRef.current?.abort();
+    syncAbortRef.current = null;
+    isSyncingRef.current = false;
   }, []);
 
   const syncQueue = useCallback(async () => {
     if (isSyncingRef.current || !navigator.onLine) return;
-    const count = await getQueueSize();
-    if (count === 0) {
-      retryCountRef.current = 0;
-      return;
-    }
 
+    const controller = new AbortController();
     isSyncingRef.current = true;
-    markSyncing();
+    syncAbortRef.current = controller;
 
     try {
-      const result = await processQueue();
+      const count = await getQueueSize();
+      if (controller.signal.aborted) return;
+      if (count === 0) {
+        retryCountRef.current = 0;
+        markSynced();
+        return;
+      }
+
+      markSyncing();
+      const result = await processQueue(undefined, controller.signal);
+      if (controller.signal.aborted) return;
+
       await refreshPendingCount();
+      if (controller.signal.aborted) return;
 
       if (result.failed > 0) {
         markSyncError();
@@ -67,7 +91,10 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
         markSynced();
         queryClient.invalidateQueries();
       }
-    } catch {
+    } catch (error) {
+      if (controller.signal.aborted) return;
+
+      console.warn("[OfflineQueue] Failed to synchronize queued actions:", error);
       markSyncError();
       const delay = RETRY_DELAYS[Math.min(retryCountRef.current, RETRY_DELAYS.length - 1)];
       retryCountRef.current++;
@@ -76,7 +103,10 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
         syncQueue();
       }, delay);
     } finally {
-      isSyncingRef.current = false;
+      if (syncAbortRef.current === controller) {
+        syncAbortRef.current = null;
+        isSyncingRef.current = false;
+      }
     }
   }, [queryClient, markSyncing, markSynced, markSyncError, refreshPendingCount]);
 
@@ -86,15 +116,25 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
       syncQueue();
     } else {
       if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+      cancelSync();
     }
-  }, [isOnline, syncQueue]);
+  }, [cancelSync, isOnline, syncQueue]);
 
   useEffect(() => {
+    isActiveRef.current = true;
+    const unregisterBeforePurge = registerBeforeOfflinePurge(() => {
+      isActiveRef.current = false;
+      cancelSync();
+    });
+
     refreshPendingCount();
     return () => {
+      isActiveRef.current = false;
+      unregisterBeforePurge();
       if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+      cancelSync();
     };
-  }, [refreshPendingCount]);
+  }, [cancelSync, refreshPendingCount]);
 
   const queueMutationIfOffline = useCallback(
     async (
@@ -103,19 +143,27 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
       payload?: unknown,
       photoBlobKeys?: string[]
     ): Promise<boolean> => {
-      if (isOnline) return false;
+      if (isOnline || !isActiveRef.current) return false;
 
-      const { queueMutation } = await import("@/lib/offlineQueue");
-      await queueMutation(method, endpoint, payload, photoBlobKeys);
+      await queueMutation(
+        method,
+        endpoint,
+        payload,
+        photoBlobKeys,
+        dataGeneration,
+      );
+      if (!isActiveRef.current) return false;
+
       await refreshPendingCount();
       return true;
     },
-    [isOnline, refreshPendingCount]
+    [dataGeneration, isOnline, refreshPendingCount]
   );
 
   const cacheResponse = useCallback(async (url: string, data: unknown) => {
-    await cacheApiResponse(url, data);
-  }, []);
+    if (!isActiveRef.current) return;
+    await cacheApiResponse(url, data, dataGeneration);
+  }, [dataGeneration]);
 
   const getCachedResponse = useCallback(async (url: string) => {
     return getCachedApiResponse(url);

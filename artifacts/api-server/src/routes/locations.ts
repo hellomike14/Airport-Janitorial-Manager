@@ -3,6 +3,12 @@ import { db } from "@workspace/db";
 import { staffLocationsTable, staffTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
+import type { StaffRow } from "../lib/actorSession";
+import {
+  canViewStaffLocations,
+  requestedStaffIdMatchesActor,
+  type StaffActor,
+} from "../lib/staffAuthorization";
 
 const router: IRouter = Router();
 
@@ -20,10 +26,16 @@ router.post("/locations/update", async (req: Request, res: Response) => {
     return;
   }
 
+  const actor = res.locals.staffActor as StaffRow;
+  if (!requestedStaffIdMatchesActor(actor as StaffActor, body.data.staffId)) {
+    res.status(403).json({ error: "Cannot update another staff member's location" });
+    return;
+  }
+
   const existing = await db
     .select()
     .from(staffLocationsTable)
-    .where(eq(staffLocationsTable.staffId, body.data.staffId));
+    .where(eq(staffLocationsTable.staffId, actor.id));
 
   if (existing.length > 0) {
     const [updated] = await db
@@ -34,14 +46,14 @@ router.post("/locations/update", async (req: Request, res: Response) => {
         accuracy: body.data.accuracy ?? null,
         updatedAt: new Date(),
       })
-      .where(eq(staffLocationsTable.staffId, body.data.staffId))
+      .where(eq(staffLocationsTable.staffId, actor.id))
       .returning();
     res.json(updated);
   } else {
     const [created] = await db
       .insert(staffLocationsTable)
       .values({
-        staffId: body.data.staffId,
+        staffId: actor.id,
         latitude: body.data.latitude,
         longitude: body.data.longitude,
         accuracy: body.data.accuracy ?? null,
@@ -52,6 +64,12 @@ router.post("/locations/update", async (req: Request, res: Response) => {
 });
 
 router.get("/locations", async (_req: Request, res: Response) => {
+  const actor = res.locals.staffActor as StaffRow;
+  if (!canViewStaffLocations(actor as StaffActor)) {
+    res.status(403).json({ error: "Not authorized to view staff locations" });
+    return;
+  }
+
   const locations = await db
     .select({
       id: staffLocationsTable.id,

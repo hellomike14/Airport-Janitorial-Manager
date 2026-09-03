@@ -4,6 +4,10 @@ packages:
   - lib/integrations/*
   - scripts
 
+allowBuilds:
+  '@clerk/shared': true
+  esbuild: true
+
 autoInstallPeers: false
 
 catalog:
@@ -18,11 +22,11 @@ catalog:
   '@vitejs/plugin-react': ^5.0.4
   class-variance-authority: ^0.7.1
   clsx: 2.1.1
-  drizzle-orm: ^0.45.1
+  drizzle-orm: ^0.45.2
   framer-motion: ^12.23.24
   lucide-react: 0.545.0
-  react: 19.1.0
-  react-dom: 19.1.0
+  react: 19.1.4
+  react-dom: 19.1.4
   tailwind-merge: 3.5.0
   tailwindcss: ^4.1.14
   tsx: ^4.21.0
@@ -38,6 +42,18 @@ onlyBuiltDependencies:
   - unrs-resolver
 
 overrides:
+  path-to-regexp: 8.4.0
+  picomatch@^2: 2.3.2
+  picomatch@^4: 4.0.4
+  lodash: 4.18.1
+  'nanoid@>=4.0.0 <5.1.16': 5.1.16
+  'fast-xml-parser@<5.7.0': 5.11.1
+  'fast-xml-builder@<1.1.7': 1.2.0
+  'form-data@<2.5.6': 2.5.6
+  'qs@<6.16.0': 6.16.0
+  'uuid@<11.1.1': 11.1.1
+  'body-parser@>=2.0.0 <2.3.0': 2.3.0
+  '@tootallnate/once@<2.0.1': 2.0.1
   '@esbuild-kit/esm-loader': npm:tsx@^4.21.0
   '@expo/ngrok-bin>@expo/ngrok-bin-darwin-arm64': '-'
   '@expo/ngrok-bin>@expo/ngrok-bin-darwin-x64': '-'
@@ -58,7 +74,6 @@ overrides:
   '@tailwindcss/oxide>@tailwindcss/oxide-linux-arm64-musl': '-'
   '@tailwindcss/oxide>@tailwindcss/oxide-linux-x64-musl': '-'
   '@tailwindcss/oxide>@tailwindcss/oxide-win32-arm64-msvc': '-'
-  '@tailwindcss/oxide>@tailwindcss/oxide-win32-x64-msvc': '-'
   esbuild: 0.27.3
   esbuild>@esbuild/aix-ppc64: '-'
   esbuild>@esbuild/android-arm: '-'
@@ -84,7 +99,6 @@ overrides:
   esbuild>@esbuild/sunos-x64: '-'
   esbuild>@esbuild/win32-arm64: '-'
   esbuild>@esbuild/win32-ia32: '-'
-  esbuild>@esbuild/win32-x64: '-'
   lightningcss>lightningcss-android-arm64: '-'
   lightningcss>lightningcss-darwin-arm64: '-'
   lightningcss>lightningcss-darwin-x64: '-'
@@ -94,7 +108,6 @@ overrides:
   lightningcss>lightningcss-linux-arm64-musl: '-'
   lightningcss>lightningcss-linux-x64-musl: '-'
   lightningcss>lightningcss-win32-arm64-msvc: '-'
-  lightningcss>lightningcss-win32-x64-msvc: '-'
   rollup>@rollup/rollup-android-arm-eabi: '-'
   rollup>@rollup/rollup-android-arm64: '-'
   rollup>@rollup/rollup-darwin-arm64: '-'
@@ -118,4 +131,3 @@ overrides:
   rollup>@rollup/rollup-win32-arm64-msvc: '-'
   rollup>@rollup/rollup-win32-ia32-msvc: '-'
   rollup>@rollup/rollup-win32-x64-gnu: '-'
-  rollup>@rollup/rollup-win32-x64-msvc: '-'

@@ -23,8 +23,18 @@ export const ListStaffResponseItem = zod.object({
   role: zod.enum(["staff", "supervisor", "admin", "inspector"]),
   hasEmail: zod
     .boolean()
+    .describe("Whether the staff member has a configured sign-in email."),
+  email: zod
+    .string()
+    .nullish()
     .describe(
-      "Whether the staff member has a configured sign-in email. The email address itself is never returned.",
+      "Exact normalized login email; included only for authenticated administrators.",
+    ),
+  loginEnabled: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Whether this staff identity may authenticate; included only for authenticated administrators.",
     ),
   active: zod.boolean(),
   createdAt: zod.string(),
@@ -62,8 +72,18 @@ export const UpdateStaffMemberResponse = zod.object({
   role: zod.enum(["staff", "supervisor", "admin", "inspector"]),
   hasEmail: zod
     .boolean()
+    .describe("Whether the staff member has a configured sign-in email."),
+  email: zod
+    .string()
+    .nullish()
     .describe(
-      "Whether the staff member has a configured sign-in email. The email address itself is never returned.",
+      "Exact normalized login email; included only for authenticated administrators.",
+    ),
+  loginEnabled: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Whether this staff identity may authenticate; included only for authenticated administrators.",
     ),
   active: zod.boolean(),
   createdAt: zod.string(),
@@ -171,6 +191,21 @@ export const ListTasksResponseItem = zod.object({
     ),
   isSpecial: zod.boolean(),
   notes: zod.string().nullish(),
+  completionEmailStatus: zod
+    .enum([
+      "not_applicable",
+      "pending",
+      "sending",
+      "retrying",
+      "accepted",
+      "disabled",
+      "not_configured",
+      "failed",
+    ])
+    .nullish()
+    .describe(
+      "Present on completion; accepted means SendGrid accepted the inspector email, not mailbox delivery.",
+    ),
 });
 export const ListTasksResponse = zod.array(ListTasksResponseItem);
 
@@ -209,6 +244,19 @@ export const ListSpecialTasksResponseItem = zod.object({
     ),
   createdAt: zod.string(),
   notes: zod.string().nullish(),
+  assignedToId: zod.number().nullish(),
+  assignedToName: zod.string().nullish(),
+  assignedToActive: zod.boolean().nullish(),
+  sourceMessageId: zod.number().nullish(),
+  dueAt: zod.string().nullish(),
+  escalatedAt: zod.string().nullish(),
+  assignmentMethod: zod.enum(["fresh_gps", "area_roster_workload"]).nullish(),
+  emailNotificationStatus: zod
+    .enum(["not_applicable", "sent", "disabled", "not_configured", "failed"])
+    .optional()
+    .describe(
+      "Present when a special request is created; inspector requests attempt external email delivery.",
+    ),
 });
 export const ListSpecialTasksResponse = zod.array(ListSpecialTasksResponseItem);
 
@@ -260,6 +308,21 @@ export const CompleteTaskResponse = zod.object({
     ),
   isSpecial: zod.boolean(),
   notes: zod.string().nullish(),
+  completionEmailStatus: zod
+    .enum([
+      "not_applicable",
+      "pending",
+      "sending",
+      "retrying",
+      "accepted",
+      "disabled",
+      "not_configured",
+      "failed",
+    ])
+    .nullish()
+    .describe(
+      "Present on completion; accepted means SendGrid accepted the inspector email, not mailbox delivery.",
+    ),
 });
 
 /**
@@ -295,6 +358,21 @@ export const UncompleteTaskResponse = zod.object({
     ),
   isSpecial: zod.boolean(),
   notes: zod.string().nullish(),
+  completionEmailStatus: zod
+    .enum([
+      "not_applicable",
+      "pending",
+      "sending",
+      "retrying",
+      "accepted",
+      "disabled",
+      "not_configured",
+      "failed",
+    ])
+    .nullish()
+    .describe(
+      "Present on completion; accepted means SendGrid accepted the inspector email, not mailbox delivery.",
+    ),
 });
 
 /**
@@ -324,6 +402,7 @@ export const ListAssignmentsResponseItem = zod.object({
   staffName: zod.string(),
   areaId: zod.number(),
   areaName: zod.string(),
+  terminal: zod.string(),
   assignmentDate: zod.string(),
   assignedById: zod.number(),
   assignedByName: zod.string(),
@@ -692,8 +771,11 @@ export const MarkAllNotificationsReadResponse = zod.object({
 /**
  * @summary List conversations for a staff member
  */
+export const listConversationsQueryArchivedDefault = false;
+
 export const ListConversationsQueryParams = zod.object({
   staffId: zod.coerce.number(),
+  archived: zod.coerce.boolean().default(listConversationsQueryArchivedDefault),
 });
 
 export const ListConversationsResponseItem = zod.object({
@@ -708,6 +790,7 @@ export const ListConversationsResponseItem = zod.object({
   lastMessage: zod.string().nullable(),
   lastMessageAt: zod.string().nullable(),
   unreadCount: zod.number(),
+  archived: zod.boolean(),
   createdAt: zod.string(),
 });
 export const ListConversationsResponse = zod.array(
@@ -734,7 +817,47 @@ export const StartConversationResponse = zod.object({
   lastMessage: zod.string().nullable(),
   lastMessageAt: zod.string().nullable(),
   unreadCount: zod.number(),
+  archived: zod.boolean(),
   createdAt: zod.string(),
+});
+
+/**
+ * @summary Open the dedicated inspector@marvolenterprises.com conversation
+ */
+export const StartInspectorConversationBody = zod.object({
+  staffId: zod.number(),
+});
+
+export const StartInspectorConversationResponse = zod.object({
+  id: zod.number(),
+  isGroup: zod.boolean(),
+  groupName: zod.string().nullable(),
+  participantCount: zod.number(),
+  participantNames: zod.array(zod.string()),
+  otherStaffId: zod.number(),
+  otherStaffName: zod.string(),
+  otherStaffRole: zod.string(),
+  lastMessage: zod.string().nullable(),
+  lastMessageAt: zod.string().nullable(),
+  unreadCount: zod.number(),
+  archived: zod.boolean(),
+  createdAt: zod.string(),
+});
+
+/**
+ * @summary Archive or restore a conversation for the authenticated staff member
+ */
+export const SetConversationArchivedParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const SetConversationArchivedBody = zod.object({
+  staffId: zod.number(),
+  archived: zod.boolean(),
+});
+
+export const SetConversationArchivedResponse = zod.object({
+  archived: zod.boolean(),
 });
 
 /**
@@ -755,6 +878,32 @@ export const ListConversationMessagesResponseItem = zod.object({
   senderName: zod.string(),
   body: zod.string(),
   isRead: zod.boolean(),
+  clientRequestId: zod.string().uuid().nullable(),
+  emailDeliveryStatus: zod
+    .enum([
+      "not_applicable",
+      "pending",
+      "sending",
+      "retrying",
+      "accepted",
+      "disabled",
+      "not_configured",
+      "failed",
+    ])
+    .describe(
+      "SendGrid handoff state; accepted means SendGrid accepted the request, not mailbox delivery.",
+    ),
+  isInboundEmail: zod.boolean(),
+  specialTaskId: zod.number().nullable(),
+  specialTaskDueAt: zod.string().nullable(),
+  specialTaskEscalatedAt: zod.string().nullable(),
+  specialTaskCompleted: zod.boolean().nullable(),
+  specialTaskAssignedStaffId: zod.number().nullable(),
+  specialTaskAssignedStaffName: zod.string().nullable(),
+  specialTaskAreaName: zod.string().nullable(),
+  specialTaskAssignmentMethod: zod
+    .enum(["fresh_gps", "area_roster_workload"])
+    .nullable(),
   createdAt: zod.string(),
 });
 export const ListConversationMessagesResponse = zod.array(
@@ -773,6 +922,82 @@ export const sendConversationMessageBodyBodyMax = 2000;
 export const SendConversationMessageBody = zod.object({
   senderId: zod.number(),
   body: zod.string().min(1).max(sendConversationMessageBodyBodyMax),
+  clientRequestId: zod
+    .string()
+    .uuid()
+    .describe(
+      "Generated once per compose\/send action and reused for retries.",
+    ),
+});
+
+export const SendConversationMessageResponse = zod.object({
+  id: zod.number(),
+  conversationId: zod.number(),
+  senderId: zod.number(),
+  senderName: zod.string(),
+  body: zod.string(),
+  isRead: zod.boolean(),
+  clientRequestId: zod.string().uuid().nullable(),
+  emailDeliveryStatus: zod
+    .enum([
+      "not_applicable",
+      "pending",
+      "sending",
+      "retrying",
+      "accepted",
+      "disabled",
+      "not_configured",
+      "failed",
+    ])
+    .describe(
+      "SendGrid handoff state; accepted means SendGrid accepted the request, not mailbox delivery.",
+    ),
+  isInboundEmail: zod.boolean(),
+  specialTaskId: zod.number().nullable(),
+  specialTaskDueAt: zod.string().nullable(),
+  specialTaskEscalatedAt: zod.string().nullable(),
+  specialTaskCompleted: zod.boolean().nullable(),
+  specialTaskAssignedStaffId: zod.number().nullable(),
+  specialTaskAssignedStaffName: zod.string().nullable(),
+  specialTaskAreaName: zod.string().nullable(),
+  specialTaskAssignmentMethod: zod
+    .enum(["fresh_gps", "area_roster_workload"])
+    .nullable(),
+  createdAt: zod.string(),
+});
+
+/**
+ * @summary Triage an authenticated inspector email into an urgent special assignment
+ */
+export const AssignInspectorMessageParams = zod.object({
+  id: zod.coerce.number(),
+  msgId: zod.coerce.number(),
+});
+
+export const assignInspectorMessageBodyTaskDateRegExp = new RegExp(
+  "^\\d{4}-\\d{2}-\\d{2}$",
+);
+
+export const AssignInspectorMessageBody = zod.object({
+  staffId: zod.number(),
+  areaId: zod.number(),
+  taskDate: zod
+    .string()
+    .regex(assignInspectorMessageBodyTaskDateRegExp)
+    .optional(),
+});
+
+export const AssignInspectorMessageResponse = zod.object({
+  status: zod.enum(["assigned", "already_assigned"]),
+  taskId: zod.number(),
+  assignedStaffId: zod.number(),
+  assignedStaffName: zod.string(),
+  areaId: zod.number(),
+  areaName: zod.string(),
+  taskDate: zod.string(),
+  dueAt: zod.string(),
+  assignmentMethod: zod.enum(["fresh_gps", "area_roster_workload"]),
+  distanceMeters: zod.number().nullable(),
 });
 
 /**
@@ -791,13 +1016,19 @@ export const MarkConversationReadResponse = zod.object({
 });
 
 /**
- * @summary Request a presigned URL for file upload
+ * @summary Request a short-lived verified URL for file upload
  */
+export const requestUploadUrlBodyNameMax = 255;
+
+export const requestUploadUrlBodySizeMax = 12582912;
 
 export const RequestUploadUrlBody = zod.object({
-  name: zod.string().min(1),
-  size: zod.number().min(1),
+  name: zod.string().min(1).max(requestUploadUrlBodyNameMax),
+  size: zod.number().min(1).max(requestUploadUrlBodySizeMax),
   contentType: zod.string().min(1),
+  purpose: zod
+    .enum(["staff-photo", "application-document"])
+    .describe("Binds the upload to its authorization and serving policy."),
 });
 
 export const RequestUploadUrlResponse = zod.object({

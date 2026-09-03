@@ -5,11 +5,13 @@ import { useTranslation } from "react-i18next";
 import { getDateLocale } from "@/i18n/dateLocale";
 import {
   useListTasks,
+  getListTasksQueryKey,
   useCompleteTask,
   useUncompleteTask,
   useCompleteAllTasks,
   useListAreas,
   useListAreaEffectiveTasks,
+  getListAreaEffectiveTasksQueryKey,
   useAddAreaTaskExclusion,
   useRemoveAreaTaskExclusion,
 } from "@workspace/api-client-react";
@@ -37,11 +39,17 @@ export default function AreaTasks() {
   const areaInfo = areas?.find(a => a.id === areaId);
 
   const { data: tasks, isLoading } = useListTasks({ areaId, date: selectedDate }, {
-    query: { enabled: !!areaId }
+    query: {
+      queryKey: getListTasksQueryKey({ areaId, date: selectedDate }),
+      enabled: !!areaId,
+    }
   });
 
   const { data: effectiveTasks, refetch: refetchEffective } = useListAreaEffectiveTasks(areaId, {
-    query: { enabled: !!areaId && isAdmin },
+    query: {
+      queryKey: getListAreaEffectiveTasksQueryKey(areaId),
+      enabled: !!areaId && isAdmin,
+    },
   });
 
   const onExclusionChange = () => {
