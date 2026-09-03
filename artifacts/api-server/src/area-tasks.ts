@@ -14,6 +14,9 @@ import { renameSharedAreaName } from "./area-renames";
 //     Bin #N" layout (same shape as R1-West) — qualified with the "Terminal::AreaName"
 //     key so Terminal B - East no longer receives these extra tasks.
 const RAW_AREA_SPECIFIC_TASKS: Record<string, { taskName: string; taskOrder: number }[]> = {
+  "Terminal A - East::Garden": [
+    { taskName: "Empty all trash receptacles and replace liners", taskOrder: 1 },
+  ],
   "Level P1 - East": [
     { taskName: "Clean trash bin #1", taskOrder: 16 },
     { taskName: "Clean trash bin #2", taskOrder: 17 },
@@ -271,6 +274,7 @@ const TERMINALS_FOR_OLD_KEY: Record<string, string[]> = {
 // Keys are raw (pre-rename) qualified keys "Terminal::AreaName"; expanded to
 // post-rename keys below so they line up with what ensureTasksForDate looks up.
 const RAW_AREAS_REPLACING_DEFAULTS: string[] = [
+  "Terminal A - East::Garden",
   "Terminal A - East::Check point",
   "Terminal A - West::Level P1 - West",
   "Terminal B - West::Taxis",

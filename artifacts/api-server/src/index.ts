@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { staffTable, areasTable, taskTypesTable, notificationsTable, staffLocationsTable, tasksTable, taskExclusionsTable, assignmentsTable, schedulesTable, issuesTable, sharedPhotosTable, conversationsTable, messagesTable, conversationParticipantsTable } from "@workspace/db/schema";
 import { eq, and, count, inArray, or, gte, like, sql } from "drizzle-orm";
 import { renameSharedAreaName, AREA_RENAME_MAP } from "./area-renames";
-import { AREAS_REPLACING_DEFAULTS } from "./area-tasks";
+import { AREA_SPECIFIC_TASKS, AREAS_REPLACING_DEFAULTS } from "./area-tasks";
 import { SEED_STAFF, REMOVED_STAFF_NAMES } from "./seed-data";
 
 const rawPort = process.env["PORT"];
@@ -711,8 +711,8 @@ async function seed() {
     }
   }
 
-  // Remove the 13 default task-type rows from areas whose area-specific bin
-  // list fully replaces the defaults (Check point, Taxis on Terminal B-West).
+  // Remove default task-type rows from areas whose area-specific list fully
+  // replaces the defaults.
   // Only un-completed rows are removed so historical completion records on
   // these areas stay intact.
   const DEFAULT_TASK_NAMES = SEED_TASK_TYPES.map((t) => t.taskName);
@@ -724,6 +724,13 @@ async function seed() {
     if (sep === -1) continue;
     const terminal = qualifiedKey.slice(0, sep);
     const name = qualifiedKey.slice(sep + 2);
+    const replacementTaskNames = new Set(
+      (AREA_SPECIFIC_TASKS[qualifiedKey] ?? []).map((task) => task.taskName),
+    );
+    const defaultsToRemove = DEFAULT_TASK_NAMES.filter(
+      (taskName) => !replacementTaskNames.has(taskName),
+    );
+    if (defaultsToRemove.length === 0) continue;
     const matches = await db
       .select({ id: areasTable.id })
       .from(areasTable)
@@ -735,7 +742,7 @@ async function seed() {
           and(
             eq(tasksTable.areaId, area.id),
             eq(tasksTable.completed, false),
-            inArray(tasksTable.taskName, DEFAULT_TASK_NAMES),
+            inArray(tasksTable.taskName, defaultsToRemove),
           ),
         )
         .returning({ id: tasksTable.id });
