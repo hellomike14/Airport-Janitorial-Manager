@@ -5,7 +5,6 @@ export const SEED_STAFF: { name: string; role: "admin" | "inspector" | "supervis
   { name: "Priscila Rosero", role: "supervisor", email: "Priscilarosero27@gmail.com" },
   { name: "Reynaldo Hernandez", role: "supervisor", email: "cnuevo986@gmail.com" },
 
-  { name: "Jason Delgado", role: "staff" },
   { name: "Jean Gardy Rigueur", role: "staff" },
   { name: "Jose Camargo", role: "staff" },
   { name: "Juan Carlos Zurita Blacio", role: "staff" },
@@ -24,5 +23,6 @@ export const REMOVED_STAFF_NAMES = [
   "Marie Ingrid Daniel",
   "Jose Altagracia Maria",
   "Edner Jules",
+  "Jason Delgado",
   "Ivan Serrano",
 ];
