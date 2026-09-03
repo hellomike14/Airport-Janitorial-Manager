@@ -21,29 +21,31 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 const RAW_SEED_AREAS = [
-  { name: "Level 4 - Row L-H",           terminal: "Terminal A - East", location: "East",         sortOrder: 1 },
-  { name: "Level 3 - Row H-P",           terminal: "Terminal A - East", location: "East",         sortOrder: 2 },
-  { name: "Level 2 - Row H-P",           terminal: "Terminal A - East", location: "East",         sortOrder: 3 },
-  { name: "Level 1 - Row H-P",           terminal: "Terminal A - East", location: "East",         sortOrder: 4 },
+  { name: "P4 - Row L-H",                terminal: "Terminal A - East", location: "East",         sortOrder: 1 },
+  { name: "Terminal A — P3 Row H-P",     terminal: "Terminal A - East", location: "East",         sortOrder: 2 },
+  { name: "Terminal A — P2 Row H-P",     terminal: "Terminal A - East", location: "East",         sortOrder: 3 },
+  { name: "Terminal A — P1 Row H-P",     terminal: "Terminal A - East", location: "East",         sortOrder: 4 },
   { name: "R2 - Avis",                   terminal: "Terminal A - East", location: "East",         sortOrder: 5 },
   { name: "R1 - Avis",                   terminal: "Terminal A - East", location: "East",         sortOrder: 6 },
   { name: "Taxis",                       terminal: "Terminal A - East", location: "East",         sortOrder: 7 },
   { name: "Check point",                 terminal: "Terminal A - East", location: "East",         sortOrder: 8 },
   { name: "Garden",                      terminal: "Terminal A - East", location: "East",         sortOrder: 9 },
-  { name: "Level 2 - Row A-G",           terminal: "Terminal A - West", location: "West",         sortOrder: 12 },
-  { name: "Level 1 - Row D-G",           terminal: "Terminal A - West", location: "West",         sortOrder: 13 },
-  { name: "R1 - Enterprises",            terminal: "Terminal A - West", location: "West",         sortOrder: 14 },
-  { name: "R1 - Hertz",                  terminal: "Terminal A - West", location: "West",         sortOrder: 15 },
-  { name: "Level 4 - Row C-G",                                terminal: "Terminal B - East", location: "East",         sortOrder: 16 },
-  { name: "Level 3 - Row A-G",                                terminal: "Terminal B - East", location: "East",         sortOrder: 17 },
-  { name: "Level 2 - Row A-G",                                terminal: "Terminal B - East", location: "East",         sortOrder: 18 },
-  { name: "Level 1 - Row D-G",                                terminal: "Terminal B - East", location: "East",         sortOrder: 19 },
+  { name: "Terminal A — P2 Row A-G",     terminal: "Terminal A - West", location: "West",         sortOrder: 12 },
+  { name: "Terminal A — P2 West",        terminal: "Terminal A - West", location: "West",         sortOrder: 13 },
+  { name: "Terminal A — P1 Row D-G",     terminal: "Terminal A - West", location: "West",         sortOrder: 14 },
+  { name: "Terminal A — P1 West",        terminal: "Terminal A - West", location: "West",         sortOrder: 15 },
+  { name: "R1 - Enterprises",            terminal: "Terminal A - West", location: "West",         sortOrder: 16 },
+  { name: "R1 - Hertz",                  terminal: "Terminal A - West", location: "West",         sortOrder: 17 },
+  { name: "Terminal B — P4 Row C-G",                           terminal: "Terminal B - East", location: "East",         sortOrder: 16 },
+  { name: "Terminal B — P3 Row A-G",                           terminal: "Terminal B - East", location: "East",         sortOrder: 17 },
+  { name: "Terminal B — P2 Row A-G",                           terminal: "Terminal B - East", location: "East",         sortOrder: 18 },
+  { name: "Terminal B — P1 Row D-G",                           terminal: "Terminal B - East", location: "East",         sortOrder: 19 },
   { name: "R2 - Avis",                                        terminal: "Terminal B - East", location: "East",         sortOrder: 20 },
   { name: "R1 - Hertz/Enterprise Return",                     terminal: "Terminal B - East", location: "East",         sortOrder: 21 },
-  { name: "Level 4 - Row H-M",                                terminal: "Terminal B - West", location: "West",         sortOrder: 22 },
-  { name: "Level 3 - Row H-P",                                terminal: "Terminal B - West", location: "West",         sortOrder: 23 },
-  { name: "Level 2 - Row H-P",                                terminal: "Terminal B - West", location: "West",         sortOrder: 24 },
-  { name: "Level 1 - Row H-P",                                terminal: "Terminal B - West", location: "West",         sortOrder: 25 },
+  { name: "P4 - Row H-M",                                     terminal: "Terminal B - West", location: "West",         sortOrder: 22 },
+  { name: "Terminal B — P3 Row H-P",                           terminal: "Terminal B - West", location: "West",         sortOrder: 23 },
+  { name: "Terminal B — P2 Row H-P",                           terminal: "Terminal B - West", location: "West",         sortOrder: 24 },
+  { name: "Terminal B — P1 Row H-P",                           terminal: "Terminal B - West", location: "West",         sortOrder: 25 },
   { name: "R2 - Hertz",                                       terminal: "Terminal B - West", location: "West",         sortOrder: 26 },
   { name: "R1 - Aloma/Enterprise Pick up",                    terminal: "Terminal B - West", location: "West",         sortOrder: 27 },
   { name: "Taxis",                                            terminal: "Terminal B - West", location: "West",         sortOrder: 28 },
@@ -558,9 +560,9 @@ async function seed() {
       if (KEEP_ACTIVE_PARKING.has(`${terminal}||${lvl}`)) continue;
       // Pre-rename form, e.g. "Level P1 - East".
       OBSOLETE_AREA_TARGETS.push({ name: `Level ${lvl} - ${side}`, terminal });
-      // Post-rename form, e.g. "Terminal A — Level P1 East".
+      // Post-rename form, e.g. "Terminal A — P1 East".
       const short = terminal.startsWith("Terminal A") ? "Terminal A" : "Terminal B";
-      OBSOLETE_AREA_TARGETS.push({ name: `${short} — Level ${lvl} ${side}`, terminal });
+      OBSOLETE_AREA_TARGETS.push({ name: `${short} — ${lvl} ${side}`, terminal });
     }
   }
   for (const target of OBSOLETE_AREA_TARGETS) {
@@ -582,8 +584,10 @@ async function seed() {
   const REACTIVATE_AREA_TARGETS: Array<{ name: string; terminal: string }> = [
     { name: "Level P1 - West", terminal: "Terminal A - West" },
     { name: "Terminal A — Level P1 West", terminal: "Terminal A - West" },
+    { name: "Terminal A — P1 West", terminal: "Terminal A - West" },
     { name: "Level P2 - West", terminal: "Terminal A - West" },
     { name: "Terminal A — Level P2 West", terminal: "Terminal A - West" },
+    { name: "Terminal A — P2 West", terminal: "Terminal A - West" },
   ];
   for (const target of REACTIVATE_AREA_TARGETS) {
     const matches = await tx
