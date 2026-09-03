@@ -176,57 +176,6 @@ async function seed() {
   // no PIN hashes linger in any environment (dev or production).
   await db.execute(sql`ALTER TABLE "staff" DROP COLUMN IF EXISTS "password"`);
 
-  // Additive, idempotent inspector-workflow migration. It deliberately
-  // creates new audit/outbox structures only; existing operational history is
-  // neither deleted nor rewritten.
-  await db.execute(sql`ALTER TABLE "staff" ADD COLUMN IF NOT EXISTS "login_enabled" boolean NOT NULL DEFAULT true`);
-  await db.execute(sql`ALTER TABLE "staff" ADD COLUMN IF NOT EXISTS "former_employee" boolean NOT NULL DEFAULT false`);
-  await db.execute(sql`CREATE TABLE IF NOT EXISTS "object_uploads" (
-    "id" serial PRIMARY KEY, "object_path" text NOT NULL UNIQUE,
-    "owner_staff_id" integer REFERENCES "staff"("id"),
-    "purpose" text NOT NULL CHECK ("purpose" IN ('task_before','task_after','issue_before','issue_after','conversation_attachment','shared_photo','application_document')),
-    "task_id" integer REFERENCES "tasks"("id"), "conversation_id" integer REFERENCES "conversations"("id"),
-    "mime_type" text NOT NULL, "size_bytes" integer NOT NULL, "created_at" timestamp NOT NULL DEFAULT now()
-  )`);
-  await db.execute(sql`ALTER TABLE "object_uploads" ALTER COLUMN "owner_staff_id" DROP NOT NULL`);
-  await db.execute(sql`ALTER TABLE "object_uploads" ADD COLUMN IF NOT EXISTS "issue_id" integer`);
-  await db.execute(sql`ALTER TABLE "object_uploads" ADD COLUMN IF NOT EXISTS "area_id" integer`);
-  await db.execute(sql`ALTER TABLE "object_uploads" ADD COLUMN IF NOT EXISTS "applicant_token" text`);
-  await db.execute(sql`ALTER TABLE "object_uploads" ADD COLUMN IF NOT EXISTS "claimed_at" timestamp`);
-  await db.execute(sql`ALTER TABLE "object_uploads" DROP CONSTRAINT IF EXISTS "object_uploads_purpose_check"`);
-  await db.execute(sql`ALTER TABLE "object_uploads" ADD CONSTRAINT "object_uploads_purpose_check" CHECK ("purpose" IN ('task_before','task_after','issue_before','issue_after','conversation_attachment','shared_photo','application_document'))`);
-  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "object_uploads_applicant_token_unique" ON "object_uploads" ("applicant_token") WHERE "applicant_token" IS NOT NULL`);
-  await db.execute(sql`ALTER TABLE "messages" ADD COLUMN IF NOT EXISTS "client_request_id" text`);
-  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "messages_sender_client_request_unique" ON "messages" ("sender_id", "client_request_id") WHERE "client_request_id" IS NOT NULL`);
-  await db.execute(sql`CREATE TABLE IF NOT EXISTS "conversation_archives" ("conversation_id" integer NOT NULL REFERENCES "conversations"("id") ON DELETE CASCADE, "staff_id" integer NOT NULL REFERENCES "staff"("id") ON DELETE CASCADE, "archived_at" timestamp NOT NULL DEFAULT now(), CONSTRAINT "conversation_archives_unique" UNIQUE ("conversation_id", "staff_id"))`);
-  await db.execute(sql`CREATE TABLE IF NOT EXISTS "message_email_outbox" ("id" serial PRIMARY KEY, "message_id" integer NOT NULL UNIQUE REFERENCES "messages"("id") ON DELETE CASCADE, "conversation_id" integer NOT NULL, "inspector_id" integer NOT NULL, "supervisor_id" integer NOT NULL, "inspector_email" text NOT NULL, "inspector_name" text NOT NULL, "supervisor_name" text NOT NULL, "message_body" text NOT NULL, "status" text NOT NULL DEFAULT 'pending', "attempt_count" integer NOT NULL DEFAULT 0, "next_attempt_at" timestamp NOT NULL DEFAULT now(), "locked_at" timestamp, "lock_token" text, "last_error" text, "accepted_at" timestamp, "created_at" timestamp NOT NULL DEFAULT now(), "updated_at" timestamp NOT NULL DEFAULT now())`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS "message_email_outbox_ready_idx" ON "message_email_outbox" ("status", "next_attempt_at")`);
-  await db.execute(sql`CREATE TABLE IF NOT EXISTS "inbound_email_messages" ("provider_message_id" text PRIMARY KEY, "conversation_id" integer NOT NULL REFERENCES "conversations"("id") ON DELETE CASCADE, "sender_id" integer NOT NULL REFERENCES "staff"("id"), "message_id" integer REFERENCES "messages"("id") ON DELETE SET NULL, "received_at" timestamp NOT NULL DEFAULT now())`);
-  await db.execute(sql`CREATE TABLE IF NOT EXISTS "inspector_task_links" ("task_id" integer PRIMARY KEY REFERENCES "tasks"("id") ON DELETE CASCADE, "source_message_id" integer NOT NULL UNIQUE REFERENCES "messages"("id"), "conversation_id" integer NOT NULL REFERENCES "conversations"("id"), "inspector_id" integer NOT NULL REFERENCES "staff"("id"), "supervisor_id" integer NOT NULL REFERENCES "staff"("id"), "assignment_method" text NOT NULL, "assignment_distance_meters" double precision, "target_latitude" double precision, "target_longitude" double precision, "due_at" timestamp NOT NULL, "escalated_at" timestamp, "escalation_staff_id" integer REFERENCES "staff"("id"), "completion_message_id" integer UNIQUE REFERENCES "messages"("id"), "created_at" timestamp NOT NULL DEFAULT now())`);
-  await db.execute(sql`CREATE TABLE IF NOT EXISTS "inspector_task_assignment_history" ("id" serial PRIMARY KEY, "task_id" integer NOT NULL REFERENCES "tasks"("id") ON DELETE CASCADE, "assigned_staff_id" integer NOT NULL REFERENCES "staff"("id"), "assigned_by_id" integer REFERENCES "staff"("id"), "event" text NOT NULL, "method" text NOT NULL, "distance_meters" double precision, "provenance" text NOT NULL, "created_at" timestamp NOT NULL DEFAULT now())`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS "inspector_task_assignment_history_task_idx" ON "inspector_task_assignment_history" ("task_id", "created_at")`);
-  // Retire the pre-login-policy index after the additive column exists. The
-  // new index is created below after duplicate login identities are disabled.
-  await db.execute(sql`DROP INDEX IF EXISTS "staff_email_active_unique"`);
-
-  // Email is the join key between Clerk accounts and staff records, so it
-  // must be unambiguous among active staff. Clear duplicate emails first
-  // (keep the lowest id; the others are flagged as "no email" in the admin
-  // Staff page), then enforce case-insensitive uniqueness going forward.
-  await db.execute(sql`
-    UPDATE "staff" s SET "email" = NULL
-    WHERE s."active" = true AND s."login_enabled" = true AND s."email" IS NOT NULL
-      AND EXISTS (
-        SELECT 1 FROM "staff" o
-        WHERE o."active" = true AND o."login_enabled" = true AND o."email" IS NOT NULL
-          AND lower(btrim(o."email")) = lower(btrim(s."email")) AND o."id" < s."id"
-      )
-  `);
-  await db.execute(sql`
-    CREATE UNIQUE INDEX IF NOT EXISTS "staff_login_email_unique"
-      ON "staff" (lower(btrim("email"))) WHERE "email" IS NOT NULL AND btrim("email") != '' AND "active" = true AND "login_enabled" = true
-  `);
-
   // Preserve existing staff history when a seeded management profile is
   // corrected after it has already been inserted in an environment.
   for (const legacy of LEGACY_STAFF_RENAMES) {
