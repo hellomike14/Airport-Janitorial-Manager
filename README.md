@@ -15,6 +15,8 @@ Approved production identities currently reconciled at API startup:
 | Priscila Rosero | `priscilarosero27@gmail.com` |
 | Reynaldo Hernandez Suarez | `cnuevo986@gmail.com` |
 | Ivan Serrano | `ivanserrano737@gmail.com` |
+| Jean Gardy Rigueur | `jeangardyrigueur@gmail.com` |
+| Juan Carlos Zurita Blacio | `jczb110371@gmail.com` |
 | Kevin Gonzalez Fernandez | `kevingonzalez2015830@gmail.com` |
 | Steeve Alphonse | `steevealphonse86@gmail.com` |
 | John Nelson Louis | `louiszya3@gmail.com` |
@@ -23,9 +25,7 @@ Approved production identities currently reconciled at API startup:
 | Alexis Moron | `alexismoron733@gmail.com` |
 | JeanFranco Perez | `jeanfranco985@gmail.com` |
 
-Edner Jules, Jason Delgado, Jean Gardy Rigueur, Jose Camargo, and Juan Carlos
-Zurita Blacio cannot be granted email-based access until their email addresses
-are added to the roster.
+Jason Delgado and Jose Camargo cannot be granted email-based access until their email addresses are added to the roster. Edner Jules has an email in the production Replit database but remains inactive, so this branch intentionally does not restore his login access unless operations explicitly reactivates him.
 
 `msutherland@marvolenterprises.com` is **notification-only**. The API explicitly denies that address, deactivates/disables any legacy Marcell staff row at startup, and prevents an administrator from assigning the address to a login-enabled staff record.
 
