@@ -13,13 +13,18 @@ export const staffTable = pgTable(
     // Join key between the Clerk account and the staff record — must be
     // unique (case-insensitive) among active staff; see partial index below.
     email: text("email"),
+    // Employment and authentication are deliberately separate.  In
+    // particular, historic and notification-only rows must not become usable
+    // just because a Clerk user has the same email address.
+    loginEnabled: boolean("login_enabled").notNull().default(true),
     active: boolean("active").notNull().default(true),
+    formerEmployee: boolean("former_employee").notNull().default(false),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => [
-    uniqueIndex("staff_email_active_unique")
-      .on(sql`lower(${t.email})`)
-      .where(sql`${t.email} IS NOT NULL AND ${t.email} != '' AND ${t.active} = true`),
+    uniqueIndex("staff_login_email_unique")
+      .on(sql`lower(btrim(${t.email}))`)
+      .where(sql`${t.email} IS NOT NULL AND btrim(${t.email}) != '' AND ${t.active} = true AND ${t.loginEnabled} = true`),
   ],
 );
 

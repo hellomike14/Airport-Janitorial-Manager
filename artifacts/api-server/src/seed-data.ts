@@ -1,7 +1,15 @@
-export const SEED_STAFF: { name: string; role: "admin" | "inspector" | "supervisor" | "staff"; phone?: string; email?: string }[] = [
+export type SeedStaff = { name: string; role: "admin" | "inspector" | "supervisor" | "staff"; phone?: string; email?: string; loginEnabled?: boolean };
+
+/** Login access is opt-in through a seed identity with a real email address. */
+export function isSeedLoginEnabled(staff: SeedStaff): boolean {
+  return staff.loginEnabled === true || (staff.loginEnabled !== false && Boolean(staff.email?.trim()));
+}
+
+export const SEED_STAFF: SeedStaff[] = [
   { name: "Marcell Sutherland", role: "admin", phone: "407-555-0001", email: "msutherland@marvolenterprises.com" },
   { name: "Michael", role: "admin", email: "michael@massifkroo.com" },
-  { name: "MCO Inspector", role: "inspector", phone: "407-555-0099", email: "raquel.santana@goaa.org" },
+  // Dedicated operational identity; do not use a personal inspector address.
+  { name: "MCO Inspector", role: "inspector", phone: "407-555-0099", email: "inspector@marvolenterprises.com" },
   { name: "Priscila Rosero", role: "supervisor", email: "Priscilarosero27@gmail.com" },
   { name: "Reynaldo Hernandez", role: "supervisor", email: "cnuevo986@gmail.com" },
 

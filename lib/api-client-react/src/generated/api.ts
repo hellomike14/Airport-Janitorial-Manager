@@ -41,6 +41,7 @@ import type {
   DeleteResponse,
   ErrorEnvelope,
   GetDashboardParams,
+  GetInspectorWorkflow200,
   HealthStatus,
   Issue,
   JobApplication,
@@ -60,6 +61,9 @@ import type {
   QuickbooksStatus,
   RemoveAreaTaskExclusionRequest,
   ReorderTaskTypesRequest,
+  SendgridInboundReplyRequest,
+  SetConversationArchive200,
+  SetConversationArchiveRequest,
   SpecialTask,
   StaffMember,
   SubmitApplicationRequest,
@@ -4751,4 +4755,355 @@ export const useDisconnectQuickbooks = <
   TContext
 > => {
   return useMutation(getDisconnectQuickbooksMutationOptions(options));
+};
+
+/**
+ * @summary Archive or restore a conversation for the authenticated participant
+ */
+export const getSetConversationArchiveUrl = (id: number) => {
+  return `/api/conversations/${id}/archive`;
+};
+
+export const setConversationArchive = async (
+  id: number,
+  setConversationArchiveRequest: SetConversationArchiveRequest,
+  options?: RequestInit,
+): Promise<SetConversationArchive200> => {
+  return customFetch<SetConversationArchive200>(
+    getSetConversationArchiveUrl(id),
+    {
+      ...options,
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(setConversationArchiveRequest),
+    },
+  );
+};
+
+export const getSetConversationArchiveMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setConversationArchive>>,
+    TError,
+    { id: number; data: BodyType<SetConversationArchiveRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setConversationArchive>>,
+  TError,
+  { id: number; data: BodyType<SetConversationArchiveRequest> },
+  TContext
+> => {
+  const mutationKey = ["setConversationArchive"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setConversationArchive>>,
+    { id: number; data: BodyType<SetConversationArchiveRequest> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return setConversationArchive(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetConversationArchiveMutationResult = NonNullable<
+  Awaited<ReturnType<typeof setConversationArchive>>
+>;
+export type SetConversationArchiveMutationBody =
+  BodyType<SetConversationArchiveRequest>;
+export type SetConversationArchiveMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Archive or restore a conversation for the authenticated participant
+ */
+export const useSetConversationArchive = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setConversationArchive>>,
+    TError,
+    { id: number; data: BodyType<SetConversationArchiveRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof setConversationArchive>>,
+  TError,
+  { id: number; data: BodyType<SetConversationArchiveRequest> },
+  TContext
+> => {
+  return useMutation(getSetConversationArchiveMutationOptions(options));
+};
+
+/**
+ * @summary Accept an authenticated inspector email reply
+ */
+export const getReceiveSendgridInspectorReplyUrl = () => {
+  return `/api/webhooks/sendgrid/inbound`;
+};
+
+export const receiveSendgridInspectorReply = async (
+  sendgridInboundReplyRequest: SendgridInboundReplyRequest,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getReceiveSendgridInspectorReplyUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(sendgridInboundReplyRequest),
+  });
+};
+
+export const getReceiveSendgridInspectorReplyMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof receiveSendgridInspectorReply>>,
+    TError,
+    { data: BodyType<SendgridInboundReplyRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof receiveSendgridInspectorReply>>,
+  TError,
+  { data: BodyType<SendgridInboundReplyRequest> },
+  TContext
+> => {
+  const mutationKey = ["receiveSendgridInspectorReply"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof receiveSendgridInspectorReply>>,
+    { data: BodyType<SendgridInboundReplyRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return receiveSendgridInspectorReply(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReceiveSendgridInspectorReplyMutationResult = NonNullable<
+  Awaited<ReturnType<typeof receiveSendgridInspectorReply>>
+>;
+export type ReceiveSendgridInspectorReplyMutationBody =
+  BodyType<SendgridInboundReplyRequest>;
+export type ReceiveSendgridInspectorReplyMutationError = ErrorType<void>;
+
+/**
+ * @summary Accept an authenticated inspector email reply
+ */
+export const useReceiveSendgridInspectorReply = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof receiveSendgridInspectorReply>>,
+    TError,
+    { data: BodyType<SendgridInboundReplyRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof receiveSendgridInspectorReply>>,
+  TError,
+  { data: BodyType<SendgridInboundReplyRequest> },
+  TContext
+> => {
+  return useMutation(getReceiveSendgridInspectorReplyMutationOptions(options));
+};
+
+/**
+ * @summary Get authorized inspector assignment workflow state and audit history
+ */
+export const getGetInspectorWorkflowUrl = (taskId: number) => {
+  return `/api/inspector-workflow/${taskId}`;
+};
+
+export const getInspectorWorkflow = async (
+  taskId: number,
+  options?: RequestInit,
+): Promise<GetInspectorWorkflow200> => {
+  return customFetch<GetInspectorWorkflow200>(
+    getGetInspectorWorkflowUrl(taskId),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetInspectorWorkflowQueryKey = (taskId: number) => {
+  return [`/api/inspector-workflow/${taskId}`] as const;
+};
+
+export const getGetInspectorWorkflowQueryOptions = <
+  TData = Awaited<ReturnType<typeof getInspectorWorkflow>>,
+  TError = ErrorType<void>,
+>(
+  taskId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getInspectorWorkflow>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetInspectorWorkflowQueryKey(taskId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getInspectorWorkflow>>
+  > = ({ signal }) =>
+    getInspectorWorkflow(taskId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!taskId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getInspectorWorkflow>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetInspectorWorkflowQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getInspectorWorkflow>>
+>;
+export type GetInspectorWorkflowQueryError = ErrorType<void>;
+
+/**
+ * @summary Get authorized inspector assignment workflow state and audit history
+ */
+
+export function useGetInspectorWorkflow<
+  TData = Awaited<ReturnType<typeof getInspectorWorkflow>>,
+  TError = ErrorType<void>,
+>(
+  taskId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getInspectorWorkflow>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetInspectorWorkflowQueryOptions(taskId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Internal scheduler trigger for overdue inspector assignments
+ */
+export const getRunInspectorSlaSweepUrl = () => {
+  return `/api/internal/inspector-sla-sweep`;
+};
+
+export const runInspectorSlaSweep = async (
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getRunInspectorSlaSweepUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getRunInspectorSlaSweepMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof runInspectorSlaSweep>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof runInspectorSlaSweep>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["runInspectorSlaSweep"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof runInspectorSlaSweep>>,
+    void
+  > = () => {
+    return runInspectorSlaSweep(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RunInspectorSlaSweepMutationResult = NonNullable<
+  Awaited<ReturnType<typeof runInspectorSlaSweep>>
+>;
+
+export type RunInspectorSlaSweepMutationError = ErrorType<void>;
+
+/**
+ * @summary Internal scheduler trigger for overdue inspector assignments
+ */
+export const useRunInspectorSlaSweep = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof runInspectorSlaSweep>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof runInspectorSlaSweep>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getRunInspectorSlaSweepMutationOptions(options));
 };

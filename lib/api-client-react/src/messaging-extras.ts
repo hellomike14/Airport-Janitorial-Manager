@@ -5,19 +5,12 @@
  */
 
 import { customFetch } from "./custom-fetch";
-import type { ConversationSummary, ChatMessage } from "./generated/api.schemas";
-
-export interface GroupConversationStartInput {
-  staffId: number;
-  recipientIds: number[];
-  groupName?: string;
-}
-
-export interface UpdateChatMessageInput {
-  senderId: number;
-  /** @minLength 1 @maxLength 2000 */
-  body: string;
-}
+import type {
+  ConversationSummary,
+  ChatMessage,
+  GroupConversationStartInput,
+  UpdateChatMessageInput,
+} from "./generated/api.schemas";
 
 export const startGroupConversation = async (
   input: GroupConversationStartInput,
@@ -27,6 +20,21 @@ export const startGroupConversation = async (
     method: "POST",
     headers: { "Content-Type": "application/json", ...options?.headers },
     body: JSON.stringify(input),
+    ...options,
+  });
+};
+
+/** Fetch the authenticated user's per-user conversation archive. */
+export const listArchivedConversations = async (
+  params: { staffId: number },
+  options?: RequestInit,
+): Promise<ConversationSummary[]> => {
+  const search = new URLSearchParams({
+    staffId: String(params.staffId),
+    archived: "true",
+  });
+  return customFetch<ConversationSummary[]>(`/api/conversations?${search}`, {
+    method: "GET",
     ...options,
   });
 };

@@ -5,7 +5,7 @@ export type SyncState = "idle" | "syncing" | "synced" | "error";
 export function useOnlineStatus() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [syncState, setSyncState] = useState<SyncState>("idle");
-  const syncTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);

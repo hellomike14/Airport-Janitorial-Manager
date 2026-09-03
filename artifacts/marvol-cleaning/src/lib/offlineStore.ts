@@ -1,4 +1,10 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
+import type { UploadUrlRequest } from "@workspace/api-client-react";
+
+export interface QueuedPhotoUpload {
+  blobKey: string;
+  request: UploadUrlRequest;
+}
 
 interface OfflineDB extends DBSchema {
   apiCache: {
@@ -17,6 +23,7 @@ interface OfflineDB extends DBSchema {
       endpoint: string;
       payload?: unknown;
       photoBlobKeys?: string[];
+      photoUploads?: QueuedPhotoUpload[];
       createdAt: number;
     };
     indexes: { "by-created": number };
@@ -89,6 +96,7 @@ export interface QueuedAction {
   endpoint: string;
   payload?: unknown;
   photoBlobKeys?: string[];
+  photoUploads?: QueuedPhotoUpload[];
   createdAt: number;
 }
 

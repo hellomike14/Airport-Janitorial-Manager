@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db } from "@workspace/db";
-import { issuesTable, staffTable, areasTable, notificationsTable, assignmentsTable } from "@workspace/db/schema";
+import { issuesTable, staffTable, areasTable, notificationsTable, assignmentsTable, objectUploadsTable } from "@workspace/db/schema";
 import { eq, and, gte, lte, inArray } from "drizzle-orm";
 import {
   ListIssuesQueryParams,
@@ -10,6 +10,7 @@ import {
   UpdateIssueImagesBody,
 } from "@workspace/api-zod";
 import { z } from "zod";
+import { actorStaffFromRequest } from "../lib/actorSession";
 
 const router: IRouter = Router();
 
@@ -22,6 +23,7 @@ const CompleteIssueParams = z.object({ id: z.coerce.number() });
 const CompleteIssueBody = z.object({
   completionNotes: z.string().nullable().optional(),
   completedById: z.number(),
+  afterImagePath: z.string().nullable().optional(),
 });
 const ListIssuesWithAssignedQuery = z.object({
   date: z.string().optional(),
@@ -195,6 +197,23 @@ router.get("/", async (req: Request, res: Response) => {
 router.post("/", async (req: Request, res: Response) => {
   const body = CreateIssueBody.parse(req.body);
   const today = new Date().toISOString().split("T")[0];
+  const actor = await actorStaffFromRequest(req);
+  if (!actor || (actor.id !== body.reportedById && actor.role !== "admin" && actor.role !== "supervisor")) {
+    res.status(403).json({ error: "Cannot report an issue for this staff member" });
+    return;
+  }
+  if (body.beforeImagePath) {
+    const [upload] = await db.select().from(objectUploadsTable).where(and(
+      eq(objectUploadsTable.objectPath, body.beforeImagePath),
+      eq(objectUploadsTable.ownerStaffId, actor.id),
+      eq(objectUploadsTable.purpose, "issue_before"),
+      eq(objectUploadsTable.areaId, body.areaId),
+    ));
+    if (!upload) {
+      res.status(403).json({ error: "Object is not authorized for this issue" });
+      return;
+    }
+  }
 
   const [created] = await db
     .insert(issuesTable)
@@ -205,9 +224,12 @@ router.post("/", async (req: Request, res: Response) => {
       description: body.description,
       severity: body.severity,
       resolved: false,
-      beforeImagePath: (body as any).beforeImagePath ?? null,
+      beforeImagePath: body.beforeImagePath ?? null,
     })
     .returning();
+  if (body.beforeImagePath) {
+    await db.update(objectUploadsTable).set({ issueId: created.id }).where(eq(objectUploadsTable.objectPath, body.beforeImagePath));
+  }
 
   const [area] = await db.select({ name: areasTable.name }).from(areasTable).where(eq(areasTable.id, created.areaId));
   const [reporter] = await db
@@ -341,6 +363,16 @@ router.patch("/:id/complete", async (req: Request, res: Response) => {
     res.status(400).json({ error: "Invalid input" });
     return;
   }
+  if (body.data.afterImagePath) {
+    const actor = await actorStaffFromRequest(req);
+    const [upload] = await db.select().from(objectUploadsTable).where(and(
+      eq(objectUploadsTable.objectPath, body.data.afterImagePath),
+      eq(objectUploadsTable.ownerStaffId, actor!.id),
+      eq(objectUploadsTable.purpose, "issue_after"),
+      eq(objectUploadsTable.issueId, params.data.id),
+    ));
+    if (!upload) { res.status(403).json({ error: "Object is not authorized for this issue" }); return; }
+  }
 
   const [updated] = await db
     .update(issuesTable)
@@ -348,6 +380,7 @@ router.patch("/:id/complete", async (req: Request, res: Response) => {
       resolved: true,
       resolvedAt: new Date(),
       completionNotes: body.data.completionNotes ?? null,
+      afterImagePath: body.data.afterImagePath ?? undefined,
     })
     .where(eq(issuesTable.id, params.data.id))
     .returning();
@@ -388,6 +421,18 @@ router.patch("/:id/complete", async (req: Request, res: Response) => {
 router.patch("/:id/images", async (req: Request, res: Response) => {
   const { id } = UpdateIssueImagesParams.parse({ id: req.params.id });
   const body = UpdateIssueImagesBody.parse(req.body);
+  const actor = await actorStaffFromRequest(req);
+  for (const [field, path] of [["beforeImagePath", body.beforeImagePath], ["afterImagePath", body.afterImagePath]] as const) {
+    if (!path) continue;
+    const purpose = field === "beforeImagePath" ? "issue_before" : "issue_after";
+    const [upload] = await db.select().from(objectUploadsTable).where(and(
+      eq(objectUploadsTable.objectPath, path),
+      eq(objectUploadsTable.ownerStaffId, actor!.id),
+      eq(objectUploadsTable.purpose, purpose),
+      eq(objectUploadsTable.issueId, id),
+    ));
+    if (!upload) { res.status(403).json({ error: "Object is not authorized for this issue image" }); return; }
+  }
 
   const updateValues: Record<string, any> = {};
   if (body.beforeImagePath !== undefined) updateValues.beforeImagePath = body.beforeImagePath;

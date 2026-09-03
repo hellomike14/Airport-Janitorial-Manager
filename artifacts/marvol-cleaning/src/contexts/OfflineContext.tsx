@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useOnlineStatus, type SyncState } from "@/hooks/useOnlineStatus";
 import { processQueue } from "@/lib/offlineQueue";
 import { cacheApiResponse, getCachedApiResponse, getQueueSize } from "@/lib/offlineStore";
+import type { QueuedPhotoUpload } from "@/lib/offlineStore";
 import { useHydrateFromOfflineCache, useCacheApiResponses } from "@/hooks/useOfflineCache";
 
 interface OfflineContextValue {
@@ -13,7 +14,7 @@ interface OfflineContextValue {
     method: string,
     endpoint: string,
     payload?: unknown,
-    photoBlobKeys?: string[]
+    photoUploads?: QueuedPhotoUpload[]
   ) => Promise<boolean>;
   cacheResponse: (url: string, data: unknown) => Promise<void>;
   getCachedResponse: (url: string) => Promise<unknown | null>;
@@ -29,7 +30,7 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
   const [pendingCount, setPendingCount] = useState(0);
   const isSyncingRef = useRef(false);
   const retryCountRef = useRef(0);
-  const retryTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useHydrateFromOfflineCache();
   useCacheApiResponses();
@@ -101,12 +102,12 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
       method: string,
       endpoint: string,
       payload?: unknown,
-      photoBlobKeys?: string[]
+      photoUploads?: QueuedPhotoUpload[]
     ): Promise<boolean> => {
       if (isOnline) return false;
 
       const { queueMutation } = await import("@/lib/offlineQueue");
-      await queueMutation(method, endpoint, payload, photoBlobKeys);
+      await queueMutation(method, endpoint, payload, photoUploads);
       await refreshPendingCount();
       return true;
     },

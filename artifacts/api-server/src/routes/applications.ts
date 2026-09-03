@@ -1,8 +1,8 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db } from "@workspace/db";
-import { jobApplicationsTable } from "@workspace/db/schema";
+import { jobApplicationsTable, objectUploadsTable } from "@workspace/db/schema";
 import { SubmitApplicationBody, UpdateApplicationBody } from "@workspace/api-zod";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and, isNull } from "drizzle-orm";
 import { requireStaffRole } from "../middlewares/requireStaffRole";
 
 const router: IRouter = Router();
@@ -37,9 +37,17 @@ router.post("/", async (req: Request, res: Response) => {
 
   try {
     const data = parsed.data;
-    const [created] = await db
-      .insert(jobApplicationsTable)
-      .values({
+    const created = await db.transaction(async (tx) => {
+      for (const document of data.documents ?? []) {
+        const [upload] = await tx.select().from(objectUploadsTable).where(and(
+          eq(objectUploadsTable.objectPath, document.path),
+          eq(objectUploadsTable.applicantToken, document.uploadToken),
+          eq(objectUploadsTable.purpose, "application_document"),
+          isNull(objectUploadsTable.claimedAt),
+        ));
+        if (!upload) throw new Error("INVALID_APPLICATION_UPLOAD");
+      }
+      const [application] = await tx.insert(jobApplicationsTable).values({
         status: "new",
         firstName: data.firstName,
         lastName: data.lastName,
@@ -51,12 +59,23 @@ router.post("/", async (req: Request, res: Response) => {
         i9Employer: {},
         w4Employee: (data.w4Employee ?? {}) as Record<string, unknown>,
         w4Employer: {},
-        documents: (data.documents ?? []) as { name: string; path: string; contentType?: string }[],
-      })
-      .returning();
+        documents: (data.documents ?? []).map(({ name, path, contentType }) => ({ name, path, contentType })),
+      }).returning();
+      for (const document of data.documents ?? []) {
+        await tx.update(objectUploadsTable).set({ claimedAt: new Date() }).where(and(
+          eq(objectUploadsTable.objectPath, document.path),
+          eq(objectUploadsTable.applicantToken, document.uploadToken),
+        ));
+      }
+      return application;
+    });
 
     res.status(201).json(created);
   } catch (err) {
+    if (err instanceof Error && err.message === "INVALID_APPLICATION_UPLOAD") {
+      res.status(400).json({ error: "Invalid or already claimed application document" });
+      return;
+    }
     console.error("Error submitting application:", err);
     res.status(500).json({ error: "Failed to submit application" });
   }

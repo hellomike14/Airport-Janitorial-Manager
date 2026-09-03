@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { TaskPhotoToggle } from "@/components/TaskPhotos";
 import { StaffName } from "@/components/StaffName";
+import { InspectorWorkflowCard } from "@/components/InspectorWorkflowCard";
 
 const TERMINAL_STYLES: Record<string, { bg: string; text: string; dot: string; bar: string; border: string }> = {
   "Terminal A - East": { bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500", bar: "bg-blue-500", border: "border-blue-200" },
@@ -66,6 +67,14 @@ export default function MyTasks() {
     date: today,
     assignedToId: currentUser?.id,
   });
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      qc.invalidateQueries({ queryKey: ["/api/assignments"] });
+      qc.invalidateQueries({ queryKey: ["/api/tasks"] });
+    }, 15000);
+    return () => window.clearInterval(interval);
+  }, [qc]);
 
   const completeMutation = useCompleteTask({
     mutation: { onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/tasks"] }) },
@@ -320,6 +329,9 @@ export default function MyTasks() {
                             </>
                           )}
                         </p>
+                      )}
+                      {task.inspectorWorkflowTaskId && (
+                        <InspectorWorkflowCard taskId={task.inspectorWorkflowTaskId} />
                       )}
                     </div>
 

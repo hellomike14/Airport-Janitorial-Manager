@@ -9,4 +9,6 @@
 export interface UploadUrlResponse {
   uploadURL: string;
   objectPath: string;
+  /** Applicant capability returned only for application_document uploads. */
+  uploadToken?: string;
 }

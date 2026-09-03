@@ -38,7 +38,7 @@ async function emailForClerkUser(userId: string): Promise<string | null> {
  * Resolves the authenticated staff member for this request from the verified
  * Clerk session, matched to the staff table by email (case-insensitive).
  * Returns null when there is no session, no email, or no matching active
- * staff record.
+ * login-enabled staff record.
  */
 export async function actorStaffFromRequest(req: Request): Promise<StaffRow | null> {
   const auth = getAuth(req);
@@ -48,7 +48,7 @@ export async function actorStaffFromRequest(req: Request): Promise<StaffRow | nu
   const [staff] = await db
     .select()
     .from(staffTable)
-    .where(sql`lower(${staffTable.email}) = ${email.toLowerCase()} AND ${staffTable.active} = true`)
+    .where(sql`lower(btrim(${staffTable.email})) = ${email.trim().toLowerCase()} AND ${staffTable.active} = true AND ${staffTable.loginEnabled} = true AND ${staffTable.formerEmployee} = false`)
     .limit(1);
   return staff ?? null;
 }

@@ -169,6 +169,12 @@ export const ListTasksResponseItem = zod.object({
     .describe(
       "Whether the assigned staff member is still active. Null when no one is assigned.",
     ),
+  inspectorWorkflowTaskId: zod
+    .number()
+    .nullable()
+    .describe(
+      "Inspector workflow link when this task originated from an inspector reply.",
+    ),
   isSpecial: zod.boolean(),
   notes: zod.string().nullish(),
 });
@@ -258,6 +264,12 @@ export const CompleteTaskResponse = zod.object({
     .describe(
       "Whether the assigned staff member is still active. Null when no one is assigned.",
     ),
+  inspectorWorkflowTaskId: zod
+    .number()
+    .nullable()
+    .describe(
+      "Inspector workflow link when this task originated from an inspector reply.",
+    ),
   isSpecial: zod.boolean(),
   notes: zod.string().nullish(),
 });
@@ -293,6 +305,12 @@ export const UncompleteTaskResponse = zod.object({
     .describe(
       "Whether the assigned staff member is still active. Null when no one is assigned.",
     ),
+  inspectorWorkflowTaskId: zod
+    .number()
+    .nullable()
+    .describe(
+      "Inspector workflow link when this task originated from an inspector reply.",
+    ),
   isSpecial: zod.boolean(),
   notes: zod.string().nullish(),
 });
@@ -324,6 +342,7 @@ export const ListAssignmentsResponseItem = zod.object({
   staffName: zod.string(),
   areaId: zod.number(),
   areaName: zod.string(),
+  terminal: zod.string(),
   assignmentDate: zod.string(),
   assignedById: zod.number(),
   assignedByName: zod.string(),
@@ -546,6 +565,7 @@ export const CompleteIssueParams = zod.object({
 export const CompleteIssueBody = zod.object({
   completionNotes: zod.string().nullish(),
   completedById: zod.number(),
+  afterImagePath: zod.string().nullish(),
 });
 
 export const CompleteIssueResponse = zod.object({
@@ -755,6 +775,17 @@ export const ListConversationMessagesResponseItem = zod.object({
   senderName: zod.string(),
   body: zod.string(),
   isRead: zod.boolean(),
+  inspectorWorkflowTaskId: zod.number().nullable(),
+  inspectorEmailDeliveryStatus: zod.enum([
+    "pending",
+    "sending",
+    "retrying",
+    "accepted",
+    "disabled",
+    "not_configured",
+    "failed",
+    "not_applicable",
+  ]),
   createdAt: zod.string(),
 });
 export const ListConversationMessagesResponse = zod.array(
@@ -773,6 +804,7 @@ export const sendConversationMessageBodyBodyMax = 2000;
 export const SendConversationMessageBody = zod.object({
   senderId: zod.number(),
   body: zod.string().min(1).max(sendConversationMessageBodyBodyMax),
+  clientRequestId: zod.string().uuid(),
 });
 
 /**
@@ -798,11 +830,31 @@ export const RequestUploadUrlBody = zod.object({
   name: zod.string().min(1),
   size: zod.number().min(1),
   contentType: zod.string().min(1),
+  purpose: zod.enum([
+    "task_before",
+    "task_after",
+    "issue_before",
+    "issue_after",
+    "conversation_attachment",
+    "shared_photo",
+    "application_document",
+  ]),
+  taskId: zod.number().optional(),
+  conversationId: zod.number().optional(),
+  issueId: zod.number().optional(),
+  areaId: zod.number().optional(),
 });
 
 export const RequestUploadUrlResponse = zod.object({
   uploadURL: zod.string().url(),
   objectPath: zod.string(),
+  uploadToken: zod
+    .string()
+    .uuid()
+    .optional()
+    .describe(
+      "Applicant capability returned only for application_document uploads.",
+    ),
 });
 
 /**
@@ -885,11 +937,17 @@ export const SubmitApplicationBody = zod.object({
   w4Employee: zod.record(zod.string(), zod.unknown()).optional(),
   documents: zod
     .array(
-      zod.object({
-        name: zod.string(),
-        path: zod.string(),
-        contentType: zod.string().optional(),
-      }),
+      zod
+        .object({
+          name: zod.string(),
+          path: zod.string(),
+          contentType: zod.string().optional(),
+        })
+        .and(
+          zod.object({
+            uploadToken: zod.string().uuid(),
+          }),
+        ),
     )
     .optional(),
 });
@@ -1124,4 +1182,100 @@ export const DisconnectQuickbooksResponse = zod.object({
   realmId: zod.string().nullish(),
   companyName: zod.string().nullish(),
   connectedAt: zod.string().nullish(),
+});
+
+/**
+ * @summary Archive or restore a conversation for the authenticated participant
+ */
+export const SetConversationArchiveParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const SetConversationArchiveBody = zod.object({
+  staffId: zod.number(),
+  archived: zod.boolean(),
+});
+
+export const SetConversationArchiveResponse = zod.object({
+  archived: zod.boolean(),
+});
+
+/**
+ * @summary Accept an authenticated inspector email reply
+ */
+export const receiveSendgridInspectorReplyBodyTextMax = 2000;
+
+export const ReceiveSendgridInspectorReplyBody = zod.object({
+  envelope: zod.object({
+    from: zod.string().email(),
+    to: zod.array(zod.string().email()),
+  }),
+  from: zod.string().email(),
+  text: zod.string().max(receiveSendgridInspectorReplyBodyTextMax),
+  headers: zod.string().optional(),
+  SPF: zod.string().optional(),
+  dkim: zod.string().optional(),
+});
+
+/**
+ * @summary Get authorized inspector assignment workflow state and audit history
+ */
+export const GetInspectorWorkflowParams = zod.object({
+  taskId: zod.coerce.number(),
+});
+
+export const getInspectorWorkflowResponseRemainingSecondsMin = 0;
+
+export const GetInspectorWorkflowResponse = zod.object({
+  source: zod.object({
+    conversationId: zod.number().optional(),
+    messageId: zod.number().optional(),
+  }),
+  task: zod.object({
+    id: zod.number(),
+    name: zod.string(),
+    completed: zod.boolean(),
+    completedAt: zod.date().nullable(),
+  }),
+  area: zod.object({
+    id: zod.number(),
+    name: zod.string(),
+  }),
+  assignedStaff: zod
+    .object({
+      id: zod.number(),
+      name: zod.string(),
+    })
+    .nullish(),
+  assignmentMethod: zod.enum(["fresh_gps", "area_roster_workload"]).optional(),
+  assignmentDistanceMeters: zod.number().nullish(),
+  dueAt: zod.date(),
+  remainingSeconds: zod
+    .number()
+    .min(getInspectorWorkflowResponseRemainingSecondsMin),
+  status: zod.enum(["assigned", "overdue", "escalated", "completed"]),
+  escalatedAt: zod.date().nullish(),
+  history: zod.array(
+    zod.object({
+      assignedStaffId: zod.number(),
+      assignedById: zod.number(),
+      event: zod.enum(["assigned", "reassigned"]),
+      method: zod.enum(["fresh_gps", "area_roster_workload"]),
+      distanceMeters: zod.number().nullable(),
+      provenance: zod.string(),
+      createdAt: zod.date(),
+    }),
+  ),
+  completionEmailDeliveryStatus: zod
+    .union([
+      zod.literal("pending"),
+      zod.literal("sending"),
+      zod.literal("retrying"),
+      zod.literal("accepted"),
+      zod.literal("disabled"),
+      zod.literal("not_configured"),
+      zod.literal("failed"),
+      zod.literal(null),
+    ])
+    .nullish(),
 });

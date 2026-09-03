@@ -5,6 +5,26 @@
  * Marvol Facility Cleaning Management API
  * OpenAPI spec version: 0.1.0
  */
+export interface SetConversationArchiveRequest {
+  staffId: number;
+  archived: boolean;
+}
+
+export type SendgridInboundReplyRequestEnvelope = {
+  from: string;
+  to: string[];
+};
+
+export interface SendgridInboundReplyRequest {
+  envelope: SendgridInboundReplyRequestEnvelope;
+  from: string;
+  /** @maxLength 2000 */
+  text: string;
+  headers?: string;
+  SPF?: string;
+  dkim?: string;
+}
+
 export interface HealthStatus {
   status: string;
 }
@@ -88,6 +108,8 @@ export interface Task {
   assignedToName?: string | null;
   /** Whether the assigned staff member is still active. Null when no one is assigned. */
   assignedToActive?: boolean | null;
+  /** Inspector workflow link when this task originated from an inspector reply. */
+  inspectorWorkflowTaskId: number | null;
   isSpecial: boolean;
   notes?: string | null;
 }
@@ -141,6 +163,7 @@ export interface Assignment {
   staffName: string;
   areaId: number;
   areaName: string;
+  terminal: string;
   assignmentDate: string;
   assignedById: number;
   assignedByName: string;
@@ -214,6 +237,7 @@ export interface AssignIssueRequest {
 export interface CompleteIssueRequest {
   completionNotes?: string | null;
   completedById: number;
+  afterImagePath?: string | null;
 }
 
 export interface UpdateIssueImagesRequest {
@@ -278,6 +302,20 @@ export interface UpdateChatMessageInput {
   body: string;
 }
 
+export type ChatMessageInspectorEmailDeliveryStatus =
+  (typeof ChatMessageInspectorEmailDeliveryStatus)[keyof typeof ChatMessageInspectorEmailDeliveryStatus];
+
+export const ChatMessageInspectorEmailDeliveryStatus = {
+  pending: "pending",
+  sending: "sending",
+  retrying: "retrying",
+  accepted: "accepted",
+  disabled: "disabled",
+  not_configured: "not_configured",
+  failed: "failed",
+  not_applicable: "not_applicable",
+} as const;
+
 export interface ChatMessage {
   id: number;
   conversationId: number;
@@ -285,6 +323,9 @@ export interface ChatMessage {
   senderName: string;
   body: string;
   isRead: boolean;
+  /** @nullable */
+  inspectorWorkflowTaskId: number | null;
+  inspectorEmailDeliveryStatus: ChatMessageInspectorEmailDeliveryStatus;
   createdAt: string;
 }
 
@@ -295,11 +336,25 @@ export interface ChatMessageInput {
    * @maxLength 2000
    */
   body: string;
+  clientRequestId: string;
 }
 
 export interface MarkAllReadRequest {
   staffId: number;
 }
+
+export type UploadUrlRequestPurpose =
+  (typeof UploadUrlRequestPurpose)[keyof typeof UploadUrlRequestPurpose];
+
+export const UploadUrlRequestPurpose = {
+  task_before: "task_before",
+  task_after: "task_after",
+  issue_before: "issue_before",
+  issue_after: "issue_after",
+  conversation_attachment: "conversation_attachment",
+  shared_photo: "shared_photo",
+  application_document: "application_document",
+} as const;
 
 export interface UploadUrlRequest {
   /** @minLength 1 */
@@ -308,11 +363,18 @@ export interface UploadUrlRequest {
   size: number;
   /** @minLength 1 */
   contentType: string;
+  purpose: UploadUrlRequestPurpose;
+  taskId?: number;
+  conversationId?: number;
+  issueId?: number;
+  areaId?: number;
 }
 
 export interface UploadUrlResponse {
   uploadURL: string;
   objectPath: string;
+  /** Applicant capability returned only for application_document uploads. */
+  uploadToken?: string;
 }
 
 export interface ErrorEnvelope {
@@ -434,6 +496,10 @@ export interface JobApplication {
   updatedAt: string;
 }
 
+export type ApplicationUploadDocument = UploadedDocument & {
+  uploadToken: string;
+};
+
 export type SubmitApplicationRequestApplication = { [key: string]: unknown };
 
 export type SubmitApplicationRequestI9Employee = { [key: string]: unknown };
@@ -449,7 +515,7 @@ export interface SubmitApplicationRequest {
   application?: SubmitApplicationRequestApplication;
   i9Employee?: SubmitApplicationRequestI9Employee;
   w4Employee?: SubmitApplicationRequestW4Employee;
-  documents?: UploadedDocument[];
+  documents?: ApplicationUploadDocument[];
 }
 
 export type UpdateApplicationRequestStatus =
@@ -594,4 +660,116 @@ export type GetDashboardParams = {
 
 export type ListApplicationsParams = {
   status?: string;
+};
+
+export type SetConversationArchive200 = {
+  archived: boolean;
+};
+
+export type GetInspectorWorkflow200Source = {
+  conversationId?: number;
+  messageId?: number;
+};
+
+export type GetInspectorWorkflow200Task = {
+  id: number;
+  name: string;
+  completed: boolean;
+  /** @nullable */
+  completedAt: string | null;
+};
+
+export type GetInspectorWorkflow200Area = {
+  id: number;
+  name: string;
+};
+
+/**
+ * @nullable
+ */
+export type GetInspectorWorkflow200AssignedStaff = {
+  id: number;
+  name: string;
+} | null;
+
+export type GetInspectorWorkflow200AssignmentMethod =
+  (typeof GetInspectorWorkflow200AssignmentMethod)[keyof typeof GetInspectorWorkflow200AssignmentMethod];
+
+export const GetInspectorWorkflow200AssignmentMethod = {
+  fresh_gps: "fresh_gps",
+  area_roster_workload: "area_roster_workload",
+} as const;
+
+export type GetInspectorWorkflow200Status =
+  (typeof GetInspectorWorkflow200Status)[keyof typeof GetInspectorWorkflow200Status];
+
+export const GetInspectorWorkflow200Status = {
+  assigned: "assigned",
+  overdue: "overdue",
+  escalated: "escalated",
+  completed: "completed",
+} as const;
+
+export type GetInspectorWorkflow200HistoryItemEvent =
+  (typeof GetInspectorWorkflow200HistoryItemEvent)[keyof typeof GetInspectorWorkflow200HistoryItemEvent];
+
+export const GetInspectorWorkflow200HistoryItemEvent = {
+  assigned: "assigned",
+  reassigned: "reassigned",
+} as const;
+
+export type GetInspectorWorkflow200HistoryItemMethod =
+  (typeof GetInspectorWorkflow200HistoryItemMethod)[keyof typeof GetInspectorWorkflow200HistoryItemMethod];
+
+export const GetInspectorWorkflow200HistoryItemMethod = {
+  fresh_gps: "fresh_gps",
+  area_roster_workload: "area_roster_workload",
+} as const;
+
+export type GetInspectorWorkflow200HistoryItem = {
+  assignedStaffId: number;
+  assignedById: number;
+  event: GetInspectorWorkflow200HistoryItemEvent;
+  method: GetInspectorWorkflow200HistoryItemMethod;
+  /** @nullable */
+  distanceMeters: number | null;
+  provenance: string;
+  createdAt: string;
+};
+
+/**
+ * @nullable
+ */
+export type GetInspectorWorkflow200CompletionEmailDeliveryStatus =
+  | (typeof GetInspectorWorkflow200CompletionEmailDeliveryStatus)[keyof typeof GetInspectorWorkflow200CompletionEmailDeliveryStatus]
+  | null;
+
+export const GetInspectorWorkflow200CompletionEmailDeliveryStatus = {
+  pending: "pending",
+  sending: "sending",
+  retrying: "retrying",
+  accepted: "accepted",
+  disabled: "disabled",
+  not_configured: "not_configured",
+  failed: "failed",
+} as const;
+
+export type GetInspectorWorkflow200 = {
+  source: GetInspectorWorkflow200Source;
+  task: GetInspectorWorkflow200Task;
+  area: GetInspectorWorkflow200Area;
+  /** @nullable */
+  assignedStaff?: GetInspectorWorkflow200AssignedStaff;
+  assignmentMethod?: GetInspectorWorkflow200AssignmentMethod;
+  /** @nullable */
+  assignmentDistanceMeters?: number | null;
+  dueAt: string;
+  /** @minimum 0 */
+  remainingSeconds: number;
+  status: GetInspectorWorkflow200Status;
+  /** @nullable */
+  escalatedAt?: string | null;
+  history: GetInspectorWorkflow200HistoryItem[];
+  /** @nullable */
+  completionEmailDeliveryStatus?: GetInspectorWorkflow200CompletionEmailDeliveryStatus;
 };

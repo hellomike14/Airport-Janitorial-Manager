@@ -3,20 +3,30 @@ import { db } from "@workspace/db";
 import { staffLocationsTable, staffTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
+import { actorStaffFromRequest } from "../lib/actorSession";
 
 const router: IRouter = Router();
 
 const UpdateLocationBody = z.object({
   staffId: z.number(),
-  latitude: z.number(),
-  longitude: z.number(),
-  accuracy: z.number().optional(),
+  latitude: z.number().finite().min(-90).max(90),
+  longitude: z.number().finite().min(-180).max(180),
+  accuracy: z.number().finite().positive().max(100).optional(),
 });
 
 router.post("/locations/update", async (req: Request, res: Response) => {
   const body = UpdateLocationBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: "Invalid location data" });
+    return;
+  }
+  const actor = await actorStaffFromRequest(req);
+  if (!actor) {
+    res.status(401).json({ error: "Login session required" });
+    return;
+  }
+  if (actor.id !== body.data.staffId) {
+    res.status(403).json({ error: "You can only update your own location" });
     return;
   }
 
@@ -51,7 +61,19 @@ router.post("/locations/update", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/locations", async (_req: Request, res: Response) => {
+router.get("/locations", async (req: Request, res: Response) => {
+  const actor = await actorStaffFromRequest(req);
+  if (!actor) {
+    res.status(401).json({ error: "Login session required" });
+    return;
+  }
+  if (actor.role === "staff") {
+    const locations = await db.select({
+      id: staffLocationsTable.id, staffId: staffLocationsTable.staffId, staffName: staffTable.name, staffRole: staffTable.role,
+      latitude: staffLocationsTable.latitude, longitude: staffLocationsTable.longitude, accuracy: staffLocationsTable.accuracy, updatedAt: staffLocationsTable.updatedAt,
+    }).from(staffLocationsTable).innerJoin(staffTable, eq(staffLocationsTable.staffId, staffTable.id)).where(eq(staffLocationsTable.staffId, actor.id));
+    return res.json(locations.map((l) => ({ ...l, updatedAt: l.updatedAt.toISOString() })));
+  }
   const locations = await db
     .select({
       id: staffLocationsTable.id,
@@ -69,7 +91,7 @@ router.get("/locations", async (_req: Request, res: Response) => {
       and(eq(staffLocationsTable.staffId, staffTable.id), eq(staffTable.active, true))
     );
 
-  res.json(
+  return res.json(
     locations.map((l) => ({
       ...l,
       updatedAt: l.updatedAt.toISOString(),

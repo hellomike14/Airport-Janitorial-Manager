@@ -12,6 +12,9 @@ import {
   useAssignIssue,
   useCompleteIssue,
   useListAssignments,
+  type Issue,
+  requestUploadUrl,
+  type UploadUrlRequest,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
@@ -40,18 +43,8 @@ import { StaffName } from "@/components/StaffName";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
-async function requestPresignedUrl(file: File): Promise<{ uploadURL: string; objectPath: string }> {
-  const res = await fetch(`${BASE_URL}/api/storage/uploads/request-url`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
-  });
-  if (!res.ok) throw new Error("Failed to get upload URL");
-  return res.json();
-}
-
-async function uploadFile(file: File): Promise<string> {
-  const { uploadURL, objectPath } = await requestPresignedUrl(file);
+async function uploadFile(file: File, request: UploadUrlRequest): Promise<string> {
+  const { uploadURL, objectPath } = await requestUploadUrl(request);
   const putRes = await fetch(uploadURL, {
     method: "PUT",
     headers: { "Content-Type": file.type },
@@ -73,9 +66,11 @@ interface ImagePickerProps {
   onFileCapture?: (file: File) => void;
   accent?: string;
   tapToAddLabel?: string;
+  uploadRequest?: (file: File) => UploadUrlRequest;
+  deferUpload?: boolean;
 }
 
-function ImagePicker({ label, objectPath, onUpload, onRemove, onFileCapture, accent = "blue", tapToAddLabel = "Tap to add photo" }: ImagePickerProps) {
+function ImagePicker({ label, objectPath, onUpload, onRemove, onFileCapture, uploadRequest, deferUpload = false, accent = "blue", tapToAddLabel = "Tap to add photo" }: ImagePickerProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
@@ -89,13 +84,14 @@ function ImagePicker({ label, objectPath, onUpload, onRemove, onFileCapture, acc
       onFileCapture(file);
     }
 
-    if (!navigator.onLine) {
+    if (!navigator.onLine || deferUpload) {
       return;
     }
+    if (!uploadRequest) throw new Error("Upload authorization metadata is required");
 
     setUploading(true);
     try {
-      const path = await uploadFile(file);
+      const path = await uploadFile(file, uploadRequest(file));
       onUpload(path);
     } catch (e) {
       console.error(e);
@@ -203,7 +199,21 @@ function IssueImageUploader({
   };
 
   return (
-    <ImagePicker label={label} objectPath={path} onUpload={handleUpload} onRemove={handleRemove} accent={accent} tapToAddLabel={tapToAddLabel} />
+    <ImagePicker
+      label={label}
+      objectPath={path}
+      onUpload={handleUpload}
+      onRemove={handleRemove}
+      uploadRequest={(file) => ({
+        name: file.name,
+        size: file.size,
+        contentType: file.type,
+        purpose: field === "beforeImagePath" ? "issue_before" : "issue_after",
+        issueId,
+      })}
+      accent={accent}
+      tapToAddLabel={tapToAddLabel}
+    />
   );
 }
 
@@ -270,7 +280,7 @@ function AssignAreaButton({
   );
 }
 
-function StaffCompletionPanel({ issue }: { issue: { id: number; afterImagePath?: string | null; [key: string]: unknown } }) {
+function StaffCompletionPanel({ issue }: { issue: Pick<Issue, "id" | "afterImagePath"> }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const { currentUser } = useAuth();
@@ -339,6 +349,7 @@ function StaffCompletionPanel({ issue }: { issue: { id: number; afterImagePath?:
                 onUpload={handleAfterUpload}
                 onRemove={() => { setAfterPath(null); setAfterPhotoFile(null); updateImages.mutate({ id: issue.id, data: { afterImagePath: null } }); }}
                 onFileCapture={setAfterPhotoFile}
+                uploadRequest={(file) => ({ name: file.name, size: file.size, contentType: file.type, purpose: "issue_after", issueId: issue.id })}
                 accent="amber"
                 tapToAddLabel={t("issues.tapToAddPhoto")}
               />
@@ -439,7 +450,12 @@ export default function Issues() {
     isStaff
       ? staffAreaId != null ? { areaId: staffAreaId } : {}
       : {},
-    { query: { enabled: !isStaff || staffAreaId != null } }
+    {
+      query: {
+        queryKey: ["/api/issues", isStaff && staffAreaId != null ? { areaId: staffAreaId } : {}],
+        enabled: !isStaff || staffAreaId != null,
+      },
+    }
   );
   const { data: areas } = useListAreas();
   const { data: staffList = [] } = useListStaff();
@@ -505,7 +521,22 @@ export default function Issues() {
       return;
     }
 
-    createMutation.mutate({ data: issueData as any });
+    try {
+      const uploadedBeforePath = beforePhotoFile
+        ? await uploadFile(beforePhotoFile, {
+          name: beforePhotoFile.name,
+          size: beforePhotoFile.size,
+          contentType: beforePhotoFile.type,
+          purpose: "issue_before",
+          areaId: issueData.areaId,
+        })
+        : null;
+      await createMutation.mutateAsync({
+        data: { ...issueData, beforeImagePath: uploadedBeforePath } as Parameters<typeof createMutation.mutateAsync>[0]["data"],
+      });
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   return (
@@ -642,6 +673,7 @@ export default function Issues() {
                   onUpload={setBeforePath}
                   onRemove={() => { setBeforePath(null); setBeforePhotoFile(null); }}
                   onFileCapture={setBeforePhotoFile}
+                  deferUpload
                   accent="rose"
                   tapToAddLabel={t("issues.tapToAddPhoto")}
                 />

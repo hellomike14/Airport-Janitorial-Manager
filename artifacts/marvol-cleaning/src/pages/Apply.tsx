@@ -1,29 +1,29 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CheckCircle2, Upload, X, Loader2, FileText } from "lucide-react";
-import { useSubmitApplication } from "@workspace/api-client-react";
-import type { UploadedDocument } from "@workspace/api-client-react";
+import { requestUploadUrl, useSubmitApplication } from "@workspace/api-client-react";
+import type { ApplicationUploadDocument } from "@workspace/api-client-react";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { PUBLIC_SECTIONS } from "./employment/formConfig";
 import { FieldGrid } from "./employment/FormField";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
-async function uploadFile(file: File): Promise<UploadedDocument> {
-  const res = await fetch(`${BASE_URL}/api/storage/uploads/request-url`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+async function uploadFile(file: File): Promise<ApplicationUploadDocument> {
+  const { uploadURL, objectPath, uploadToken } = await requestUploadUrl({
+    name: file.name,
+    size: file.size,
+    contentType: file.type,
+    purpose: "application_document",
   });
-  if (!res.ok) throw new Error("Failed to get upload URL");
-  const { uploadURL, objectPath } = await res.json();
+  if (!uploadToken) throw new Error("Application upload capability was not returned");
   const putRes = await fetch(uploadURL, {
     method: "PUT",
     headers: { "Content-Type": file.type },
     body: file,
   });
   if (!putRes.ok) throw new Error("Upload failed");
-  return { name: file.name, path: objectPath, contentType: file.type };
+  return { name: file.name, path: objectPath, contentType: file.type, uploadToken };
 }
 
 export default function Apply() {
@@ -41,7 +41,7 @@ export default function Apply() {
     i9Employee: {},
     w4Employee: {},
   });
-  const [documents, setDocuments] = useState<UploadedDocument[]>([]);
+  const [documents, setDocuments] = useState<ApplicationUploadDocument[]>([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);

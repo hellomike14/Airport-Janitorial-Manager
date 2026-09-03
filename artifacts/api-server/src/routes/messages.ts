@@ -6,14 +6,25 @@ import {
   staffTable,
   notificationsTable,
   conversationParticipantsTable,
+  messageEmailOutboxTable,
+  inboundEmailMessagesTable,
+  conversationArchivesTable,
+  inspectorTaskLinksTable,
+  inspectorTaskAssignmentHistoryTable,
+  tasksTable,
+  areasTable,
 } from "@workspace/db/schema";
 import { eq, and, or, desc, asc, ne, count, gt, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { actorStaffFromRequest } from "../lib/actorSession";
+import { INSPECTOR_EMAIL, normalizedEmail, outboundEmailStatus, verifyInboundWebhookSecret, verifyReplyToken, inboundProviderMessageId, inboundAuthenticationPasses } from "../lib/sendgridEmailBridge";
+import { autoAssignInboundInspectorMessage } from "../lib/inspectorTaskWorkflow";
 
 const router: IRouter = Router();
+/** Deliberately mounted before the staff-session router in app.ts. */
+export const inboundSendgridRouter: IRouter = Router();
 
-const StaffIdQuery = z.object({ staffId: z.coerce.number() });
+const StaffIdQuery = z.object({ staffId: z.coerce.number(), archived: z.enum(["true", "false"]).optional() });
 const IdParams = z.object({ id: z.coerce.number() });
 const StartBody = z.object({ staffId: z.number(), recipientId: z.number() });
 const GroupStartBody = z.object({
@@ -24,9 +35,16 @@ const GroupStartBody = z.object({
 const MessageBody = z.object({
   senderId: z.number(),
   body: z.string().trim().min(1).max(2000),
+  clientRequestId: z.string().uuid().optional(),
 });
 const ReadBody = z.object({ staffId: z.coerce.number() });
 const MessageParams = z.object({ id: z.coerce.number(), msgId: z.coerce.number() });
+const InspectorWorkflowParams = z.object({ taskId: z.coerce.number().int().positive() });
+const InboundReplyBody = z.object({
+  envelope: z.object({ from: z.string(), to: z.array(z.string()).min(1) }),
+  from: z.string(), text: z.string().trim().min(1).max(2000),
+  headers: z.string().optional(), SPF: z.string().optional(), dkim: z.string().optional(),
+}).strict();
 
 type StaffRow = typeof staffTable.$inferSelect;
 type ConversationRow = typeof conversationsTable.$inferSelect;
@@ -217,6 +235,117 @@ function sendConvoError(res: Response, status: 404 | 403) {
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
+// SendGrid must be configured to POST JSON (or a gateway must translate its
+// multipart Parse payload). This endpoint intentionally accepts no unauthenticated
+// browser identity and never logs headers, tokens, or email bodies.
+inboundSendgridRouter.post("/", async (req: Request, res: Response) => {
+  const querySecret = typeof req.query.secret === "string" ? req.query.secret : undefined;
+  const presented = req.header("x-sendgrid-inbound-secret") ?? req.header("authorization")?.replace(/^Bearer\s+/i, "") ?? querySecret;
+  if (!verifyInboundWebhookSecret(presented)) {
+    res.status(401).json({ error: "Invalid webhook credential" });
+    return;
+  }
+  const body = InboundReplyBody.safeParse(req.body);
+  if (!body.success) { res.status(400).json({ error: "Invalid inbound email" }); return; }
+  const domain = process.env.SENDGRID_INBOUND_DOMAIN?.trim().toLowerCase();
+  const recipient = body.data.envelope.to.map(normalizedEmail).find((address) => address?.startsWith("reply+") && address.endsWith(`@${domain}`));
+  const token = recipient?.slice("reply+".length, recipient.lastIndexOf("@"));
+  const claims = token ? verifyReplyToken(token, process.env.SENDGRID_REPLY_TOKEN_SECRET) : null;
+  if (!claims) { res.status(403).json({ error: "Invalid or expired reply address" }); return; }
+  const [inspector, supervisor, conversation] = await Promise.all([
+    getStaff(claims.inspectorId), getStaff(claims.supervisorId),
+    db.select().from(conversationsTable).where(eq(conversationsTable.id, claims.conversationId)).then((rows) => rows[0]),
+  ]);
+  if (!inspector || !supervisor || !conversation || conversation.isGroup ||
+      inspector.role !== "inspector" || supervisor.role !== "supervisor" ||
+      !inspector.active || !inspector.loginEnabled || !supervisor.active || !supervisor.loginEnabled ||
+      normalizedEmail(inspector.email) !== INSPECTOR_EMAIL ||
+      normalizedEmail(body.data.from) !== INSPECTOR_EMAIL ||
+      normalizedEmail(body.data.envelope.from) !== INSPECTOR_EMAIL ||
+      !inboundAuthenticationPasses(body.data.SPF, body.data.dkim, INSPECTOR_EMAIL)) {
+    res.status(403).json({ error: "Inbound sender is not authorized" }); return;
+  }
+  if (!new Set([conversation.participantAId, conversation.participantBId]).has(inspector.id) ||
+      !new Set([conversation.participantAId, conversation.participantBId]).has(supervisor.id)) {
+    res.status(403).json({ error: "Conversation is not authorized" }); return;
+  }
+  const providerMessageId = inboundProviderMessageId(body.data.headers, body.data);
+  const result = await db.transaction(async (tx) => {
+    const [claim] = await tx.insert(inboundEmailMessagesTable)
+      .values({ providerMessageId, conversationId: conversation.id, senderId: inspector.id })
+      .onConflictDoNothing().returning();
+    if (!claim) {
+      const [existing] = await tx.select({ messageId: inboundEmailMessagesTable.messageId }).from(inboundEmailMessagesTable).where(eq(inboundEmailMessagesTable.providerMessageId, providerMessageId));
+      return { duplicate: true, messageId: existing?.messageId ?? null };
+    }
+    const [message] = await tx.insert(messagesTable).values({ conversationId: conversation.id, senderId: inspector.id, body: body.data.text }).returning();
+    await tx.update(inboundEmailMessagesTable).set({ messageId: message.id }).where(eq(inboundEmailMessagesTable.providerMessageId, providerMessageId));
+    await tx.insert(notificationsTable).values({ staffId: supervisor.id, type: "inspector_to_supervisor", message: "URGENT: Inspector email reply received", isRead: false });
+    return { duplicate: false, messageId: message.id };
+  });
+  // A provider retry repairs a prior post-commit assignment failure. The
+  // source-message unique link makes this safe and prevents duplicate tasks.
+  const assignment = result.messageId
+    ? await autoAssignInboundInspectorMessage(result.messageId, supervisor.id)
+    : null;
+  res.json({ ...result, assignment });
+});
+
+/**
+ * Returns the narrow inspector assignment audit view.  Access is derived from
+ * the Clerk actor and requires membership in the source conversation, a
+ * management role, the dedicated inspector, or the currently assigned worker.
+ */
+router.get("/inspector-workflow/:taskId", async (req: Request, res: Response) => {
+  const params = InspectorWorkflowParams.safeParse(req.params);
+  if (!params.success) { res.status(400).json({ error: "Invalid task id" }); return; }
+  const actor = await actorStaffFromRequest(req);
+  if (!actor) { res.status(401).json({ error: "Login session required" }); return; }
+  const [row] = await db.select({
+    taskId: tasksTable.id, taskName: tasksTable.taskName, completed: tasksTable.completed,
+    completedAt: tasksTable.completedAt, assignedStaffId: tasksTable.assignedToId,
+    sourceMessageId: inspectorTaskLinksTable.sourceMessageId, conversationId: inspectorTaskLinksTable.conversationId,
+    inspectorId: inspectorTaskLinksTable.inspectorId, supervisorId: inspectorTaskLinksTable.supervisorId,
+    dueAt: inspectorTaskLinksTable.dueAt, escalatedAt: inspectorTaskLinksTable.escalatedAt,
+    assignmentMethod: inspectorTaskLinksTable.assignmentMethod, assignmentDistanceMeters: inspectorTaskLinksTable.assignmentDistanceMeters,
+    completionMessageId: inspectorTaskLinksTable.completionMessageId, areaId: areasTable.id, areaName: areasTable.name,
+    assignedStaffName: staffTable.name,
+  }).from(inspectorTaskLinksTable).innerJoin(tasksTable, eq(tasksTable.id, inspectorTaskLinksTable.taskId))
+    .innerJoin(areasTable, eq(areasTable.id, tasksTable.areaId)).leftJoin(staffTable, eq(staffTable.id, tasksTable.assignedToId))
+    .where(eq(inspectorTaskLinksTable.taskId, params.data.taskId));
+  if (!row) { res.status(404).json({ error: "Inspector workflow task not found" }); return; }
+  const isParticipant = actor.id === row.inspectorId || actor.id === row.supervisorId;
+  // A supervisor must be the supervisor encoded in this conversation; another
+  // supervisor is not implicitly entitled to read a separate conversation.
+  const isAuthorizedManager = actor.role === "admin" || (actor.role === "supervisor" && actor.id === row.supervisorId);
+  if (!isParticipant && !isAuthorizedManager && actor.id !== row.assignedStaffId) {
+    res.status(403).json({ error: "Not authorized for this inspector workflow" }); return;
+  }
+  const [completionOutbox] = row.completionMessageId
+    ? await db.select({ status: messageEmailOutboxTable.status }).from(messageEmailOutboxTable).where(eq(messageEmailOutboxTable.messageId, row.completionMessageId))
+    : [];
+  const history = await db.select({
+    assignedStaffId: inspectorTaskAssignmentHistoryTable.assignedStaffId,
+    assignedById: inspectorTaskAssignmentHistoryTable.assignedById,
+    event: inspectorTaskAssignmentHistoryTable.event, method: inspectorTaskAssignmentHistoryTable.method,
+    distanceMeters: inspectorTaskAssignmentHistoryTable.distanceMeters, provenance: inspectorTaskAssignmentHistoryTable.provenance,
+    createdAt: inspectorTaskAssignmentHistoryTable.createdAt,
+  }).from(inspectorTaskAssignmentHistoryTable).where(eq(inspectorTaskAssignmentHistoryTable.taskId, row.taskId)).orderBy(asc(inspectorTaskAssignmentHistoryTable.id));
+  const now = Date.now();
+  res.json({
+    source: { conversationId: row.conversationId, messageId: row.sourceMessageId },
+    task: { id: row.taskId, name: row.taskName, completed: row.completed, completedAt: row.completedAt?.toISOString() ?? null },
+    area: { id: row.areaId, name: row.areaName },
+    assignedStaff: row.assignedStaffId ? { id: row.assignedStaffId, name: row.assignedStaffName } : null,
+    assignmentMethod: row.assignmentMethod, assignmentDistanceMeters: row.assignmentDistanceMeters,
+    dueAt: row.dueAt.toISOString(), remainingSeconds: Math.max(0, Math.ceil((row.dueAt.getTime() - now) / 1000)),
+    status: row.completed ? "completed" : row.escalatedAt ? "escalated" : row.dueAt.getTime() <= now ? "overdue" : "assigned",
+    escalatedAt: row.escalatedAt?.toISOString() ?? null,
+    history: history.map((item) => ({ ...item, createdAt: item.createdAt.toISOString() })),
+    completionEmailDeliveryStatus: completionOutbox?.status ?? null,
+  });
+});
+
 router.get("/conversations", async (req: Request, res: Response) => {
   const query = StaffIdQuery.safeParse({ staffId: req.query.staffId });
   if (!query.success) {
@@ -256,7 +385,11 @@ router.get("/conversations", async (req: Request, res: Response) => {
       .where(inArray(conversationsTable.id, groupIds));
   }
 
-  const convos = [...oneToOne, ...groupConvos];
+  const archived = await db.select({ conversationId: conversationArchivesTable.conversationId })
+    .from(conversationArchivesTable).where(eq(conversationArchivesTable.staffId, staffId));
+  const archivedIds = new Set(archived.map((row) => row.conversationId));
+  const showArchived = query.data.archived === "true";
+  const convos = [...oneToOne, ...groupConvos].filter((convo) => archivedIds.has(convo.id) === showArchived);
   const summaries = await Promise.all(convos.map((c) => buildSummary(c, staffId)));
   summaries.sort((a, b) => {
     const ta = a.lastMessageAt ?? a.createdAt;
@@ -382,7 +515,27 @@ router.get("/conversations/:id/messages", async (req: Request, res: Response) =>
     .innerJoin(staffTable, eq(messagesTable.senderId, staffTable.id))
     .where(eq(messagesTable.conversationId, params.data.id))
     .orderBy(asc(messagesTable.createdAt), asc(messagesTable.id));
-  res.json(rows.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })));
+  const [workflowLinks, outboxRows] = await Promise.all([
+    db.select({
+      taskId: inspectorTaskLinksTable.taskId,
+      sourceMessageId: inspectorTaskLinksTable.sourceMessageId,
+      completionMessageId: inspectorTaskLinksTable.completionMessageId,
+    }).from(inspectorTaskLinksTable).where(eq(inspectorTaskLinksTable.conversationId, params.data.id)),
+    db.select({ messageId: messageEmailOutboxTable.messageId, status: messageEmailOutboxTable.status })
+      .from(messageEmailOutboxTable).where(eq(messageEmailOutboxTable.conversationId, params.data.id)),
+  ]);
+  const workflowTaskByMessageId = new Map<number, number>();
+  workflowLinks.forEach((link) => {
+    workflowTaskByMessageId.set(link.sourceMessageId, link.taskId);
+    if (link.completionMessageId) workflowTaskByMessageId.set(link.completionMessageId, link.taskId);
+  });
+  const deliveryByMessageId = new Map(outboxRows.map((row) => [row.messageId, row.status]));
+  res.json(rows.map((m) => ({
+    ...m,
+    createdAt: m.createdAt.toISOString(),
+    inspectorWorkflowTaskId: workflowTaskByMessageId.get(m.id) ?? null,
+    inspectorEmailDeliveryStatus: deliveryByMessageId.get(m.id) ?? "not_applicable",
+  })));
 });
 
 router.post("/conversations/:id/messages", async (req: Request, res: Response) => {
@@ -420,17 +573,58 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
       return;
     }
   }
+  if (body.data.clientRequestId) {
+    const [prior] = await db.select().from(messagesTable).where(and(eq(messagesTable.senderId, sender.id), eq(messagesTable.clientRequestId, body.data.clientRequestId)));
+    if (prior) {
+      if (prior.conversationId !== convo.id) return res.status(409).json({ error: "clientRequestId was already used for another conversation" });
+      const [priorOutbox] = await db.select({ status: messageEmailOutboxTable.status }).from(messageEmailOutboxTable).where(eq(messageEmailOutboxTable.messageId, prior.id));
+      return res.status(200).json({ id: prior.id, conversationId: prior.conversationId, senderId: prior.senderId, senderName: sender.name, body: prior.body, isRead: prior.isRead, createdAt: prior.createdAt.toISOString(), inspectorWorkflowTaskId: null, inspectorEmailDeliveryStatus: priorOutbox?.status ?? "not_applicable" });
+    }
+  }
 
-  const [message] = await db
-    .insert(messagesTable)
-    .values({ conversationId: convo.id, senderId: sender.id, body: body.data.body })
-    .returning();
+  // The app message and its external-delivery intent commit together.  Missing
+  // SendGrid configuration is recorded honestly as not_configured; no caller
+  // is told the email was delivered.
+  const { message, replayed } = await db.transaction(async (tx) => {
+    const [created] = await tx
+      .insert(messagesTable)
+      .values({ conversationId: convo.id, senderId: sender.id, body: body.data.body, clientRequestId: body.data.clientRequestId ?? null })
+      .onConflictDoNothing()
+      .returning();
+    if (!created) {
+      if (!body.data.clientRequestId) throw new Error("Message insert failed");
+      const [existing] = await tx.select().from(messagesTable).where(and(eq(messagesTable.senderId, sender.id), eq(messagesTable.clientRequestId, body.data.clientRequestId)));
+      if (!existing || existing.conversationId !== convo.id) throw new Error("clientRequestId conflict");
+      return { message: existing, replayed: true };
+    }
+    if (
+      !convo.isGroup &&
+      sender.role === "supervisor"
+    ) {
+      const otherId = convo.participantAId === sender.id ? convo.participantBId! : convo.participantAId!;
+      const [inspector] = await tx.select().from(staffTable).where(eq(staffTable.id, otherId));
+      if (
+        inspector?.role === "inspector" &&
+        inspector.active &&
+        inspector.loginEnabled &&
+        normalizedEmail(inspector.email) === INSPECTOR_EMAIL
+      ) {
+        await tx.insert(messageEmailOutboxTable).values({
+          messageId: created.id, conversationId: convo.id, inspectorId: inspector.id,
+          supervisorId: sender.id, inspectorEmail: inspector.email!, inspectorName: inspector.name,
+          supervisorName: sender.name, messageBody: body.data.body, status: outboundEmailStatus(),
+        });
+      }
+    }
+    return { message: created, replayed: false };
+  });
 
   const preview =
     body.data.body.length > 120 ? `${body.data.body.slice(0, 117)}...` : body.data.body;
 
-  // Notify all other participants
-  if (convo.isGroup) {
+  // Notify only for the winning insert; concurrent idempotent retries must not
+  // duplicate notifications.
+  if (!replayed && convo.isGroup) {
     const parts = await db
       .select({ staffId: conversationParticipantsTable.staffId })
       .from(conversationParticipantsTable)
@@ -445,7 +639,7 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
         }))
       );
     }
-  } else {
+  } else if (!replayed) {
     const recipientId =
       convo.participantAId === sender.id ? convo.participantBId! : convo.participantAId!;
     await db.insert(notificationsTable).values({
@@ -455,13 +649,20 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
     });
   }
 
-  res.status(201).json({
+  const [outbox] = await db.select({ status: messageEmailOutboxTable.status })
+    .from(messageEmailOutboxTable).where(eq(messageEmailOutboxTable.messageId, message.id));
+  return res.status(replayed ? 200 : 201).json({
     id: message.id,
     conversationId: message.conversationId,
     senderId: message.senderId,
     senderName: sender.name,
     body: message.body,
     isRead: message.isRead,
+    inspectorWorkflowTaskId: null,
+    // Status represents the durable provider-delivery intent only. "accepted"
+    // (when a worker later records it) is not a claim that the recipient read
+    // the message.
+    inspectorEmailDeliveryStatus: outbox?.status ?? "not_applicable",
     createdAt: message.createdAt.toISOString(),
   });
 });
@@ -602,6 +803,26 @@ router.post("/conversations/:id/read", async (req: Request, res: Response) => {
       .returning({ id: messagesTable.id });
     res.json({ updated: updated.length });
   }
+});
+
+router.patch("/conversations/:id/archive", async (req: Request, res: Response) => {
+  const params = IdParams.safeParse(req.params);
+  const body = z.object({ staffId: z.coerce.number(), archived: z.boolean() }).safeParse(req.body);
+  if (!params.success || !body.success) { res.status(400).json({ error: "Invalid request" }); return; }
+  const actor = await requireActor(req, res, body.data.staffId);
+  if (!actor) return;
+  const access = await loadConversationForParticipant(params.data.id, actor.id);
+  if (access.status !== undefined) { sendConvoError(res, access.status); return; }
+  if (body.data.archived) {
+    await db.insert(conversationArchivesTable).values({ conversationId: params.data.id, staffId: actor.id })
+      .onConflictDoNothing();
+  } else {
+    await db.delete(conversationArchivesTable).where(and(
+      eq(conversationArchivesTable.conversationId, params.data.id),
+      eq(conversationArchivesTable.staffId, actor.id),
+    ));
+  }
+  res.json({ archived: body.data.archived });
 });
 
 export default router;

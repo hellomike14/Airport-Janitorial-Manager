@@ -1147,8 +1147,164 @@ paths:
               schema:
                 $ref: "#/components/schemas/QuickbooksStatus"
 
+  /conversations/{id}/archive:
+    patch:
+      operationId: setConversationArchive
+      tags: [messages]
+      summary: Archive or restore a conversation for the authenticated participant
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetConversationArchiveRequest"
+      responses:
+        "200":
+          description: Archive state changed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [archived]
+                properties:
+                  archived: { type: boolean }
+
+  /webhooks/sendgrid/inbound:
+    post:
+      operationId: receiveSendgridInspectorReply
+      tags: [messages]
+      summary: Accept an authenticated inspector email reply
+      security:
+        - SendGridInboundSecret: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendgridInboundReplyRequest"
+      responses:
+        "200": { description: Reply accepted or idempotently replayed }
+        "401": { description: Invalid webhook credential }
+        "403": { description: "Invalid sender, token, authentication, or conversation" }
+
+  /inspector-workflow/{taskId}:
+    get:
+      operationId: getInspectorWorkflow
+      tags: [messages]
+      summary: Get authorized inspector assignment workflow state and audit history
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Inspector assignment state for an authorized actor
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [source, task, area, dueAt, remainingSeconds, status, history]
+                properties:
+                  source:
+                    type: object
+                    properties:
+                      conversationId: { type: integer }
+                      messageId: { type: integer }
+                  task:
+                    type: object
+                    required: [id, name, completed, completedAt]
+                    properties:
+                      id: { type: integer }
+                      name: { type: string }
+                      completed: { type: boolean }
+                      completedAt: { type: [string, 'null'], format: date-time }
+                  area:
+                    type: object
+                    required: [id, name]
+                    properties:
+                      id: { type: integer }
+                      name: { type: string }
+                  assignedStaff:
+                    type: [object, 'null']
+                    required: [id, name]
+                    properties:
+                      id: { type: integer }
+                      name: { type: string }
+                  assignmentMethod: { type: string, enum: [fresh_gps, area_roster_workload] }
+                  assignmentDistanceMeters: { type: [number, 'null'] }
+                  dueAt: { type: string, format: date-time }
+                  remainingSeconds: { type: integer, minimum: 0 }
+                  status: { type: string, enum: [assigned, overdue, escalated, completed] }
+                  escalatedAt: { type: [string, 'null'], format: date-time }
+                  history:
+                    type: array
+                    items:
+                      type: object
+                      required: [assignedStaffId, assignedById, event, method, distanceMeters, provenance, createdAt]
+                      properties:
+                        assignedStaffId: { type: integer }
+                        assignedById: { type: integer }
+                        event: { type: string, enum: [assigned, reassigned] }
+                        method: { type: string, enum: [fresh_gps, area_roster_workload] }
+                        distanceMeters: { type: [number, 'null'] }
+                        provenance: { type: string }
+                        createdAt: { type: string, format: date-time }
+                  completionEmailDeliveryStatus:
+                    type: [string, 'null']
+                    enum: [pending, sending, retrying, accepted, disabled, not_configured, failed, null]
+        "401": { description: Login required }
+        "403": { description: Not authorized for this workflow }
+        "404": { description: Inspector workflow task not found }
+
+  /internal/inspector-sla-sweep:
+    post:
+      operationId: runInspectorSlaSweep
+      tags: [internal]
+      summary: Internal scheduler trigger for overdue inspector assignments
+      security:
+        - InternalCronSecret: []
+      responses:
+        "202": { description: Idempotent sweep completed }
+        "401": { description: Invalid scheduler credential }
+
 components:
+  securitySchemes:
+    InternalCronSecret:
+      type: apiKey
+      in: header
+      name: X-Internal-Cron-Secret
+    SendGridInboundSecret:
+      type: apiKey
+      in: header
+      name: X-SendGrid-Inbound-Secret
   schemas:
+    SetConversationArchiveRequest:
+      type: object
+      required: [staffId, archived]
+      properties:
+        staffId: { type: integer }
+        archived: { type: boolean }
+    SendgridInboundReplyRequest:
+      type: object
+      required: [envelope, from, text]
+      properties:
+        envelope:
+          type: object
+          required: [from, to]
+          properties:
+            from: { type: string, format: email }
+            to: { type: array, items: { type: string, format: email } }
+        from: { type: string, format: email }
+        text: { type: string, maxLength: 2000 }
+        headers: { type: string }
+        SPF: { type: string }
+        dkim: { type: string }
     HealthStatus:
       type: object
       properties:
@@ -1275,6 +1431,10 @@ components:
           type: boolean
           nullable: true
           description: Whether the assigned staff member is still active. Null when no one is assigned.
+        inspectorWorkflowTaskId:
+          type: integer
+          nullable: true
+          description: Inspector workflow link when this task originated from an inspector reply.
         isSpecial:
           type: boolean
         notes:
@@ -1288,6 +1448,7 @@ components:
         - taskOrder
         - completed
         - isSpecial
+        - inspectorWorkflowTaskId
 
     SpecialTask:
       type: object
@@ -1405,6 +1566,8 @@ components:
           type: integer
         areaName:
           type: string
+        terminal:
+          type: string
         assignmentDate:
           type: string
         assignedById:
@@ -1424,6 +1587,7 @@ components:
         - staffName
         - areaId
         - areaName
+        - terminal
         - assignmentDate
         - assignedById
         - assignedByName
@@ -1555,6 +1719,9 @@ components:
           nullable: true
         completedById:
           type: integer
+        afterImagePath:
+          type: string
+          nullable: true
       required:
         - completedById
 
@@ -1692,6 +1859,11 @@ components:
           type: string
         isRead:
           type: boolean
+        inspectorWorkflowTaskId:
+          type: [integer, 'null']
+        inspectorEmailDeliveryStatus:
+          type: string
+          enum: [pending, sending, retrying, accepted, disabled, not_configured, failed, not_applicable]
         createdAt:
           type: string
       required:
@@ -1701,6 +1873,8 @@ components:
         - senderName
         - body
         - isRead
+        - inspectorWorkflowTaskId
+        - inspectorEmailDeliveryStatus
         - createdAt
 
     ChatMessageInput:
@@ -1712,9 +1886,13 @@ components:
           type: string
           minLength: 1
           maxLength: 2000
+        clientRequestId:
+          type: string
+          format: uuid
       required:
         - senderId
         - body
+        - clientRequestId
 
     MarkAllReadRequest:
       type: object
@@ -1726,7 +1904,7 @@ components:
 
     UploadUrlRequest:
       type: object
-      required: [name, size, contentType]
+      required: [name, size, contentType, purpose]
       properties:
         name:
           type: string
@@ -1737,6 +1915,17 @@ components:
         contentType:
           type: string
           minLength: 1
+        purpose:
+          type: string
+          enum: [task_before, task_after, issue_before, issue_after, conversation_attachment, shared_photo, application_document]
+        taskId:
+          type: integer
+        conversationId:
+          type: integer
+        issueId:
+          type: integer
+        areaId:
+          type: integer
 
     UploadUrlResponse:
       type: object
@@ -1747,6 +1936,10 @@ components:
           format: uri
         objectPath:
           type: string
+        uploadToken:
+          type: string
+          format: uuid
+          description: Applicant capability returned only for application_document uploads.
 
     ErrorEnvelope:
       type: object
@@ -1977,6 +2170,17 @@ components:
         - name
         - path
 
+    ApplicationUploadDocument:
+      allOf:
+        - $ref: "#/components/schemas/UploadedDocument"
+        - type: object
+          properties:
+            uploadToken:
+              type: string
+              format: uuid
+          required:
+            - uploadToken
+
     SubmitApplicationRequest:
       type: object
       properties:
@@ -2005,7 +2209,7 @@ components:
         documents:
           type: array
           items:
-            $ref: "#/components/schemas/UploadedDocument"
+            $ref: "#/components/schemas/ApplicationUploadDocument"
       required:
         - firstName
         - lastName

@@ -56,14 +56,19 @@ router.get("/", async (req: Request, res: Response) => {
 
 const timeRegex = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-const CreateScheduleBody = z.object({
+const ScheduleFields = z.object({
   staffId: z.number().int().positive(),
   areaId: z.number().int().positive().nullable().optional(),
   dayOfWeek: z.number().int().min(0).max(6),
   startTime: z.string().regex(timeRegex, "Must be HH:mm format"),
   endTime: z.string().regex(timeRegex, "Must be HH:mm format"),
   notes: z.string().nullable().optional(),
-}).refine((d) => d.startTime < d.endTime, { message: "startTime must be before endTime" });
+});
+const CreateScheduleBody = ScheduleFields.refine((d) => d.startTime < d.endTime, { message: "startTime must be before endTime" });
+const UpdateScheduleBody = ScheduleFields.partial().refine(
+  (d) => !d.startTime || !d.endTime || d.startTime < d.endTime,
+  { message: "startTime must be before endTime" },
+);
 
 router.post("/", async (req: Request, res: Response) => {
   const body = CreateScheduleBody.safeParse(req.body);
@@ -131,7 +136,7 @@ router.put("/:id", async (req: Request, res: Response) => {
     return;
   }
 
-  const body = CreateScheduleBody.partial().safeParse(req.body);
+  const body = UpdateScheduleBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: "Invalid request" });
     return;

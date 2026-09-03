@@ -226,7 +226,7 @@ function NotificationBell({ staffId }: { staffId: number }) {
 
   const { data: notifications = [] } = useListNotifications(
     { staffId },
-    { query: { refetchInterval: 15000 } }
+    { query: { queryKey: ["/api/notifications", { staffId }], refetchInterval: 15000 } }
   );
 
   const markRead = useMarkNotificationRead({

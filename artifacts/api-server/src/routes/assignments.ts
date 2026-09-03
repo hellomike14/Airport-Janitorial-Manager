@@ -7,6 +7,7 @@ import {
   CreateAssignmentBody,
   DeleteAssignmentParams,
 } from "@workspace/api-zod";
+import { actorStaffFromRequest } from "../lib/actorSession";
 
 const router: IRouter = Router();
 
@@ -66,14 +67,23 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
+  const actor = await actorStaffFromRequest(req);
+  if (!actor) return res.status(401).json({ error: "Login session required" });
+  if (actor.role !== "admin" && actor.role !== "supervisor") return res.status(403).json({ error: "Supervisor access required" });
   const body = CreateAssignmentBody.parse(req.body);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(body.assignmentDate)) return res.status(400).json({ error: "Invalid assignment date" });
+  const [[target], [targetArea]] = await Promise.all([
+    db.select({ id: staffTable.id }).from(staffTable).where(and(eq(staffTable.id, body.staffId), eq(staffTable.active, true), eq(staffTable.loginEnabled, true), eq(staffTable.formerEmployee, false))),
+    db.select({ id: areasTable.id }).from(areasTable).where(and(eq(areasTable.id, body.areaId), eq(areasTable.archived, false))),
+  ]);
+  if (!target || !targetArea) return res.status(400).json({ error: "Target staff or area is not eligible" });
   const [created] = await db
     .insert(assignmentsTable)
     .values({
       staffId: body.staffId,
       areaId: body.areaId,
       assignmentDate: body.assignmentDate,
-      assignedById: body.assignedById,
+      assignedById: actor.id,
       notes: body.notes ?? null,
       isSpecial: body.isSpecial,
     })
@@ -129,7 +139,7 @@ router.post("/", async (req, res) => {
     .from(staffTable)
     .where(eq(staffTable.id, created.assignedById));
 
-  res.status(201).json({
+  return res.status(201).json({
     ...created,
     staffName: staff?.name ?? "",
     areaName: area?.name ?? "",
@@ -139,9 +149,12 @@ router.post("/", async (req, res) => {
 });
 
 router.delete("/:id", async (req, res) => {
+  const actor = await actorStaffFromRequest(req);
+  if (!actor) return res.status(401).json({ error: "Login session required" });
+  if (actor.role !== "admin" && actor.role !== "supervisor") return res.status(403).json({ error: "Supervisor access required" });
   const { id } = DeleteAssignmentParams.parse({ id: req.params.id });
   await db.delete(assignmentsTable).where(eq(assignmentsTable.id, id));
-  res.json({ success: true });
+  return res.json({ success: true });
 });
 
 export default router;

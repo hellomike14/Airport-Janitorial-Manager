@@ -16,8 +16,13 @@ import {
   ChevronRight,
   Trash2,
   Pencil,
+  Archive,
+  ArchiveRestore,
+  AlertTriangle,
+  Mail,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { InspectorWorkflowCard } from "@/components/InspectorWorkflowCard";
 import humanTraffickingFlyer from "@assets/MCO_Human_Trafficing_1787144155521.jpeg";
 import {
   listConversations,
@@ -28,7 +33,9 @@ import {
   markConversationRead,
   deleteConversationMessage,
   updateConversationMessage,
+  setConversationArchive,
   listStaff,
+  listArchivedConversations,
   type ConversationSummary,
 } from "@workspace/api-client-react";
 
@@ -57,6 +64,18 @@ function GroupAvatar({ count }: { count: number }) {
       <Users2 className="w-5 h-5" />
     </div>
   );
+}
+
+function emailDeliveryText(status: string) {
+  return {
+    pending: "Email pending",
+    sending: "Email sending",
+    retrying: "Email retrying",
+    accepted: "Email accepted by provider",
+    disabled: "Email delivery disabled",
+    not_configured: "Email not configured",
+    failed: "Email failed",
+  }[status] ?? null;
 }
 
 // ── New conversation dialog ────────────────────────────────────────────────────
@@ -100,6 +119,12 @@ function NewConvoDialog({ senderRole, staffId, onClose, onStarted }: NewConvoDia
   const supervisorGroup = groupRecipients.filter((s) => s.role === "supervisor");
   const inspectorGroup = groupRecipients.filter((s) => s.role === "inspector");
   const adminGroup = groupRecipients.filter((s) => s.role === "admin");
+  // The server restricts this role pairing and validates the inspector's
+  // configured address before it queues external delivery.
+  const dedicatedInspector =
+    senderRole === "supervisor"
+      ? allowedRecipients.find((s) => s.role === "inspector" && s.hasEmail)
+      : undefined;
 
   const individualMutation = useMutation({
     mutationFn: (recipientId: number) => startConversation({ staffId, recipientId }),
@@ -191,7 +216,26 @@ function NewConvoDialog({ senderRole, staffId, onClose, onStarted }: NewConvoDia
               {allowedRecipients.length === 0 && (
                 <div className="p-6 text-center text-slate-400 text-sm">{t("messages.noRecipients")}</div>
               )}
-              {allowedRecipients.map((s) => (
+              {dedicatedInspector && (
+                <button
+                  type="button"
+                  disabled={individualMutation.isPending}
+                  onClick={() => individualMutation.mutate(dedicatedInspector.id)}
+                  className="m-3 w-[calc(100%-1.5rem)] rounded-xl border border-amber-300 bg-amber-50 px-3 py-3 text-left hover:bg-amber-100 disabled:opacity-50"
+                >
+                  <span className="flex items-center gap-2 text-sm font-semibold text-amber-900">
+                    <Mail className="w-4 h-4" />
+                    Message inspector@marvolenterprises.com
+                    <ChevronRight className="ml-auto w-4 h-4" />
+                  </span>
+                  <span className="mt-1 block text-xs text-amber-800">
+                    Dedicated inspector communication identity
+                  </span>
+                </button>
+              )}
+              {allowedRecipients
+                .filter((s) => s.id !== dedicatedInspector?.id)
+                .map((s) => (
                 <button
                   key={s.id}
                   disabled={individualMutation.isPending}
@@ -385,7 +429,13 @@ export default function Messages() {
   const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const composeRequestRef = useRef<{
+    conversationId: number;
+    body: string;
+    clientRequestId: string;
+  } | null>(null);
 
   const { data: conversations = [], isLoading: convosLoading, error: convosError } = useQuery({
     queryKey: [CONVERSATIONS_KEY, staffId],
@@ -394,16 +444,28 @@ export default function Messages() {
     refetchInterval: 15000,
     retry: (failureCount, error: any) => (error?.status === 401 ? false : failureCount < 2),
   });
+  const { data: archivedConversations = [], isLoading: archivedLoading, error: archivedError } = useQuery({
+    queryKey: [CONVERSATIONS_KEY, staffId, "archived"],
+    queryFn: () => listArchivedConversations({ staffId }),
+    enabled: staffId > 0 && showArchived,
+    refetchInterval: 15000,
+    retry: (failureCount, error: any) => (error?.status === 401 ? false : failureCount < 2),
+  });
   const sessionExpired = (convosError as any)?.status === 401;
+  const visibleConversations = showArchived ? archivedConversations : conversations;
 
-  const { data: messages = [] } = useQuery({
+  const {
+    data: messages = [],
+    isLoading: messagesLoading,
+    error: messagesError,
+  } = useQuery({
     queryKey: [CONVERSATIONS_KEY, selectedId, "messages"],
     queryFn: () => listConversationMessages(selectedId!, { staffId }),
     enabled: staffId > 0 && selectedId !== null,
     refetchInterval: 5000,
   });
 
-  const selectedConvo = conversations.find((c) => c.id === selectedId) ?? null;
+  const selectedConvo = visibleConversations.find((c) => c.id === selectedId) ?? null;
 
   const unreadInSelected = useMemo(
     () => messages.some((m) => m.senderId !== staffId && !m.isRead),
@@ -438,10 +500,27 @@ export default function Messages() {
   }, [selectedId]);
 
   const sendMutation = useMutation({
-    mutationFn: (body: string) => sendConversationMessage(selectedId!, { senderId: staffId, body }),
-    onSuccess: () => {
-      setDraft("");
+    mutationFn: (submission: { conversationId: number; body: string; clientRequestId: string }) =>
+      sendConversationMessage(submission.conversationId, {
+        senderId: staffId,
+        body: submission.body,
+        clientRequestId: submission.clientRequestId,
+      }),
+    onSuccess: (_message, submission) => {
+      if (composeRequestRef.current?.clientRequestId === submission.clientRequestId) {
+        composeRequestRef.current = null;
+      }
+      if (selectedId === submission.conversationId) setDraft("");
       qc.invalidateQueries({ queryKey: [CONVERSATIONS_KEY] });
+    },
+  });
+
+  const archiveMutation = useMutation({
+    mutationFn: ({ id, archived }: { id: number; archived: boolean }) =>
+      setConversationArchive(id, { staffId, archived }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [CONVERSATIONS_KEY] });
+      setSelectedId(null);
     },
   });
 
@@ -478,7 +557,21 @@ export default function Messages() {
   const handleSend = () => {
     const body = draft.trim();
     if (!body || selectedId === null || sendMutation.isPending) return;
-    sendMutation.mutate(body);
+    const prior = composeRequestRef.current;
+    const submission =
+      prior?.conversationId === selectedId && prior.body === body
+        ? prior
+        : {
+            conversationId: selectedId,
+            body,
+            clientRequestId: crypto.randomUUID(),
+          };
+    composeRequestRef.current = submission;
+    sendMutation.mutate({
+      conversationId: submission.conversationId,
+      body: submission.body,
+      clientRequestId: submission.clientRequestId,
+    });
   };
 
   const handleStartEdit = (msgId: number, body: string) => {
@@ -509,6 +602,11 @@ export default function Messages() {
     setShowNewConvo(false);
     setSelectedId(convo.id);
     qc.invalidateQueries({ queryKey: [CONVERSATIONS_KEY] });
+  };
+
+  const toggleArchiveView = () => {
+    setSelectedId(null);
+    setShowArchived((current) => !current);
   };
 
   const canStartConversation =
@@ -578,20 +676,40 @@ export default function Messages() {
         <div
           className={`${selectedId !== null ? "hidden md:flex" : "flex"} flex-col w-full md:w-80 shrink-0 bg-white rounded-2xl border border-slate-200 overflow-hidden`}
         >
+          <div className="border-b border-slate-100 px-3 py-2 flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold text-slate-500">
+              {showArchived ? "Archived conversations" : "Active conversations"}
+            </span>
+            <button
+              type="button"
+              onClick={toggleArchiveView}
+              className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+            >
+              {showArchived ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
+              {showArchived ? "Inbox" : "Archive"}
+            </button>
+          </div>
           <div className="overflow-y-auto flex-1 divide-y divide-slate-50">
             {sessionExpired && (
               <div className="p-6 text-center text-amber-600 text-sm">{t("messages.sessionExpired")}</div>
             )}
-            {convosLoading && (
+            {(convosLoading || (showArchived && archivedLoading)) && (
               <div className="p-6 text-center text-slate-400 text-sm">{t("common.loading")}</div>
             )}
-            {!convosLoading && conversations.length === 0 && (
-              <div className="p-8 text-center text-slate-400 text-sm">
-                <MessageSquare className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                {t("messages.noConversations")}
+            {!convosLoading && !archivedLoading && (showArchived ? archivedError : convosError) && !sessionExpired && (
+              <div className="p-6 text-center text-rose-600 text-sm">
+                Conversations could not be refreshed. Please try again.
               </div>
             )}
-            {conversations.map((c) => (
+            {!convosLoading && !archivedLoading && visibleConversations.length === 0 && (
+              <div className="p-8 text-center text-slate-400 text-sm">
+                <MessageSquare className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                {showArchived ? "No archived conversations." : t("messages.noConversations")}
+              </div>
+            )}
+            {[...visibleConversations]
+              .sort((a, b) => Number(b.otherStaffRole === "inspector") - Number(a.otherStaffRole === "inspector"))
+              .map((c) => (
               <button
                 key={c.id}
                 onClick={() => setSelectedId(c.id)}
@@ -608,6 +726,9 @@ export default function Messages() {
                   <div className="flex items-center gap-1.5">
                     <span className="font-semibold text-slate-800 text-sm truncate">{c.otherStaffName}</span>
                     {roleIcon(c.otherStaffRole)}
+                    {c.otherStaffRole === "inspector" && (
+                      <AlertTriangle className="w-3.5 h-3.5 text-red-500" aria-label="Inspector messages are urgent" />
+                    )}
                   </div>
                   <p className="text-xs text-slate-500 truncate">
                     {c.isGroup
@@ -680,17 +801,47 @@ export default function Messages() {
                     </p>
                   )}
                 </div>
+                  <button
+                    type="button"
+                    onClick={() => archiveMutation.mutate({ id: selectedConvo.id, archived: !showArchived })}
+                    disabled={archiveMutation.isPending}
+                    className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+                    aria-label={showArchived ? "Restore conversation to inbox" : "Archive conversation"}
+                    title={showArchived ? "Restore to inbox" : "Archive conversation"}
+                  >
+                    {showArchived ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
+                  </button>
               </div>
+                {selectedConvo.otherStaffRole === "inspector" && (
+                  <div className="mx-4 mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                    <div className="flex items-center gap-1 font-semibold">
+                      <Mail className="w-3.5 h-3.5" />
+                      Inspector email identity: inspector@marvolenterprises.com
+                    </div>
+                    <p className="mt-0.5">
+                      Each applicable message shows its provider delivery state. “Accepted by provider” is not a read confirmation; pending, disabled, not configured, and failed are not sent.
+                    </p>
+                  </div>
+                )}
 
               {/* Messages */}
               <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50">
-                {messages.length === 0 && (
+                {messagesLoading && (
+                  <div className="text-center text-slate-400 text-sm py-8">{t("common.loading")}</div>
+                )}
+                {messagesError && !messagesLoading && (
+                  <div className="text-center text-rose-600 text-sm py-8">
+                    Messages could not be refreshed. Please try again.
+                  </div>
+                )}
+                {!messagesLoading && !messagesError && messages.length === 0 && (
                   <div className="text-center text-slate-400 text-sm py-8">
                     {t("messages.startOfConversation")}
                   </div>
                 )}
-                {messages.map((m) => {
+                {!messagesError && messages.map((m) => {
                   const mine = m.senderId === staffId;
+                  const urgentInspectorReply = !mine && selectedConvo.otherStaffRole === "inspector";
                   const isEditing = editingMessageId === m.id;
                   const canDelete = senderRole === "admin";
                   const messageActions = !isEditing && (mine || canDelete) && (
@@ -728,11 +879,16 @@ export default function Messages() {
                         className={`max-w-[75%] rounded-2xl px-4 py-2.5 ${
                           mine
                             ? "bg-emerald-600 text-white rounded-br-md"
-                            : "bg-white border border-slate-200 text-slate-800 rounded-bl-md"
+                            : urgentInspectorReply
+                              ? "bg-amber-50 border-2 border-amber-400 text-slate-800 rounded-bl-md"
+                              : "bg-white border border-slate-200 text-slate-800 rounded-bl-md"
                         }`}
                       >
                         {!mine && (
-                          <p className="text-[11px] font-semibold text-emerald-700 mb-0.5">{m.senderName}</p>
+                          <p className="text-[11px] font-semibold text-emerald-700 mb-0.5 flex items-center gap-1">
+                            {urgentInspectorReply && <AlertTriangle className="w-3 h-3 text-red-500" />}
+                            {urgentInspectorReply ? "URGENT inspector reply · " : ""}{m.senderName}
+                          </p>
                         )}
                         {isEditing ? (
                           <div className="space-y-2">
@@ -790,6 +946,14 @@ export default function Messages() {
                         <p className={`text-[10px] mt-1 ${mine ? "text-emerald-100" : "text-slate-400"}`}>
                           {format(new Date(m.createdAt), "MMM d, h:mm a")}
                         </p>
+                        {emailDeliveryText(m.inspectorEmailDeliveryStatus) && (
+                          <p className={`text-[10px] mt-1 font-semibold ${mine ? "text-emerald-100" : "text-slate-500"}`}>
+                            {emailDeliveryText(m.inspectorEmailDeliveryStatus)}
+                          </p>
+                        )}
+                        {m.inspectorWorkflowTaskId && (
+                          <InspectorWorkflowCard taskId={m.inspectorWorkflowTaskId} />
+                        )}
                       </div>
                       {!mine && messageActions}
                     </div>

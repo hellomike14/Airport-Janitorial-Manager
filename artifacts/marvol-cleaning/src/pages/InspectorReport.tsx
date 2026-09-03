@@ -86,6 +86,7 @@ function buildIssuePDF(issue: any, t: (key: string, opts?: any) => string): stri
   const afterUrl = issue.afterImagePath ? `${origin}${BASE_URL}/api/storage${issue.afterImagePath}` : null;
 
   const sev = SEVERITY_STYLE[issue.severity as keyof typeof SEVERITY_STYLE] ?? SEVERITY_STYLE.low;
+  const severityLabel = t(`inspectorReport.${issue.severity}`, { defaultValue: issue.severity });
   const generatedAt = format(new Date(), "MMMM d, yyyy 'at' h:mm a");
   const reportedDate = format(parseISO(issue.issueDate), "MMMM d, yyyy");
   const resolvedDate = issue.resolvedAt ? format(parseISO(issue.resolvedAt), "MMMM d, yyyy 'at' h:mm a") : null;
@@ -163,7 +164,7 @@ function buildIssuePDF(issue: any, t: (key: string, opts?: any) => string): stri
     <!-- Severity banner -->
     <div style="background:${sev.color}15;border-bottom:3px solid ${sev.color};padding:12px 32px;display:flex;align-items:center;justify-content:space-between;">
       <div style="display:flex;align-items:center;gap:10px;">
-        <span style="background:${sev.color};color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;padding:3px 10px;border-radius:20px;">${t("issuePdf.priority", { level: sev.label })}</span>
+        <span style="background:${sev.color};color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;padding:3px 10px;border-radius:20px;">${t("issuePdf.priority", { level: severityLabel })}</span>
         <span style="font-size:12px;font-weight:600;color:${sev.color};">${severityDesc}</span>
       </div>
       <span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:${issue.resolved ? '#d1fae5' : '#dbeafe'};color:${issue.resolved ? '#065f46' : '#1d4ed8'};">${issue.resolved ? t("issuePdf.resolvedLabel") : t("issuePdf.openLabel")}</span>

@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, unique, check } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, unique, index, check } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { staffTable } from "./staff";
 
@@ -24,10 +24,42 @@ export const messagesTable = pgTable("messages", {
   id: serial("id").primaryKey(),
   conversationId: integer("conversation_id").notNull().references(() => conversationsTable.id),
   senderId: integer("sender_id").notNull().references(() => staffTable.id),
+  // A UUID generated per compose action. NULL is retained for historic and
+  // inbound messages; the unique pair makes retries safe without rewriting
+  // old conversations.
+  clientRequestId: text("client_request_id"),
   body: text("body").notNull(),
   isRead: boolean("is_read").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => [unique("messages_sender_client_request_unique").on(t.senderId, t.clientRequestId)]);
+
+export type MessageEmailDeliveryStatus = "pending" | "sending" | "retrying" | "accepted" | "disabled" | "not_configured" | "failed";
+
+/** Transactional email intent; a worker owns external delivery. */
+export const messageEmailOutboxTable = pgTable("message_email_outbox", {
+  id: serial("id").primaryKey(),
+  messageId: integer("message_id").notNull().references(() => messagesTable.id, { onDelete: "cascade" }),
+  conversationId: integer("conversation_id").notNull(),
+  inspectorId: integer("inspector_id").notNull(),
+  supervisorId: integer("supervisor_id").notNull(),
+  inspectorEmail: text("inspector_email").notNull(),
+  inspectorName: text("inspector_name").notNull(),
+  supervisorName: text("supervisor_name").notNull(),
+  messageBody: text("message_body").notNull(),
+  status: text("status").$type<MessageEmailDeliveryStatus>().notNull().default("pending"),
+  attemptCount: integer("attempt_count").notNull().default(0),
+  nextAttemptAt: timestamp("next_attempt_at").notNull().defaultNow(),
+  lockedAt: timestamp("locked_at"),
+  lockToken: text("lock_token"),
+  lastError: text("last_error"),
+  acceptedAt: timestamp("accepted_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => [
+  unique("message_email_outbox_message_unique").on(t.messageId),
+  index("message_email_outbox_ready_idx").on(t.status, t.nextAttemptAt),
+  check("message_email_outbox_status_valid", sql`${t.status} IN ('pending','sending','retrying','accepted','disabled','not_configured','failed')`),
+]);
 
 // Per-participant tracking for group conversations (also used to track
 // last-read position so unread counts work per user in a group).
@@ -47,6 +79,23 @@ export const conversationParticipantsTable = pgTable(
   (t) => [unique("conversation_participants_unique").on(t.conversationId, t.staffId)]
 );
 
+/** Per-user archive state; no conversation history is ever deleted. */
+export const conversationArchivesTable = pgTable("conversation_archives", {
+  conversationId: integer("conversation_id").notNull().references(() => conversationsTable.id, { onDelete: "cascade" }),
+  staffId: integer("staff_id").notNull().references(() => staffTable.id, { onDelete: "cascade" }),
+  archivedAt: timestamp("archived_at").notNull().defaultNow(),
+}, (t) => [unique("conversation_archives_unique").on(t.conversationId, t.staffId)]);
+
+/** Hashed provider identifier used to make inbound SendGrid retries safe. */
+export const inboundEmailMessagesTable = pgTable("inbound_email_messages", {
+  providerMessageId: text("provider_message_id").primaryKey(),
+  conversationId: integer("conversation_id").notNull().references(() => conversationsTable.id, { onDelete: "cascade" }),
+  senderId: integer("sender_id").notNull().references(() => staffTable.id),
+  messageId: integer("message_id").references(() => messagesTable.id, { onDelete: "set null" }),
+  receivedAt: timestamp("received_at").notNull().defaultNow(),
+});
+
 export type Conversation = typeof conversationsTable.$inferSelect;
 export type Message = typeof messagesTable.$inferSelect;
 export type ConversationParticipant = typeof conversationParticipantsTable.$inferSelect;
+export type MessageEmailOutbox = typeof messageEmailOutboxTable.$inferSelect;

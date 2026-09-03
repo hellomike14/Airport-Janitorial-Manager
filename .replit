@@ -27,3 +27,17 @@ timeoutMs = 20000
 
 [nix]
 channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+SENDGRID_EMAIL_BRIDGE_ENABLED = "true"
+SENDGRID_FROM_EMAIL = "messages@marvolenterprises.com"
+SENDGRID_INBOUND_DOMAIN = "replies.marvolenterprises.com"
+PUBLIC_APP_URL = "https://airport-janitorial-manager.replit.app"
+SENDGRID_REPLY_TOKEN_TTL_DAYS = "30"
+MESSAGE_EMAIL_OUTBOX_POLL_MS = "1000"
+MESSAGE_EMAIL_OUTBOX_LEASE_MS = "60000"
+MESSAGE_EMAIL_OUTBOX_BATCH_SIZE = "10"
+MESSAGE_EMAIL_OUTBOX_MAX_ATTEMPTS = "8"
+INSPECTOR_ESCALATION_POLL_MS = "30000"

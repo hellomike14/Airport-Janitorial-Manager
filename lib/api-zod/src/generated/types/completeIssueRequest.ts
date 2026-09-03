@@ -9,4 +9,5 @@
 export interface CompleteIssueRequest {
   completionNotes?: string | null;
   completedById: number;
+  afterImagePath?: string | null;
 }

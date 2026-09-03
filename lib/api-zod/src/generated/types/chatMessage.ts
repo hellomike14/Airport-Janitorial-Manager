@@ -5,6 +5,7 @@
  * Marvol Facility Cleaning Management API
  * OpenAPI spec version: 0.1.0
  */
+import type { ChatMessageInspectorEmailDeliveryStatus } from "./chatMessageInspectorEmailDeliveryStatus";
 
 export interface ChatMessage {
   id: number;
@@ -13,5 +14,8 @@ export interface ChatMessage {
   senderName: string;
   body: string;
   isRead: boolean;
+  /** @nullable */
+  inspectorWorkflowTaskId: number | null;
+  inspectorEmailDeliveryStatus: ChatMessageInspectorEmailDeliveryStatus;
   createdAt: string;
 }

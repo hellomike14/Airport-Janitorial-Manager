@@ -86,6 +86,10 @@ router.post("/", requireStaffRole("admin"), async (req, res) => {
 router.put("/:id", requireStaffRole("admin"), async (req, res) => {
   const { id } = UpdateStaffMemberParams.parse({ id: req.params.id });
   const body = UpdateStaffMemberBody.parse(req.body);
+  const [target] = await db.select({ name: staffTable.name, formerEmployee: staffTable.formerEmployee }).from(staffTable).where(eq(staffTable.id, id));
+  if (target?.formerEmployee && (body.active === true || (body.name !== undefined && body.name !== target.name))) {
+    return res.status(403).json({ error: "Former staff records cannot be renamed or reactivated" });
+  }
   const updateData: Partial<typeof staffTable.$inferInsert> = {};
   if (body.name !== undefined) updateData.name = body.name;
   if (body.role !== undefined) updateData.role = body.role;
@@ -98,7 +102,10 @@ router.put("/:id", requireStaffRole("admin"), async (req, res) => {
     }
     updateData.email = email;
   }
-  if (body.active !== undefined) updateData.active = body.active;
+  if (body.active !== undefined) {
+    updateData.active = body.active;
+    if (!body.active) updateData.loginEnabled = false;
+  }
 
   const [updated] = await db
     .update(staffTable)
@@ -109,14 +116,14 @@ router.put("/:id", requireStaffRole("admin"), async (req, res) => {
     res.status(404).json({ error: "Staff member not found" });
     return;
   }
-  res.json(toPublicStaff(updated));
+  return res.json(toPublicStaff(updated));
 });
 
 router.delete("/:id", requireStaffRole("admin"), async (req, res) => {
   const { id } = DeleteStaffMemberParams.parse({ id: req.params.id });
   const [updated] = await db
     .update(staffTable)
-    .set({ active: false })
+    .set({ active: false, loginEnabled: false })
     .where(eq(staffTable.id, id))
     .returning();
   if (!updated) {

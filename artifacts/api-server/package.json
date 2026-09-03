@@ -20,12 +20,14 @@
     "express": "^5",
     "google-auth-library": "^10.6.2",
     "http-proxy-middleware": "^4.2.0",
+    "multer": "^2.3.0",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@types/multer": "^2.2.0",
     "@types/node": "catalog:",
     "esbuild": "^0.27.3",
     "tsx": "catalog:"

@@ -1,4 +1,5 @@
 import express, { type Express } from "express";
+import multer from "multer";
 import cors from "cors";
 import { clerkMiddleware } from "@clerk/express";
 import { publishableKeyFromHost } from "@clerk/shared/keys";
@@ -8,12 +9,30 @@ import {
   getClerkProxyHost,
 } from "./middlewares/clerkProxyMiddleware";
 import router from "./routes";
+import { inboundSendgridRouter } from "./routes/messages";
+import internalRouter from "./routes/internal";
+import { normalizeInboundParseFields } from "./lib/inboundParsePolicy";
 
 const app: Express = express();
+const inboundParse = multer({ storage: multer.memoryStorage(), limits: { fields: 12, fieldSize: 64 * 1024, files: 0, fileSize: 1 } }).none();
 
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 
 app.use(cors({ credentials: true, origin: true }));
+// SendGrid cannot hold a Clerk session. This narrow route is parsed with a
+// bounded JSON body and authenticates exclusively through its signed webhook
+// credentials in the handler.
+app.use("/api/webhooks/sendgrid/inbound", (req, res, next) => {
+  if (req.is("multipart/form-data")) return inboundParse(req, res, (error) => {
+    if (error) return res.status(413).json({ error: "Inbound payload rejected" });
+    try {
+      req.body = normalizeInboundParseFields(req.body);
+      return next();
+    } catch { return res.status(400).json({ error: "Invalid inbound envelope" }); }
+  });
+  return express.json({ limit: "64kb", strict: true })(req, res, next);
+}, inboundSendgridRouter);
+app.use("/api/internal", internalRouter);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

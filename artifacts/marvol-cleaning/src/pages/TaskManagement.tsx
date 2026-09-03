@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StaffName } from "@/components/StaffName";
+import { InspectorWorkflowCard } from "@/components/InspectorWorkflowCard";
 
 type StatusFilter = "all" | "pending" | "completed";
 
@@ -57,6 +58,13 @@ export default function TaskManagement() {
 
   const { data: areas } = useListAreas();
   const { data: tasks, isLoading } = useListTasks({ date });
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      qc.invalidateQueries({ queryKey: ["/api/tasks"] });
+    }, 15000);
+    return () => window.clearInterval(interval);
+  }, [qc]);
 
   const completeMutation = useCompleteTask({
     mutation: { onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/tasks"] }) },
@@ -362,6 +370,9 @@ export default function TaskManagement() {
                             )}
                             {task.notes && (
                               <p className="text-xs text-slate-400 italic mt-0.5">"{task.notes}"</p>
+                            )}
+                            {task.inspectorWorkflowTaskId && (
+                              <InspectorWorkflowCard taskId={task.inspectorWorkflowTaskId} />
                             )}
                           </div>
 

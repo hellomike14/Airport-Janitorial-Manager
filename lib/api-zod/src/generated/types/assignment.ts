@@ -12,6 +12,7 @@ export interface Assignment {
   staffName: string;
   areaId: number;
   areaName: string;
+  terminal: string;
   assignmentDate: string;
   assignedById: number;
   assignedByName: string;

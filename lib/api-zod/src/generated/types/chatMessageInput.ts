@@ -13,4 +13,5 @@ export interface ChatMessageInput {
    * @maxLength 2000
    */
   body: string;
+  clientRequestId: string;
 }

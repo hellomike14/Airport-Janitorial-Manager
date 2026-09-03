@@ -37,11 +37,11 @@ export default function AreaTasks() {
   const areaInfo = areas?.find(a => a.id === areaId);
 
   const { data: tasks, isLoading } = useListTasks({ areaId, date: selectedDate }, {
-    query: { enabled: !!areaId }
+    query: { queryKey: ["/api/tasks", { areaId, date: selectedDate }], enabled: !!areaId }
   });
 
   const { data: effectiveTasks, refetch: refetchEffective } = useListAreaEffectiveTasks(areaId, {
-    query: { enabled: !!areaId && isAdmin },
+    query: { queryKey: [`/api/areas/${areaId}/effective-tasks`], enabled: !!areaId && isAdmin },
   });
 
   const onExclusionChange = () => {
