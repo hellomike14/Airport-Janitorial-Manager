@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createReplyToken, outboundEmailStatus, verifyInboundWebhookSecret, verifyReplyToken } from "./sendgridEmailBridge";
 import { normalizeInboundParseFields } from "./inboundParsePolicy";
+import { inspectorRuntimeConfig } from "./inspectorRuntimeConfig";
 import { leaseTokenMayFinalize, outboxClaimEligible, outboxFailureTransition } from "./outboxPolicy";
 import {
   bulkCompletionEligible, canManageAssignments, canMutateTask, canReadPrivateObject,
@@ -114,4 +115,21 @@ test("SLA sweep is false immediately before deadline and true exactly at deadlin
   const due = new Date("2026-01-01T00:15:00.000Z");
   assert.equal(inspectorSweepEligible(due, new Date(due.getTime() - 1)), false);
   assert.equal(inspectorSweepEligible(due, due), true);
+});
+test("inspector runtime settings honor bounded environment configuration", () => {
+  assert.deepEqual(inspectorRuntimeConfig({
+    SENDGRID_REPLY_TOKEN_TTL_DAYS: "30",
+    MESSAGE_EMAIL_OUTBOX_POLL_MS: "1000",
+    MESSAGE_EMAIL_OUTBOX_LEASE_MS: "60000",
+    MESSAGE_EMAIL_OUTBOX_BATCH_SIZE: "10",
+    MESSAGE_EMAIL_OUTBOX_MAX_ATTEMPTS: "8",
+    INSPECTOR_ESCALATION_POLL_MS: "30000",
+  }), {
+    replyTokenTtlSeconds: 30 * 86_400,
+    outboxPollMs: 1000,
+    outboxLeaseMs: 60000,
+    outboxBatchSize: 10,
+    outboxMaxAttempts: 8,
+    escalationPollMs: 30000,
+  });
 });

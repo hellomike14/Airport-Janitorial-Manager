@@ -7,6 +7,7 @@ import { AREA_SPECIFIC_TASKS, AREAS_REPLACING_DEFAULTS } from "./area-tasks";
 import { SEED_STAFF, REMOVED_STAFF_NAMES, isSeedLoginEnabled } from "./seed-data";
 import { sweepOverdueInspectorAssignments } from "./lib/inspectorTaskWorkflow";
 import { drainOutbox } from "./lib/messageEmailOutboxWorker";
+import { inspectorRuntimeConfig } from "./lib/inspectorRuntimeConfig";
 
 const rawPort = process.env["PORT"];
 
@@ -767,8 +768,15 @@ async function seed() {
 app.listen(port, async () => {
   console.log(`Server listening on port ${port}`);
   await seed().catch((err) => console.error("Seed error:", err));
+  const inspectorConfig = inspectorRuntimeConfig();
   // A lock-protected sweep is safe to run on every instance; deployments
   // should additionally invoke it from their scheduler for sleep resilience.
-  setInterval(() => void sweepOverdueInspectorAssignments().catch(() => undefined), 60_000).unref();
-  setInterval(() => void drainOutbox().catch(() => undefined), 30_000).unref();
+  setInterval(
+    () => void sweepOverdueInspectorAssignments().catch(() => undefined),
+    inspectorConfig.escalationPollMs,
+  ).unref();
+  setInterval(
+    () => void drainOutbox().catch(() => undefined),
+    inspectorConfig.outboxPollMs,
+  ).unref();
 });
