@@ -4,9 +4,7 @@ export const SEED_STAFF: { name: string; role: "admin" | "inspector" | "supervis
   { name: "Priscila Rosero", role: "supervisor", email: "priscilarosero27@gmail.com" },
   { name: "Reynaldo Hernandez Suarez", role: "supervisor", email: "cnuevo986@gmail.com" },
 
-  { name: "Edner Jules", role: "staff" },
   { name: "Ivan Serrano", role: "staff", email: "ivanserrano737@gmail.com" },
-  { name: "Jason Delgado", role: "staff" },
   { name: "Jean Gardy Rigueur", role: "staff", email: "jeangardyrigueur@gmail.com" },
   { name: "Jose Camargo", role: "staff" },
   { name: "Juan Carlos Zurita Blacio", role: "staff", email: "jczb110371@gmail.com" },
@@ -28,4 +26,4 @@ export const REQUIRED_PRODUCTION_LOGIN_NAMES = new Set(
   SEED_STAFF.filter((staff) => Boolean(staff.email)).map((staff) => staff.name),
 );
 
-export const REMOVED_STAFF_NAMES = ["Floraima Pinero Valdez", "Ashandre Longmore", "Marie Ingrid Daniel", "Jose Altagracia Maria"];
+export const REMOVED_STAFF_NAMES = ["Floraima Pinero Valdez", "Ashandre Longmore", "Marie Ingrid Daniel", "Jose Altagracia Maria", "Edner Jules", "Jason Delgado"];
