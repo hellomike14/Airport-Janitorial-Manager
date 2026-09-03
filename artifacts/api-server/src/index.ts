@@ -30,7 +30,6 @@ const RAW_SEED_AREAS = [
   { name: "Taxis",                       terminal: "Terminal A - East", location: "East",         sortOrder: 7 },
   { name: "Check point",                 terminal: "Terminal A - East", location: "East",         sortOrder: 8 },
   { name: "Garden",                      terminal: "Terminal A - East", location: "East",         sortOrder: 9 },
-  { name: "Level 3 - Row A-G",           terminal: "Terminal A - West", location: "West",         sortOrder: 11 },
   { name: "Level 2 - Row A-G",           terminal: "Terminal A - West", location: "West",         sortOrder: 12 },
   { name: "Level 1 - Row D-G",           terminal: "Terminal A - West", location: "West",         sortOrder: 13 },
   { name: "R1 - Enterprises",            terminal: "Terminal A - West", location: "West",         sortOrder: 14 },
@@ -529,6 +528,8 @@ async function seed() {
     { name: "Terminal B - West Garage", terminal: "Terminal B - West" },
     { name: "Level 4 - Row C-G", terminal: "Terminal A - West" },
     { name: "Terminal A — Level 4 Row C-G", terminal: "Terminal A - West" },
+    { name: "Level 3 - Row A-G", terminal: "Terminal A - West" },
+    { name: "Terminal A — Level 3 Row A-G", terminal: "Terminal A - West" },
   ];
   // Per-terminal parking-level archival exception list. Anything NOT in here
   // gets archived. Terminal A - West / Level P1 and Level P2 stay active (with
