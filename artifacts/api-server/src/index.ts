@@ -64,7 +64,14 @@ const RAW_SEED_AREAS = [
   { name: "Level 4 - C4 C59-C69",                             terminal: "Terminal C", location: "Level 4", sortOrder: 43 },
   { name: "Level 4 - Driveway",                               terminal: "Terminal C", location: "Level 4", sortOrder: 44 },
   { name: "Level 6 - C6 C59-C69",                             terminal: "Terminal C", location: "Level 6", sortOrder: 45 },
-  { name: "Top Terminal - Levels 4-11",  terminal: "Top Terminal", location: "Levels 4-11", sortOrder: 46 },
+  { name: "Top Terminal — Level 4",  terminal: "Top Terminal", location: "Level 4", sortOrder: 46 },
+  { name: "Top Terminal — Level 5",  terminal: "Top Terminal", location: "Level 5", sortOrder: 47 },
+  { name: "Top Terminal — Level 6",  terminal: "Top Terminal", location: "Level 6", sortOrder: 48 },
+  { name: "Top Terminal — Level 7",  terminal: "Top Terminal", location: "Level 7", sortOrder: 49 },
+  { name: "Top Terminal — Level 8",  terminal: "Top Terminal", location: "Level 8", sortOrder: 50 },
+  { name: "Top Terminal — Level 9",  terminal: "Top Terminal", location: "Level 9", sortOrder: 51 },
+  { name: "Top Terminal — Level 10", terminal: "Top Terminal", location: "Level 10", sortOrder: 52 },
+  { name: "Top Terminal — Level 11", terminal: "Top Terminal", location: "Level 11", sortOrder: 53 },
 ];
 
 const SEED_AREAS = RAW_SEED_AREAS.map((a) => ({
@@ -530,6 +537,7 @@ async function seed() {
     { name: "Terminal A — Level 4 Row C-G", terminal: "Terminal A - West" },
     { name: "Level 3 - Row A-G", terminal: "Terminal A - West" },
     { name: "Terminal A — Level 3 Row A-G", terminal: "Terminal A - West" },
+    { name: "Top Terminal - Levels 4-11", terminal: "Top Terminal" },
   ];
   // Per-terminal parking-level archival exception list. Anything NOT in here
   // gets archived. Terminal A - West / Level P1 and Level P2 stay active (with
