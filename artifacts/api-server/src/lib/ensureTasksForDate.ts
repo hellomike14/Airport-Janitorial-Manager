@@ -1,6 +1,6 @@
 import { db } from "@workspace/db";
 import { tasksTable, areasTable, taskTypesTable, taskExclusionsTable } from "@workspace/db/schema";
-import { eq, and, asc } from "drizzle-orm";
+import { eq, and, asc, sql } from "drizzle-orm";
 import { AREA_SPECIFIC_TASKS, AREAS_REPLACING_DEFAULTS } from "../area-tasks";
 
 export const FALLBACK_TASKS = [
@@ -60,17 +60,24 @@ export async function getEffectiveTasksForArea(areaId: number): Promise<{ taskNa
 }
 
 export async function ensureTasksForDate(areaId: number, date: string) {
-  const existing = await db
-    .select({ id: tasksTable.id })
-    .from(tasksTable)
-    .where(and(eq(tasksTable.areaId, areaId), eq(tasksTable.taskDate, date)))
-    .limit(1);
+  await db.transaction(async (tx) => {
+    // Several dashboard/task requests can try to initialize the same area and
+    // date concurrently. Serialize that initialization before checking whether
+    // rows already exist so two requests cannot insert identical checklists.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(${areaId}, hashtext(${date}))`);
 
-  if (existing.length === 0) {
+    const existing = await tx
+      .select({ id: tasksTable.id })
+      .from(tasksTable)
+      .where(and(eq(tasksTable.areaId, areaId), eq(tasksTable.taskDate, date)))
+      .limit(1);
+
+    if (existing.length > 0) return;
+
     const allTasks = await getEffectiveTasksForArea(areaId);
     if (allTasks.length === 0) return;
 
-    await db.insert(tasksTable).values(
+    await tx.insert(tasksTable).values(
       allTasks.map((t) => ({
         areaId,
         taskDate: date,
@@ -80,5 +87,5 @@ export async function ensureTasksForDate(areaId: number, date: string) {
         isSpecial: false,
       }))
     );
-  }
+  });
 }
