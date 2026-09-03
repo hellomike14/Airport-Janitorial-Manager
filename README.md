@@ -25,7 +25,7 @@ Approved production identities currently reconciled at API startup:
 | Alexis Moron | `alexismoron733@gmail.com` |
 | JeanFranco Perez | `jeanfranco985@gmail.com` |
 
-Jason Delgado and Jose Camargo cannot be granted email-based access until their email addresses are added to the roster. Edner Jules has an email in the production Replit database but remains inactive, so this branch intentionally does not restore his login access unless operations explicitly reactivates him.
+Jose Camargo cannot be granted email-based access until an email address is added to the roster. Edner Jules and Jason Delgado are former employees: startup reconciliation treats them as removed staff, keeps them inactive/login-disabled, and preserves historical operational records instead of granting access.
 
 `msutherland@marvolenterprises.com` is **notification-only**. The API explicitly denies that address, deactivates/disables any legacy Marcell staff row at startup, and prevents an administrator from assigning the address to a login-enabled staff record.
 
