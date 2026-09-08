@@ -122,6 +122,11 @@ export default function SpecialRequests() {
 
   return (
     <div className="space-y-8 max-w-4xl mx-auto pb-12">
+      {(currentUser?.role === "admin" || currentUser?.role === "supervisor") && (
+        <a href="/messages" className="block rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 font-semibold text-amber-950 hover:bg-amber-100">
+          {t("messages.inspectorMessages")} →
+        </a>
+      )}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
         <div>
           <h1 className="text-3xl font-display font-bold text-slate-900 flex items-center gap-3">

@@ -76,6 +76,10 @@
     "messages": "Messages"
   },
   "messages": {
+    "inspectorMessages": "Messages de l’inspecteur",
+    "inspectorEmailHelp": "Envoyez un e-mail à inspector@marvolenterprises.com et recevez les réponses ici.",
+    "inspectorUnavailable": "Le compte de l’inspecteur est indisponible. Vérifiez qu’il est actif et possède une adresse e-mail.",
+    "inspectorOpenFailed": "Impossible d’ouvrir les messages. Réessayez.",
     "title": "Messages",
     "subtitle": "Conversations directes avec votre équipe",
     "newConversation": "Nouvelle conversation",
