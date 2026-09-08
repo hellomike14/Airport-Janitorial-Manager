@@ -104,9 +104,9 @@ function NewConvoDialog({ senderRole, staffId, onClose, onStarted }: NewConvoDia
 
   const allowedRecipients = staffList.filter((s) => {
     if (s.id === staffId) return false;
-    if (senderRole === "admin") return s.role === "staff" || s.role === "supervisor";
+    if (senderRole === "admin") return s.role === "staff" || s.role === "supervisor" || s.role === "inspector";
     if (senderRole === "supervisor") return s.role === "staff" || s.role === "admin" || s.role === "inspector";
-    if (senderRole === "inspector") return s.role === "supervisor";
+    if (senderRole === "inspector") return s.role === "supervisor" || s.role === "admin";
     if (senderRole === "staff") return s.role === "supervisor";
     return false;
   });
@@ -122,7 +122,7 @@ function NewConvoDialog({ senderRole, staffId, onClose, onStarted }: NewConvoDia
   // The server restricts this role pairing and validates the inspector's
   // configured address before it queues external delivery.
   const dedicatedInspector =
-    senderRole === "supervisor"
+    (senderRole === "supervisor" || senderRole === "admin")
       ? allowedRecipients.find((s) => s.role === "inspector" && s.hasEmail)
       : undefined;
 
@@ -609,6 +609,19 @@ export default function Messages() {
     setShowArchived((current) => !current);
   };
 
+  const canEmailInspector = senderRole === "admin" || senderRole === "supervisor";
+  const inspectorMutation = useMutation({
+    mutationFn: async () => {
+      const staff = await listStaff();
+      const inspector = staff.find((s) => s.active && s.role === "inspector" && s.hasEmail);
+      if (!inspector) throw new Error(t("messages.inspectorUnavailable"));
+      const convo = await startConversation({ staffId, recipientId: inspector.id });
+      await setConversationArchive(convo.id, { staffId, archived: false });
+      return convo;
+    },
+    onSuccess: (convo) => { setShowArchived(false); handleStarted(convo); },
+  });
+
   const canStartConversation =
     senderRole === "admin" || senderRole === "supervisor" || senderRole === "staff";
 
@@ -632,6 +645,20 @@ export default function Messages() {
           </button>
         )}
       </div>
+
+      {canEmailInspector && (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 shrink-0">
+          <button type="button" data-testid="inspector-messages"
+            disabled={inspectorMutation.isPending}
+            onClick={() => inspectorMutation.mutate()}
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-semibold text-amber-950 hover:bg-amber-100 disabled:opacity-50">
+            <Mail className="h-5 w-5" /> {t("messages.inspectorMessages")}
+            <ChevronRight className="ml-auto h-5 w-5" />
+          </button>
+          <p className="px-3 text-sm text-amber-900">{t("messages.inspectorEmailHelp")}</p>
+          {inspectorMutation.isError && <p role="alert" className="mt-2 px-3 text-sm text-red-700">{inspectorMutation.error.message || t("messages.inspectorOpenFailed")}</p>}
+        </div>
+      )}
 
       <section
         data-testid="card-human-trafficking-announcement"

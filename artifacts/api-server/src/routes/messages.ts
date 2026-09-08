@@ -1,3 +1,4 @@
+import { isAllowedPair, canStart, isInspectorManager } from "../lib/conversationPolicy";
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db } from "@workspace/db";
 import {
@@ -80,33 +81,6 @@ async function requireActor(req: Request, res: Response, claimedId: number): Pro
 //   staff      ↔ admin or supervisor
 //   admin      ↔ supervisor
 //   supervisor ↔ inspector
-function isAllowedPair(a: StaffRow, b: StaffRow): boolean {
-  const isMgr = (s: StaffRow) => s.role === "admin" || s.role === "supervisor";
-  if (a.role === "staff" && isMgr(b)) return true;
-  if (b.role === "staff" && isMgr(a)) return true;
-  if (isMgr(a) && isMgr(b)) return true;
-  if (
-    (a.role === "supervisor" && b.role === "inspector") ||
-    (a.role === "inspector" && b.role === "supervisor")
-  )
-    return true;
-  return false;
-}
-
-// Who can start a 1:1 conversation:
-//   admin      → staff, supervisor
-//   supervisor → staff, admin, inspector
-//   inspector  → supervisor
-//   staff      → supervisor
-function canStart(sender: StaffRow, recipient: StaffRow): boolean {
-  const isMgr = (s: StaffRow) => s.role === "admin" || s.role === "supervisor";
-  if (sender.role === "admin") return recipient.role === "staff" || recipient.role === "supervisor";
-  if (sender.role === "supervisor") return recipient.role === "staff" || isMgr(recipient) || recipient.role === "inspector";
-  if (sender.role === "inspector") return recipient.role === "supervisor";
-  if (sender.role === "staff") return recipient.role === "supervisor";
-  return false;
-}
-
 // ── Summary builder ───────────────────────────────────────────────────────────
 
 async function buildSummary(convo: ConversationRow, viewerId: number) {
@@ -257,7 +231,7 @@ inboundSendgridRouter.post("/", async (req: Request, res: Response) => {
     db.select().from(conversationsTable).where(eq(conversationsTable.id, claims.conversationId)).then((rows) => rows[0]),
   ]);
   if (!inspector || !supervisor || !conversation || conversation.isGroup ||
-      inspector.role !== "inspector" || supervisor.role !== "supervisor" ||
+      inspector.role !== "inspector" || !isInspectorManager(supervisor.role) ||
       !inspector.active || !inspector.loginEnabled || !supervisor.active || !supervisor.loginEnabled ||
       normalizedEmail(inspector.email) !== INSPECTOR_EMAIL ||
       normalizedEmail(body.data.from) !== INSPECTOR_EMAIL ||
@@ -599,7 +573,7 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
     }
     if (
       !convo.isGroup &&
-      sender.role === "supervisor"
+      isInspectorManager(sender.role)
     ) {
       const otherId = convo.participantAId === sender.id ? convo.participantBId! : convo.participantAId!;
       const [inspector] = await tx.select().from(staffTable).where(eq(staffTable.id, otherId));
