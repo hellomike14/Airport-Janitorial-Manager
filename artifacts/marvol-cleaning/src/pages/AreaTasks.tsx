@@ -21,6 +21,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { TaskPhotoToggle } from "@/components/TaskPhotos";
 import { StaffName } from "@/components/StaffName";
 import { useAuth } from "@/contexts/AuthContext";
+import { trackEvent } from "@/lib/analytics";
 
 export default function AreaTasks() {
   const { t, i18n } = useTranslation();
@@ -77,7 +78,14 @@ export default function AreaTasks() {
 
   const completeMutation = useCompleteTask({
     mutation: {
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/tasks"] })
+      onSuccess: () => {
+        trackEvent("task_completed", {
+          task_kind: "standard",
+          completion_mode: "single",
+          offline: false,
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      }
     }
   });
 
@@ -89,7 +97,14 @@ export default function AreaTasks() {
 
   const completeAllMutation = useCompleteAllTasks({
     mutation: {
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/tasks"] })
+      onSuccess: () => {
+        trackEvent("task_completed", {
+          task_kind: "standard",
+          completion_mode: "bulk",
+          offline: false,
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      }
     }
   });
 

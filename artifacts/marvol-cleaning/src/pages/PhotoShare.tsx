@@ -19,6 +19,7 @@ import { formatDistanceToNow, format } from "date-fns";
 import { getDateLocale } from "@/i18n/dateLocale";
 import RefreshButton from "@/components/RefreshButton";
 import { requestUploadUrl } from "@workspace/api-client-react";
+import { trackEvent } from "@/lib/analytics";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -246,6 +247,12 @@ export default function PhotoShare() {
         }),
       });
       if (!res.ok) throw new Error("Failed to share photo");
+      trackEvent("photo_shared", {
+        has_area: areaId !== null,
+        has_gps: geoPosition !== null,
+        gps_available: !geoError,
+        role: currentUser.role,
+      });
       setPreview(null);
       setSelectedFile(null);
       setCaption("");

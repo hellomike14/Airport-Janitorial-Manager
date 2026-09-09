@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { InspectorWorkflowCard } from "@/components/InspectorWorkflowCard";
+import { trackEvent } from "@/lib/analytics";
 import humanTraffickingFlyer from "@assets/MCO_Human_Trafficing_1787144155521.jpeg";
 import {
   listConversations,
@@ -511,6 +512,10 @@ export default function Messages() {
         composeRequestRef.current = null;
       }
       if (selectedId === submission.conversationId) setDraft("");
+      trackEvent("message_sent", {
+        conversation_type: selectedConvo?.otherStaffRole === "inspector" ? "inspector" : "standard",
+        sender_role: senderRole,
+      });
       qc.invalidateQueries({ queryKey: [CONVERSATIONS_KEY] });
     },
   });
@@ -619,7 +624,11 @@ export default function Messages() {
       await setConversationArchive(convo.id, { staffId, archived: false });
       return convo;
     },
-    onSuccess: (convo) => { setShowArchived(false); handleStarted(convo); },
+    onSuccess: (convo) => {
+      trackEvent("inspector_conversation_opened", { sender_role: senderRole });
+      setShowArchived(false);
+      handleStarted(convo);
+    },
   });
 
   const canStartConversation =

@@ -6,6 +6,7 @@ import type { ApplicationUploadDocument } from "@workspace/api-client-react";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { PUBLIC_SECTIONS } from "./employment/formConfig";
 import { FieldGrid } from "./employment/FormField";
+import { trackEvent } from "@/lib/analytics";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -83,6 +84,12 @@ export default function Apply() {
           w4Employee: groups.w4Employee,
           documents,
         },
+      });
+      trackEvent("application_submitted", {
+        has_email: Boolean(email.trim()),
+        has_phone: Boolean(phone.trim()),
+        has_position: Boolean(positionApplied.trim()),
+        document_count: documents.length,
       });
       setSubmitted(true);
       window.scrollTo({ top: 0, behavior: "smooth" });

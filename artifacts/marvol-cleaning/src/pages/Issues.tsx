@@ -19,6 +19,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOfflineCreateIssue, useOfflineCompleteIssue, useOfflineResolveIssue } from "@/hooks/useOfflineMutations";
+import { trackEvent } from "@/lib/analytics";
 import {
   AlertOctagon,
   CheckCircle2,
@@ -514,6 +515,12 @@ export default function Issues() {
 
     const handled = await offlineCreateIssue.mutateOffline(issueData, beforePhotoFile);
     if (handled) {
+      trackEvent("issue_report_submitted", {
+        severity: issueData.severity,
+        has_before_photo: Boolean(beforePhotoFile),
+        offline: true,
+        reporter_role: currentUser?.role ?? "unknown",
+      });
       setIsReporting(false);
       setFormData({ areaId: "", description: "", severity: "medium" });
       setBeforePath(null);
@@ -533,6 +540,12 @@ export default function Issues() {
         : null;
       await createMutation.mutateAsync({
         data: { ...issueData, beforeImagePath: uploadedBeforePath } as Parameters<typeof createMutation.mutateAsync>[0]["data"],
+      });
+      trackEvent("issue_report_submitted", {
+        severity: issueData.severity,
+        has_before_photo: Boolean(beforePhotoFile),
+        offline: false,
+        reporter_role: currentUser?.role ?? "unknown",
       });
     } catch (error) {
       console.error(error);

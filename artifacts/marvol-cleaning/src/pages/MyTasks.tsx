@@ -28,6 +28,7 @@ import {
 import { TaskPhotoToggle } from "@/components/TaskPhotos";
 import { StaffName } from "@/components/StaffName";
 import { InspectorWorkflowCard } from "@/components/InspectorWorkflowCard";
+import { trackEvent } from "@/lib/analytics";
 
 const TERMINAL_STYLES: Record<string, { bg: string; text: string; dot: string; bar: string; border: string }> = {
   "Terminal A - East": { bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500", bar: "bg-blue-500", border: "border-blue-200" },
@@ -155,13 +156,22 @@ export default function MyTasks() {
     if (task.completed) {
       const handled = await offlineUncomplete.mutateOffline(task.id);
       if (!handled) {
-        uncompleteMutation.mutate({ id: task.id });
+        await uncompleteMutation.mutateAsync({ id: task.id });
       }
+      trackEvent("task_undone", {
+        task_kind: task.isSpecial ? "special" : "standard",
+        offline: handled,
+      });
     } else {
       const handled = await offlineComplete.mutateOffline(task.id, currentUser.id);
       if (!handled) {
-        completeMutation.mutate({ id: task.id, data: { completedById: currentUser.id } });
+        await completeMutation.mutateAsync({ id: task.id, data: { completedById: currentUser.id } });
       }
+      trackEvent("task_completed", {
+        task_kind: task.isSpecial ? "special" : "standard",
+        completion_mode: "single",
+        offline: handled,
+      });
     }
   };
 
