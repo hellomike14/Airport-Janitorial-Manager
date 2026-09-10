@@ -180,7 +180,11 @@
     "sessionExpired": "Please sign in again",
     "sessionExpiredHelp": "Your login session has expired or could not be verified. Sign in again to continue.",
     "connectionTitle": "We could not finish loading",
-    "connectionHelp": "Marvol could not reach the sign-in service. Check your connection, then try again. Your account has not been rejected.",
+    "connectionHelp": "Marvol encountered a loading error. Try again or reload the page. This message does not mean your account was rejected.",
+    "slowTitle": "Loading is taking longer than usual",
+    "slowLoadingHelp": "Please wait while Marvol finishes loading. A slow response does not mean your account was rejected.",
+    "bootstrapTitle": "Sign-in has not finished loading",
+    "bootstrapHelp": "Automatic recovery is limited to prevent repeated reloads. Make sure you are online, then select Reload sign-in to try again. Your saved offline work has not been cleared.",
     "retry": "Try again",
     "signInAgain": "Sign in again",
     "reloadHelp": "Sign-out did not finish. Reload this page and try again."

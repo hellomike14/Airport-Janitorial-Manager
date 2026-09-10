@@ -180,7 +180,11 @@
     "sessionExpired": "Inicia sesión de nuevo",
     "sessionExpiredHelp": "Tu sesión ha caducado o no se pudo verificar. Inicia sesión de nuevo para continuar.",
     "connectionTitle": "No pudimos terminar de cargar",
-    "connectionHelp": "Marvol no pudo conectar con el servicio de inicio de sesión. Comprueba tu conexión e inténtalo de nuevo. Tu cuenta no ha sido rechazada.",
+    "connectionHelp": "Marvol encontró un error de carga. Inténtalo de nuevo o recarga la página. Este mensaje no significa que tu cuenta haya sido rechazada.",
+    "slowTitle": "La carga está tardando más de lo habitual",
+    "slowLoadingHelp": "Espera mientras Marvol termina de cargar. Una respuesta lenta no significa que tu cuenta haya sido rechazada.",
+    "bootstrapTitle": "El inicio de sesión no ha terminado de cargar",
+    "bootstrapHelp": "La recuperación automática está limitada para evitar recargas repetidas. Asegúrate de tener conexión y selecciona Recargar inicio de sesión para volver a intentarlo. Tu trabajo guardado sin conexión no se ha borrado.",
     "retry": "Intentar de nuevo",
     "signInAgain": "Iniciar sesión de nuevo",
     "reloadHelp": "No se pudo cerrar la sesión. Recarga la página e inténtalo de nuevo."

@@ -33,6 +33,7 @@ const Employment = lazy(() => import("./pages/Employment"));
 const Apply = lazy(() => import("./pages/Apply"));
 const Messages = lazy(() => import("./pages/Messages"));
 import { LoginRecovery } from "./components/LoginRecovery";
+import { AuthBootstrapGate } from "./components/AuthBootstrapGate";
 import { SignInPage, SignUpPage, NoStaffMatch } from "./pages/Login";
 
 const queryClient = new QueryClient({
@@ -279,6 +280,7 @@ function ClerkProviderWithRoutes() {
       routerPush={(to) => setLocation(stripBase(to))}
       routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
     >
+      <AuthBootstrapGate>
       <QueryClientProvider client={queryClient}>
         <ClerkQueryClientCacheInvalidator />
         <TooltipProvider>
@@ -297,6 +299,7 @@ function ClerkProviderWithRoutes() {
           <Toaster />
         </TooltipProvider>
       </QueryClientProvider>
+      </AuthBootstrapGate>
     </ClerkProvider>
   );
 }

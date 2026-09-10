@@ -1,7 +1,7 @@
 import React from "react";
 import { SignIn, SignUp, useClerk, useUser, useAuth as useClerkAuth } from "@clerk/react";
 import { Redirect } from "wouter";
-import { LoginRecovery, SlowSignInHelp } from "../components/LoginRecovery";
+import { LoginRecovery } from "../components/LoginRecovery";
 import { useTranslation } from "react-i18next";
 import { MailWarning, LogOut } from "lucide-react";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -42,7 +42,6 @@ function AuthShell({ children }: { children: React.ReactNode }) {
       </div>
 
       <div className="relative z-10 w-full flex justify-center">{children}</div>
-      <SlowSignInHelp />
 
       <p className="text-slate-500 text-xs mt-8 relative z-10">{t("login.footer")}</p>
     </div>
