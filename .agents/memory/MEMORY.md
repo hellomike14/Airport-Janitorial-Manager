@@ -4,3 +4,4 @@
 - [Marvol email-only sign-in](marvol-email-signin.md) — social login is hidden in the app; disabling its provider entirely requires Clerk tenant access per environment.
 - [Marvol orval codegen safety](marvol-orval-codegen.md) — never append helpers to generated/ files; put them in a stable *-extras.ts and re-export from index.ts.
 - [Marvol assignment freshness](marvol-assignment-freshness.md) — staff assignments are exact-area and cross-session; refetch them after identity resolves and whenever My Tasks mounts.
+- [Marvol sign-in latency](marvol-signin-latency.md) — delayed Clerk script loading reproduced the stuck login screen; it is not proof of Wi-Fi or account rejection.
