@@ -36,6 +36,7 @@ router.get("/", async (_req, res) => {
 // Resolves the acting staff member from the verified Clerk session (matched
 // by email). This is the client's session bridge after Clerk sign-in.
 router.get("/me", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
   const staff = await actorStaffFromRequest(req);
   if (!staff) {
     res.status(404).json({ error: "NO_STAFF_MATCH" });

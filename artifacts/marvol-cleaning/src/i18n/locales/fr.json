@@ -173,7 +173,17 @@
     },
     "askAdminForPin": "Un administrateur doit définir un code PIN pour votre compte avant que vous puissiez vous connecter. Veuillez contacter un administrateur.",
     "noStaffMatchTitle": "Compte non lié à une fiche employé",
-    "noStaffMatchBody": "Vous êtes connecté, mais aucune fiche employé n'utilise cette adresse e-mail. Demandez à un administrateur d'ajouter cet e-mail à votre profil, puis reconnectez-vous."
+    "noStaffMatchBody": "Vous êtes connecté, mais aucune fiche employé n'utilise cette adresse e-mail. Demandez à un administrateur d'ajouter cet e-mail à votre profil, puis reconnectez-vous.",
+    "loading": "Ouverture de Marvol…",
+    "slowHelp": "Si la connexion reste bloquée, vérifiez votre réseau et rechargez la page. Utilisez l’e-mail de votre profil employé.",
+    "reload": "Recharger",
+    "sessionExpired": "Veuillez vous reconnecter",
+    "sessionExpiredHelp": "Votre session a expiré ou n’a pas pu être vérifiée. Reconnectez-vous pour continuer.",
+    "connectionTitle": "Le chargement n’a pas abouti",
+    "connectionHelp": "Marvol n’a pas pu joindre le service de connexion. Vérifiez votre réseau et réessayez. Votre compte n’a pas été refusé.",
+    "retry": "Réessayer",
+    "signInAgain": "Se reconnecter",
+    "reloadHelp": "La déconnexion n’a pas abouti. Rechargez la page et réessayez."
   },
   "dashboard": {
     "facilityOverview": "Vue d'Ensemble de l'Installation",

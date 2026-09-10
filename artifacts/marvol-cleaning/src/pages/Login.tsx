@@ -1,5 +1,7 @@
 import React from "react";
-import { SignIn, SignUp, useClerk, useUser } from "@clerk/react";
+import { SignIn, SignUp, useClerk, useUser, useAuth as useClerkAuth } from "@clerk/react";
+import { Redirect } from "wouter";
+import { LoginRecovery, SlowSignInHelp } from "../components/LoginRecovery";
 import { useTranslation } from "react-i18next";
 import { MailWarning, LogOut } from "lucide-react";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -40,6 +42,7 @@ function AuthShell({ children }: { children: React.ReactNode }) {
       </div>
 
       <div className="relative z-10 w-full flex justify-center">{children}</div>
+      <SlowSignInHelp />
 
       <p className="text-slate-500 text-xs mt-8 relative z-10">{t("login.footer")}</p>
     </div>
@@ -47,6 +50,9 @@ function AuthShell({ children }: { children: React.ReactNode }) {
 }
 
 export function SignInPage() {
+  const { isLoaded, isSignedIn } = useClerkAuth();
+  if (!isLoaded) return <LoginRecovery />;
+  if (isSignedIn) return <Redirect to="/" />;
   return (
     <AuthShell>
       {/* path must be the full browser path — Clerk reads window.location.pathname directly */}
@@ -56,6 +62,9 @@ export function SignInPage() {
 }
 
 export function SignUpPage() {
+  const { isLoaded, isSignedIn } = useClerkAuth();
+  if (!isLoaded) return <LoginRecovery />;
+  if (isSignedIn) return <Redirect to="/" />;
   return (
     <AuthShell>
       <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} />

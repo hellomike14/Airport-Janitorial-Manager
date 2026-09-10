@@ -1,127 +1,91 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { useUser, useClerk } from "@clerk/react";
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
+import { useAuth as useClerkAuth, useClerk } from "@clerk/react";
+import { resolveStaffSession, type StaffIdentity } from "../lib/resolveStaffSession";
 
-export type UserRole = "admin" | "supervisor" | "staff" | "inspector";
-export type ViewMode = "admin" | "supervisor" | "staff" | "inspector";
-
-export interface CurrentUser {
-  id: number;
-  name: string;
-  role: UserRole;
-}
-
-/**
- * - "signedOut": no Clerk session
- * - "loading":   Clerk session present, staff match in flight
- * - "nomatch":   Clerk account has no matching active staff record
- * - "ok":        staff record resolved
- */
-export type StaffStatus = "signedOut" | "loading" | "nomatch" | "ok";
-
+export type UserRole = StaffIdentity["role"];
+export type ViewMode = UserRole;
+export type CurrentUser = StaffIdentity;
+export type StaffStatus = "signedOut" | "loading" | "nomatch" | "ok" | "expired" | "error";
 interface AuthContextValue {
   currentUser: CurrentUser | null;
   staffStatus: StaffStatus;
   viewMode: ViewMode;
-  logout: () => void;
+  logout: () => Promise<void>;
+  retryStaff: () => void;
   setViewMode: (mode: ViewMode) => void;
   effectiveRole: ViewMode;
 }
-
 const AuthContext = createContext<AuthContextValue | null>(null);
-
-const VIEW_MODE_KEY = "marvol_view_mode";
 const BASE = import.meta.env.BASE_URL;
 const basePath = BASE.replace(/\/$/, "");
+type Snapshot = { owner: string; status: StaffStatus; user: CurrentUser | null; view: ViewMode };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { isLoaded, isSignedIn } = useUser();
+  const { isLoaded, isSignedIn, userId, sessionId, getToken } = useClerkAuth();
   const { signOut } = useClerk();
-  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
-  const [staffStatus, setStaffStatus] = useState<StaffStatus>("loading");
+  const owner = isSignedIn ? `${userId}:${sessionId}` : "";
+  const [snapshot, setSnapshot] = useState<Snapshot>({ owner: "", status: "loading", user: null, view: "staff" });
+  const [attempt, setAttempt] = useState(0);
+  const tokenGetter = useRef(getToken);
+  tokenGetter.current = getToken;
+  const retryStaff = useCallback(() => setAttempt(value => value + 1), []);
 
-  const [viewMode, setViewModeState] = useState<ViewMode>(() => {
-    try {
-      const stored = localStorage.getItem(VIEW_MODE_KEY);
-      return (stored as ViewMode) || "staff";
-    } catch {
-      return "staff";
-    }
-  });
-
-  // Resolve (and keep fresh) the staff record matching the signed-in Clerk
-  // account. The server derives the match from the verified Clerk session.
   useEffect(() => {
     if (!isLoaded) return;
-    if (!isSignedIn) {
-      setCurrentUser(null);
-      setStaffStatus("signedOut");
+    if (!isSignedIn || !owner) {
+      setSnapshot({ owner: "", status: "signedOut", user: null, view: "staff" });
       return;
     }
-
     let cancelled = false;
-    const resolveStaff = async () => {
-      try {
-        const res = await fetch(`${BASE}api/staff/me`, { credentials: "same-origin" });
-        if (cancelled) return;
-        if (res.ok) {
-          const s = await res.json();
-          if (cancelled) return;
-          const user: CurrentUser = {
-            id: s.id,
-            name: s.name,
-            role: s.role,
-          };
-          setCurrentUser((prev) => {
-            if (!prev || prev.role !== user.role) {
-              setViewModeState(user.role as ViewMode);
-              localStorage.setItem(VIEW_MODE_KEY, user.role);
-            }
-            return user;
-          });
-          setStaffStatus("ok");
-        } else if (res.status === 404) {
-          setCurrentUser(null);
-          setStaffStatus("nomatch");
-        }
-        // other statuses (e.g. gate 401, network blips): keep current state
-      } catch {
-        // ignore network errors
-      }
+    let inFlight = false;
+    let activeRequest: AbortController | undefined;
+    setSnapshot(previous => previous.owner === owner && previous.status === "ok" ? previous :
+      { owner, status: "loading", user: null, view: "staff" });
+    const resolve = async () => {
+      if (inFlight || cancelled) return;
+      inFlight = true;
+      activeRequest = new AbortController();
+      const result = await resolveStaffSession({ url: `${BASE}api/staff/me`, getToken: fresh => tokenGetter.current({ skipCache: !!fresh }), signal: activeRequest.signal });
+      inFlight = false;
+      if (cancelled) return;
+      setSnapshot(previous => {
+        // A temporary connectivity failure must not evict a resolved worker
+        // from the existing offline-capable session. Explicit revocation does.
+        if (result.status === "error" && previous.owner === owner && previous.status === "ok") return previous;
+        if (result.status !== "ok") return { owner, status: result.status, user: null, view: "staff" };
+        const sameIdentity = previous.owner === owner && previous.user?.id === result.user.id && previous.user?.role === result.user.role;
+        return { owner, status: "ok", user: result.user, view: sameIdentity ? previous.view : result.user.role };
+      });
     };
-
-    setStaffStatus((prev) => (prev === "ok" ? prev : "loading"));
-    resolveStaff();
-    const interval = setInterval(resolveStaff, 20000);
-    const onFocus = () => resolveStaff();
-    window.addEventListener("focus", onFocus);
+    void resolve();
+    const interval = setInterval(resolve, 20000);
+    window.addEventListener("focus", resolve);
+    window.addEventListener("online", resolve);
     return () => {
       cancelled = true;
+      activeRequest?.abort();
       clearInterval(interval);
-      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("focus", resolve);
+      window.removeEventListener("online", resolve);
     };
-  }, [isLoaded, isSignedIn]);
+  }, [isLoaded, isSignedIn, owner, attempt]);
 
-  const logout = () => {
-    localStorage.removeItem(VIEW_MODE_KEY);
-    setCurrentUser(null);
-    // Clerk owns the browser session — sign out through the client SDK.
-    signOut({ redirectUrl: basePath || "/" });
+  // Never expose the previous person's role while the new account is resolving.
+  const matches = snapshot.owner === owner;
+  const staffStatus: StaffStatus = !isLoaded ? "loading" : !isSignedIn ? "signedOut" : matches ? snapshot.status : "loading";
+  const currentUser = matches && staffStatus === "ok" ? snapshot.user : null;
+  const viewMode = currentUser ? snapshot.view : "staff";
+  const logout = async () => {
+    try { localStorage.removeItem("marvol_view_mode"); } catch { /* Storage can be disabled. */ }
+    await signOut({ redirectUrl: `${basePath}/sign-in` });
+    setSnapshot({ owner: "", status: "signedOut", user: null, view: "staff" });
   };
-
   const setViewMode = (mode: ViewMode) => {
-    setViewModeState(mode);
-    localStorage.setItem(VIEW_MODE_KEY, mode);
+    if (!currentUser || (currentUser.role !== "admin" && mode !== currentUser.role)) return;
+    if (!["admin", "supervisor", "staff", "inspector"].includes(mode)) return;
+    setSnapshot(previous => previous.owner === owner ? { ...previous, view: mode } : previous);
   };
-
-  const effectiveRole = viewMode;
-
-  return (
-    <AuthContext.Provider
-      value={{ currentUser, staffStatus, viewMode, logout, setViewMode, effectiveRole }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={{ currentUser, staffStatus, viewMode, logout, retryStaff, setViewMode, effectiveRole: viewMode }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
