@@ -77,7 +77,7 @@
   },
   "messages": {
     "inspectorMessages": "Mensajes del inspector",
-    "inspectorEmailHelp": "Envía un correo a inspector@marvolenterprises.com y recibe las respuestas aquí.",
+    "inspectorEmailHelp": "Compartido con todos los administradores y supervisores. Envía un correo a inspector@marvolenterprises.com y consulta aquí los mensajes del equipo y las respuestas del inspector.",
     "inspectorUnavailable": "La cuenta del inspector no está disponible. Comprueba que esté activa y tenga correo electrónico.",
     "inspectorOpenFailed": "No se pudieron abrir los mensajes. Inténtalo de nuevo.",
     "title": "Mensajes",
@@ -173,7 +173,17 @@
     },
     "askAdminForPin": "Un administrador debe asignar un PIN a tu cuenta antes de que puedas iniciar sesión. Pide ayuda a un administrador.",
     "noStaffMatchTitle": "La cuenta no está vinculada a un registro de personal",
-    "noStaffMatchBody": "Iniciaste sesión correctamente, pero ningún registro de personal usa este correo. Pide a un administrador que agregue este correo a tu perfil y vuelve a iniciar sesión."
+    "noStaffMatchBody": "Iniciaste sesión correctamente, pero ningún registro de personal usa este correo. Pide a un administrador que agregue este correo a tu perfil y vuelve a iniciar sesión.",
+    "loading": "Abriendo Marvol…",
+    "slowHelp": "Si el inicio de sesión se queda bloqueado, comprueba tu conexión y recarga para intentarlo de nuevo. Usa el correo de tu perfil de empleado.",
+    "reload": "Recargar",
+    "sessionExpired": "Inicia sesión de nuevo",
+    "sessionExpiredHelp": "Tu sesión ha caducado o no se pudo verificar. Inicia sesión de nuevo para continuar.",
+    "connectionTitle": "No pudimos terminar de cargar",
+    "connectionHelp": "Marvol no pudo conectar con el servicio de inicio de sesión. Comprueba tu conexión e inténtalo de nuevo. Tu cuenta no ha sido rechazada.",
+    "retry": "Intentar de nuevo",
+    "signInAgain": "Iniciar sesión de nuevo",
+    "reloadHelp": "No se pudo cerrar la sesión. Recarga la página e inténtalo de nuevo."
   },
   "dashboard": {
     "facilityOverview": "Vista General de la Instalación",

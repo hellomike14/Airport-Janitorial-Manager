@@ -1,4 +1,5 @@
-import express, { type Express } from "express";
+import express, { type Express, type ErrorRequestHandler } from "express";
+import { AuthServiceUnavailable } from "./lib/authAvailability";
 import multer from "multer";
 import cors from "cors";
 import { clerkMiddleware } from "@clerk/express";
@@ -49,5 +50,14 @@ app.use(
 );
 
 app.use("/api", router);
+
+const authUnavailableHandler: ErrorRequestHandler = (error, _req, res, next) => {
+  if (!(error instanceof AuthServiceUnavailable)) { next(error); return; }
+  if (res.headersSent) { next(error); return; }
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Retry-After", "5");
+  res.status(503).json({ error: "AUTH_TEMPORARILY_UNAVAILABLE" });
+};
+app.use(authUnavailableHandler);
 
 export default app;

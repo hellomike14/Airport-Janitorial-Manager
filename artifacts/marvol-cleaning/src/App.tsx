@@ -1,7 +1,7 @@
-import { useEffect, useRef } from "react";
+import { Component, Suspense, lazy, useEffect, useRef, type ReactNode } from "react";
 import { Switch, Route, Router as WouterRouter, Redirect, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
-import { ClerkProvider, useClerk, useUser } from "@clerk/react";
+import { ClerkProvider, useClerk, useAuth as useClerkAuth } from "@clerk/react";
 import { publishableKeyFromHost } from "@clerk/react/internal";
 import { shadcn } from "@clerk/themes";
 import { Toaster } from "@/components/ui/toaster";
@@ -13,25 +13,26 @@ import { OfflineProvider } from "./contexts/OfflineContext";
 import { OfflineBanner } from "./components/OfflineBanner";
 import "./i18n";
 
-import Dashboard from "./pages/Dashboard";
-import AreasList from "./pages/AreasList";
-import AreaTasks from "./pages/AreaTasks";
-import Staff from "./pages/Staff";
-import Assignments from "./pages/Assignments";
-import Issues from "./pages/Issues";
-import MyTasks from "./pages/MyTasks";
-import TaskManagement from "./pages/TaskManagement";
-import TaskTypes from "./pages/TaskTypes";
-import InspectorReport from "./pages/InspectorReport";
-import CompletedJobs from "./pages/CompletedJobs";
-import GPSTracking from "./pages/GPSTracking";
-import EmployeePortal from "./pages/EmployeePortal";
-import PhotoShare from "./pages/PhotoShare";
-import WeeklyReport from "./pages/WeeklyReport";
-import SpecialRequests from "./pages/SpecialRequests";
-import Employment from "./pages/Employment";
-import Apply from "./pages/Apply";
-import Messages from "./pages/Messages";
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const AreasList = lazy(() => import("./pages/AreasList"));
+const AreaTasks = lazy(() => import("./pages/AreaTasks"));
+const Staff = lazy(() => import("./pages/Staff"));
+const Assignments = lazy(() => import("./pages/Assignments"));
+const Issues = lazy(() => import("./pages/Issues"));
+const MyTasks = lazy(() => import("./pages/MyTasks"));
+const TaskManagement = lazy(() => import("./pages/TaskManagement"));
+const TaskTypes = lazy(() => import("./pages/TaskTypes"));
+const InspectorReport = lazy(() => import("./pages/InspectorReport"));
+const CompletedJobs = lazy(() => import("./pages/CompletedJobs"));
+const GPSTracking = lazy(() => import("./pages/GPSTracking"));
+const EmployeePortal = lazy(() => import("./pages/EmployeePortal"));
+const PhotoShare = lazy(() => import("./pages/PhotoShare"));
+const WeeklyReport = lazy(() => import("./pages/WeeklyReport"));
+const SpecialRequests = lazy(() => import("./pages/SpecialRequests"));
+const Employment = lazy(() => import("./pages/Employment"));
+const Apply = lazy(() => import("./pages/Apply"));
+const Messages = lazy(() => import("./pages/Messages"));
+import { LoginRecovery } from "./components/LoginRecovery";
 import { SignInPage, SignUpPage, NoStaffMatch } from "./pages/Login";
 
 const queryClient = new QueryClient({
@@ -149,19 +150,19 @@ function AppRoutes() {
 }
 
 function ProtectedRoutes() {
-  const { isLoaded, isSignedIn } = useUser();
-  const { currentUser, staffStatus, effectiveRole } = useAuth();
+  const { isLoaded, isSignedIn } = useClerkAuth();
+  const { currentUser, staffStatus, effectiveRole, retryStaff, logout } = useAuth();
 
   if (!isLoaded || (isSignedIn && staffStatus === "loading")) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-green-900 to-emerald-950 flex items-center justify-center">
-        <span className="animate-spin text-3xl text-emerald-300">&#8635;</span>
-      </div>
-    );
+    return <LoginRecovery />;
   }
 
   if (!isSignedIn) {
     return <Redirect to="/sign-in" />;
+  }
+
+  if (staffStatus === "expired" || staffStatus === "error") {
+    return <LoginRecovery kind={staffStatus} retry={retryStaff} signOut={logout} />;
   }
 
   if (staffStatus === "nomatch" || !currentUser) {
@@ -259,6 +260,8 @@ function ClerkProviderWithRoutes() {
       appearance={clerkAppearance}
       signInUrl={`${basePath}/sign-in`}
       signUpUrl={`${basePath}/sign-up`}
+      signInFallbackRedirectUrl={basePath || "/"}
+      signUpFallbackRedirectUrl={basePath || "/"}
       localization={{
         signIn: {
           start: {
@@ -281,12 +284,14 @@ function ClerkProviderWithRoutes() {
         <TooltipProvider>
           <OfflineProvider>
             <AuthProvider>
+              <Suspense fallback={<LoginRecovery />}>
               <Switch>
                 <Route path="/apply" component={Apply} />
                 <Route>
                   <AppRoutes />
                 </Route>
               </Switch>
+              </Suspense>
             </AuthProvider>
           </OfflineProvider>
           <Toaster />
@@ -296,11 +301,19 @@ function ClerkProviderWithRoutes() {
   );
 }
 
+class PageLoadBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  render() { return this.state.failed ? <LoginRecovery kind="error" /> : this.props.children; }
+}
+
 function App() {
   return (
+    <PageLoadBoundary>
     <WouterRouter base={basePath}>
       <ClerkProviderWithRoutes />
     </WouterRouter>
+    </PageLoadBoundary>
   );
 }
 

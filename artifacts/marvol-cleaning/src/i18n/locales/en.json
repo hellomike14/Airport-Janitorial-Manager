@@ -77,7 +77,7 @@
   },
   "messages": {
     "inspectorMessages": "Inspector Messages",
-    "inspectorEmailHelp": "Send an email to inspector@marvolenterprises.com and receive replies here.",
+    "inspectorEmailHelp": "Shared with all admins and supervisors. Send an email to inspector@marvolenterprises.com and read the team's messages and inspector replies here.",
     "inspectorUnavailable": "The inspector account is not available. Check that it is active and has an email address.",
     "inspectorOpenFailed": "Could not open inspector messages. Please try again.",
     "title": "Messages",
@@ -173,7 +173,17 @@
     },
     "askAdminForPin": "Your account needs a PIN set by an administrator before you can log in. Please ask an admin.",
     "noStaffMatchTitle": "Account not linked to a staff record",
-    "noStaffMatchBody": "You signed in successfully, but no staff record uses this email address. Ask an administrator to add this email to your staff profile, then sign in again."
+    "noStaffMatchBody": "You signed in successfully, but no staff record uses this email address. Ask an administrator to add this email to your staff profile, then sign in again.",
+    "loading": "Opening Marvol…",
+    "slowHelp": "If sign-in is stuck, check your connection and reload to try again. Use the same work email as your staff profile.",
+    "reload": "Reload sign-in",
+    "sessionExpired": "Please sign in again",
+    "sessionExpiredHelp": "Your login session has expired or could not be verified. Sign in again to continue.",
+    "connectionTitle": "We could not finish loading",
+    "connectionHelp": "Marvol could not reach the sign-in service. Check your connection, then try again. Your account has not been rejected.",
+    "retry": "Try again",
+    "signInAgain": "Sign in again",
+    "reloadHelp": "Sign-out did not finish. Reload this page and try again."
   },
   "dashboard": {
     "facilityOverview": "Facility Overview",

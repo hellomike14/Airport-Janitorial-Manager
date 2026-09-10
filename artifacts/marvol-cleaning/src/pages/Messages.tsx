@@ -460,7 +460,7 @@ export default function Messages() {
     isLoading: messagesLoading,
     error: messagesError,
   } = useQuery({
-    queryKey: [CONVERSATIONS_KEY, selectedId, "messages"],
+    queryKey: [CONVERSATIONS_KEY, selectedId, "messages", staffId],
     queryFn: () => listConversationMessages(selectedId!, { staffId }),
     enabled: staffId > 0 && selectedId !== null,
     refetchInterval: 5000,
@@ -877,7 +877,7 @@ export default function Messages() {
                 )}
                 {!messagesError && messages.map((m) => {
                   const mine = m.senderId === staffId;
-                  const urgentInspectorReply = !mine && selectedConvo.otherStaffRole === "inspector";
+                  const urgentInspectorReply = m.senderId === selectedConvo.otherStaffId && selectedConvo.otherStaffRole === "inspector";
                   const isEditing = editingMessageId === m.id;
                   const canDelete = senderRole === "admin";
                   const messageActions = !isEditing && (mine || canDelete) && (

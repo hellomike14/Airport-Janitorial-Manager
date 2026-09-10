@@ -1,3 +1,4 @@
+import { sharedInspector, canReadSharedInspector, sharedMessageIsRead } from "../lib/sharedInspectorConversation";
 import { isAllowedPair, canStart, isInspectorManager } from "../lib/conversationPolicy";
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db } from "@workspace/db";
@@ -75,6 +76,24 @@ async function requireActor(req: Request, res: Response, claimedId: number): Pro
   return actor;
 }
 
+async function inspectorForConversation(convo: ConversationRow) {
+  if (convo.isGroup) return undefined;
+  const people = await db.select().from(staffTable).where(inArray(staffTable.id, [convo.participantAId!, convo.participantBId!]));
+  return sharedInspector(convo, people);
+}
+
+async function readPosition(conversationId: number, staffId: number) {
+  const [position] = await db.select().from(conversationParticipantsTable).where(and(
+    eq(conversationParticipantsTable.conversationId, conversationId), eq(conversationParticipantsTable.staffId, staffId)));
+  return position?.lastReadAt ?? null;
+}
+
+async function inspectorManagers() {
+  return db.select({ id: staffTable.id }).from(staffTable).where(and(
+    inArray(staffTable.role, ["admin", "supervisor"]), eq(staffTable.active, true),
+    eq(staffTable.loginEnabled, true), eq(staffTable.formerEmployee, false)));
+}
+
 // ── 1-on-1 pair rules ─────────────────────────────────────────────────────────
 
 // Allowed 1:1 pairs:
@@ -146,9 +165,11 @@ async function buildSummary(convo: ConversationRow, viewerId: number) {
     };
   }
 
-  // 1:1
-  const otherId =
+  // Shared inspector threads retain their history and original participant IDs.
+  const inspector = await inspectorForConversation(convo);
+  const otherId = inspector && inspector.id !== viewerId ? inspector.id :
     convo.participantAId === viewerId ? convo.participantBId! : convo.participantAId!;
+  const lastReadAt = inspector ? await readPosition(convo.id, viewerId) : null;
   const other = await getStaff(otherId);
   const [{ value: unread }] = await db
     .select({ value: count() })
@@ -156,7 +177,7 @@ async function buildSummary(convo: ConversationRow, viewerId: number) {
     .where(
       and(
         eq(messagesTable.conversationId, convo.id),
-        eq(messagesTable.isRead, false),
+        inspector ? (lastReadAt ? gt(messagesTable.createdAt, lastReadAt) : undefined) : eq(messagesTable.isRead, false),
         ne(messagesTable.senderId, viewerId)
       )
     );
@@ -197,8 +218,11 @@ async function loadConversationForParticipant(
       );
     if (!part) return { status: 403 };
   } else {
-    if (convo.participantAId !== staffId && convo.participantBId !== staffId)
-      return { status: 403 };
+    if (convo.participantAId !== staffId && convo.participantBId !== staffId) {
+      const actor = await getStaff(staffId);
+      const people = await db.select().from(staffTable).where(inArray(staffTable.id, [convo.participantAId!, convo.participantBId!]));
+      if (!actor || !canReadSharedInspector(actor, convo, people)) return { status: 403 };
+    }
   }
   return { convo };
 }
@@ -240,7 +264,7 @@ inboundSendgridRouter.post("/", async (req: Request, res: Response) => {
     res.status(403).json({ error: "Inbound sender is not authorized" }); return;
   }
   if (!new Set([conversation.participantAId, conversation.participantBId]).has(inspector.id) ||
-      !new Set([conversation.participantAId, conversation.participantBId]).has(supervisor.id)) {
+      !(await inspectorForConversation(conversation))) {
     res.status(403).json({ error: "Conversation is not authorized" }); return;
   }
   const providerMessageId = inboundProviderMessageId(body.data.headers, body.data);
@@ -254,7 +278,8 @@ inboundSendgridRouter.post("/", async (req: Request, res: Response) => {
     }
     const [message] = await tx.insert(messagesTable).values({ conversationId: conversation.id, senderId: inspector.id, body: body.data.text }).returning();
     await tx.update(inboundEmailMessagesTable).set({ messageId: message.id }).where(eq(inboundEmailMessagesTable.providerMessageId, providerMessageId));
-    await tx.insert(notificationsTable).values({ staffId: supervisor.id, type: "inspector_to_supervisor", message: "URGENT: Inspector email reply received", isRead: false });
+    const managers = await inspectorManagers();
+    if (managers.length) await tx.insert(notificationsTable).values(managers.map(manager => ({ staffId: manager.id, type: "inspector_to_supervisor" as const, message: "URGENT: Inspector email reply received", isRead: false })));
     return { duplicate: false, messageId: message.id };
   });
   // A provider retry repairs a prior post-commit assignment failure. The
@@ -289,9 +314,7 @@ router.get("/inspector-workflow/:taskId", async (req: Request, res: Response) =>
     .where(eq(inspectorTaskLinksTable.taskId, params.data.taskId));
   if (!row) { res.status(404).json({ error: "Inspector workflow task not found" }); return; }
   const isParticipant = actor.id === row.inspectorId || actor.id === row.supervisorId;
-  // A supervisor must be the supervisor encoded in this conversation; another
-  // supervisor is not implicitly entitled to read a separate conversation.
-  const isAuthorizedManager = actor.role === "admin" || (actor.role === "supervisor" && actor.id === row.supervisorId);
+  const isAuthorizedManager = isInspectorManager(actor.role);
   if (!isParticipant && !isAuthorizedManager && actor.id !== row.assignedStaffId) {
     res.status(403).json({ error: "Not authorized for this inspector workflow" }); return;
   }
@@ -321,7 +344,7 @@ router.get("/inspector-workflow/:taskId", async (req: Request, res: Response) =>
 });
 
 router.get("/conversations", async (req: Request, res: Response) => {
-  const query = StaffIdQuery.safeParse({ staffId: req.query.staffId });
+  const query = StaffIdQuery.safeParse({ staffId: req.query.staffId, archived: req.query.archived });
   if (!query.success) {
     res.status(400).json({ error: "staffId is required" });
     return;
@@ -344,6 +367,18 @@ router.get("/conversations", async (req: Request, res: Response) => {
       )
     );
 
+  if (isInspectorManager(actor.role)) {
+    const people = await db.select().from(staffTable);
+    const inspectorIds = people.filter(p => p.role === "inspector" && normalizedEmail(p.email) === INSPECTOR_EMAIL).map(p => p.id);
+    if (inspectorIds.length) {
+      const candidates = await db.select().from(conversationsTable).where(and(eq(conversationsTable.isGroup, false), or(
+        inArray(conversationsTable.participantAId, inspectorIds), inArray(conversationsTable.participantBId, inspectorIds))));
+      for (const convo of candidates) {
+        if (canReadSharedInspector(actor, convo, people) && !oneToOne.some(c => c.id === convo.id)) oneToOne.push(convo);
+      }
+    }
+  }
+
   // Group conversations where this user is a participant
   const groupParticipantRows = await db
     .select({ conversationId: conversationParticipantsTable.conversationId })
@@ -356,7 +391,7 @@ router.get("/conversations", async (req: Request, res: Response) => {
     groupConvos = await db
       .select()
       .from(conversationsTable)
-      .where(inArray(conversationsTable.id, groupIds));
+      .where(and(eq(conversationsTable.isGroup, true), inArray(conversationsTable.id, groupIds)));
   }
 
   const archived = await db.select({ conversationId: conversationArchivesTable.conversationId })
@@ -395,6 +430,14 @@ router.post("/conversations", async (req: Request, res: Response) => {
   if (!canStart(sender, recipient)) {
     res.status(403).json({ error: "You are not allowed to message this person" });
     return;
+  }
+  // Reuse the oldest inspector thread for new messages. Existing threads stay readable.
+  if (isInspectorManager(sender.role) && recipient.role === "inspector" && normalizedEmail(recipient.email) === INSPECTOR_EMAIL) {
+    const candidates = await db.select().from(conversationsTable).where(and(eq(conversationsTable.isGroup, false), or(
+      eq(conversationsTable.participantAId, recipient.id), eq(conversationsTable.participantBId, recipient.id)))).orderBy(asc(conversationsTable.id));
+    const people = await db.select().from(staffTable);
+    const shared = candidates.find(convo => canReadSharedInspector(sender, convo, people));
+    if (shared) { res.json(await buildSummary(shared, sender.id)); return; }
   }
   const [aId, bId] = sender.id < recipientId ? [sender.id, recipientId] : [recipientId, sender.id];
   const [inserted] = await db
@@ -475,6 +518,8 @@ router.get("/conversations/:id/messages", async (req: Request, res: Response) =>
     sendConvoError(res, result.status);
     return;
   }
+  const shared = await inspectorForConversation(result.convo);
+  const lastReadAt = shared ? await readPosition(result.convo.id, actor.id) : null;
   const rows = await db
     .select({
       id: messagesTable.id,
@@ -506,6 +551,7 @@ router.get("/conversations/:id/messages", async (req: Request, res: Response) =>
   const deliveryByMessageId = new Map(outboxRows.map((row) => [row.messageId, row.status]));
   res.json(rows.map((m) => ({
     ...m,
+    isRead: shared ? sharedMessageIsRead(m, actor.id, lastReadAt) : m.isRead,
     createdAt: m.createdAt.toISOString(),
     inspectorWorkflowTaskId: workflowTaskByMessageId.get(m.id) ?? null,
     inspectorEmailDeliveryStatus: deliveryByMessageId.get(m.id) ?? "not_applicable",
@@ -531,12 +577,13 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
     return;
   }
   const { convo } = result;
+  const shared = await inspectorForConversation(convo);
 
   // Validate sender is still allowed to send (1:1 only; group membership was
   // validated at creation time so no further pair-check is needed).
   if (!convo.isGroup) {
     const recipientId =
-      convo.participantAId === sender.id ? convo.participantBId! : convo.participantAId!;
+      shared && isInspectorManager(sender.role) ? shared.id : convo.participantAId === sender.id ? convo.participantBId! : convo.participantAId!;
     const recipient = await getStaff(recipientId);
     if (!recipient) {
       res.status(404).json({ error: "Staff member not found" });
@@ -575,7 +622,7 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
       !convo.isGroup &&
       isInspectorManager(sender.role)
     ) {
-      const otherId = convo.participantAId === sender.id ? convo.participantBId! : convo.participantAId!;
+      const otherId = shared?.id ?? (convo.participantAId === sender.id ? convo.participantBId! : convo.participantAId!);
       const [inspector] = await tx.select().from(staffTable).where(eq(staffTable.id, otherId));
       if (
         inspector?.role === "inspector" &&
@@ -598,7 +645,10 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
 
   // Notify only for the winning insert; concurrent idempotent retries must not
   // duplicate notifications.
-  if (!replayed && convo.isGroup) {
+  if (!replayed && shared) {
+    const recipients = [...new Set([shared.id, ...(await inspectorManagers()).map(manager => manager.id)])].filter(id => id !== sender.id);
+    if (recipients.length) await db.insert(notificationsTable).values(recipients.map(id => ({ staffId: id, type: "new_message" as const, message: "Inspector messages — " + sender.name + ": " + preview })));
+  } else if (!replayed && convo.isGroup) {
     const parts = await db
       .select({ staffId: conversationParticipantsTable.staffId })
       .from(conversationParticipantsTable)
@@ -751,7 +801,11 @@ router.post("/conversations/:id/read", async (req: Request, res: Response) => {
     return;
   }
 
-  if (result.convo.isGroup) {
+  if (await inspectorForConversation(result.convo)) {
+    await db.insert(conversationParticipantsTable).values({ conversationId: params.data.id, staffId: actor.id, lastReadAt: new Date() })
+      .onConflictDoUpdate({ target: [conversationParticipantsTable.conversationId, conversationParticipantsTable.staffId], set: { lastReadAt: new Date() } });
+    res.json({ updated: 1 });
+  } else if (result.convo.isGroup) {
     // Update last_read_at for this participant
     await db
       .update(conversationParticipantsTable)
