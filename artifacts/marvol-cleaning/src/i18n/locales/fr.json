@@ -77,7 +77,7 @@
   },
   "messages": {
     "inspectorMessages": "Messages de l’inspecteur",
-    "inspectorEmailHelp": "Envoyez un e-mail à inspector@marvolenterprises.com et recevez les réponses ici.",
+    "inspectorEmailHelp": "Partagé avec tous les administrateurs et superviseurs. Envoyez un e-mail à inspector@marvolenterprises.com et consultez ici les messages de l’équipe et les réponses de l’inspecteur.",
     "inspectorUnavailable": "Le compte de l’inspecteur est indisponible. Vérifiez qu’il est actif et possède une adresse e-mail.",
     "inspectorOpenFailed": "Impossible d’ouvrir les messages. Réessayez.",
     "title": "Messages",
