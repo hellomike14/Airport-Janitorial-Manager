@@ -300,7 +300,10 @@
     "staffMember": "Membre du Personnel",
     "assignedArea": "Zone Assignée",
     "notes": "Notes",
-    "assignedByCol": "Assigné Par"
+    "assignedByCol": "Assigné Par",
+    "createFailed": "Impossible de créer l'affectation. Vérifiez le membre du personnel sélectionné et réessayez.",
+    "deleteFailed": "Impossible de supprimer l'affectation. Veuillez réessayer.",
+    "unavailableStaffHint": "Le personnel dont la connexion est désactivée ne peut pas être affecté. Un administrateur doit modifier et enregistrer son e-mail pour activer le personnel actif admissible."
   },
   "staff": {
     "staffDirectory": "Répertoire du Personnel",
@@ -335,10 +338,14 @@
     "setEmailPrompt": "E-mail de connexion pour {{name}} :",
     "emailFormatError": "Veuillez saisir une adresse e-mail valide.",
     "emailRequired": "E-mail (utilisé pour se connecter)",
-    "missingEmailBanner": "{{count}} membre(s) du personnel n'ont pas d'e-mail et ne peuvent pas se connecter.",
-    "migrationHint": "Le personnel se connecte avec son compte e-mail. Ajoutez un e-mail à chaque profil, puis demandez à l'employé de créer son compte avec ce même e-mail sur la page d'inscription.",
+    "missingEmailBanner": "La connexion est désactivée pour {{count}} membre(s) actif(s) et admissible(s) du personnel.",
+    "migrationHint": "Un administrateur doit modifier et enregistrer l'e-mail de chaque membre actif admissible pour activer la connexion.",
     "canLogIn": "Peut se connecter avec cet e-mail",
-    "noEmailCannotLogIn": "Pas d'e-mail — connexion impossible. Ajoutez-en un."
+    "noEmailCannotLogIn": "Pas d'e-mail — connexion impossible. Ajoutez-en un.",
+    "loginDisabled": "Connexion désactivée",
+    "loginDisabledHint": "Un administrateur doit modifier et enregistrer l'e-mail de ce membre du personnel pour activer la connexion.",
+    "editAndSaveEmail": "Modifier et enregistrer l'e-mail",
+    "inactiveLoginHint": "Le personnel inactif et les anciens employés ne peuvent pas se connecter."
   },
   "areas": {
     "cleaningZones": "Zones de Nettoyage",

@@ -8,6 +8,7 @@ import { SEED_STAFF, REMOVED_STAFF_NAMES, isSeedLoginEnabled } from "./seed-data
 import { sweepOverdueInspectorAssignments } from "./lib/inspectorTaskWorkflow";
 import { drainOutbox } from "./lib/messageEmailOutboxWorker";
 import { inspectorRuntimeConfig } from "./lib/inspectorRuntimeConfig";
+import { loginEnabledAfterSeedReconciliation } from "./lib/staffLoginPolicy";
 
 const rawPort = process.env["PORT"];
 
@@ -428,10 +429,15 @@ async function seed() {
       await db.update(staffTable).set({ email: seedEntry.email }).where(eq(staffTable.id, existing.id));
       console.log(`Updated ${existing.name}: email`);
     }
-    // Only current, named seed identities receive seed login policy.  This
-    // intentionally leaves arbitrary legacy inactive rows unchanged.
-    if (seedEntry && existing.active && seedEntry.name === existing.name) {
-      const loginEnabled = isSeedLoginEnabled(seedEntry);
+    // Only named seed identities receive seed login safety policy. Arbitrary
+    // legacy rows remain unchanged, while inactive/former seed rows stay off.
+    if (seedEntry && seedEntry.name === existing.name) {
+      const loginEnabled = loginEnabledAfterSeedReconciliation({
+        active: existing.active,
+        loginEnabled: existing.loginEnabled,
+        formerEmployee: existing.formerEmployee,
+        seedLoginEnabled: seedEntry.loginEnabled,
+      });
       if (existing.loginEnabled !== loginEnabled) {
         await db.update(staffTable).set({ loginEnabled }).where(eq(staffTable.id, existing.id));
       }

@@ -1328,6 +1328,14 @@ components:
           description: Whether the staff member has a configured sign-in email. The email address itself is never returned.
         active:
           type: boolean
+        loginEnabled:
+          type: boolean
+          readOnly: true
+          description: Whether this staff member is currently eligible to sign in.
+        formerEmployee:
+          type: boolean
+          readOnly: true
+          description: Whether this retained historical record belongs to a former employee.
         createdAt:
           type: string
       required:
@@ -1336,6 +1344,8 @@ components:
         - role
         - hasEmail
         - active
+        - loginEnabled
+        - formerEmployee
         - createdAt
 
     CreateStaffMemberRequest:

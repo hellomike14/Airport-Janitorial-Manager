@@ -27,6 +27,14 @@ export const ListStaffResponseItem = zod.object({
       "Whether the staff member has a configured sign-in email. The email address itself is never returned.",
     ),
   active: zod.boolean(),
+  loginEnabled: zod
+    .boolean()
+    .describe("Whether this staff member is currently eligible to sign in."),
+  formerEmployee: zod
+    .boolean()
+    .describe(
+      "Whether this retained historical record belongs to a former employee.",
+    ),
   createdAt: zod.string(),
 });
 export const ListStaffResponse = zod.array(ListStaffResponseItem);
@@ -66,6 +74,14 @@ export const UpdateStaffMemberResponse = zod.object({
       "Whether the staff member has a configured sign-in email. The email address itself is never returned.",
     ),
   active: zod.boolean(),
+  loginEnabled: zod
+    .boolean()
+    .describe("Whether this staff member is currently eligible to sign in."),
+  formerEmployee: zod
+    .boolean()
+    .describe(
+      "Whether this retained historical record belongs to a former employee.",
+    ),
   createdAt: zod.string(),
 });
 

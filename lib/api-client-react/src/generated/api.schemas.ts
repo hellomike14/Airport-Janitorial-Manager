@@ -46,6 +46,10 @@ export interface StaffMember {
   /** Whether the staff member has a configured sign-in email. The email address itself is never returned. */
   hasEmail: boolean;
   active: boolean;
+  /** Whether this staff member is currently eligible to sign in. */
+  readonly loginEnabled: boolean;
+  /** Whether this retained historical record belongs to a former employee. */
+  readonly formerEmployee: boolean;
   createdAt: string;
 }
 

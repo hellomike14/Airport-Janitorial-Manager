@@ -300,7 +300,10 @@
     "staffMember": "Staff Member",
     "assignedArea": "Assigned Area",
     "notes": "Notes",
-    "assignedByCol": "Assigned By"
+    "assignedByCol": "Assigned By",
+    "createFailed": "Could not create the assignment. Check the selected staff member and try again.",
+    "deleteFailed": "Could not remove the assignment. Please try again.",
+    "unavailableStaffHint": "Staff with disabled sign-in are unavailable for assignments. An admin must edit and save their email to enable eligible active staff."
   },
   "staff": {
     "staffDirectory": "Staff Directory",
@@ -335,10 +338,14 @@
     "setEmailPrompt": "Login email for {{name}}:",
     "emailFormatError": "Please enter a valid email address.",
     "emailRequired": "Email (used to sign in)",
-    "missingEmailBanner": "{{count}} staff member(s) have no email on file and cannot sign in.",
-    "migrationHint": "Staff sign in with their email account. Add an email to each profile below, then have the employee create their account with that same email on the sign-up page.",
+    "missingEmailBanner": "{{count}} eligible active staff member(s) have sign-in disabled.",
+    "migrationHint": "An admin must edit and save each eligible active staff member's email to enable sign-in.",
     "canLogIn": "Can sign in with this email",
-    "noEmailCannotLogIn": "No email — cannot sign in. Add one."
+    "noEmailCannotLogIn": "No email — cannot sign in. Add one.",
+    "loginDisabled": "Sign-in disabled",
+    "loginDisabledHint": "An admin must edit and save this staff member's email to enable sign-in.",
+    "editAndSaveEmail": "Edit and save email",
+    "inactiveLoginHint": "Inactive and former staff cannot sign in."
   },
   "areas": {
     "cleaningZones": "Cleaning Zones",

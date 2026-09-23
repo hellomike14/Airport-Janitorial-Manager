@@ -10,8 +10,20 @@ test("removed identities are distinct from current seed identities", () => {
 
 test("only explicitly seeded email identities have login enabled by default", () => {
   for (const staff of SEED_STAFF) {
-    assert.equal(isSeedLoginEnabled(staff), Boolean(staff.email?.trim()));
+    assert.equal(
+      isSeedLoginEnabled(staff),
+      staff.loginEnabled !== false && Boolean(staff.email?.trim()),
+    );
   }
   assert.equal(isSeedLoginEnabled({ name: "legacy", role: "staff" }), false);
   assert.equal(isSeedLoginEnabled({ name: "disabled", role: "staff", email: "x@example.test", loginEnabled: false }), false);
+});
+
+test("Jean Gardy and Kevin seeds do not override administrator-managed login identity or status", () => {
+  for (const name of ["Jean Gardy Rigueur", "Kevin Gonzalez Fernandez"]) {
+    const staff = SEED_STAFF.find((entry) => entry.name === name);
+    assert.ok(staff);
+    assert.equal(staff.email, undefined);
+    assert.equal(staff.loginEnabled, undefined);
+  }
 });

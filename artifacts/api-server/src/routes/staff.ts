@@ -10,6 +10,7 @@ import {
 } from "@workspace/api-zod";
 import { actorStaffFromRequest } from "../lib/actorSession";
 import { requireStaffRole } from "../middlewares/requireStaffRole";
+import { loginEnabledAfterAdminUpdate } from "../lib/staffLoginPolicy";
 
 const router: IRouter = Router();
 
@@ -20,6 +21,8 @@ function toPublicStaff(staff: typeof staffTable.$inferSelect) {
     role: staff.role,
     hasEmail: Boolean(staff.email),
     active: staff.active,
+    loginEnabled: staff.loginEnabled,
+    formerEmployee: staff.formerEmployee,
     createdAt: staff.createdAt.toISOString(),
   };
 }
@@ -87,7 +90,17 @@ router.post("/", requireStaffRole("admin"), async (req, res) => {
 router.put("/:id", requireStaffRole("admin"), async (req, res) => {
   const { id } = UpdateStaffMemberParams.parse({ id: req.params.id });
   const body = UpdateStaffMemberBody.parse(req.body);
-  const [target] = await db.select({ name: staffTable.name, formerEmployee: staffTable.formerEmployee }).from(staffTable).where(eq(staffTable.id, id));
+  const [target] = await db.select({
+    name: staffTable.name,
+    active: staffTable.active,
+    email: staffTable.email,
+    loginEnabled: staffTable.loginEnabled,
+    formerEmployee: staffTable.formerEmployee,
+  }).from(staffTable).where(eq(staffTable.id, id));
+  if (!target) {
+    res.status(404).json({ error: "Staff member not found" });
+    return;
+  }
   if (target?.formerEmployee && (body.active === true || (body.name !== undefined && body.name !== target.name))) {
     return res.status(403).json({ error: "Former staff records cannot be renamed or reactivated" });
   }
@@ -105,8 +118,11 @@ router.put("/:id", requireStaffRole("admin"), async (req, res) => {
   }
   if (body.active !== undefined) {
     updateData.active = body.active;
-    if (!body.active) updateData.loginEnabled = false;
   }
+  updateData.loginEnabled = loginEnabledAfterAdminUpdate(target, {
+    active: body.active,
+    email: body.email === undefined ? undefined : body.email?.trim() || null,
+  });
 
   const [updated] = await db
     .update(staffTable)

@@ -300,7 +300,10 @@
     "staffMember": "Miembro del Personal",
     "assignedArea": "Área Asignada",
     "notes": "Notas",
-    "assignedByCol": "Asignado Por"
+    "assignedByCol": "Asignado Por",
+    "createFailed": "No se pudo crear la asignación. Verifique el miembro del personal seleccionado e inténtelo de nuevo.",
+    "deleteFailed": "No se pudo eliminar la asignación. Inténtelo de nuevo.",
+    "unavailableStaffHint": "El personal con el inicio de sesión deshabilitado no está disponible para asignaciones. Un administrador debe editar y guardar su correo para habilitar al personal activo elegible."
   },
   "staff": {
     "staffDirectory": "Directorio de Personal",
@@ -335,10 +338,14 @@
     "setEmailPrompt": "Correo de inicio de sesión para {{name}}:",
     "emailFormatError": "Ingresa un correo electrónico válido.",
     "emailRequired": "Correo (usado para iniciar sesión)",
-    "missingEmailBanner": "{{count}} miembro(s) del personal no tienen correo y no pueden iniciar sesión.",
-    "migrationHint": "El personal inicia sesión con su cuenta de correo. Agrega un correo a cada perfil y pide al empleado que cree su cuenta con ese mismo correo en la página de registro.",
+    "missingEmailBanner": "{{count}} miembro(s) activo(s) elegible(s) del personal tienen el inicio de sesión deshabilitado.",
+    "migrationHint": "Un administrador debe editar y guardar el correo de cada miembro activo elegible para habilitar el inicio de sesión.",
     "canLogIn": "Puede iniciar sesión con este correo",
-    "noEmailCannotLogIn": "Sin correo — no puede iniciar sesión. Agrega uno."
+    "noEmailCannotLogIn": "Sin correo — no puede iniciar sesión. Agrega uno.",
+    "loginDisabled": "Inicio de sesión deshabilitado",
+    "loginDisabledHint": "Un administrador debe editar y guardar el correo de este miembro del personal para habilitar el inicio de sesión.",
+    "editAndSaveEmail": "Editar y guardar correo",
+    "inactiveLoginHint": "El personal inactivo y los exempleados no pueden iniciar sesión."
   },
   "areas": {
     "cleaningZones": "Zonas de Limpieza",
