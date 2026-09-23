@@ -21,16 +21,15 @@ export const SEED_STAFF: SeedStaff[] = [
   { name: "John Nelson Louis", role: "staff", email: "louiszya3@gmail.com" },
   { name: "Diego Moreno Velez", role: "staff", email: "diegomoreno198419@gmail.com" },
   { name: "Luis Garcia", role: "staff", email: "kikeyuli1112@gmail.com" },
-  { name: "Alexis Moron", role: "staff", email: "alexismoron733@gmail.com" },
   { name: "JeanFranco Perez", role: "staff", email: "jeanfranco985@gmail.com" },
 ];
 
 export const REMOVED_STAFF_NAMES = [
+  "Alexis Moron",
   "Floraima Pinero Valdez",
   "Ashandre Longmore",
   "Marie Ingrid Daniel",
   "Jose Altagracia Maria",
-  "Edner Jules",
   "Jason Delgado",
   "Ivan Serrano",
 ];

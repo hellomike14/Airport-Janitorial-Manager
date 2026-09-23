@@ -8,6 +8,17 @@ test("removed identities are distinct from current seed identities", () => {
   }
 });
 
+test("Edner is no longer forced inactive during startup reconciliation", () => {
+  assert.equal(REMOVED_STAFF_NAMES.includes("Edner Jules"), false);
+  // Restore the existing record, rather than reseeding a replacement identity.
+  assert.equal(SEED_STAFF.some((staff) => staff.name === "Edner Jules"), false);
+});
+
+test("Alexis remains removed and cannot be reseeded as active staff", () => {
+  assert.equal(REMOVED_STAFF_NAMES.includes("Alexis Moron"), true);
+  assert.equal(SEED_STAFF.some((staff) => staff.name === "Alexis Moron"), false);
+});
+
 test("only explicitly seeded email identities have login enabled by default", () => {
   for (const staff of SEED_STAFF) {
     assert.equal(
