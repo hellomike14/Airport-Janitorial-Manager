@@ -11,6 +11,10 @@ import { AuthServiceUnavailable, withAuthDeadline } from "./authAvailability";
 // must trust ONLY this server-derived identity — never client-sent staff ids.
 
 type StaffRow = typeof staffTable.$inferSelect;
+export type StaffIdentityResolution =
+  | { status: "matched"; staff: StaffRow }
+  | { status: "no_match" }
+  | { status: "access_disabled" };
 
 // Small cache of Clerk userId -> primary email to avoid a Clerk API round
 // trip on every request. Entries expire so email changes propagate.
@@ -18,6 +22,7 @@ const emailCache = new Map<string, { email: string | null; expiresAt: number }>(
 const EMAIL_CACHE_TTL_MS = 60 * 1000;
 const emailRequests = new Map<string, Promise<string | null>>();
 const requestActors = new WeakMap<Request, Promise<StaffRow | null>>();
+const requestResolutions = new WeakMap<Request, Promise<StaffIdentityResolution>>();
 
 async function emailForClerkUser(userId: string): Promise<string | null> {
   const cached = emailCache.get(userId);
@@ -64,16 +69,43 @@ export async function actorStaffFromRequest(req: Request): Promise<StaffRow | nu
 }
 
 async function resolveActor(req: Request): Promise<StaffRow | null> {
+  const resolution = await resolveStaffIdentity(req);
+  return resolution.status === "matched" ? resolution.staff : null;
+}
+
+/**
+ * Detailed identity resolution for /staff/me. actorStaffFromRequest remains
+ * backward-compatible while this distinguishes an ineligible record from no match.
+ */
+export async function resolveStaffIdentity(req: Request): Promise<StaffIdentityResolution> {
+  const cached = requestResolutions.get(req);
+  if (cached) return cached;
+  const pending = resolveStaffIdentityUncached(req);
+  requestResolutions.set(req, pending);
+  return pending;
+}
+
+async function resolveStaffIdentityUncached(req: Request): Promise<StaffIdentityResolution> {
   const auth = getAuth(req);
-  if (!auth?.userId) return null;
+  if (!auth?.userId) return { status: "no_match" };
   const email = await emailForClerkUser(auth.userId);
-  if (!email) return null;
-  const [staff] = await withAuthDeadline(db
-    .select()
-    .from(staffTable)
-    .where(sql`lower(btrim(${staffTable.email})) = ${email.trim().toLowerCase()} AND ${staffTable.active} = true AND ${staffTable.loginEnabled} = true AND ${staffTable.formerEmployee} = false`)
-    .limit(1).then(rows => rows));
-  return staff ?? null;
+  if (!email) return { status: "no_match" };
+  try {
+    const [staff] = await withAuthDeadline(db
+      .select()
+      .from(staffTable)
+      .where(sql`lower(btrim(${staffTable.email})) = ${email.trim().toLowerCase()}`)
+      .limit(1).then(rows => rows));
+    if (!staff) return { status: "no_match" };
+    if (!staff.active || !staff.loginEnabled || staff.formerEmployee) {
+      return { status: "access_disabled" };
+    }
+    return { status: "matched", staff };
+  } catch (error) {
+    if (error instanceof AuthServiceUnavailable) throw error;
+    console.error("Staff identity lookup temporarily unavailable");
+    throw new AuthServiceUnavailable();
+  }
 }
 
 /** Returns the authenticated staff id derived from the Clerk session, or null. */

@@ -187,7 +187,12 @@
     "bootstrapHelp": "La recuperación automática está limitada para evitar recargas repetidas. Asegúrate de tener conexión y selecciona Recargar inicio de sesión para volver a intentarlo. Tu trabajo guardado sin conexión no se ha borrado.",
     "retry": "Intentar de nuevo",
     "signInAgain": "Iniciar sesión de nuevo",
-    "reloadHelp": "No se pudo cerrar la sesión. Recarga la página e inténtalo de nuevo."
+    "reloadHelp": "No se pudo cerrar la sesión. Recarga la página e inténtalo de nuevo.",
+    "accessDisabledTitle": "El acceso del personal está deshabilitado",
+    "accessDisabledHelp": "Tu cuenta de inicio de sesión es válida, pero este perfil no tiene permiso para acceder a Marvol. Contacta a un administrador. Repetir el inicio de sesión no habilitará el acceso.",
+    "serviceUnavailableTitle": "El servicio de inicio de sesión no está disponible temporalmente",
+    "serviceUnavailableHelp": "No pudimos verificar el acceso del personal en este momento. Espera un momento e inténtalo de nuevo. No cambies tu correo ni crees otra cuenta.",
+    "diagnosticId": "ID de diagnóstico: {{id}}"
   },
   "dashboard": {
     "facilityOverview": "Vista General de la Instalación",
@@ -345,7 +350,40 @@
     "loginDisabled": "Inicio de sesión deshabilitado",
     "loginDisabledHint": "Un administrador debe editar y guardar el correo de este miembro del personal para habilitar el inicio de sesión.",
     "editAndSaveEmail": "Editar y guardar correo",
-    "inactiveLoginHint": "El personal inactivo y los exempleados no pueden iniciar sesión."
+    "inactiveLoginHint": "El personal inactivo y los exempleados no pueden iniciar sesión.",
+    "accessHealth": {
+      "title": "Estado del acceso",
+      "last24Hours": "Fallos de inicio de sesión de las últimas 24 horas y los 100 registros de acceso más recientes.",
+      "refresh": "Actualizar",
+      "loading": "Cargando estado del acceso…",
+      "error": "No se pudo cargar el estado del acceso. Intenta actualizar.",
+      "empty": "No hay fallos de inicio de sesión ni cambios de acceso recientes.",
+      "failureSummary": "Resumen de fallos repetidos",
+      "noFailures": "No se registraron fallos de inicio de sesión en las últimas 24 horas.",
+      "recentEvents": "Fallos recientes de inicio de sesión",
+      "failure": "Fallo",
+      "source": "Origen",
+      "diagnosticId": "ID de diagnóstico",
+      "when": "Cuándo",
+      "clientUnverified": "Informe del cliente (no verificado)",
+      "server": "Servidor",
+      "recentChanges": "Auditoría de acceso reciente",
+      "noChanges": "No hay cambios de acceso recientes.",
+      "active": "Activo",
+      "inactive": "Inactivo",
+      "hasEmail": "Tiene correo",
+      "noEmail": "Sin correo",
+      "loginEnabled": "Inicio habilitado",
+      "loginDisabled": "Inicio deshabilitado",
+      "formerEmployee": "Exempleado",
+      "codes": {
+        "AUTH_SERVICE_UNAVAILABLE": "Servicio de autenticación no disponible",
+        "STAFF_LOOKUP_TIMEOUT": "Tiempo agotado al buscar personal",
+        "SESSION_EXPIRED": "Sesión caducada",
+        "NO_STAFF_MATCH": "Sin registro de personal coincidente",
+        "STAFF_ACCESS_DISABLED": "Acceso del personal deshabilitado"
+      }
+    }
   },
   "areas": {
     "cleaningZones": "Zonas de Limpieza",

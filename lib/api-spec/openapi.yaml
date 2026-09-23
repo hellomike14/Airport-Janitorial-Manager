@@ -11,6 +11,8 @@ tags:
     description: Health operations
   - name: staff
     description: Staff management
+  - name: authDiagnostics
+    description: Authentication availability diagnostics and access audit history
   - name: areas
     description: Cleaning areas
   - name: tasks
@@ -73,6 +75,43 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/StaffMember"
+
+  /staff/me:
+    get:
+      operationId: getCurrentStaffMember
+      tags: [staff]
+      summary: Resolve the authenticated session to a staff member
+      responses:
+        "200":
+          description: Authenticated staff member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffMember"
+        "401":
+          description: The login session has expired
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionExpiredError"
+        "403":
+          description: Staff access is disabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffAccessDisabledError"
+        "404":
+          description: No staff record matches the authenticated identity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NoStaffMatchError"
+        "503":
+          description: The authentication service is temporarily unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthServiceUnavailableError"
 
   /staff/{id}:
     put:
@@ -1273,8 +1312,83 @@ paths:
         "202": { description: Idempotent sweep completed }
         "401": { description: Invalid scheduler credential }
 
+  /auth-diagnostics/events:
+    post:
+      operationId: reportAuthDiagnosticEvent
+      tags: [authDiagnostics]
+      summary: Report a limited authentication availability diagnostic
+      description: Accepts a limited set of diagnostic codes without requiring an authenticated session.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthDiagnosticEventInput"
+      responses:
+        "201":
+          description: Diagnostic event recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthDiagnosticEventReceipt"
+        "400":
+          description: Diagnostic code is not accepted from unauthenticated clients
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvalidDiagnosticCodeError"
+        "429":
+          description: Too many diagnostic reports
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthDiagnosticRateLimitError"
+        "503":
+          description: The diagnostic event could not be persisted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiagnosticStoreUnavailableError"
+
+  /auth-diagnostics:
+    get:
+      operationId: getAuthDiagnostics
+      tags: [authDiagnostics]
+      summary: Get authentication diagnostics and staff access audit history
+      description: Available only to authenticated administrators.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Authentication diagnostics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthDiagnostics"
+        "401":
+          description: Login required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: Administrator access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
 components:
   securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
     InternalCronSecret:
       type: apiKey
       in: header
@@ -1313,6 +1427,175 @@ components:
       required:
         - status
 
+    SessionExpiredError:
+      type: object
+      required: [error, diagnosticId]
+      properties:
+        error:
+          type: string
+          enum: [SESSION_EXPIRED]
+        diagnosticId:
+          type: string
+
+    StaffAccessDisabledError:
+      type: object
+      required: [error, diagnosticId]
+      properties:
+        error:
+          type: string
+          enum: [STAFF_ACCESS_DISABLED]
+        diagnosticId:
+          type: string
+
+    NoStaffMatchError:
+      type: object
+      required: [error, diagnosticId]
+      properties:
+        error:
+          type: string
+          enum: [NO_STAFF_MATCH]
+        diagnosticId:
+          type: string
+
+    AuthServiceUnavailableError:
+      type: object
+      required: [error, diagnosticId]
+      properties:
+        error:
+          type: string
+          enum: [AUTH_SERVICE_UNAVAILABLE]
+        diagnosticId:
+          type: string
+
+    AuthDiagnosticCode:
+      type: string
+      enum: [AUTH_SERVICE_UNAVAILABLE, STAFF_LOOKUP_TIMEOUT]
+
+    AuthDiagnosticRecordedCode:
+      type: string
+      enum:
+        - SESSION_EXPIRED
+        - NO_STAFF_MATCH
+        - STAFF_ACCESS_DISABLED
+        - AUTH_SERVICE_UNAVAILABLE
+        - STAFF_LOOKUP_TIMEOUT
+
+    AuthDiagnosticEventInput:
+      type: object
+      required: [code]
+      properties:
+        code:
+          $ref: "#/components/schemas/AuthDiagnosticCode"
+
+    AuthDiagnosticEventReceipt:
+      type: object
+      required: [diagnosticId]
+      properties:
+        diagnosticId:
+          type: string
+
+    InvalidDiagnosticCodeError:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          enum: [INVALID_DIAGNOSTIC_CODE]
+
+    AuthDiagnosticRateLimitError:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          enum: [RATE_LIMITED]
+
+    DiagnosticStoreUnavailableError:
+      type: object
+      required: [error, diagnosticId]
+      properties:
+        error:
+          type: string
+          enum: [DIAGNOSTIC_STORE_UNAVAILABLE]
+        diagnosticId:
+          type: string
+
+    AuthDiagnosticEvent:
+      type: object
+      required: [diagnosticId, code, source, createdAt]
+      properties:
+        diagnosticId:
+          type: string
+        code:
+          $ref: "#/components/schemas/AuthDiagnosticRecordedCode"
+        source:
+          type: string
+          enum: [server, client]
+        createdAt:
+          type: string
+          format: date-time
+
+    AuthDiagnosticSummary:
+      type: object
+      required: [code, count]
+      properties:
+        code:
+          $ref: "#/components/schemas/AuthDiagnosticRecordedCode"
+        count:
+          type: integer
+          minimum: 0
+
+    StaffAccessState:
+      type: object
+      required: [active, loginEnabled, formerEmployee, hasEmail]
+      properties:
+        active:
+          type: boolean
+        loginEnabled:
+          type: boolean
+        formerEmployee:
+          type: boolean
+        hasEmail:
+          type: boolean
+
+    StaffAccessChange:
+      type: object
+      required: [id, actorName, staffName, action, createdAt, before, after]
+      properties:
+        id:
+          type: integer
+        actorName:
+          type: string
+        staffName:
+          type: string
+        action:
+          type: string
+          enum: [CREATE, UPDATE, DELETE]
+        createdAt:
+          type: string
+          format: date-time
+        before:
+          $ref: "#/components/schemas/StaffAccessState"
+        after:
+          $ref: "#/components/schemas/StaffAccessState"
+
+    AuthDiagnostics:
+      type: object
+      required: [events, summary, accessChanges]
+      properties:
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuthDiagnosticEvent"
+        summary:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuthDiagnosticSummary"
+        accessChanges:
+          type: array
+          items:
+            $ref: "#/components/schemas/StaffAccessChange"
+
     StaffMember:
       type: object
       properties:
@@ -1325,7 +1608,15 @@ components:
           enum: [staff, supervisor, admin, inspector]
         hasEmail:
           type: boolean
-          description: Whether the staff member has a configured sign-in email. The email address itself is never returned.
+          description: Whether the staff member has a configured sign-in email.
+        email:
+          type: ["string", "null"]
+          readOnly: true
+          description: Saved email, returned in the staff directory only to administrators and supervisors.
+        phone:
+          type: ["string", "null"]
+          readOnly: true
+          description: Saved phone number, returned in the staff directory only to administrators and supervisors.
         active:
           type: boolean
         loginEnabled:

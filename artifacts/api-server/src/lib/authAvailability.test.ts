@@ -17,14 +17,18 @@ test("signed-in staff identity probes reach the missing-account response", async
   assert.equal(lookedUp, false);
 });
 
-test("identity probes require a verified session; other private APIs still require staff", async () => {
-  for (const [path, signedIn] of [["/staff/me", false], ["/staff", true], ["/conversations", true]] as const) {
+test("identity probes own structured session failures; other private APIs still require staff", async () => {
+  for (const path of ["/staff", "/conversations"] as const) {
     let status = 0, next = false;
     const res = { status: (value: number) => { status = value; return res; }, json: () => {} };
-    const gate = createStaffSessionGate(() => signedIn, async () => null);
+    const gate = createStaffSessionGate(() => true, async () => null);
     await gate({ path, method: "GET" } as any, res as any, () => { next = true; });
     assert.equal(status, 401); assert.equal(next, false);
   }
+  let next = false;
+  const gate = createStaffSessionGate(() => false, async () => null);
+  await gate({ path: "/staff/me", method: "GET" } as any, {} as any, () => { next = true; });
+  assert.equal(next, true);
 });
 
 test("temporary resolution failures are not turned into missing-account or unauthorized responses", async () => {

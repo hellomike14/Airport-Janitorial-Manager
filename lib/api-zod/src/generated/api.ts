@@ -23,8 +23,18 @@ export const ListStaffResponseItem = zod.object({
   role: zod.enum(["staff", "supervisor", "admin", "inspector"]),
   hasEmail: zod
     .boolean()
+    .describe("Whether the staff member has a configured sign-in email."),
+  email: zod
+    .string()
+    .nullish()
     .describe(
-      "Whether the staff member has a configured sign-in email. The email address itself is never returned.",
+      "Saved email, returned in the staff directory only to administrators and supervisors.",
+    ),
+  phone: zod
+    .string()
+    .nullish()
+    .describe(
+      "Saved phone number, returned in the staff directory only to administrators and supervisors.",
     ),
   active: zod.boolean(),
   loginEnabled: zod
@@ -50,6 +60,40 @@ export const CreateStaffMemberBody = zod.object({
 });
 
 /**
+ * @summary Resolve the authenticated session to a staff member
+ */
+export const GetCurrentStaffMemberResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  role: zod.enum(["staff", "supervisor", "admin", "inspector"]),
+  hasEmail: zod
+    .boolean()
+    .describe("Whether the staff member has a configured sign-in email."),
+  email: zod
+    .string()
+    .nullish()
+    .describe(
+      "Saved email, returned in the staff directory only to administrators and supervisors.",
+    ),
+  phone: zod
+    .string()
+    .nullish()
+    .describe(
+      "Saved phone number, returned in the staff directory only to administrators and supervisors.",
+    ),
+  active: zod.boolean(),
+  loginEnabled: zod
+    .boolean()
+    .describe("Whether this staff member is currently eligible to sign in."),
+  formerEmployee: zod
+    .boolean()
+    .describe(
+      "Whether this retained historical record belongs to a former employee.",
+    ),
+  createdAt: zod.string(),
+});
+
+/**
  * @summary Update a staff member
  */
 export const UpdateStaffMemberParams = zod.object({
@@ -70,8 +114,18 @@ export const UpdateStaffMemberResponse = zod.object({
   role: zod.enum(["staff", "supervisor", "admin", "inspector"]),
   hasEmail: zod
     .boolean()
+    .describe("Whether the staff member has a configured sign-in email."),
+  email: zod
+    .string()
+    .nullish()
     .describe(
-      "Whether the staff member has a configured sign-in email. The email address itself is never returned.",
+      "Saved email, returned in the staff directory only to administrators and supervisors.",
+    ),
+  phone: zod
+    .string()
+    .nullish()
+    .describe(
+      "Saved phone number, returned in the staff directory only to administrators and supervisors.",
     ),
   active: zod.boolean(),
   loginEnabled: zod
@@ -1294,4 +1348,68 @@ export const GetInspectorWorkflowResponse = zod.object({
       zod.literal(null),
     ])
     .nullish(),
+});
+
+/**
+ * Accepts a limited set of diagnostic codes without requiring an authenticated session.
+ * @summary Report a limited authentication availability diagnostic
+ */
+export const ReportAuthDiagnosticEventBody = zod.object({
+  code: zod.enum(["AUTH_SERVICE_UNAVAILABLE", "STAFF_LOOKUP_TIMEOUT"]),
+});
+
+/**
+ * Available only to authenticated administrators.
+ * @summary Get authentication diagnostics and staff access audit history
+ */
+export const getAuthDiagnosticsResponseSummaryItemCountMin = 0;
+
+export const GetAuthDiagnosticsResponse = zod.object({
+  events: zod.array(
+    zod.object({
+      diagnosticId: zod.string(),
+      code: zod.enum([
+        "SESSION_EXPIRED",
+        "NO_STAFF_MATCH",
+        "STAFF_ACCESS_DISABLED",
+        "AUTH_SERVICE_UNAVAILABLE",
+        "STAFF_LOOKUP_TIMEOUT",
+      ]),
+      source: zod.enum(["server", "client"]),
+      createdAt: zod.date(),
+    }),
+  ),
+  summary: zod.array(
+    zod.object({
+      code: zod.enum([
+        "SESSION_EXPIRED",
+        "NO_STAFF_MATCH",
+        "STAFF_ACCESS_DISABLED",
+        "AUTH_SERVICE_UNAVAILABLE",
+        "STAFF_LOOKUP_TIMEOUT",
+      ]),
+      count: zod.number().min(getAuthDiagnosticsResponseSummaryItemCountMin),
+    }),
+  ),
+  accessChanges: zod.array(
+    zod.object({
+      id: zod.number(),
+      actorName: zod.string(),
+      staffName: zod.string(),
+      action: zod.enum(["CREATE", "UPDATE", "DELETE"]),
+      createdAt: zod.date(),
+      before: zod.object({
+        active: zod.boolean(),
+        loginEnabled: zod.boolean(),
+        formerEmployee: zod.boolean(),
+        hasEmail: zod.boolean(),
+      }),
+      after: zod.object({
+        active: zod.boolean(),
+        loginEnabled: zod.boolean(),
+        formerEmployee: zod.boolean(),
+        hasEmail: zod.boolean(),
+      }),
+    }),
+  ),
 });

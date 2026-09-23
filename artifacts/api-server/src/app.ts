@@ -13,6 +13,7 @@ import router from "./routes";
 import { inboundSendgridRouter } from "./routes/messages";
 import internalRouter from "./routes/internal";
 import { normalizeInboundParseFields } from "./lib/inboundParsePolicy";
+import { safeRecordServerDiagnostic } from "./lib/authDiagnostics";
 
 const app: Express = express();
 const inboundParse = multer({ storage: multer.memoryStorage(), limits: { fields: 12, fieldSize: 64 * 1024, files: 0, fileSize: 1 } }).none();
@@ -51,12 +52,13 @@ app.use(
 
 app.use("/api", router);
 
-const authUnavailableHandler: ErrorRequestHandler = (error, _req, res, next) => {
+const authUnavailableHandler: ErrorRequestHandler = async (error, _req, res, next) => {
   if (!(error instanceof AuthServiceUnavailable)) { next(error); return; }
   if (res.headersSent) { next(error); return; }
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("Retry-After", "5");
-  res.status(503).json({ error: "AUTH_TEMPORARILY_UNAVAILABLE" });
+  const diagnosticId = await safeRecordServerDiagnostic("AUTH_SERVICE_UNAVAILABLE");
+  res.status(503).json({ error: "AUTH_SERVICE_UNAVAILABLE", diagnosticId });
 };
 app.use(authUnavailableHandler);
 

@@ -1,14 +1,16 @@
-import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useAuth as useClerkAuth, useClerk } from "@clerk/react";
 import { resolveStaffSession, type StaffIdentity } from "../lib/resolveStaffSession";
+import { reportAuthDiagnostic } from "../lib/authDiagnosticsApi";
 
 export type UserRole = StaffIdentity["role"];
 export type ViewMode = UserRole;
 export type CurrentUser = StaffIdentity;
-export type StaffStatus = "signedOut" | "loading" | "nomatch" | "ok" | "expired" | "error";
+export type StaffStatus = "signedOut" | "loading" | "nomatch" | "ok" | "expired" | "disabled" | "unavailable" | "error";
 interface AuthContextValue {
   currentUser: CurrentUser | null;
   staffStatus: StaffStatus;
+  diagnosticId?: string;
   viewMode: ViewMode;
   logout: () => Promise<void>;
   retryStaff: () => void;
@@ -18,16 +20,14 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 const BASE = import.meta.env.BASE_URL;
 const basePath = BASE.replace(/\/$/, "");
-type Snapshot = { owner: string; status: StaffStatus; user: CurrentUser | null; view: ViewMode };
+type Snapshot = { owner: string; status: StaffStatus; user: CurrentUser | null; view: ViewMode; diagnosticId?: string };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { isLoaded, isSignedIn, userId, sessionId, getToken } = useClerkAuth();
+  const { isLoaded, isSignedIn, userId, sessionId } = useClerkAuth();
   const { signOut } = useClerk();
   const owner = isSignedIn ? `${userId}:${sessionId}` : "";
   const [snapshot, setSnapshot] = useState<Snapshot>({ owner: "", status: "loading", user: null, view: "staff" });
   const [attempt, setAttempt] = useState(0);
-  const tokenGetter = useRef(getToken);
-  tokenGetter.current = getToken;
   const retryStaff = useCallback(() => setAttempt(value => value + 1), []);
 
   useEffect(() => {
@@ -45,17 +45,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (inFlight || cancelled) return;
       inFlight = true;
       activeRequest = new AbortController();
-      const result = await resolveStaffSession({ url: `${BASE}api/staff/me`, getToken: fresh => tokenGetter.current({ skipCache: !!fresh }), signal: activeRequest.signal });
+       const result = await resolveStaffSession({ url: `${BASE}api/staff/me`, signal: activeRequest.signal });
       inFlight = false;
       if (cancelled) return;
       setSnapshot(previous => {
         // A temporary connectivity failure must not evict a resolved worker
         // from the existing offline-capable session. Explicit revocation does.
-        if (result.status === "error" && previous.owner === owner && previous.status === "ok") return previous;
-        if (result.status !== "ok") return { owner, status: result.status, user: null, view: "staff" };
+        if ((result.status === "error" || result.status === "unavailable") && previous.owner === owner && previous.status === "ok") return previous;
+        if (result.status !== "ok") return { owner, status: result.status, user: null, view: "staff", diagnosticId: result.diagnosticId };
         const sameIdentity = previous.owner === owner && previous.user?.id === result.user.id && previous.user?.role === result.user.role;
         return { owner, status: "ok", user: result.user, view: sameIdentity ? previous.view : result.user.role };
       });
+      if (result.status === "unavailable" && result.reason === "timeout") {
+        const incidentKey = `marvol:staff-lookup-timeout:${owner}`;
+        let shouldReport = true;
+        try {
+          shouldReport = window.sessionStorage.getItem(incidentKey) !== "reported";
+          if (shouldReport) window.sessionStorage.setItem(incidentKey, "reported");
+        } catch { /* In-memory request locking still prevents storms this mount. */ }
+        if (shouldReport) {
+          void reportAuthDiagnostic("STAFF_LOOKUP_TIMEOUT").then(diagnosticId => {
+            if (!diagnosticId || cancelled) return;
+            setSnapshot(previous => previous.owner === owner && previous.status === "unavailable"
+              ? { ...previous, diagnosticId }
+              : previous);
+          }).catch(() => { /* Telemetry must never block recovery. */ });
+        }
+      } else if (result.status === "ok") {
+        try { window.sessionStorage.removeItem(`marvol:staff-lookup-timeout:${owner}`); } catch { /* Storage is optional. */ }
+      }
     };
     void resolve();
     const interval = setInterval(resolve, 20000);
@@ -74,6 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const matches = snapshot.owner === owner;
   const staffStatus: StaffStatus = !isLoaded ? "loading" : !isSignedIn ? "signedOut" : matches ? snapshot.status : "loading";
   const currentUser = matches && staffStatus === "ok" ? snapshot.user : null;
+  const diagnosticId = matches ? snapshot.diagnosticId : undefined;
   const viewMode = currentUser ? snapshot.view : "staff";
   const logout = async () => {
     try { localStorage.removeItem("marvol_view_mode"); } catch { /* Storage can be disabled. */ }
@@ -85,7 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!["admin", "supervisor", "staff", "inspector"].includes(mode)) return;
     setSnapshot(previous => previous.owner === owner ? { ...previous, view: mode } : previous);
   };
-  return <AuthContext.Provider value={{ currentUser, staffStatus, viewMode, logout, retryStaff, setViewMode, effectiveRole: viewMode }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ currentUser, staffStatus, diagnosticId, viewMode, logout, retryStaff, setViewMode, effectiveRole: viewMode }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

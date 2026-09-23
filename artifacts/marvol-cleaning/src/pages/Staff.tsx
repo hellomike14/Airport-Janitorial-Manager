@@ -1,11 +1,12 @@
 import React, { useState } from "react";
 import { useListStaff, useCreateStaffMember, useDeleteStaffMember, useUpdateStaffMember } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { UserPlus, Shield, User, Trash2, Lock, ArrowUpDown, LogOut, MailWarning, CheckCircle2 } from "lucide-react";
+import { UserPlus, Shield, User, Trash2, Lock, ArrowUpDown, LogOut, MailWarning, CheckCircle2, Mail, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/AuthContext";
+import { AccessHealthSection } from "@/components/AccessHealthSection";
 
 export default function Staff() {
   const { t } = useTranslation();
@@ -105,6 +106,8 @@ export default function Staff() {
           </Button>
         )}
       </div>
+
+      {effectiveRole === "admin" && <AccessHealthSection />}
 
       {loginDisabledCount > 0 && (
         <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-4">
@@ -309,6 +312,18 @@ function StaffCard({ person, onDelete, onToggleRole, roleType, onLogout, onSetEm
         </div>
       </div>
       <div className="space-y-2 text-sm text-slate-500">
+        {person.email?.trim() && (
+          <div className="flex items-start gap-2" data-testid={`staff-email-${person.id}`}>
+            <Mail aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
+            <span className="min-w-0 break-all">{person.email}</span>
+          </div>
+        )}
+        {person.phone?.trim() && (
+          <div className="flex items-start gap-2" data-testid={`staff-phone-${person.id}`}>
+            <Phone aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
+            <span className="min-w-0 break-words">{person.phone}</span>
+          </div>
+        )}
         {canLogIn ? (
           <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-600">
             <CheckCircle2 className="w-3.5 h-3.5" />

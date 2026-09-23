@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-export function LoginRecovery({ kind = "loading", retry, signOut }: {
-  kind?: "loading" | "slow" | "bootstrap-error" | "error" | "expired";
+export function LoginRecovery({ kind = "loading", retry, signOut, diagnosticId }: {
+  kind?: "loading" | "slow" | "bootstrap-error" | "error" | "expired" | "disabled" | "unavailable";
   retry?: () => void; signOut?: () => Promise<void>;
+  diagnosticId?: string;
 }) {
   const { t } = useTranslation();
   const [slow, setSlow] = useState(false);
@@ -18,9 +19,13 @@ export function LoginRecovery({ kind = "loading", retry, signOut }: {
   const waiting = kind === "loading" && !slow;
   const stillLoading = kind === "loading" || kind === "slow";
   const title = kind === "expired" ? "login.sessionExpired"
+    : kind === "disabled" ? "login.accessDisabledTitle"
+    : kind === "unavailable" ? "login.serviceUnavailableTitle"
     : stillLoading ? "login.slowTitle"
     : kind === "bootstrap-error" ? "login.bootstrapTitle" : "login.connectionTitle";
   const help = kind === "expired" ? "login.sessionExpiredHelp"
+    : kind === "disabled" ? "login.accessDisabledHelp"
+    : kind === "unavailable" ? "login.serviceUnavailableHelp"
     : stillLoading ? "login.slowLoadingHelp"
     : kind === "bootstrap-error" ? "login.bootstrapHelp" : "login.connectionHelp";
   const restart = async () => {
@@ -39,9 +44,10 @@ export function LoginRecovery({ kind = "loading", retry, signOut }: {
       {waiting ? <div role="status" aria-live="polite"><span aria-hidden="true" className="inline-block animate-spin text-3xl text-emerald-700">↻</span><p className="mt-3 text-slate-700">{t("login.loading")}</p></div> : <>
         <h1 className="text-xl font-bold text-slate-900">{t(title)}</h1>
         <p role={stillLoading ? "status" : "alert"} className="mt-3 text-sm text-slate-600">{t(help)}</p>
-        {retry && kind !== "expired" && <button type="button" onClick={retry} className="mt-5 w-full rounded-lg bg-emerald-700 px-4 py-3 font-semibold text-white">{t("login.retry")}</button>}
-        {signOut && <button type="button" disabled={busy} onClick={restart} className="mt-3 w-full rounded-lg bg-slate-900 px-4 py-3 font-semibold text-white disabled:opacity-50">{t("login.signInAgain")}</button>}
-        <button type="button" onClick={() => window.location.reload()} className="mt-3 rounded-lg px-4 py-2 font-semibold text-emerald-800 underline">{t("login.reload")}</button>
+        {diagnosticId && <p className="mt-3 rounded-lg bg-slate-100 px-3 py-2 font-mono text-xs text-slate-700" data-testid="text-diagnostic-id">{t("login.diagnosticId", { id: diagnosticId })}</p>}
+        {retry && kind !== "expired" && kind !== "disabled" && <button type="button" onClick={retry} className="mt-5 w-full rounded-lg bg-emerald-700 px-4 py-3 font-semibold text-white" data-testid="button-retry-login">{t("login.retry")}</button>}
+        {signOut && <button type="button" disabled={busy} onClick={restart} className="mt-3 w-full rounded-lg bg-slate-900 px-4 py-3 font-semibold text-white disabled:opacity-50" data-testid="button-sign-in-again">{t(kind === "disabled" ? "layout.logout" : "login.signInAgain")}</button>}
+        {kind !== "disabled" && <button type="button" onClick={() => window.location.reload()} className="mt-3 rounded-lg px-4 py-2 font-semibold text-emerald-800 underline" data-testid="button-reload-login">{t("login.reload")}</button>}
         {failed && <p role="alert" className="mt-3 text-sm text-red-700">{t("login.reloadHelp")}</p>}
       </>}
     </div>

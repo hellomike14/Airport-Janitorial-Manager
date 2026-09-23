@@ -21,6 +21,11 @@ import type {
   AreaEffectiveTask,
   AssignIssueRequest,
   Assignment,
+  AuthDiagnosticEventInput,
+  AuthDiagnosticEventReceipt,
+  AuthDiagnosticRateLimitError,
+  AuthDiagnostics,
+  AuthServiceUnavailableError,
   BatchCompleteResponse,
   ChatMessage,
   ChatMessageInput,
@@ -39,10 +44,12 @@ import type {
   CreateTaskTypeRequest,
   DashboardStats,
   DeleteResponse,
+  DiagnosticStoreUnavailableError,
   ErrorEnvelope,
   GetDashboardParams,
   GetInspectorWorkflow200,
   HealthStatus,
+  InvalidDiagnosticCodeError,
   Issue,
   JobApplication,
   ListApplicationsParams,
@@ -54,6 +61,7 @@ import type {
   ListSpecialTasksParams,
   ListTasksParams,
   MarkAllReadRequest,
+  NoStaffMatchError,
   Notification,
   OnboardingHire,
   OnboardingItem,
@@ -62,9 +70,11 @@ import type {
   RemoveAreaTaskExclusionRequest,
   ReorderTaskTypesRequest,
   SendgridInboundReplyRequest,
+  SessionExpiredError,
   SetConversationArchive200,
   SetConversationArchiveRequest,
   SpecialTask,
+  StaffAccessDisabledError,
   StaffMember,
   SubmitApplicationRequest,
   Task,
@@ -314,6 +324,96 @@ export const useCreateStaffMember = <
 > => {
   return useMutation(getCreateStaffMemberMutationOptions(options));
 };
+
+/**
+ * @summary Resolve the authenticated session to a staff member
+ */
+export const getGetCurrentStaffMemberUrl = () => {
+  return `/api/staff/me`;
+};
+
+export const getCurrentStaffMember = async (
+  options?: RequestInit,
+): Promise<StaffMember> => {
+  return customFetch<StaffMember>(getGetCurrentStaffMemberUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetCurrentStaffMemberQueryKey = () => {
+  return [`/api/staff/me`] as const;
+};
+
+export const getGetCurrentStaffMemberQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCurrentStaffMember>>,
+  TError = ErrorType<
+    | SessionExpiredError
+    | StaffAccessDisabledError
+    | NoStaffMatchError
+    | AuthServiceUnavailableError
+  >,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getCurrentStaffMember>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetCurrentStaffMemberQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getCurrentStaffMember>>
+  > = ({ signal }) => getCurrentStaffMember({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getCurrentStaffMember>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetCurrentStaffMemberQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getCurrentStaffMember>>
+>;
+export type GetCurrentStaffMemberQueryError = ErrorType<
+  | SessionExpiredError
+  | StaffAccessDisabledError
+  | NoStaffMatchError
+  | AuthServiceUnavailableError
+>;
+
+/**
+ * @summary Resolve the authenticated session to a staff member
+ */
+
+export function useGetCurrentStaffMember<
+  TData = Awaited<ReturnType<typeof getCurrentStaffMember>>,
+  TError = ErrorType<
+    | SessionExpiredError
+    | StaffAccessDisabledError
+    | NoStaffMatchError
+    | AuthServiceUnavailableError
+  >,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getCurrentStaffMember>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetCurrentStaffMemberQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Update a staff member
@@ -5107,3 +5207,182 @@ export const useRunInspectorSlaSweep = <
 > => {
   return useMutation(getRunInspectorSlaSweepMutationOptions(options));
 };
+
+/**
+ * Accepts a limited set of diagnostic codes without requiring an authenticated session.
+ * @summary Report a limited authentication availability diagnostic
+ */
+export const getReportAuthDiagnosticEventUrl = () => {
+  return `/api/auth-diagnostics/events`;
+};
+
+export const reportAuthDiagnosticEvent = async (
+  authDiagnosticEventInput: AuthDiagnosticEventInput,
+  options?: RequestInit,
+): Promise<AuthDiagnosticEventReceipt> => {
+  return customFetch<AuthDiagnosticEventReceipt>(
+    getReportAuthDiagnosticEventUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(authDiagnosticEventInput),
+    },
+  );
+};
+
+export const getReportAuthDiagnosticEventMutationOptions = <
+  TError = ErrorType<
+    | InvalidDiagnosticCodeError
+    | AuthDiagnosticRateLimitError
+    | DiagnosticStoreUnavailableError
+  >,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reportAuthDiagnosticEvent>>,
+    TError,
+    { data: BodyType<AuthDiagnosticEventInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof reportAuthDiagnosticEvent>>,
+  TError,
+  { data: BodyType<AuthDiagnosticEventInput> },
+  TContext
+> => {
+  const mutationKey = ["reportAuthDiagnosticEvent"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof reportAuthDiagnosticEvent>>,
+    { data: BodyType<AuthDiagnosticEventInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return reportAuthDiagnosticEvent(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReportAuthDiagnosticEventMutationResult = NonNullable<
+  Awaited<ReturnType<typeof reportAuthDiagnosticEvent>>
+>;
+export type ReportAuthDiagnosticEventMutationBody =
+  BodyType<AuthDiagnosticEventInput>;
+export type ReportAuthDiagnosticEventMutationError = ErrorType<
+  | InvalidDiagnosticCodeError
+  | AuthDiagnosticRateLimitError
+  | DiagnosticStoreUnavailableError
+>;
+
+/**
+ * @summary Report a limited authentication availability diagnostic
+ */
+export const useReportAuthDiagnosticEvent = <
+  TError = ErrorType<
+    | InvalidDiagnosticCodeError
+    | AuthDiagnosticRateLimitError
+    | DiagnosticStoreUnavailableError
+  >,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reportAuthDiagnosticEvent>>,
+    TError,
+    { data: BodyType<AuthDiagnosticEventInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof reportAuthDiagnosticEvent>>,
+  TError,
+  { data: BodyType<AuthDiagnosticEventInput> },
+  TContext
+> => {
+  return useMutation(getReportAuthDiagnosticEventMutationOptions(options));
+};
+
+/**
+ * Available only to authenticated administrators.
+ * @summary Get authentication diagnostics and staff access audit history
+ */
+export const getGetAuthDiagnosticsUrl = () => {
+  return `/api/auth-diagnostics`;
+};
+
+export const getAuthDiagnostics = async (
+  options?: RequestInit,
+): Promise<AuthDiagnostics> => {
+  return customFetch<AuthDiagnostics>(getGetAuthDiagnosticsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAuthDiagnosticsQueryKey = () => {
+  return [`/api/auth-diagnostics`] as const;
+};
+
+export const getGetAuthDiagnosticsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAuthDiagnostics>>,
+  TError = ErrorType<ErrorEnvelope>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAuthDiagnostics>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetAuthDiagnosticsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAuthDiagnostics>>
+  > = ({ signal }) => getAuthDiagnostics({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAuthDiagnostics>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAuthDiagnosticsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAuthDiagnostics>>
+>;
+export type GetAuthDiagnosticsQueryError = ErrorType<ErrorEnvelope>;
+
+/**
+ * @summary Get authentication diagnostics and staff access audit history
+ */
+
+export function useGetAuthDiagnostics<
+  TData = Awaited<ReturnType<typeof getAuthDiagnostics>>,
+  TError = ErrorType<ErrorEnvelope>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAuthDiagnostics>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAuthDiagnosticsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}

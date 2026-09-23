@@ -187,7 +187,12 @@
     "bootstrapHelp": "Automatic recovery is limited to prevent repeated reloads. Make sure you are online, then select Reload sign-in to try again. Your saved offline work has not been cleared.",
     "retry": "Try again",
     "signInAgain": "Sign in again",
-    "reloadHelp": "Sign-out did not finish. Reload this page and try again."
+    "reloadHelp": "Sign-out did not finish. Reload this page and try again.",
+    "accessDisabledTitle": "Staff access is disabled",
+    "accessDisabledHelp": "Your sign-in account is valid, but this staff profile is not permitted to access Marvol. Contact an administrator. Repeated sign-in attempts will not enable access.",
+    "serviceUnavailableTitle": "Sign-in service is temporarily unavailable",
+    "serviceUnavailableHelp": "We could not verify staff access right now. Wait a moment and try again. Do not change your email or create another account.",
+    "diagnosticId": "Diagnostic ID: {{id}}"
   },
   "dashboard": {
     "facilityOverview": "Facility Overview",
@@ -345,7 +350,40 @@
     "loginDisabled": "Sign-in disabled",
     "loginDisabledHint": "An admin must edit and save this staff member's email to enable sign-in.",
     "editAndSaveEmail": "Edit and save email",
-    "inactiveLoginHint": "Inactive and former staff cannot sign in."
+    "inactiveLoginHint": "Inactive and former staff cannot sign in.",
+    "accessHealth": {
+      "title": "Access health",
+      "last24Hours": "Sign-in failures from the last 24 hours and the 100 most recent access records.",
+      "refresh": "Refresh",
+      "loading": "Loading access health…",
+      "error": "Access health could not be loaded. Try refreshing.",
+      "empty": "No recent sign-in failures or access changes.",
+      "failureSummary": "Repeated failure summary",
+      "noFailures": "No sign-in failures were recorded in the last 24 hours.",
+      "recentEvents": "Recent sign-in failures",
+      "failure": "Failure",
+      "source": "Source",
+      "diagnosticId": "Diagnostic ID",
+      "when": "When",
+      "clientUnverified": "Client report (unverified)",
+      "server": "Server",
+      "recentChanges": "Recent access audit",
+      "noChanges": "No recent access changes.",
+      "active": "Active",
+      "inactive": "Inactive",
+      "hasEmail": "Has email",
+      "noEmail": "No email",
+      "loginEnabled": "Sign-in enabled",
+      "loginDisabled": "Sign-in disabled",
+      "formerEmployee": "Former employee",
+      "codes": {
+        "AUTH_SERVICE_UNAVAILABLE": "Authentication service unavailable",
+        "STAFF_LOOKUP_TIMEOUT": "Staff lookup timed out",
+        "SESSION_EXPIRED": "Session expired",
+        "NO_STAFF_MATCH": "No matching staff record",
+        "STAFF_ACCESS_DISABLED": "Staff access disabled"
+      }
+    }
   },
   "areas": {
     "cleaningZones": "Cleaning Zones",

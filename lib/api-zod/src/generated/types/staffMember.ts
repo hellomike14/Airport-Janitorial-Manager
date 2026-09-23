@@ -11,8 +11,18 @@ export interface StaffMember {
   id: number;
   name: string;
   role: StaffMemberRole;
-  /** Whether the staff member has a configured sign-in email. The email address itself is never returned. */
+  /** Whether the staff member has a configured sign-in email. */
   hasEmail: boolean;
+  /**
+   * Saved email, returned in the staff directory only to administrators and supervisors.
+   * @nullable
+   */
+  readonly email?: string | null;
+  /**
+   * Saved phone number, returned in the staff directory only to administrators and supervisors.
+   * @nullable
+   */
+  readonly phone?: string | null;
   active: boolean;
   /** Whether this staff member is currently eligible to sign in. */
   readonly loginEnabled: boolean;

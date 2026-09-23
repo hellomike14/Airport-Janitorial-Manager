@@ -17,6 +17,7 @@ import weeklyReportRouter from "./weeklyReport";
 import applicationsRouter from "./applications";
 import onboardingRouter from "./onboarding";
 import quickbooksRouter from "./quickbooks";
+import authDiagnosticsRouter from "./authDiagnostics";
 import { requireStaffSession } from "../middlewares/requireStaffSession";
 import { requireStaffRole } from "../middlewares/requireStaffRole";
 
@@ -26,6 +27,7 @@ router.use(requireStaffSession);
 router.use(healthRouter);
 router.use(dashboardRouter);
 router.use("/staff", staffRouter);
+router.use("/auth-diagnostics", authDiagnosticsRouter);
 router.use("/areas", areasRouter);
 router.use("/tasks", tasksRouter);
 router.use("/assignments", assignmentsRouter);

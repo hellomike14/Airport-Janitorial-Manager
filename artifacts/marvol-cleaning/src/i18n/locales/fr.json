@@ -187,7 +187,12 @@
     "bootstrapHelp": "La récupération automatique est limitée pour éviter des rechargements répétés. Vérifiez que vous êtes en ligne, puis sélectionnez Recharger la connexion pour réessayer. Votre travail enregistré hors ligne n’a pas été effacé.",
     "retry": "Réessayer",
     "signInAgain": "Se reconnecter",
-    "reloadHelp": "La déconnexion n’a pas abouti. Rechargez la page et réessayez."
+    "reloadHelp": "La déconnexion n’a pas abouti. Rechargez la page et réessayez.",
+    "accessDisabledTitle": "L’accès du personnel est désactivé",
+    "accessDisabledHelp": "Votre compte de connexion est valide, mais ce profil n’est pas autorisé à accéder à Marvol. Contactez un administrateur. Des tentatives répétées n’activeront pas l’accès.",
+    "serviceUnavailableTitle": "Le service de connexion est temporairement indisponible",
+    "serviceUnavailableHelp": "Nous ne pouvons pas vérifier l’accès du personnel pour le moment. Patientez puis réessayez. Ne modifiez pas votre e-mail et ne créez pas un autre compte.",
+    "diagnosticId": "Identifiant de diagnostic : {{id}}"
   },
   "dashboard": {
     "facilityOverview": "Vue d'Ensemble de l'Installation",
@@ -345,7 +350,40 @@
     "loginDisabled": "Connexion désactivée",
     "loginDisabledHint": "Un administrateur doit modifier et enregistrer l'e-mail de ce membre du personnel pour activer la connexion.",
     "editAndSaveEmail": "Modifier et enregistrer l'e-mail",
-    "inactiveLoginHint": "Le personnel inactif et les anciens employés ne peuvent pas se connecter."
+    "inactiveLoginHint": "Le personnel inactif et les anciens employés ne peuvent pas se connecter.",
+    "accessHealth": {
+      "title": "État des accès",
+      "last24Hours": "Échecs de connexion des dernières 24 heures et 100 enregistrements d’accès les plus récents.",
+      "refresh": "Actualiser",
+      "loading": "Chargement de l’état des accès…",
+      "error": "Impossible de charger l’état des accès. Essayez d’actualiser.",
+      "empty": "Aucun échec de connexion ni changement d’accès récent.",
+      "failureSummary": "Résumé des échecs répétés",
+      "noFailures": "Aucun échec de connexion enregistré au cours des dernières 24 heures.",
+      "recentEvents": "Échecs de connexion récents",
+      "failure": "Échec",
+      "source": "Source",
+      "diagnosticId": "Identifiant de diagnostic",
+      "when": "Date",
+      "clientUnverified": "Rapport client (non vérifié)",
+      "server": "Serveur",
+      "recentChanges": "Audit récent des accès",
+      "noChanges": "Aucun changement d’accès récent.",
+      "active": "Actif",
+      "inactive": "Inactif",
+      "hasEmail": "E-mail présent",
+      "noEmail": "Aucun e-mail",
+      "loginEnabled": "Connexion activée",
+      "loginDisabled": "Connexion désactivée",
+      "formerEmployee": "Ancien employé",
+      "codes": {
+        "AUTH_SERVICE_UNAVAILABLE": "Service d’authentification indisponible",
+        "STAFF_LOOKUP_TIMEOUT": "Délai dépassé pour la recherche du personnel",
+        "SESSION_EXPIRED": "Session expirée",
+        "NO_STAFF_MATCH": "Aucune fiche employé correspondante",
+        "STAFF_ACCESS_DISABLED": "Accès du personnel désactivé"
+      }
+    }
   },
   "areas": {
     "cleaningZones": "Zones de Nettoyage",

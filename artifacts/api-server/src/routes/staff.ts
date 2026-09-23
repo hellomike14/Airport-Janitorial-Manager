@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { staffTable } from "@workspace/db/schema";
+import { staffAccessChangesTable, staffTable } from "@workspace/db/schema";
 import { eq, sql, and, ne } from "drizzle-orm";
 import {
   CreateStaffMemberBody,
@@ -8,9 +8,16 @@ import {
   UpdateStaffMemberParams,
   DeleteStaffMemberParams,
 } from "@workspace/api-zod";
-import { actorStaffFromRequest } from "../lib/actorSession";
+import { actorStaffFromRequest, resolveStaffIdentity } from "../lib/actorSession";
 import { requireStaffRole } from "../middlewares/requireStaffRole";
 import { loginEnabledAfterAdminUpdate } from "../lib/staffLoginPolicy";
+import { getAuth } from "@clerk/express";
+import {
+  accessChangeValues,
+  accessSnapshot,
+  safeRecordServerDiagnostic,
+  type ServerDiagnosticCode,
+} from "../lib/authDiagnostics";
 
 const router: IRouter = Router();
 
@@ -27,25 +34,40 @@ function toPublicStaff(staff: typeof staffTable.$inferSelect) {
   };
 }
 
-router.get("/", async (_req, res) => {
+router.get("/", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const actor = await actorStaffFromRequest(req);
+  const showContacts = actor?.role === "admin" || actor?.role === "supervisor";
   const staff = await db
     .select()
     .from(staffTable)
     .where(eq(staffTable.active, true))
     .orderBy(staffTable.role, staffTable.name);
-  res.json(staff.map(toPublicStaff));
+  res.json(staff.map(person => ({
+    ...toPublicStaff(person),
+    ...(showContacts ? { email: person.email, phone: person.phone } : {}),
+  })));
 });
 
 // Resolves the acting staff member from the verified Clerk session (matched
 // by email). This is the client's session bridge after Clerk sign-in.
 router.get("/me", async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
-  const staff = await actorStaffFromRequest(req);
-  if (!staff) {
-    res.status(404).json({ error: "NO_STAFF_MATCH" });
+  if (!getAuth(req)?.userId) {
+    const diagnosticId = await safeRecordServerDiagnostic("SESSION_EXPIRED");
+    res.status(401).json({ error: "SESSION_EXPIRED", diagnosticId });
     return;
   }
-  res.json(toPublicStaff(staff));
+  const resolution = await resolveStaffIdentity(req);
+  if (resolution.status !== "matched") {
+    const code: ServerDiagnosticCode = resolution.status === "access_disabled"
+      ? "STAFF_ACCESS_DISABLED"
+      : "NO_STAFF_MATCH";
+    const diagnosticId = await safeRecordServerDiagnostic(code);
+    res.status(code === "STAFF_ACCESS_DISABLED" ? 403 : 404).json({ error: code, diagnosticId });
+    return;
+  }
+  res.json(toPublicStaff(resolution.staff));
 });
 
 // Email is the Clerk↔staff join key: it must be unique (case-insensitive)
@@ -65,6 +87,8 @@ async function emailTakenByOther(email: string, excludeId?: number): Promise<boo
 }
 
 router.post("/", requireStaffRole("admin"), async (req, res) => {
+  const actor = await actorStaffFromRequest(req);
+  if (!actor) return res.status(401).json({ error: "Login session required" });
   const body = CreateStaffMemberBody.parse(req.body);
   const email = body.email?.trim();
   if (!email) {
@@ -75,79 +99,109 @@ router.post("/", requireStaffRole("admin"), async (req, res) => {
     res.status(409).json({ error: "Another active staff member already uses this email" });
     return;
   }
-  const [created] = await db
-    .insert(staffTable)
-    .values({
+  const created = await db.transaction(async tx => {
+    const [staff] = await tx.insert(staffTable).values({
       name: body.name,
       role: body.role,
       phone: body.phone ?? null,
       email,
-    })
-    .returning();
-  res.status(201).json(toPublicStaff(created));
+    }).returning();
+    const after = accessSnapshot(staff);
+    await tx.insert(staffAccessChangesTable).values(accessChangeValues({
+      actor,
+      staff,
+      action: "CREATE",
+      before: { active: false, loginEnabled: false, formerEmployee: false, hasEmail: false },
+      after,
+    }));
+    return staff;
+  });
+  return res.status(201).json(toPublicStaff(created));
 });
 
 router.put("/:id", requireStaffRole("admin"), async (req, res) => {
+  const actor = await actorStaffFromRequest(req);
+  if (!actor) return res.status(401).json({ error: "Login session required" });
   const { id } = UpdateStaffMemberParams.parse({ id: req.params.id });
   const body = UpdateStaffMemberBody.parse(req.body);
-  const [target] = await db.select({
-    name: staffTable.name,
-    active: staffTable.active,
-    email: staffTable.email,
-    loginEnabled: staffTable.loginEnabled,
-    formerEmployee: staffTable.formerEmployee,
-  }).from(staffTable).where(eq(staffTable.id, id));
-  if (!target) {
-    res.status(404).json({ error: "Staff member not found" });
-    return;
-  }
-  if (target?.formerEmployee && (body.active === true || (body.name !== undefined && body.name !== target.name))) {
-    return res.status(403).json({ error: "Former staff records cannot be renamed or reactivated" });
-  }
-  const updateData: Partial<typeof staffTable.$inferInsert> = {};
-  if (body.name !== undefined) updateData.name = body.name;
-  if (body.role !== undefined) updateData.role = body.role;
-  if (body.phone !== undefined) updateData.phone = body.phone ?? null;
-  if (body.email !== undefined) {
-    const email = body.email?.trim() || null;
-    if (email && (await emailTakenByOther(email, id))) {
-      res.status(409).json({ error: "Another active staff member already uses this email" });
-      return;
+  const result = await db.transaction(async tx => {
+    const [before] = await tx.select().from(staffTable)
+      .where(eq(staffTable.id, id))
+      .for("update");
+    if (!before) return { status: "not_found" as const };
+    if (before.formerEmployee && (body.active === true || (body.name !== undefined && body.name !== before.name))) {
+      return { status: "former" as const };
     }
-    updateData.email = email;
-  }
-  if (body.active !== undefined) {
-    updateData.active = body.active;
-  }
-  updateData.loginEnabled = loginEnabledAfterAdminUpdate(target, {
-    active: body.active,
-    email: body.email === undefined ? undefined : body.email?.trim() || null,
+    const updateData: Partial<typeof staffTable.$inferInsert> = {};
+    if (body.name !== undefined) updateData.name = body.name;
+    if (body.role !== undefined) updateData.role = body.role;
+    if (body.phone !== undefined) updateData.phone = body.phone ?? null;
+    if (body.email !== undefined) {
+      const email = body.email?.trim() || null;
+      if (email) {
+        const [existing] = await tx.select({ id: staffTable.id }).from(staffTable)
+          .where(and(
+            sql`lower(${staffTable.email}) = ${email.toLowerCase()}`,
+            eq(staffTable.active, true),
+            ne(staffTable.id, id),
+          ))
+          .limit(1);
+        if (existing) return { status: "email_taken" as const };
+      }
+      updateData.email = email;
+    }
+    if (body.active !== undefined) updateData.active = body.active;
+    updateData.loginEnabled = loginEnabledAfterAdminUpdate(before, {
+      active: body.active,
+      email: body.email === undefined ? undefined : body.email?.trim() || null,
+    });
+    const [staff] = await tx.update(staffTable)
+      .set(updateData)
+      .where(eq(staffTable.id, id))
+      .returning();
+    if (!staff) return { status: "not_found" as const };
+    await tx.insert(staffAccessChangesTable).values(accessChangeValues({
+      actor,
+      staff,
+      action: "UPDATE",
+      before: accessSnapshot(before),
+      after: accessSnapshot(staff),
+    }));
+    return { status: "updated" as const, staff };
   });
-
-  const [updated] = await db
-    .update(staffTable)
-    .set(updateData)
-    .where(eq(staffTable.id, id))
-    .returning();
-  if (!updated) {
-    res.status(404).json({ error: "Staff member not found" });
-    return;
-  }
-  return res.json(toPublicStaff(updated));
+  if (result.status === "not_found") return res.status(404).json({ error: "Staff member not found" });
+  if (result.status === "former") return res.status(403).json({ error: "Former staff records cannot be renamed or reactivated" });
+  if (result.status === "email_taken") return res.status(409).json({ error: "Another active staff member already uses this email" });
+  return res.json(toPublicStaff(result.staff));
 });
 
 router.delete("/:id", requireStaffRole("admin"), async (req, res) => {
+  const actor = await actorStaffFromRequest(req);
+  if (!actor) return res.status(401).json({ error: "Login session required" });
   const { id } = DeleteStaffMemberParams.parse({ id: req.params.id });
-  const [updated] = await db
-    .update(staffTable)
-    .set({ active: false, loginEnabled: false })
-    .where(eq(staffTable.id, id))
-    .returning();
+  const updated = await db.transaction(async tx => {
+    const [before] = await tx.select().from(staffTable)
+      .where(eq(staffTable.id, id))
+      .for("update");
+    if (!before) return undefined;
+    const [staff] = await tx.update(staffTable)
+      .set({ active: false, loginEnabled: false })
+      .where(eq(staffTable.id, id))
+      .returning();
+    await tx.insert(staffAccessChangesTable).values(accessChangeValues({
+      actor,
+      staff,
+      action: "DELETE",
+      before: accessSnapshot(before),
+      after: accessSnapshot(staff),
+    }));
+    return staff;
+  });
   if (!updated) {
     res.status(404).json({ error: "Staff member not found" });
     return;
   }
-  res.json({ success: true });
+  return res.json({ success: true });
 });
 
 export default router;

@@ -29,6 +29,168 @@ export interface HealthStatus {
   status: string;
 }
 
+export type SessionExpiredErrorError =
+  (typeof SessionExpiredErrorError)[keyof typeof SessionExpiredErrorError];
+
+export const SessionExpiredErrorError = {
+  SESSION_EXPIRED: "SESSION_EXPIRED",
+} as const;
+
+export interface SessionExpiredError {
+  error: SessionExpiredErrorError;
+  diagnosticId: string;
+}
+
+export type StaffAccessDisabledErrorError =
+  (typeof StaffAccessDisabledErrorError)[keyof typeof StaffAccessDisabledErrorError];
+
+export const StaffAccessDisabledErrorError = {
+  STAFF_ACCESS_DISABLED: "STAFF_ACCESS_DISABLED",
+} as const;
+
+export interface StaffAccessDisabledError {
+  error: StaffAccessDisabledErrorError;
+  diagnosticId: string;
+}
+
+export type NoStaffMatchErrorError =
+  (typeof NoStaffMatchErrorError)[keyof typeof NoStaffMatchErrorError];
+
+export const NoStaffMatchErrorError = {
+  NO_STAFF_MATCH: "NO_STAFF_MATCH",
+} as const;
+
+export interface NoStaffMatchError {
+  error: NoStaffMatchErrorError;
+  diagnosticId: string;
+}
+
+export type AuthServiceUnavailableErrorError =
+  (typeof AuthServiceUnavailableErrorError)[keyof typeof AuthServiceUnavailableErrorError];
+
+export const AuthServiceUnavailableErrorError = {
+  AUTH_SERVICE_UNAVAILABLE: "AUTH_SERVICE_UNAVAILABLE",
+} as const;
+
+export interface AuthServiceUnavailableError {
+  error: AuthServiceUnavailableErrorError;
+  diagnosticId: string;
+}
+
+export type AuthDiagnosticCode =
+  (typeof AuthDiagnosticCode)[keyof typeof AuthDiagnosticCode];
+
+export const AuthDiagnosticCode = {
+  AUTH_SERVICE_UNAVAILABLE: "AUTH_SERVICE_UNAVAILABLE",
+  STAFF_LOOKUP_TIMEOUT: "STAFF_LOOKUP_TIMEOUT",
+} as const;
+
+export type AuthDiagnosticRecordedCode =
+  (typeof AuthDiagnosticRecordedCode)[keyof typeof AuthDiagnosticRecordedCode];
+
+export const AuthDiagnosticRecordedCode = {
+  SESSION_EXPIRED: "SESSION_EXPIRED",
+  NO_STAFF_MATCH: "NO_STAFF_MATCH",
+  STAFF_ACCESS_DISABLED: "STAFF_ACCESS_DISABLED",
+  AUTH_SERVICE_UNAVAILABLE: "AUTH_SERVICE_UNAVAILABLE",
+  STAFF_LOOKUP_TIMEOUT: "STAFF_LOOKUP_TIMEOUT",
+} as const;
+
+export interface AuthDiagnosticEventInput {
+  code: AuthDiagnosticCode;
+}
+
+export interface AuthDiagnosticEventReceipt {
+  diagnosticId: string;
+}
+
+export type InvalidDiagnosticCodeErrorError =
+  (typeof InvalidDiagnosticCodeErrorError)[keyof typeof InvalidDiagnosticCodeErrorError];
+
+export const InvalidDiagnosticCodeErrorError = {
+  INVALID_DIAGNOSTIC_CODE: "INVALID_DIAGNOSTIC_CODE",
+} as const;
+
+export interface InvalidDiagnosticCodeError {
+  error: InvalidDiagnosticCodeErrorError;
+}
+
+export type AuthDiagnosticRateLimitErrorError =
+  (typeof AuthDiagnosticRateLimitErrorError)[keyof typeof AuthDiagnosticRateLimitErrorError];
+
+export const AuthDiagnosticRateLimitErrorError = {
+  RATE_LIMITED: "RATE_LIMITED",
+} as const;
+
+export interface AuthDiagnosticRateLimitError {
+  error: AuthDiagnosticRateLimitErrorError;
+}
+
+export type DiagnosticStoreUnavailableErrorError =
+  (typeof DiagnosticStoreUnavailableErrorError)[keyof typeof DiagnosticStoreUnavailableErrorError];
+
+export const DiagnosticStoreUnavailableErrorError = {
+  DIAGNOSTIC_STORE_UNAVAILABLE: "DIAGNOSTIC_STORE_UNAVAILABLE",
+} as const;
+
+export interface DiagnosticStoreUnavailableError {
+  error: DiagnosticStoreUnavailableErrorError;
+  diagnosticId: string;
+}
+
+export type AuthDiagnosticEventSource =
+  (typeof AuthDiagnosticEventSource)[keyof typeof AuthDiagnosticEventSource];
+
+export const AuthDiagnosticEventSource = {
+  server: "server",
+  client: "client",
+} as const;
+
+export interface AuthDiagnosticEvent {
+  diagnosticId: string;
+  code: AuthDiagnosticRecordedCode;
+  source: AuthDiagnosticEventSource;
+  createdAt: string;
+}
+
+export interface AuthDiagnosticSummary {
+  code: AuthDiagnosticRecordedCode;
+  /** @minimum 0 */
+  count: number;
+}
+
+export interface StaffAccessState {
+  active: boolean;
+  loginEnabled: boolean;
+  formerEmployee: boolean;
+  hasEmail: boolean;
+}
+
+export type StaffAccessChangeAction =
+  (typeof StaffAccessChangeAction)[keyof typeof StaffAccessChangeAction];
+
+export const StaffAccessChangeAction = {
+  CREATE: "CREATE",
+  UPDATE: "UPDATE",
+  DELETE: "DELETE",
+} as const;
+
+export interface StaffAccessChange {
+  id: number;
+  actorName: string;
+  staffName: string;
+  action: StaffAccessChangeAction;
+  createdAt: string;
+  before: StaffAccessState;
+  after: StaffAccessState;
+}
+
+export interface AuthDiagnostics {
+  events: AuthDiagnosticEvent[];
+  summary: AuthDiagnosticSummary[];
+  accessChanges: StaffAccessChange[];
+}
+
 export type StaffMemberRole =
   (typeof StaffMemberRole)[keyof typeof StaffMemberRole];
 
@@ -43,8 +205,18 @@ export interface StaffMember {
   id: number;
   name: string;
   role: StaffMemberRole;
-  /** Whether the staff member has a configured sign-in email. The email address itself is never returned. */
+  /** Whether the staff member has a configured sign-in email. */
   hasEmail: boolean;
+  /**
+   * Saved email, returned in the staff directory only to administrators and supervisors.
+   * @nullable
+   */
+  readonly email?: string | null;
+  /**
+   * Saved phone number, returned in the staff directory only to administrators and supervisors.
+   * @nullable
+   */
+  readonly phone?: string | null;
   active: boolean;
   /** Whether this staff member is currently eligible to sign in. */
   readonly loginEnabled: boolean;

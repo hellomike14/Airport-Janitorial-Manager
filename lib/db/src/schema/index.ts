@@ -13,3 +13,4 @@ export * from "./sharedPhotos";
 export * from "./jobApplications";
 export * from "./onboarding";
 export * from "./quickbooks";
+export * from "./authDiagnostics";

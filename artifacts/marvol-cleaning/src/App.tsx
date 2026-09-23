@@ -152,7 +152,7 @@ function AppRoutes() {
 
 function ProtectedRoutes() {
   const { isLoaded, isSignedIn } = useClerkAuth();
-  const { currentUser, staffStatus, effectiveRole, retryStaff, logout } = useAuth();
+  const { currentUser, staffStatus, diagnosticId, effectiveRole, retryStaff, logout } = useAuth();
 
   if (!isLoaded || (isSignedIn && staffStatus === "loading")) {
     return <LoginRecovery />;
@@ -162,12 +162,12 @@ function ProtectedRoutes() {
     return <Redirect to="/sign-in" />;
   }
 
-  if (staffStatus === "expired" || staffStatus === "error") {
-    return <LoginRecovery kind={staffStatus} retry={retryStaff} signOut={logout} />;
+  if (staffStatus === "expired" || staffStatus === "disabled" || staffStatus === "unavailable" || staffStatus === "error") {
+    return <LoginRecovery kind={staffStatus} retry={retryStaff} signOut={logout} diagnosticId={diagnosticId} />;
   }
 
   if (staffStatus === "nomatch" || !currentUser) {
-    return <NoStaffMatch />;
+    return <NoStaffMatch diagnosticId={diagnosticId} />;
   }
 
   return (

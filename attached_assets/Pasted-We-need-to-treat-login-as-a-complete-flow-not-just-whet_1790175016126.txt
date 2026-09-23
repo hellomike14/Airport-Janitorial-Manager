@@ -1,0 +1,24 @@
+We need to treat login as a complete flow—not just whether the sign-in screen loads. **We can prevent known failures and detect new ones quickly, but no system can guarantee zero login issues.**
+
+The fix we just made is persistent: restarting the server should no longer disable access that an administrator enabled. The email re-save is a **one-time repair for affected accounts**, not something staff should need repeatedly.
+
+For a durable solution, I recommend these safeguards:
+
+1. **Test the complete access flow automatically**
+   Cover sign-in, matching the account to a staff record, session expiry, logout, and assignments. Specifically test that enabled access survives a server restart and former employees remain blocked.
+
+2. **Report the actual reason access failed**
+   Distinguish “sign-in service unavailable,” “session expired,” “no matching staff email,” and “staff access disabled.” Those require different fixes; one generic “account not linked” message isn’t enough.
+
+3. **Give admins a clear access-status check**
+   Show whether each worker is active, has a login email, and is permitted to sign in, with a safe correction path. Record who changed access and when.
+
+4. **Monitor failures without exposing private information**
+   Track repeated login failures and service-loading timeouts, with diagnostic IDs for investigation—never passwords, session tokens, or verification codes.
+
+5. **Verify after publishing**
+   Development tests alone don’t prove production works. After publication, confirm the live sign-in and assignment flow using a controlled account, without modifying real employees’ operational records.
+
+**Already done:** the startup eligibility fix, regression tests for that policy, accurate access indicators, and development assignment verification.
+
+**Still needed for broader protection:** structured login diagnostics, access-change auditing, failure monitoring, and repeatable end-to-end checks. Those are the next hardening steps—not more retries or repeated email repairs.
