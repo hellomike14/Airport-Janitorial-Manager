@@ -38,8 +38,15 @@ function targetConflict(rows: Array<{ staffId: number; areaId: number | null; da
   return false;
 }
 
-router.get("/group/preview", async (req, res) => {
-  const actor = await actorStaffFromRequest(req);
+// Dependencies are injectable so the reviewed move can be exercised against an
+// isolated schedule fixture without touching the live schedule tables.
+export function createGroupScheduleMoveRouter(
+  database: typeof db = db,
+  resolveActor: typeof actorStaffFromRequest = actorStaffFromRequest,
+): IRouter {
+const groupRouter: IRouter = Router();
+groupRouter.get("/group/preview", async (req, res) => {
+  const actor = await resolveActor(req);
   if (!actor) return res.status(401).json({ error: "Login session required" });
   if (actor.role !== "admin" && actor.role !== "supervisor") return res.status(403).json({ error: "Supervisor access required" });
   const parsed = PreviewTerminalGroupScheduleMoveQueryParams.safeParse(req.query);
@@ -47,15 +54,15 @@ router.get("/group/preview", async (req, res) => {
     return res.status(400).json({ error: "Invalid group or target" });
   }
   const { groupKey, staffId } = parsed.data;
-  const [target] = await db.select({ id: staffTable.id, active: staffTable.active, formerEmployee: staffTable.formerEmployee })
+  const [target] = await database.select({ id: staffTable.id, active: staffTable.active, formerEmployee: staffTable.formerEmployee })
     .from(staffTable).where(eq(staffTable.id, staffId));
   if (!target || !isAssignmentTargetEligible(target)) return res.status(400).json({ error: "Target staff is not eligible" });
-  const areas = await db.select({
+  const areas = await database.select({
     id: areasTable.id, name: areasTable.name, terminal: areasTable.terminal, location: areasTable.location,
   }).from(areasTable).where(eq(areasTable.archived, false));
   const groupAreas = areas.filter((area) => areaBelongsToGroup(area, groupKey as TerminalGroupKey));
   const areaIds = groupAreas.map((area) => area.id);
-  const rows = areaIds.length ? await db.select({
+  const rows = areaIds.length ? await database.select({
     id: schedulesTable.id, staffId: schedulesTable.staffId, staffName: staffTable.name,
     areaId: schedulesTable.areaId, areaName: areasTable.name, dayOfWeek: schedulesTable.dayOfWeek,
     startTime: schedulesTable.startTime, endTime: schedulesTable.endTime,
@@ -75,8 +82,8 @@ router.get("/group/preview", async (req, res) => {
   });
 });
 
-router.post("/group/preview", async (req, res) => {
-  const actor = await actorStaffFromRequest(req);
+groupRouter.post("/group/preview", async (req, res) => {
+  const actor = await resolveActor(req);
   if (!actor) return res.status(401).json({ error: "Login session required" });
   if (actor.role !== "admin" && actor.role !== "supervisor") return res.status(403).json({ error: "Supervisor access required" });
   const parsed = MoveTerminalGroupScheduleBody.safeParse(req.body);
@@ -84,7 +91,7 @@ router.post("/group/preview", async (req, res) => {
     return res.status(400).json({ error: "Invalid schedule move" });
   }
   const { groupKey, staffId, snapshot } = parsed.data;
-  const result = await db.transaction(async (tx) => {
+  const result = await database.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"schedule:" + groupKey}))`);
     const [target] = await tx.select({ id: staffTable.id, active: staffTable.active, formerEmployee: staffTable.formerEmployee })
       .from(staffTable).where(eq(staffTable.id, staffId));
@@ -110,6 +117,9 @@ router.post("/group/preview", async (req, res) => {
   if (result.status === "conflict") return res.status(409).json({ error: "Schedules changed, no rows need moving, or target already has a schedule for an affected area and weekday. Review again." });
   return res.json({ movedCount: result.movedCount });
 });
+return groupRouter;
+}
+router.use(createGroupScheduleMoveRouter());
 
 router.get("/", async (req: Request, res: Response) => {
   const staffId = req.query.staffId ? Number(req.query.staffId) : undefined;
