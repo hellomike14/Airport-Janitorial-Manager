@@ -81,6 +81,7 @@ import type {
   TaskType,
   TerminalGroupAssignmentInput,
   TerminalGroupAssignmentResult,
+  TerminalGroupReassignmentInput,
   UpdateApplicationRequest,
   UpdateIssueImagesRequest,
   UpdateOnboardingItemRequest,
@@ -1884,6 +1885,96 @@ export const useAssignTerminalGroup = <
   TContext
 > => {
   return useMutation(getAssignTerminalGroupMutationOptions(options));
+};
+
+/**
+ * @summary Confirmed date-only reassignment of a terminal group; tasks and recurring schedules are unchanged
+ */
+export const getReassignTerminalGroupUrl = () => {
+  return `/api/assignments/group/reassign`;
+};
+
+export const reassignTerminalGroup = async (
+  terminalGroupReassignmentInput: TerminalGroupReassignmentInput,
+  options?: RequestInit,
+): Promise<TerminalGroupAssignmentResult> => {
+  return customFetch<TerminalGroupAssignmentResult>(
+    getReassignTerminalGroupUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(terminalGroupReassignmentInput),
+    },
+  );
+};
+
+export const getReassignTerminalGroupMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reassignTerminalGroup>>,
+    TError,
+    { data: BodyType<TerminalGroupReassignmentInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof reassignTerminalGroup>>,
+  TError,
+  { data: BodyType<TerminalGroupReassignmentInput> },
+  TContext
+> => {
+  const mutationKey = ["reassignTerminalGroup"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof reassignTerminalGroup>>,
+    { data: BodyType<TerminalGroupReassignmentInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return reassignTerminalGroup(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReassignTerminalGroupMutationResult = NonNullable<
+  Awaited<ReturnType<typeof reassignTerminalGroup>>
+>;
+export type ReassignTerminalGroupMutationBody =
+  BodyType<TerminalGroupReassignmentInput>;
+export type ReassignTerminalGroupMutationError = ErrorType<void>;
+
+/**
+ * @summary Confirmed date-only reassignment of a terminal group; tasks and recurring schedules are unchanged
+ */
+export const useReassignTerminalGroup = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reassignTerminalGroup>>,
+    TError,
+    { data: BodyType<TerminalGroupReassignmentInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof reassignTerminalGroup>>,
+  TError,
+  { data: BodyType<TerminalGroupReassignmentInput> },
+  TContext
+> => {
+  return useMutation(getReassignTerminalGroupMutationOptions(options));
 };
 
 /**

@@ -1,3 +1,5 @@
+import { sql } from "drizzle-orm";
+
 export const TERMINAL_GROUP_KEYS = [
   "terminal-a-east",
   "terminal-a-west",
@@ -9,6 +11,14 @@ export const TERMINAL_GROUP_KEYS = [
 ] as const;
 
 export type TerminalGroupKey = (typeof TERMINAL_GROUP_KEYS)[number];
+
+export function groupForArea(area: { name: string; terminal: string; location: string }): TerminalGroupKey | undefined {
+  return TERMINAL_GROUP_KEYS.find((key) => areaBelongsToGroup(area, key));
+}
+
+export function groupAssignmentLock(date: string, groupKey: TerminalGroupKey) {
+  return sql`SELECT pg_advisory_xact_lock(hashtext(${"assignment:" + date + ":" + groupKey}))`;
+}
 
 export function areaBelongsToGroup(
   area: { name: string; terminal: string; location: string },
@@ -46,4 +56,20 @@ export function planGroupAssignment(
     missingIds: areaIds.filter((id) => !existingIds.has(id)),
     existingCount: existingIds.size,
   };
+}
+
+export function planGroupReassignment(
+  areaIds: number[],
+  existing: { id: number; areaId: number; staffId: number; active: boolean }[],
+  expected: { id: number; staffId: number }[],
+  targetStaffId: number,
+): { existingCount: number } | null {
+  const active = existing.filter((row) => row.active);
+  const actual = active.map(({ id, staffId }) => `${id}:${staffId}`).sort();
+  const confirmed = expected.map(({ id, staffId }) => `${id}:${staffId}`).sort();
+  if (!actual.length || actual.length !== confirmed.length ||
+      actual.some((value, index) => value !== confirmed[index]) ||
+      !active.some((row) => row.staffId !== targetStaffId) ||
+      active.some((row) => !areaIds.includes(row.areaId))) return null;
+  return { existingCount: new Set(active.map((row) => row.areaId)).size };
 }

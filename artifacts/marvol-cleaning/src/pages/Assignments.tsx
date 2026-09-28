@@ -5,6 +5,7 @@ import { getDateLocale } from "@/i18n/dateLocale";
 import { 
   useListAssignments, 
   useAssignTerminalGroup,
+  useReassignTerminalGroup,
   useDeleteAssignment,
   useListStaff
 } from "@workspace/api-client-react";
@@ -46,6 +47,9 @@ export default function Assignments() {
   const [isAdding, setIsAdding] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [reassignError, setReassignError] = useState<string | null>(null);
+  const [reassignGroup, setReassignGroup] = useState<string | null>(null);
+  const [reassignStaffId, setReassignStaffId] = useState("");
 
   const { data: assignments, isLoading } = useListAssignments({ date: selectedDate });
   const { data: staff } = useListStaff();
@@ -77,6 +81,24 @@ export default function Assignments() {
       },
       onError: () => setDeleteError(t("assignments.deleteFailed")),
     }
+  });
+
+  const reassignMutation = useReassignTerminalGroup({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+        setReassignGroup(null);
+        setReassignStaffId("");
+        setReassignError(null);
+      },
+      onError: (error) => {
+        setReassignError(error?.status === 409
+          ? t("assignments.reassignConflict")
+          : t("assignments.reassignFailed"));
+        queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
+      },
+    },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -114,6 +136,32 @@ export default function Assignments() {
     }
   };
 
+  const reassign = (groupKey: string, rows: NonNullable<typeof assignments>) => {
+    if (!reassignStaffId || !selectedDate || reassignMutation.isPending) return;
+    const target = eligibleStaff.find((person) => person.id === Number(reassignStaffId));
+    if (!target || rows.every((row) => row.staffId === target.id)) {
+      setReassignError(t("assignments.reassignChooseDifferent"));
+      return;
+    }
+    const label = terminalGroups.find(([key]) => key === groupKey)?.[1];
+    const owners = [...new Set(rows.map((row) => row.staffName))].join(", ");
+    if (!confirm(t("assignments.reassignConfirm", {
+      group: label ? t(`assignments.groups.${label}`) : groupKey,
+      date: selectedDate,
+      owners,
+      target: target.name,
+    }))) return;
+    setReassignError(null);
+    reassignMutation.mutate({
+      data: {
+        groupKey: groupKey as (typeof terminalGroups)[number][0],
+        assignmentDate: selectedDate,
+        staffId: target.id,
+        expectedAssignments: rows.map(({ id, staffId }) => ({ id, staffId })),
+      },
+    });
+  };
+
   return (
     <div className="space-y-8 max-w-5xl mx-auto pb-12">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
@@ -132,6 +180,8 @@ export default function Assignments() {
                 setSelectedDate(e.target.value);
                 setCreateError(null);
                 setDeleteError(null);
+                setReassignGroup(null);
+                setReassignError(null);
               }}
               className="font-bold text-slate-700 bg-transparent outline-none cursor-pointer"
             />
@@ -257,10 +307,46 @@ export default function Assignments() {
                   return (
                     <section key={group} className="p-0">
                       <header className="px-6 py-3 bg-slate-50 border-b border-slate-200">
-                        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                          {label ? t(`assignments.groups.${label}`) : group}
-                        </h2>
+                        <div className="flex items-center justify-between gap-3">
+                          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                            {label ? t(`assignments.groups.${label}`) : group}
+                          </h2>
+                          {label && <Button type="button" variant="outline" size="sm"
+                            onClick={() => {
+                              setReassignGroup(reassignGroup === group ? null : group);
+                              setReassignStaffId("");
+                              setReassignError(null);
+                            }}>
+                            {t("assignments.reassignGroup")}
+                          </Button>}
+                        </div>
                       </header>
+                      {reassignGroup === group && (
+                        <div className="p-4 bg-indigo-50 border-b border-indigo-100 space-y-3">
+                          <p className="text-sm font-semibold text-indigo-900">{t("assignments.reassignFrom", {
+                            owners: [...new Set(rows.map((row) => row.staffName))].join(", "),
+                            date: selectedDate,
+                          })}</p>
+                          <p className="text-xs text-indigo-800">{t("assignments.reassignScope")}</p>
+                          <label className="block text-sm font-semibold text-indigo-900" htmlFor={`reassign-${group}`}>
+                            {t("assignments.reassignTo")}
+                          </label>
+                          <select id={`reassign-${group}`} value={reassignStaffId}
+                            onChange={(e) => { setReassignStaffId(e.target.value); setReassignError(null); }}
+                            className="w-full sm:max-w-xs bg-white border border-indigo-200 rounded-xl px-4 py-2">
+                            <option value="">{t("assignments.chooseStaffMember")}</option>
+                            {eligibleStaff.map((person) => (
+                              <option key={person.id} value={person.id}>{person.name}</option>
+                            ))}
+                          </select>
+                          {reassignError && <p role="alert" className="text-sm font-semibold text-rose-700">{reassignError}</p>}
+                          <div className="flex gap-2">
+                            <Button type="button" disabled={!reassignStaffId || reassignMutation.isPending}
+                              onClick={() => reassign(group, rows)}>{t("assignments.confirmReassignment")}</Button>
+                            <Button type="button" variant="ghost" onClick={() => setReassignGroup(null)}>{t("common.cancel")}</Button>
+                          </div>
+                        </div>
+                      )}
 
                       <div className="sm:hidden divide-y divide-slate-100">
                         {rows.map((assignment) => (

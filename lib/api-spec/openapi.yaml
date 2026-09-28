@@ -475,6 +475,27 @@ paths:
         "409":
           description: Some areas in the group already belong to another staff member
 
+  /assignments/group/reassign:
+    post:
+      operationId: reassignTerminalGroup
+      tags: [assignments]
+      summary: Confirmed date-only reassignment of a terminal group; tasks and recurring schedules are unchanged
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TerminalGroupReassignmentInput"
+      responses:
+        "200":
+          description: Group reassigned for the selected date
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TerminalGroupAssignmentResult"
+        "409":
+          description: Assignments changed since confirmation; refresh before retrying
+
   /assignments/{id}:
     delete:
       operationId: deleteAssignment
@@ -1998,6 +2019,24 @@ components:
         createdCount: { type: integer }
         existingCount: { type: integer }
       required: [createdCount, existingCount]
+
+    TerminalGroupReassignmentInput:
+      type: object
+      properties:
+        staffId: { type: integer }
+        groupKey:
+          type: string
+          enum: [terminal-a-east, terminal-a-west, terminal-b-east, terminal-b-west, terminal-c-135, terminal-c-246, top-terminal]
+        assignmentDate: { type: string }
+        expectedAssignments:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              staffId: { type: integer }
+            required: [id, staffId]
+      required: [staffId, groupKey, assignmentDate, expectedAssignments]
 
     Issue:
       type: object

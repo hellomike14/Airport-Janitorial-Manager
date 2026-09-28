@@ -529,6 +529,34 @@ export const AssignTerminalGroupBody = zod.object({
 });
 
 /**
+ * @summary Confirmed date-only reassignment of a terminal group; tasks and recurring schedules are unchanged
+ */
+export const ReassignTerminalGroupBody = zod.object({
+  staffId: zod.number(),
+  groupKey: zod.enum([
+    "terminal-a-east",
+    "terminal-a-west",
+    "terminal-b-east",
+    "terminal-b-west",
+    "terminal-c-135",
+    "terminal-c-246",
+    "top-terminal",
+  ]),
+  assignmentDate: zod.string(),
+  expectedAssignments: zod.array(
+    zod.object({
+      id: zod.number(),
+      staffId: zod.number(),
+    }),
+  ),
+});
+
+export const ReassignTerminalGroupResponse = zod.object({
+  createdCount: zod.number(),
+  existingCount: zod.number(),
+});
+
+/**
  * @summary Delete an assignment
  */
 export const DeleteAssignmentParams = zod.object({

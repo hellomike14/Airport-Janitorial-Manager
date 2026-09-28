@@ -385,6 +385,31 @@ export interface TerminalGroupAssignmentResult {
   existingCount: number;
 }
 
+export type TerminalGroupReassignmentInputGroupKey =
+  (typeof TerminalGroupReassignmentInputGroupKey)[keyof typeof TerminalGroupReassignmentInputGroupKey];
+
+export const TerminalGroupReassignmentInputGroupKey = {
+  "terminal-a-east": "terminal-a-east",
+  "terminal-a-west": "terminal-a-west",
+  "terminal-b-east": "terminal-b-east",
+  "terminal-b-west": "terminal-b-west",
+  "terminal-c-135": "terminal-c-135",
+  "terminal-c-246": "terminal-c-246",
+  "top-terminal": "top-terminal",
+} as const;
+
+export type TerminalGroupReassignmentInputExpectedAssignmentsItem = {
+  id: number;
+  staffId: number;
+};
+
+export interface TerminalGroupReassignmentInput {
+  staffId: number;
+  groupKey: TerminalGroupReassignmentInputGroupKey;
+  assignmentDate: string;
+  expectedAssignments: TerminalGroupReassignmentInputExpectedAssignmentsItem[];
+}
+
 export type IssueSeverity = (typeof IssueSeverity)[keyof typeof IssueSeverity];
 
 export const IssueSeverity = {

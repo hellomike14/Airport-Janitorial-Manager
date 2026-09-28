@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { MCO_TERMINAL_AREAS } from "@workspace/db/area-catalog";
-import { areaBelongsToGroup, planGroupAssignment, TERMINAL_GROUP_KEYS } from "./assignmentGroups";
+import { areaBelongsToGroup, planGroupAssignment, planGroupReassignment, TERMINAL_GROUP_KEYS } from "./assignmentGroups";
 
 test("each catalog cleaning area belongs to exactly one of the seven terminal groups", () => {
   const counts = Object.fromEntries(TERMINAL_GROUP_KEYS.map((key) => [key, 0]));
@@ -37,4 +37,18 @@ test("one staff member per group: refuse conflicts and do not duplicate existing
   assert.deepEqual(planGroupAssignment([1, 2, 3], [
     { areaId: 1, staffId: 10 }, { areaId: 1, staffId: 10 },
   ], 10), { missingIds: [2, 3], existingCount: 1 });
+});
+
+test("reassignment needs an exact confirmed snapshot and a different owner", () => {
+  const rows = [
+    { id: 3, areaId: 1, staffId: 10, active: true },
+    { id: 4, areaId: 2, staffId: 10, active: true },
+    { id: 5, areaId: 1, staffId: 9, active: false },
+  ];
+  const expected = [{ id: 4, staffId: 10 }, { id: 3, staffId: 10 }];
+  assert.deepEqual(planGroupReassignment([1, 2, 3], rows, expected, 11), { existingCount: 2 });
+  assert.equal(planGroupReassignment([1, 2, 3], rows, expected, 10), null);
+  assert.equal(planGroupReassignment([1, 2, 3], rows, [{ id: 3, staffId: 10 }], 11), null);
+  assert.equal(planGroupReassignment([1, 2, 3], rows, [{ id: 3, staffId: 11 }, expected[0]], 11), null);
+  assert.equal(planGroupReassignment([1, 2, 3], [...rows, { id: 6, areaId: 3, staffId: 8, active: true }], expected, 11), null);
 });

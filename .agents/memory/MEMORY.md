@@ -7,3 +7,4 @@
 - [Marvol sign-in latency](marvol-signin-latency.md) — delayed Clerk script loading reproduced the stuck login screen; it is not proof of Wi-Fi or account rejection.
 - [Staff access ownership](staff-access-ownership.md) — seed defaults must not undo administrator-managed login eligibility; former-worker restrictions remain authoritative.
 - [Access verification boundaries](access-verification.md) — distinguish local checks from production sign-in; preserve messaging data during interactive schema pushes.
+- [Group reassignment scope](group-reassignment-scope.md) — one-day group moves leave task ownership and weekly schedules unchanged; avoid inferring recurring intent.
