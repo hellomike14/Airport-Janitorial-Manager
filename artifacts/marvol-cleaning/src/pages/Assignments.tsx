@@ -4,15 +4,39 @@ import { useTranslation } from "react-i18next";
 import { getDateLocale } from "@/i18n/dateLocale";
 import { 
   useListAssignments, 
-  useCreateAssignment, 
+  useAssignTerminalGroup,
   useDeleteAssignment,
-  useListStaff,
-  useListAreas
+  useListStaff
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, Calendar, Trash2, Plus, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/contexts/AuthContext";
+
+const terminalGroups = [
+  ["terminal-a-east", "terminalAEast"],
+  ["terminal-a-west", "terminalAWest"],
+  ["terminal-b-east", "terminalBEast"],
+  ["terminal-b-west", "terminalBWest"],
+  ["terminal-c-135", "terminalC135"],
+  ["terminal-c-246", "terminalC246"],
+  ["top-terminal", "topTerminal"],
+] as const;
+
+function assignmentGroup(terminal: string, areaName: string): string {
+  const directGroup: Record<string, string> = {
+    "Terminal A - East": "terminal-a-east",
+    "Terminal A - West": "terminal-a-west",
+    "Terminal B - East": "terminal-b-east",
+    "Terminal B - West": "terminal-b-west",
+    "Top Terminal": "top-terminal",
+  };
+  if (directGroup[terminal]) return directGroup[terminal];
+  if (terminal === "Terminal C") {
+    if (/^(Group 1|Terminal C - Levels 1|Level [135]\b)/.test(areaName)) return "terminal-c-135";
+    if (/^(Group 2|Terminal C - Levels 2|Level [246]\b)/.test(areaName)) return "terminal-c-246";
+  }
+  return terminal || "—";
+}
 
 export default function Assignments() {
   const { t, i18n } = useTranslation();
@@ -22,28 +46,26 @@ export default function Assignments() {
   const [isAdding, setIsAdding] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const { currentUser } = useAuth();
-  
+
   const { data: assignments, isLoading } = useListAssignments({ date: selectedDate });
   const { data: staff } = useListStaff();
-  const { data: areas } = useListAreas();
-
-  const currentUserId = currentUser?.id ?? 0;
 
   const [formData, setFormData] = useState({
-    staffId: '', areaId: '', notes: '', isSpecial: false
+    staffId: '', groupKey: '', notes: '', isSpecial: false
   });
 
-  const createMutation = useCreateAssignment({
+  const createMutation = useAssignTerminalGroup({
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
         queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
         setIsAdding(false);
-        setFormData({ staffId: '', areaId: '', notes: '', isSpecial: false });
+        setFormData({ staffId: '', groupKey: '', notes: '', isSpecial: false });
         setCreateError(null);
       },
-      onError: () => setCreateError(t("assignments.createFailed")),
+      onError: (error) => setCreateError(error?.status === 409
+        ? t("assignments.groupConflict")
+        : t("assignments.createFailed")),
     }
   });
 
@@ -60,12 +82,15 @@ export default function Assignments() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setCreateError(null);
+    if (!formData.staffId || !formData.groupKey) {
+      setCreateError(t("assignments.chooseStaffAndGroup"));
+      return;
+    }
     createMutation.mutate({
       data: {
-        staffId: parseInt(formData.staffId),
-        areaId: parseInt(formData.areaId),
+        staffId: Number(formData.staffId),
+        groupKey: formData.groupKey as (typeof terminalGroups)[number][0],
         assignmentDate: selectedDate,
-        assignedById: currentUserId,
         notes: formData.notes,
         isSpecial: formData.isSpecial
       }
@@ -152,13 +177,14 @@ export default function Assignments() {
                 </p>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-indigo-900 mb-1">{t("assignments.selectArea")}</label>
-                <select required value={formData.areaId} onChange={e => updateForm({ areaId: e.target.value })} className="w-full bg-white border border-indigo-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
-                  <option value="">{t("assignments.chooseArea")}</option>
-                  {areas?.map(a => (
-                    <option key={a.id} value={a.id}>{a.name} ({a.terminal})</option>
+                <label className="block text-sm font-semibold text-indigo-900 mb-1" htmlFor="assignment-group">{t("assignments.selectGroup")}</label>
+                <select id="assignment-group" required value={formData.groupKey} onChange={e => updateForm({ groupKey: e.target.value })} className="w-full bg-white border border-indigo-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
+                  <option value="">{t("assignments.chooseGroup")}</option>
+                  {terminalGroups.map(([key, label]) => (
+                    <option key={key} value={key}>{t(`assignments.groups.${label}`)}</option>
                   ))}
                 </select>
+                <p className="mt-2 text-xs leading-relaxed text-indigo-700">{t("assignments.groupHint")}</p>
               </div>
             </div>
             
@@ -209,29 +235,30 @@ export default function Assignments() {
           </div>
         ) : (
           (() => {
-            // Group assignments by terminal so each terminal only shows the
-            // areas that actually have a shift assignment for the selected
-            // date. Terminals with zero assignments are hidden entirely (per
-            // task #38: stop showing the long jumbled list of unassigned
-            // rows for Terminals A and B).
-            const groupedByTerminal = assignments.reduce<
+            // Keep the two Terminal C groups separate when showing saved areas.
+            const groupedByGroup = assignments.reduce<
               Record<string, typeof assignments>
             >((acc, a) => {
-              const key = a.terminal || "—";
+              const key = assignmentGroup(a.terminal, a.areaName);
               if (!acc[key]) acc[key] = [];
               acc[key].push(a);
               return acc;
             }, {});
-            const terminalOrder = Object.keys(groupedByTerminal).sort();
+            const groupOrder = Object.keys(groupedByGroup).sort((a, b) => {
+              const aIndex = terminalGroups.findIndex(([key]) => key === a);
+              const bIndex = terminalGroups.findIndex(([key]) => key === b);
+              return (aIndex < 0 ? 99 : aIndex) - (bIndex < 0 ? 99 : bIndex) || a.localeCompare(b);
+            });
             return (
               <div className="divide-y divide-slate-100">
-                {terminalOrder.map((terminal) => {
-                  const rows = groupedByTerminal[terminal];
+                {groupOrder.map((group) => {
+                  const rows = groupedByGroup[group];
+                  const label = terminalGroups.find(([key]) => key === group)?.[1];
                   return (
-                    <section key={terminal} className="p-0">
+                    <section key={group} className="p-0">
                       <header className="px-6 py-3 bg-slate-50 border-b border-slate-200">
                         <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                          {terminal}
+                          {label ? t(`assignments.groups.${label}`) : group}
                         </h2>
                       </header>
 

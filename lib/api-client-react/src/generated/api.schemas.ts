@@ -359,6 +359,32 @@ export interface CreateAssignmentRequest {
   isSpecial: boolean;
 }
 
+export type TerminalGroupAssignmentInputGroupKey =
+  (typeof TerminalGroupAssignmentInputGroupKey)[keyof typeof TerminalGroupAssignmentInputGroupKey];
+
+export const TerminalGroupAssignmentInputGroupKey = {
+  "terminal-a-east": "terminal-a-east",
+  "terminal-a-west": "terminal-a-west",
+  "terminal-b-east": "terminal-b-east",
+  "terminal-b-west": "terminal-b-west",
+  "terminal-c-135": "terminal-c-135",
+  "terminal-c-246": "terminal-c-246",
+  "top-terminal": "top-terminal",
+} as const;
+
+export interface TerminalGroupAssignmentInput {
+  staffId: number;
+  groupKey: TerminalGroupAssignmentInputGroupKey;
+  assignmentDate: string;
+  notes?: string;
+  isSpecial: boolean;
+}
+
+export interface TerminalGroupAssignmentResult {
+  createdCount: number;
+  existingCount: number;
+}
+
 export type IssueSeverity = (typeof IssueSeverity)[keyof typeof IssueSeverity];
 
 export const IssueSeverity = {

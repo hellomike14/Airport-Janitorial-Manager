@@ -510,6 +510,25 @@ export const CreateAssignmentBody = zod.object({
 });
 
 /**
+ * @summary Assign one active staff member to every area in a terminal group for a date
+ */
+export const AssignTerminalGroupBody = zod.object({
+  staffId: zod.number(),
+  groupKey: zod.enum([
+    "terminal-a-east",
+    "terminal-a-west",
+    "terminal-b-east",
+    "terminal-b-west",
+    "terminal-c-135",
+    "terminal-c-246",
+    "top-terminal",
+  ]),
+  assignmentDate: zod.string(),
+  notes: zod.string().optional(),
+  isSpecial: zod.boolean(),
+});
+
+/**
  * @summary Delete an assignment
  */
 export const DeleteAssignmentParams = zod.object({

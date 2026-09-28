@@ -79,6 +79,8 @@ import type {
   SubmitApplicationRequest,
   Task,
   TaskType,
+  TerminalGroupAssignmentInput,
+  TerminalGroupAssignmentResult,
   UpdateApplicationRequest,
   UpdateIssueImagesRequest,
   UpdateOnboardingItemRequest,
@@ -1792,6 +1794,96 @@ export const useCreateAssignment = <
   TContext
 > => {
   return useMutation(getCreateAssignmentMutationOptions(options));
+};
+
+/**
+ * @summary Assign one active staff member to every area in a terminal group for a date
+ */
+export const getAssignTerminalGroupUrl = () => {
+  return `/api/assignments/group`;
+};
+
+export const assignTerminalGroup = async (
+  terminalGroupAssignmentInput: TerminalGroupAssignmentInput,
+  options?: RequestInit,
+): Promise<TerminalGroupAssignmentResult> => {
+  return customFetch<TerminalGroupAssignmentResult>(
+    getAssignTerminalGroupUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(terminalGroupAssignmentInput),
+    },
+  );
+};
+
+export const getAssignTerminalGroupMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assignTerminalGroup>>,
+    TError,
+    { data: BodyType<TerminalGroupAssignmentInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assignTerminalGroup>>,
+  TError,
+  { data: BodyType<TerminalGroupAssignmentInput> },
+  TContext
+> => {
+  const mutationKey = ["assignTerminalGroup"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assignTerminalGroup>>,
+    { data: BodyType<TerminalGroupAssignmentInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return assignTerminalGroup(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssignTerminalGroupMutationResult = NonNullable<
+  Awaited<ReturnType<typeof assignTerminalGroup>>
+>;
+export type AssignTerminalGroupMutationBody =
+  BodyType<TerminalGroupAssignmentInput>;
+export type AssignTerminalGroupMutationError = ErrorType<void>;
+
+/**
+ * @summary Assign one active staff member to every area in a terminal group for a date
+ */
+export const useAssignTerminalGroup = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assignTerminalGroup>>,
+    TError,
+    { data: BodyType<TerminalGroupAssignmentInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof assignTerminalGroup>>,
+  TError,
+  { data: BodyType<TerminalGroupAssignmentInput> },
+  TContext
+> => {
+  return useMutation(getAssignTerminalGroupMutationOptions(options));
 };
 
 /**
