@@ -30,15 +30,19 @@ import { InspectorWorkflowCard } from "@/components/InspectorWorkflowCard";
 
 type StatusFilter = "all" | "pending" | "completed";
 
-const TERMINAL_COLORS: Record<string, { ring: string; bg: string; dot: string; bar: string }> = {
-  "Terminal A": { ring: "ring-blue-200", bg: "bg-blue-50", dot: "bg-blue-500", bar: "bg-blue-500" },
-  "Terminal B": { ring: "ring-violet-200", bg: "bg-violet-50", dot: "bg-violet-500", bar: "bg-violet-500" },
-  "Terminal C": { ring: "ring-emerald-200", bg: "bg-emerald-50", dot: "bg-emerald-500", bar: "bg-emerald-500" },
-  "Top Terminal": { ring: "ring-amber-200", bg: "bg-amber-50", dot: "bg-amber-500", bar: "bg-amber-500" },
+const TERMINAL_COLORS: Record<string, { ring: string; bg: string; dot: string; bar: string; text: string }> = {
+  "Terminal A": { ring: "ring-orange-200", bg: "bg-orange-50", dot: "bg-orange-500", bar: "bg-orange-500", text: "text-orange-700" },
+  "Terminal B": { ring: "ring-green-200", bg: "bg-green-50", dot: "bg-green-500", bar: "bg-green-500", text: "text-green-700" },
+  "Terminal C": { ring: "ring-blue-200", bg: "bg-blue-50", dot: "bg-blue-500", bar: "bg-blue-500", text: "text-blue-700" },
+  "Top Terminal": { ring: "ring-amber-200", bg: "bg-amber-50", dot: "bg-amber-500", bar: "bg-amber-500", text: "text-amber-700" },
 };
 
 function getColors(terminal: string) {
-  return TERMINAL_COLORS[terminal] ?? { ring: "ring-slate-200", bg: "bg-slate-50", dot: "bg-slate-400", bar: "bg-slate-400" };
+  const group = terminal.startsWith("Terminal A") ? "Terminal A"
+    : terminal.startsWith("Terminal B") ? "Terminal B"
+    : terminal.startsWith("Terminal C") ? "Terminal C"
+    : terminal;
+  return TERMINAL_COLORS[group] ?? { ring: "ring-slate-200", bg: "bg-slate-50", dot: "bg-slate-400", bar: "bg-slate-400", text: "text-slate-700" };
 }
 
 const TERMINAL_HEADINGS: Record<string, string> = {
@@ -310,7 +314,7 @@ export default function TaskManagement() {
             return (
               <React.Fragment key={area.id}>
               {startsSection && (
-                <h2 className="pt-3 text-xl font-extrabold tracking-wide text-slate-900">
+                <h2 className={`pt-3 text-xl font-extrabold tracking-wide ${col.text}`}>
                   {heading}
                 </h2>
               )}
@@ -319,12 +323,12 @@ export default function TaskManagement() {
                   className={`flex items-center gap-4 px-5 py-4 cursor-pointer hover:bg-slate-50/60 transition-colors ${allDone ? "bg-emerald-50/60" : ""}`}
                   onClick={() => toggleCollapse(area.id)}
                 >
-                  <div className={`w-3 h-3 rounded-full ${allDone ? "bg-emerald-500" : col.dot} shrink-0`} />
+                  <div className={`w-3 h-3 rounded-full ${col.dot} shrink-0`} />
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 flex-wrap">
                       <h2 className="font-bold text-slate-800">{area.name}</h2>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${col.bg} ${col.ring} ring-1 text-slate-600`}>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${col.bg} ${col.ring} ${col.text} ring-1`}>
                         {area.terminal}
                       </span>
                       {allDone && (
@@ -336,7 +340,7 @@ export default function TaskManagement() {
                     <div className="flex items-center gap-3 mt-1.5">
                       <div className="flex-1 max-w-[200px] h-1.5 bg-slate-100 rounded-full overflow-hidden">
                         <div
-                          className={`h-full rounded-full transition-all duration-500 ${allDone ? "bg-emerald-500" : col.bar}`}
+                          className={`h-full rounded-full transition-all duration-500 ${col.bar}`}
                           style={{ width: `${pctArea}%` }}
                         />
                       </div>
