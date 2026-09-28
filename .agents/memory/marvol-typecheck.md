@@ -1,11 +1,19 @@
 ---
 name: Marvol typecheck quirks
-description: Pre-existing typecheck breakage in the pnpm monorepo and the orval query-hook typing pitfall to avoid.
+description: Monorepo declaration freshness and Orval typing pitfalls.
 ---
 
 # Typecheck baseline
 
 Do not assume root typecheck is broken based on older notes. The root check passed on 2026-09-23; use the current command result rather than the historical error list.
+
+# Shared declarations after merges
+
+After an isolated task merge, generated API source can contain a new endpoint while the locally built declaration output is still stale. A leaf-package typecheck may then report a missing export even though the source defines it.
+
+**Why:** Merged source and local build output do not necessarily advance together.
+
+**How to apply:** Rebuild shared library declarations before changing imports or regenerating code when the missing symbol already exists in generated source; then rerun the leaf-package check.
 
 # Orval react-query typing pitfall
 
