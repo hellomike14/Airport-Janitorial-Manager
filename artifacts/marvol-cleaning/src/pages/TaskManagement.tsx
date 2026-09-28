@@ -68,6 +68,7 @@ export default function TaskManagement() {
   const qc = useQueryClient();
 
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [terminalFilter, setTerminalFilter] = useState<string | "all">("all");
   const [areaFilter, setAreaFilter] = useState<number | "all">("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
@@ -78,6 +79,8 @@ export default function TaskManagement() {
 
   const { data: areas } = useListAreas();
   const { data: tasks, isLoading } = useListTasks({ date });
+  const terminals = useMemo(() => [...new Set((areas ?? []).map(terminalHeading))], [areas]);
+  const visibleAreas = (areas ?? []).filter((area) => terminalFilter === "all" || terminalHeading(area) === terminalFilter);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -136,7 +139,8 @@ export default function TaskManagement() {
     const areaList = areas ?? [];
 
     return areaList
-      .filter((a) => areaFilter === "all" || a.id === areaFilter)
+      .filter((a) => (areaFilter === "all" || a.id === areaFilter) &&
+        (terminalFilter === "all" || terminalHeading(a) === terminalFilter))
       .map((area) => {
         let areaTasks = taskList.filter((t) => t.areaId === area.id);
         if (statusFilter === "pending") areaTasks = areaTasks.filter((t) => !t.completed);
@@ -149,8 +153,8 @@ export default function TaskManagement() {
         const completed = taskList.filter((t) => t.areaId === area.id && t.completed).length;
         return { area, tasks: areaTasks, total, completed };
       })
-      .filter((g) => g.tasks.length > 0 || (areaFilter !== "all" && g.area.id === areaFilter));
-  }, [tasks, areas, areaFilter, statusFilter, search]);
+      .filter((g) => g.tasks.length > 0 || terminalFilter !== "all" || (areaFilter !== "all" && g.area.id === areaFilter));
+  }, [tasks, areas, terminalFilter, areaFilter, statusFilter, search]);
 
   const totalTasks = (tasks ?? []).length;
   const totalCompleted = (tasks ?? []).filter((t) => t.completed).length;
@@ -231,6 +235,27 @@ export default function TaskManagement() {
         <span className="text-sm font-bold text-slate-600 shrink-0 min-w-[40px] text-right">{pct}%</span>
       </div>
 
+      <div className="flex flex-wrap gap-2" aria-label={t("taskManagement.allTerminals")}>
+        {(["all", ...terminals] as string[]).map((terminal) => (
+          <button
+            key={terminal}
+            type="button"
+            aria-pressed={terminalFilter === terminal}
+            onClick={() => {
+              setTerminalFilter(terminal);
+              setAreaFilter("all");
+            }}
+            className={`px-3 py-2 rounded-lg text-xs font-bold transition-colors ${
+              terminalFilter === terminal
+                ? "bg-slate-900 text-white shadow-sm"
+                : "bg-white border border-slate-200 text-slate-600 hover:border-slate-400"
+            }`}
+          >
+            {terminal === "all" ? t("taskManagement.allTerminals") : terminal}
+          </button>
+        ))}
+      </div>
+
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -258,7 +283,7 @@ export default function TaskManagement() {
           >
             {t("taskManagement.allAreas")}
           </button>
-          {(areas ?? []).map((a) => (
+          {visibleAreas.map((a) => (
             <button
               key={a.id}
               ref={(el) => {
@@ -268,7 +293,7 @@ export default function TaskManagement() {
               onClick={() => setAreaFilter(a.id)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${areaFilter === a.id ? "bg-slate-900 text-white shadow" : "text-slate-500 hover:text-slate-800"}`}
             >
-              {a.name.replace("Terminal ", "T").replace(" Garage", "").replace("Levels ", "L")}
+              {terminalFilter === "all" ? `${terminalHeading(a)} · ${a.name}` : a.name}
             </button>
           ))}
         </div>

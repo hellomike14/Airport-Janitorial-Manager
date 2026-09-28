@@ -24,6 +24,8 @@ export default function AreasList() {
     acc[area.terminal].push(area);
     return acc;
   }, {});
+  const terminalEntries = groupedAreas ? Object.entries(groupedAreas) as [string, any[]][] : [];
+  const terminalAnchor = (terminal: string) => `terminal-${terminal.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto pb-12">
@@ -32,9 +34,21 @@ export default function AreasList() {
         <p className="text-slate-500 mt-2 font-medium">{t("areas.subtitle")}</p>
       </div>
 
+      <nav className="flex flex-wrap gap-2" aria-label={t("areas.cleaningZones")}>
+        {terminalEntries.map(([terminal]) => (
+          <a
+            key={terminal}
+            href={`#${terminalAnchor(terminal)}`}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400 hover:text-slate-900"
+          >
+            {TERMINAL_HEADINGS[terminal] ?? terminal}
+          </a>
+        ))}
+      </nav>
+
       <div className="space-y-10">
-        {groupedAreas && Object.entries(groupedAreas).map(([terminal, terminalAreas]: [string, any]) => (
-          <div key={terminal} className="animate-fade-in-up">
+        {terminalEntries.map(([terminal, terminalAreas]) => (
+          <div key={terminal} id={terminalAnchor(terminal)} className="animate-fade-in-up scroll-mt-24">
             <div className="flex items-center gap-3 mb-4 border-b border-slate-200 pb-2">
               <MapPin className="w-5 h-5 text-accent" />
               <h2 className="text-xl font-display font-bold text-slate-800">

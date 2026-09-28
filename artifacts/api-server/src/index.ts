@@ -825,6 +825,43 @@ async function seed() {
       }
     }
   }
+
+  // Legacy P2 West and the workbook's Level 2 used to be separate areas. When
+  // their history was merged, both daily checklists ended up on the same area.
+  // Keep a completed (otherwise the oldest) copy, and remove only untouched
+  // standard-task duplicates. Never discard notes, images, assignments, or
+  // records referenced by inspector work or uploaded files.
+  const [p2West] = await db
+    .select({ id: areasTable.id })
+    .from(areasTable)
+    .where(and(eq(areasTable.terminal, "Terminal A - West"), eq(areasTable.name, "Level 2")));
+  if (p2West) {
+    await db.execute(sql`
+      WITH ranked AS (
+        SELECT id, row_number() OVER (
+          PARTITION BY task_date, task_name
+          ORDER BY completed DESC, completed_at DESC NULLS LAST, id ASC
+        ) AS copy_number
+        FROM tasks
+        WHERE area_id = ${p2West.id} AND is_special = false
+      )
+      DELETE FROM tasks AS duplicate
+      USING ranked
+      WHERE duplicate.id = ranked.id
+        AND ranked.copy_number > 1
+        AND duplicate.completed = false
+        AND duplicate.completed_at IS NULL
+        AND duplicate.completed_by_id IS NULL
+        AND duplicate.assigned_to_id IS NULL
+        AND duplicate.created_by_id IS NULL
+        AND duplicate.notes IS NULL
+        AND duplicate.before_image_path IS NULL
+        AND duplicate.after_image_path IS NULL
+        AND NOT EXISTS (SELECT 1 FROM inspector_task_links WHERE task_id = duplicate.id)
+        AND NOT EXISTS (SELECT 1 FROM inspector_task_assignment_history WHERE task_id = duplicate.id)
+        AND NOT EXISTS (SELECT 1 FROM object_uploads WHERE task_id = duplicate.id)
+    `);
+  }
 }
 
 app.listen(port, async () => {
