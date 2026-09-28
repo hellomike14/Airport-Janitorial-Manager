@@ -9,7 +9,6 @@ import { SEED_STAFF, REMOVED_STAFF_NAMES, isSeedLoginEnabled } from "./seed-data
 import { sweepOverdueInspectorAssignments } from "./lib/inspectorTaskWorkflow";
 import { drainOutbox } from "./lib/messageEmailOutboxWorker";
 import { inspectorRuntimeConfig } from "./lib/inspectorRuntimeConfig";
-import { loginEnabledAfterSeedReconciliation } from "./lib/staffLoginPolicy";
 
 const rawPort = process.env["PORT"];
 
@@ -427,15 +426,10 @@ async function seed() {
       await db.update(staffTable).set({ email: seedEntry.email }).where(eq(staffTable.id, existing.id));
       console.log(`Updated ${existing.name}: email`);
     }
-    // Only named seed identities receive seed login safety policy. Arbitrary
-    // legacy rows remain unchanged, while inactive/former seed rows stay off.
-    if (seedEntry && seedEntry.name === existing.name) {
-      const loginEnabled = loginEnabledAfterSeedReconciliation({
-        active: existing.active,
-        loginEnabled: existing.loginEnabled,
-        formerEmployee: existing.formerEmployee,
-        seedLoginEnabled: seedEntry.loginEnabled,
-      });
+    // Only current, named seed identities receive seed login policy.  This
+    // intentionally leaves arbitrary legacy inactive rows unchanged.
+    if (seedEntry && existing.active && seedEntry.name === existing.name) {
+      const loginEnabled = isSeedLoginEnabled(seedEntry);
       if (existing.loginEnabled !== loginEnabled) {
         await db.update(staffTable).set({ loginEnabled }).where(eq(staffTable.id, existing.id));
       }
@@ -684,6 +678,22 @@ async function seed() {
       .update(areasTable)
       .set({ archived: true })
       .where(and(eq(areasTable.name, legacy.name), eq(areasTable.terminal, legacy.terminal)));
+  }
+
+  // The workbook is the complete operating-area list, not just a source of
+  // additional rows. Preserve unmatched historical areas and their references,
+  // but never expose them as extra or duplicate cleaning zones.
+  const operatingAreaKeys = new Set(
+    MCO_TERMINAL_AREAS.map((area) => `${area.terminal}\u0000${area.name}`),
+  );
+  const allAreas = await tx
+    .select({ id: areasTable.id, terminal: areasTable.terminal, name: areasTable.name, archived: areasTable.archived })
+    .from(areasTable);
+  for (const existing of allAreas) {
+    if (!existing.archived && !operatingAreaKeys.has(`${existing.terminal}\u0000${existing.name}`)) {
+      await tx.update(areasTable).set({ archived: true }).where(eq(areasTable.id, existing.id));
+      console.log(`Archived non-workbook area #${existing.id} ${existing.name} (${existing.terminal})`);
+    }
   }
   });
 
