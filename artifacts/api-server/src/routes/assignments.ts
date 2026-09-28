@@ -14,6 +14,11 @@ import { isAssignmentTargetEligible } from "../lib/workflowPolicies";
 import { areaBelongsToGroup, groupAssignmentLock, groupForArea, planGroupAssignment, planGroupReassignment, TERMINAL_GROUP_KEYS } from "../lib/assignmentGroups";
 import { lockScheduleWrites } from "../lib/scheduleLocks";
 
+// Injectable dependencies keep assignment/schedule concurrency tests off the live database.
+export function createAssignmentsRouter(
+  database: typeof db = db,
+  resolveActor: typeof actorStaffFromRequest = actorStaffFromRequest,
+): IRouter {
 const router: IRouter = Router();
 
 router.get("/", async (req, res) => {
@@ -25,7 +30,7 @@ router.get("/", async (req, res) => {
   const today = new Date().toISOString().split("T")[0];
   const date = query.date ?? today;
 
-  const assignments = await db
+  const assignments = await database
     .select({
       id: assignmentsTable.id,
       staffId: assignmentsTable.staffId,
@@ -55,7 +60,7 @@ router.get("/", async (req, res) => {
   const supervisorIds = [...new Set(assignments.map((a) => a.assignedById).filter(Boolean))] as number[];
   const supervisors =
     supervisorIds.length > 0
-      ? await db
+      ? await database
           .select({ id: staffTable.id, name: staffTable.name })
           .from(staffTable)
           .where(inArray(staffTable.id, supervisorIds))
@@ -72,12 +77,12 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const actor = await actorStaffFromRequest(req);
+  const actor = await resolveActor(req);
   if (!actor) return res.status(401).json({ error: "Login session required" });
   if (actor.role !== "admin" && actor.role !== "supervisor") return res.status(403).json({ error: "Supervisor access required" });
   const body = CreateAssignmentBody.parse(req.body);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(body.assignmentDate)) return res.status(400).json({ error: "Invalid assignment date" });
-  const result = await db.transaction(async (tx) => {
+  const result = await database.transaction(async (tx) => {
     const [targetArea] = await tx.select({
       id: areasTable.id, name: areasTable.name, terminal: areasTable.terminal, location: areasTable.location,
     }).from(areasTable).where(and(eq(areasTable.id, body.areaId), eq(areasTable.archived, false)));
@@ -128,17 +133,17 @@ router.post("/", async (req, res) => {
   if (result.status === "conflict") return res.status(409).json({ error: "Group already assigned to another staff member or area already assigned" });
   const created = result.created;
 
-  const [staff] = await db
+  const [staff] = await database
     .select({ name: staffTable.name })
     .from(staffTable)
     .where(eq(staffTable.id, created.staffId));
 
-  const [area] = await db
+  const [area] = await database
     .select({ name: areasTable.name })
     .from(areasTable)
     .where(eq(areasTable.id, created.areaId));
 
-  const [supervisor] = await db
+  const [supervisor] = await database
     .select({ name: staffTable.name })
     .from(staffTable)
     .where(eq(staffTable.id, created.assignedById));
@@ -153,7 +158,7 @@ router.post("/", async (req, res) => {
 });
 
 router.post("/group", async (req, res) => {
-  const actor = await actorStaffFromRequest(req);
+  const actor = await resolveActor(req);
   if (!actor) return res.status(401).json({ error: "Login session required" });
   if (actor.role !== "admin" && actor.role !== "supervisor") return res.status(403).json({ error: "Supervisor access required" });
   const parsed = AssignTerminalGroupBody.safeParse(req.body);
@@ -164,7 +169,7 @@ router.post("/group", async (req, res) => {
     return res.status(400).json({ error: "Invalid group or assignment date" });
   }
   const groupKey = body.groupKey as typeof TERMINAL_GROUP_KEYS[number];
-  const result = await db.transaction(async (tx) => {
+  const result = await database.transaction(async (tx) => {
     // Serialize group saves so two supervisors cannot assign different staff
     // to the same group at the same time.
     await tx.execute(groupAssignmentLock(body.assignmentDate, groupKey));
@@ -228,7 +233,7 @@ router.post("/group", async (req, res) => {
 });
 
 router.post("/group/reassign", async (req, res) => {
-  const actor = await actorStaffFromRequest(req);
+  const actor = await resolveActor(req);
   if (!actor) return res.status(401).json({ error: "Login session required" });
   if (actor.role !== "admin" && actor.role !== "supervisor") return res.status(403).json({ error: "Supervisor access required" });
   const parsed = ReassignTerminalGroupBody.safeParse(req.body);
@@ -237,7 +242,7 @@ router.post("/group/reassign", async (req, res) => {
     return res.status(400).json({ error: "Invalid group reassignment" });
   }
   const body = parsed.data;
-  const result = await db.transaction(async (tx) => {
+  const result = await database.transaction(async (tx) => {
     await tx.execute(groupAssignmentLock(body.assignmentDate, body.groupKey as typeof TERMINAL_GROUP_KEYS[number]));
     const [target] = await tx.select({
       id: staffTable.id, active: staffTable.active, formerEmployee: staffTable.formerEmployee,
@@ -281,11 +286,11 @@ router.post("/group/reassign", async (req, res) => {
 });
 
 router.delete("/:id", async (req, res) => {
-  const actor = await actorStaffFromRequest(req);
+  const actor = await resolveActor(req);
   if (!actor) return res.status(401).json({ error: "Login session required" });
   if (actor.role !== "admin" && actor.role !== "supervisor") return res.status(403).json({ error: "Supervisor access required" });
   const { id } = DeleteAssignmentParams.parse({ id: req.params.id });
-  await db.transaction(async (tx) => {
+  await database.transaction(async (tx) => {
     const [row] = await tx.select({
       areaId: assignmentsTable.areaId, assignmentDate: assignmentsTable.assignmentDate,
       name: areasTable.name, terminal: areasTable.terminal, location: areasTable.location,
@@ -301,4 +306,7 @@ router.delete("/:id", async (req, res) => {
   return res.json({ success: true });
 });
 
-export default router;
+return router;
+}
+
+export default createAssignmentsRouter();

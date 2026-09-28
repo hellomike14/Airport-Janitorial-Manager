@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import express from "express";
 import { type AddressInfo } from "node:net";
-import { areasTable, schedulesTable, staffTable } from "@workspace/db/schema";
+import { areasTable, assignmentsTable, schedulesTable, staffTable } from "@workspace/db/schema";
 import { createGroupScheduleMoveRouter, createSchedulesRouter } from "./schedules";
+import { createAssignmentsRouter } from "./assignments";
 import { PgDialect } from "drizzle-orm/pg-core";
 import type { SQL } from "drizzle-orm";
 
@@ -277,6 +278,168 @@ test("a simultaneous schedule edit or insert cannot slip past group confirmation
       if (change === "insert") assert.equal(rows.length, 2, "the inserted row remains owned by its creator");
     } finally {
       releaseWrite();
+      await new Promise<void>((resolve, reject) => server.close((err) => err ? reject(err) : resolve()));
+    }
+  }
+});
+
+test("assignment-created schedules serialize with a reviewed move in either lock order", async () => {
+  for (const [assignmentRoute, firstRequest] of [
+    ["single", "assignment"], ["single", "confirmation"],
+    ["group", "assignment"], ["group", "confirmation"],
+  ] as const) {
+    const area = { id: 987656, name: "Assignment race fixture", terminal: "Terminal A - East", location: "Fixture", archived: false };
+    const assignmentDate = "2099-01-05";
+    const dayOfWeek = new Date(`${assignmentDate}T12:00:00`).getDay();
+    const original: Row = {
+      id: 1001, staffId: 11, areaId: area.id, dayOfWeek,
+      startTime: "06:15", endTime: "13:45", notes: null,
+      updatedAt: new Date("2026-01-01"), staffName: "Original", areaName: area.name,
+    };
+    let rows = [original];
+    let releaseFirst!: () => void;
+    const firstGate = new Promise<void>((resolve) => { releaseFirst = resolve; });
+    let firstPaused!: () => void;
+    const paused = new Promise<void>((resolve) => { firstPaused = resolve; });
+    let secondWaiting!: () => void;
+    const waiting = new Promise<void>((resolve) => { secondWaiting = resolve; });
+    const dialect = new PgDialect();
+    const held = new Map<string, Promise<void>>();
+    let scheduleLockAttempts = 0;
+    const database = {
+      select: (fields: Record<string, unknown>) => ({
+        from(table: unknown) {
+          const read = async (forUpdate: boolean) => {
+            if (forUpdate && firstRequest === "confirmation" && table === schedulesTable) {
+              firstPaused();
+              await firstGate;
+            }
+            const data = table === staffTable
+              ? [{ id: 99, name: "Target", active: true, formerEmployee: false }, { id: 12, name: "Assigned", active: true, formerEmployee: false }]
+              : table === areasTable ? [area]
+              : table === assignmentsTable ? []
+              : table === schedulesTable && (Object.keys(fields).join(",") === "id" ||
+                  Object.keys(fields).join(",") === "areaId" ||
+                  Object.keys(fields).join(",") === "startTime,endTime")
+                ? rows.filter((row) => row.staffId === 12)
+              : table === schedulesTable ? rows
+              : (() => { throw new Error("Unexpected table"); })();
+            return data.map((item) => {
+              const record = item as Record<string, unknown>;
+              return Object.fromEntries(Object.keys(fields).map((key) => [
+                key, key === "staffName" ? record.staffName : key === "areaName" ? area.name : record[key],
+              ]));
+            });
+          };
+          let lockedRead = false;
+          const query = {
+            where: () => query, innerJoin: () => query,
+            for: () => { lockedRead = true; return query; },
+            limit: () => query,
+            then: (resolve: (value: unknown[]) => unknown, reject: (reason: unknown) => unknown) =>
+              read(lockedRead).then(resolve, reject),
+          };
+          return query;
+        },
+      }),
+      transaction: async (callback: (tx: unknown) => Promise<unknown>) => {
+        const releases: Array<() => void> = [];
+        const tx = {
+          ...database,
+          execute: async (query: SQL) => {
+            const { sql, params } = dialect.sqlToQuery(query);
+            assert.match(sql, /pg_advisory_xact_lock/);
+            const key = String(params[0]);
+            const previous = held.get(key);
+            let release!: () => void;
+            held.set(key, new Promise<void>((resolve) => { release = resolve; }));
+            if (key === "schedule:terminal-a-east" && ++scheduleLockAttempts === 2) secondWaiting();
+            if (previous) await previous;
+            releases.push(release);
+          },
+          insert: (table: unknown) => ({
+            values: (values: Record<string, unknown>) => {
+              if (table === assignmentsTable) {
+                return {
+                  returning: async () => [{ ...values, id: 2001, createdAt: new Date("2026-01-01") }],
+                  then: (resolve: (value: unknown) => unknown) => resolve(undefined),
+                };
+              }
+              assert.equal(table, schedulesTable);
+              return { then: async (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) => {
+                try {
+                  const schedule = Array.isArray(values) ? values[0] : values;
+                  if (firstRequest === "assignment") {
+                    firstPaused();
+                    await firstGate;
+                  }
+                  rows.push({ ...original, ...schedule, id: 1002, staffName: "Assigned" } as Row);
+                  return resolve(undefined);
+                } catch (error) { return reject(error); }
+              } };
+            },
+          }),
+          update: (table: unknown) => {
+            assert.equal(table, schedulesTable);
+            return { set: (values: Partial<Row>) => ({
+              where: async () => { rows = rows.map((row) => row.id === original.id ? { ...row, ...values } : row); },
+            }) };
+          },
+        };
+        try {
+          return await callback(tx);
+        } finally {
+          for (const release of releases) release();
+        }
+      },
+    };
+    const actor = (async () => ({ id: 7, role: "supervisor" })) as never;
+    const app = express();
+    app.use(express.json());
+    app.use("/api/schedules", createGroupScheduleMoveRouter(database as never, actor));
+    app.use("/api/assignments", createAssignmentsRouter(database as never, actor));
+    const server = app.listen(0, "127.0.0.1");
+    await new Promise<void>((resolve) => server.once("listening", resolve));
+    const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
+    const within = async <T>(promise: Promise<T>): Promise<T> => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        return await Promise.race([
+          promise,
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(() => reject(new Error(`${assignmentRoute}/${firstRequest}: concurrent requests did not finish`)), 3000);
+          }),
+        ]);
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+    };
+    try {
+      const reviewed = await (await fetch(`${origin}/schedules/group/preview?groupKey=terminal-a-east&staffId=99`)).json() as { snapshot: string };
+      const confirm = () => fetch(`${origin}/schedules/group/preview`, {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ groupKey: "terminal-a-east", staffId: 99, snapshot: reviewed.snapshot }),
+      });
+      const assign = () => fetch(`${origin}/assignments${assignmentRoute === "group" ? "/group" : ""}`, {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ staffId: 12, ...(assignmentRoute === "group" ? { groupKey: "terminal-a-east" } : { areaId: area.id, assignedById: 7 }), assignmentDate, isSpecial: false }),
+      });
+      const first = firstRequest === "assignment" ? assign() : confirm();
+      await within(paused);
+      const second = firstRequest === "assignment" ? confirm() : assign();
+      await within(waiting);
+      let secondFinished = false;
+      void second.then(() => { secondFinished = true; });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      assert.equal(secondFinished, false, "the second request waits for the first transaction's schedule lock");
+      releaseFirst();
+      assert.equal((await within(first)).status, firstRequest === "assignment" ? 201 : 200);
+      assert.equal((await within(second)).status, firstRequest === "assignment" ? 409 : 201);
+      assert.equal(rows.length, 2);
+      assert.equal(rows[0].staffId, firstRequest === "assignment" ? 11 : 99);
+      assert.equal(rows[1].staffId, 12, "the assignment-created row is not silently moved");
+    } finally {
+      releaseFirst();
       await new Promise<void>((resolve, reject) => server.close((err) => err ? reject(err) : resolve()));
     }
   }
