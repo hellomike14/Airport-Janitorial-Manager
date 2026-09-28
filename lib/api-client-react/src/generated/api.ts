@@ -66,6 +66,7 @@ import type {
   Notification,
   OnboardingHire,
   OnboardingItem,
+  PreviewTerminalGroupScheduleMoveParams,
   QuickbooksConnectUrl,
   QuickbooksStatus,
   RemoveAreaTaskExclusionRequest,
@@ -83,6 +84,9 @@ import type {
   TerminalGroupAssignmentInput,
   TerminalGroupAssignmentResult,
   TerminalGroupReassignmentInput,
+  TerminalGroupScheduleMoveInput,
+  TerminalGroupScheduleMoveResult,
+  TerminalGroupSchedulePreview,
   UpdateApplicationRequest,
   UpdateIssueImagesRequest,
   UpdateOnboardingItemRequest,
@@ -1976,6 +1980,203 @@ export const useReassignTerminalGroup = <
   TContext
 > => {
   return useMutation(getReassignTerminalGroupMutationOptions(options));
+};
+
+/**
+ * @summary Review recurring schedule rows that would move to another staff member
+ */
+export const getPreviewTerminalGroupScheduleMoveUrl = (
+  params: PreviewTerminalGroupScheduleMoveParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/schedules/group/preview?${stringifiedParams}`
+    : `/api/schedules/group/preview`;
+};
+
+export const previewTerminalGroupScheduleMove = async (
+  params: PreviewTerminalGroupScheduleMoveParams,
+  options?: RequestInit,
+): Promise<TerminalGroupSchedulePreview> => {
+  return customFetch<TerminalGroupSchedulePreview>(
+    getPreviewTerminalGroupScheduleMoveUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getPreviewTerminalGroupScheduleMoveQueryKey = (
+  params?: PreviewTerminalGroupScheduleMoveParams,
+) => {
+  return [`/api/schedules/group/preview`, ...(params ? [params] : [])] as const;
+};
+
+export const getPreviewTerminalGroupScheduleMoveQueryOptions = <
+  TData = Awaited<ReturnType<typeof previewTerminalGroupScheduleMove>>,
+  TError = ErrorType<void>,
+>(
+  params: PreviewTerminalGroupScheduleMoveParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof previewTerminalGroupScheduleMove>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getPreviewTerminalGroupScheduleMoveQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof previewTerminalGroupScheduleMove>>
+  > = ({ signal }) =>
+    previewTerminalGroupScheduleMove(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof previewTerminalGroupScheduleMove>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type PreviewTerminalGroupScheduleMoveQueryResult = NonNullable<
+  Awaited<ReturnType<typeof previewTerminalGroupScheduleMove>>
+>;
+export type PreviewTerminalGroupScheduleMoveQueryError = ErrorType<void>;
+
+/**
+ * @summary Review recurring schedule rows that would move to another staff member
+ */
+
+export function usePreviewTerminalGroupScheduleMove<
+  TData = Awaited<ReturnType<typeof previewTerminalGroupScheduleMove>>,
+  TError = ErrorType<void>,
+>(
+  params: PreviewTerminalGroupScheduleMoveParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof previewTerminalGroupScheduleMove>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getPreviewTerminalGroupScheduleMoveQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Move reviewed recurring schedules only; dated assignments and tasks remain unchanged
+ */
+export const getMoveTerminalGroupScheduleUrl = () => {
+  return `/api/schedules/group/preview`;
+};
+
+export const moveTerminalGroupSchedule = async (
+  terminalGroupScheduleMoveInput: TerminalGroupScheduleMoveInput,
+  options?: RequestInit,
+): Promise<TerminalGroupScheduleMoveResult> => {
+  return customFetch<TerminalGroupScheduleMoveResult>(
+    getMoveTerminalGroupScheduleUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(terminalGroupScheduleMoveInput),
+    },
+  );
+};
+
+export const getMoveTerminalGroupScheduleMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof moveTerminalGroupSchedule>>,
+    TError,
+    { data: BodyType<TerminalGroupScheduleMoveInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof moveTerminalGroupSchedule>>,
+  TError,
+  { data: BodyType<TerminalGroupScheduleMoveInput> },
+  TContext
+> => {
+  const mutationKey = ["moveTerminalGroupSchedule"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof moveTerminalGroupSchedule>>,
+    { data: BodyType<TerminalGroupScheduleMoveInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return moveTerminalGroupSchedule(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type MoveTerminalGroupScheduleMutationResult = NonNullable<
+  Awaited<ReturnType<typeof moveTerminalGroupSchedule>>
+>;
+export type MoveTerminalGroupScheduleMutationBody =
+  BodyType<TerminalGroupScheduleMoveInput>;
+export type MoveTerminalGroupScheduleMutationError = ErrorType<void>;
+
+/**
+ * @summary Move reviewed recurring schedules only; dated assignments and tasks remain unchanged
+ */
+export const useMoveTerminalGroupSchedule = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof moveTerminalGroupSchedule>>,
+    TError,
+    { data: BodyType<TerminalGroupScheduleMoveInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof moveTerminalGroupSchedule>>,
+  TError,
+  { data: BodyType<TerminalGroupScheduleMoveInput> },
+  TContext
+> => {
+  return useMutation(getMoveTerminalGroupScheduleMutationOptions(options));
 };
 
 /**

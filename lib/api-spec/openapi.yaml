@@ -496,6 +496,41 @@ paths:
         "409":
           description: Assignments changed since confirmation; refresh before retrying
 
+  /schedules/group/preview:
+    get:
+      operationId: previewTerminalGroupScheduleMove
+      tags: [schedules]
+      summary: Review recurring schedule rows that would move to another staff member
+      parameters:
+        - { name: groupKey, in: query, required: true, schema: { $ref: "#/components/schemas/TerminalGroupKey" } }
+        - { name: staffId, in: query, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Current recurring schedules for active areas in the group
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TerminalGroupSchedulePreview"
+        "400": { description: Invalid group or ineligible target staff }
+    post:
+      operationId: moveTerminalGroupSchedule
+      tags: [schedules]
+      summary: Move reviewed recurring schedules only; dated assignments and tasks remain unchanged
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TerminalGroupScheduleMoveInput"
+      responses:
+        "200":
+          description: Recurring schedule rows moved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TerminalGroupScheduleMoveResult"
+        "409": { description: Schedule changed since review or target schedule conflicts }
+
   /assignments/{id}:
     delete:
       operationId: deleteAssignment
@@ -2054,6 +2089,47 @@ components:
               staffId: { type: integer }
             required: [id, staffId]
       required: [staffId, groupKey, assignmentDate, expectedAssignments]
+
+    TerminalGroupKey:
+      type: string
+      enum: [terminal-a-east, terminal-a-west, terminal-b-east, terminal-b-west, terminal-c-135, terminal-c-246, top-terminal]
+
+    TerminalGroupScheduleRow:
+      type: object
+      required: [id, staffId, staffName, areaId, areaName, dayOfWeek, startTime, endTime]
+      properties:
+        id: { type: integer }
+        staffId: { type: integer }
+        staffName: { type: string }
+        areaId: { type: integer }
+        areaName: { type: string }
+        dayOfWeek: { type: integer }
+        startTime: { type: string }
+        endTime: { type: string }
+
+    TerminalGroupSchedulePreview:
+      type: object
+      required: [snapshot, rows, conflict]
+      properties:
+        snapshot: { type: string }
+        rows:
+          type: array
+          items: { $ref: "#/components/schemas/TerminalGroupScheduleRow" }
+        conflict: { type: boolean }
+
+    TerminalGroupScheduleMoveInput:
+      type: object
+      required: [groupKey, staffId, snapshot]
+      properties:
+        groupKey: { $ref: "#/components/schemas/TerminalGroupKey" }
+        staffId: { type: integer }
+        snapshot: { type: string, minLength: 1 }
+
+    TerminalGroupScheduleMoveResult:
+      type: object
+      required: [movedCount]
+      properties:
+        movedCount: { type: integer }
 
     Issue:
       type: object

@@ -1,10 +1,115 @@
 import { Router, type IRouter, type Request, type Response } from "express";
+import { createHash } from "node:crypto";
 import { db } from "@workspace/db";
 import { schedulesTable, staffTable, areasTable } from "@workspace/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
+import { MoveTerminalGroupScheduleBody, PreviewTerminalGroupScheduleMoveQueryParams } from "@workspace/api-zod";
+import { actorStaffFromRequest } from "../lib/actorSession";
+import { isAssignmentTargetEligible } from "../lib/workflowPolicies";
+import { areaBelongsToGroup, TERMINAL_GROUP_KEYS, type TerminalGroupKey } from "../lib/assignmentGroups";
 
 const router: IRouter = Router();
+
+// The preview includes every schedule in active group areas, including rows
+// already owned by the target. This lets the save detect additions and edits
+// between review and confirmation, rather than silently moving a new row.
+function scheduleSnapshot(areaIds: number[], rows: Array<{
+  id: number; areaId: number | null; staffId: number; dayOfWeek: number;
+  startTime: string; endTime: string; notes: string | null; updatedAt: Date;
+}>) {
+  return createHash("sha256").update(JSON.stringify({
+    areaIds: [...areaIds].sort((a, b) => a - b),
+    rows: [...rows].sort((a, b) => a.id - b.id).map((row) => [
+      row.id, row.areaId, row.staffId, row.dayOfWeek,
+      row.startTime, row.endTime, row.notes, row.updatedAt.toISOString(),
+    ]),
+  })).digest("hex");
+}
+
+function targetConflict(rows: Array<{ staffId: number; areaId: number | null; dayOfWeek: number }>, targetId: number) {
+  const targetSlots = new Set(rows.filter((row) => row.staffId === targetId)
+    .map((row) => `${row.areaId}:${row.dayOfWeek}`));
+  for (const row of rows.filter((row) => row.staffId !== targetId)) {
+    const slot = `${row.areaId}:${row.dayOfWeek}`;
+    if (targetSlots.has(slot)) return true;
+    targetSlots.add(slot);
+  }
+  return false;
+}
+
+router.get("/group/preview", async (req, res) => {
+  const actor = await actorStaffFromRequest(req);
+  if (!actor) return res.status(401).json({ error: "Login session required" });
+  if (actor.role !== "admin" && actor.role !== "supervisor") return res.status(403).json({ error: "Supervisor access required" });
+  const parsed = PreviewTerminalGroupScheduleMoveQueryParams.safeParse(req.query);
+  if (!parsed.success || !TERMINAL_GROUP_KEYS.includes(parsed.data.groupKey as TerminalGroupKey)) {
+    return res.status(400).json({ error: "Invalid group or target" });
+  }
+  const { groupKey, staffId } = parsed.data;
+  const [target] = await db.select({ id: staffTable.id, active: staffTable.active, formerEmployee: staffTable.formerEmployee })
+    .from(staffTable).where(eq(staffTable.id, staffId));
+  if (!target || !isAssignmentTargetEligible(target)) return res.status(400).json({ error: "Target staff is not eligible" });
+  const areas = await db.select({
+    id: areasTable.id, name: areasTable.name, terminal: areasTable.terminal, location: areasTable.location,
+  }).from(areasTable).where(eq(areasTable.archived, false));
+  const groupAreas = areas.filter((area) => areaBelongsToGroup(area, groupKey as TerminalGroupKey));
+  const areaIds = groupAreas.map((area) => area.id);
+  const rows = areaIds.length ? await db.select({
+    id: schedulesTable.id, staffId: schedulesTable.staffId, staffName: staffTable.name,
+    areaId: schedulesTable.areaId, areaName: areasTable.name, dayOfWeek: schedulesTable.dayOfWeek,
+    startTime: schedulesTable.startTime, endTime: schedulesTable.endTime,
+    notes: schedulesTable.notes, updatedAt: schedulesTable.updatedAt,
+  }).from(schedulesTable)
+    .innerJoin(staffTable, eq(schedulesTable.staffId, staffTable.id))
+    .innerJoin(areasTable, eq(schedulesTable.areaId, areasTable.id))
+    .where(inArray(schedulesTable.areaId, areaIds)) : [];
+  return res.json({
+    snapshot: scheduleSnapshot(areaIds, rows),
+    rows: rows.filter((row) => row.staffId !== staffId).map((row) => ({
+      id: row.id, staffId: row.staffId, staffName: row.staffName,
+      areaId: row.areaId, areaName: row.areaName, dayOfWeek: row.dayOfWeek,
+      startTime: row.startTime, endTime: row.endTime,
+    })),
+    conflict: targetConflict(rows, staffId),
+  });
+});
+
+router.post("/group/preview", async (req, res) => {
+  const actor = await actorStaffFromRequest(req);
+  if (!actor) return res.status(401).json({ error: "Login session required" });
+  if (actor.role !== "admin" && actor.role !== "supervisor") return res.status(403).json({ error: "Supervisor access required" });
+  const parsed = MoveTerminalGroupScheduleBody.safeParse(req.body);
+  if (!parsed.success || !TERMINAL_GROUP_KEYS.includes(parsed.data.groupKey as TerminalGroupKey)) {
+    return res.status(400).json({ error: "Invalid schedule move" });
+  }
+  const { groupKey, staffId, snapshot } = parsed.data;
+  const result = await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"schedule:" + groupKey}))`);
+    const [target] = await tx.select({ id: staffTable.id, active: staffTable.active, formerEmployee: staffTable.formerEmployee })
+      .from(staffTable).where(eq(staffTable.id, staffId));
+    if (!target || !isAssignmentTargetEligible(target)) return { status: "invalid" as const };
+    const areas = await tx.select({
+      id: areasTable.id, name: areasTable.name, terminal: areasTable.terminal, location: areasTable.location,
+    }).from(areasTable).where(eq(areasTable.archived, false));
+    const areaIds = areas.filter((area) => areaBelongsToGroup(area, groupKey as TerminalGroupKey)).map((area) => area.id);
+    const rows = areaIds.length ? await tx.select({
+      id: schedulesTable.id, staffId: schedulesTable.staffId, areaId: schedulesTable.areaId,
+      dayOfWeek: schedulesTable.dayOfWeek, startTime: schedulesTable.startTime,
+      endTime: schedulesTable.endTime, notes: schedulesTable.notes, updatedAt: schedulesTable.updatedAt,
+    }).from(schedulesTable).where(inArray(schedulesTable.areaId, areaIds)).for("update") : [];
+    const moving = rows.filter((row) => row.staffId !== staffId);
+    if (scheduleSnapshot(areaIds, rows) !== snapshot || !moving.length || targetConflict(rows, staffId)) {
+      return { status: "conflict" as const };
+    }
+    await tx.update(schedulesTable).set({ staffId, updatedAt: new Date() })
+      .where(inArray(schedulesTable.id, moving.map((row) => row.id)));
+    return { status: "moved" as const, movedCount: moving.length };
+  });
+  if (result.status === "invalid") return res.status(400).json({ error: "Target staff is not eligible" });
+  if (result.status === "conflict") return res.status(409).json({ error: "Schedules changed, no rows need moving, or target already has a schedule for an affected area and weekday. Review again." });
+  return res.json({ movedCount: result.movedCount });
+});
 
 router.get("/", async (req: Request, res: Response) => {
   const staffId = req.query.staffId ? Number(req.query.staffId) : undefined;

@@ -557,6 +557,61 @@ export const ReassignTerminalGroupResponse = zod.object({
 });
 
 /**
+ * @summary Review recurring schedule rows that would move to another staff member
+ */
+export const PreviewTerminalGroupScheduleMoveQueryParams = zod.object({
+  groupKey: zod.enum([
+    "terminal-a-east",
+    "terminal-a-west",
+    "terminal-b-east",
+    "terminal-b-west",
+    "terminal-c-135",
+    "terminal-c-246",
+    "top-terminal",
+  ]),
+  staffId: zod.coerce.number(),
+});
+
+export const PreviewTerminalGroupScheduleMoveResponse = zod.object({
+  snapshot: zod.string(),
+  rows: zod.array(
+    zod.object({
+      id: zod.number(),
+      staffId: zod.number(),
+      staffName: zod.string(),
+      areaId: zod.number(),
+      areaName: zod.string(),
+      dayOfWeek: zod.number(),
+      startTime: zod.string(),
+      endTime: zod.string(),
+    }),
+  ),
+  conflict: zod.boolean(),
+});
+
+/**
+ * @summary Move reviewed recurring schedules only; dated assignments and tasks remain unchanged
+ */
+
+export const MoveTerminalGroupScheduleBody = zod.object({
+  groupKey: zod.enum([
+    "terminal-a-east",
+    "terminal-a-west",
+    "terminal-b-east",
+    "terminal-b-west",
+    "terminal-c-135",
+    "terminal-c-246",
+    "top-terminal",
+  ]),
+  staffId: zod.number(),
+  snapshot: zod.string().min(1),
+});
+
+export const MoveTerminalGroupScheduleResponse = zod.object({
+  movedCount: zod.number(),
+});
+
+/**
  * @summary Delete an assignment
  */
 export const DeleteAssignmentParams = zod.object({

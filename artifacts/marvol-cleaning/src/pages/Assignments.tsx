@@ -12,6 +12,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, Calendar, Trash2, Plus, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { WeeklyGroupScheduleMove } from "@/components/WeeklyGroupScheduleMove";
 
 const terminalGroups = [
   ["terminal-a-east", "terminalAEast"],
@@ -198,6 +199,8 @@ export default function Assignments() {
           </Button>
         </div>
       </div>
+
+      <WeeklyGroupScheduleMove groups={terminalGroups} staff={eligibleStaff} />
 
       {isAdding && (
         <div className="bg-indigo-50/50 rounded-3xl p-6 border border-indigo-100 shadow-sm animate-fade-in-up">

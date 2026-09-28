@@ -410,6 +410,47 @@ export interface TerminalGroupReassignmentInput {
   expectedAssignments: TerminalGroupReassignmentInputExpectedAssignmentsItem[];
 }
 
+export type TerminalGroupKey =
+  (typeof TerminalGroupKey)[keyof typeof TerminalGroupKey];
+
+export const TerminalGroupKey = {
+  "terminal-a-east": "terminal-a-east",
+  "terminal-a-west": "terminal-a-west",
+  "terminal-b-east": "terminal-b-east",
+  "terminal-b-west": "terminal-b-west",
+  "terminal-c-135": "terminal-c-135",
+  "terminal-c-246": "terminal-c-246",
+  "top-terminal": "top-terminal",
+} as const;
+
+export interface TerminalGroupScheduleRow {
+  id: number;
+  staffId: number;
+  staffName: string;
+  areaId: number;
+  areaName: string;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+}
+
+export interface TerminalGroupSchedulePreview {
+  snapshot: string;
+  rows: TerminalGroupScheduleRow[];
+  conflict: boolean;
+}
+
+export interface TerminalGroupScheduleMoveInput {
+  groupKey: TerminalGroupKey;
+  staffId: number;
+  /** @minLength 1 */
+  snapshot: string;
+}
+
+export interface TerminalGroupScheduleMoveResult {
+  movedCount: number;
+}
+
 export type IssueSeverity = (typeof IssueSeverity)[keyof typeof IssueSeverity];
 
 export const IssueSeverity = {
@@ -868,6 +909,11 @@ export type ListSpecialTasksParams = {
 export type ListAssignmentsParams = {
   date?: string;
   staffId?: number;
+};
+
+export type PreviewTerminalGroupScheduleMoveParams = {
+  groupKey: TerminalGroupKey;
+  staffId: number;
 };
 
 export type ListIssuesParams = {
