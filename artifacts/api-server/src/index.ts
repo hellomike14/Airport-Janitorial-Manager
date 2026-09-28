@@ -10,6 +10,7 @@ import { loginEnabledAfterSeedReconciliation } from "./lib/staffLoginPolicy";
 import { sweepOverdueInspectorAssignments } from "./lib/inspectorTaskWorkflow";
 import { drainOutbox } from "./lib/messageEmailOutboxWorker";
 import { inspectorRuntimeConfig } from "./lib/inspectorRuntimeConfig";
+import { lockScheduleWrites } from "./lib/scheduleLocks";
 
 const rawPort = process.env["PORT"];
 
@@ -246,6 +247,9 @@ async function seed() {
   const MGMT_ROLES = new Set(["admin", "inspector", "supervisor"]);
   const mgmtSeedNames = SEED_STAFF.filter((s) => MGMT_ROLES.has(s.role)).map((s) => s.name);
   await db.transaction(async (tx) => {
+    // Lock before any FK updates, so a reviewed schedule move cannot overlap
+    // this staff merge or acquire schedule/other row locks in reverse order.
+    await lockScheduleWrites(tx);
     for (const seedName of mgmtSeedNames) {
       const dupes = existingStaff.filter(
         (s) => s.name === seedName && s.active && MGMT_ROLES.has(s.role)
@@ -286,6 +290,7 @@ async function seed() {
   // canonical profile (and its Clerk email) while moving all historical
   // references from the typo row before removing it.
   await db.transaction(async (tx) => {
+    await lockScheduleWrites(tx);
     const [canonical] = await tx
       .select()
       .from(staffTable)
@@ -452,6 +457,9 @@ async function seed() {
   // either every reference is re-pointed and every duplicate cleared, or
   // none of it lands.
   await db.transaction(async (tx) => {
+  // Take the same ordered locks as ordinary schedule writers before area
+  // renames/merges; moving schedule area IDs can cross terminal groups.
+  await lockScheduleWrites(tx);
   for (const { oldName, terminal, newName } of AREA_RENAME_MAP) {
     if (oldName === newName) continue;
     const result = await tx
