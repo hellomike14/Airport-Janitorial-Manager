@@ -47,11 +47,10 @@ test("only management can mutate roster assignments and assignedBy is server act
   const clientAssignedBy = 999; const persistedAssignedBy = supervisor.id;
   assert.notEqual(clientAssignedBy, persistedAssignedBy);
 });
-test("former, inactive, and login-disabled assignment targets are rejected", () => {
-  assert.equal(isAssignmentTargetEligible({ active: true, loginEnabled: true, formerEmployee: false }), true);
-  assert.equal(isAssignmentTargetEligible({ active: false, loginEnabled: true, formerEmployee: false }), false);
-  assert.equal(isAssignmentTargetEligible({ active: true, loginEnabled: false, formerEmployee: false }), false);
-  assert.equal(isAssignmentTargetEligible({ active: true, loginEnabled: true, formerEmployee: true }), false);
+test("former and inactive staff cannot be assigned, but active staff without login can", () => {
+  assert.equal(isAssignmentTargetEligible({ active: true, formerEmployee: false }), true);
+  assert.equal(isAssignmentTargetEligible({ active: false, formerEmployee: false }), false);
+  assert.equal(isAssignmentTargetEligible({ active: true, formerEmployee: true }), false);
 });
 test("private object ACL permits only owner, assignment, participant, or admin", () => {
   assert.equal(canReadPrivateObject({ actor: staff, ownerStaffId: 1 }), true);

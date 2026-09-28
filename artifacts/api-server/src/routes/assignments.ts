@@ -8,6 +8,7 @@ import {
   DeleteAssignmentParams,
 } from "@workspace/api-zod";
 import { actorStaffFromRequest } from "../lib/actorSession";
+import { isAssignmentTargetEligible } from "../lib/workflowPolicies";
 
 const router: IRouter = Router();
 
@@ -73,10 +74,11 @@ router.post("/", async (req, res) => {
   const body = CreateAssignmentBody.parse(req.body);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(body.assignmentDate)) return res.status(400).json({ error: "Invalid assignment date" });
   const [[target], [targetArea]] = await Promise.all([
-    db.select({ id: staffTable.id }).from(staffTable).where(and(eq(staffTable.id, body.staffId), eq(staffTable.active, true), eq(staffTable.loginEnabled, true), eq(staffTable.formerEmployee, false))),
+    db.select({ id: staffTable.id, active: staffTable.active, formerEmployee: staffTable.formerEmployee })
+      .from(staffTable).where(eq(staffTable.id, body.staffId)),
     db.select({ id: areasTable.id }).from(areasTable).where(and(eq(areasTable.id, body.areaId), eq(areasTable.archived, false))),
   ]);
-  if (!target || !targetArea) return res.status(400).json({ error: "Target staff or area is not eligible" });
+  if (!target || !isAssignmentTargetEligible(target) || !targetArea) return res.status(400).json({ error: "Target staff or area is not eligible" });
   const [created] = await db
     .insert(assignmentsTable)
     .values({

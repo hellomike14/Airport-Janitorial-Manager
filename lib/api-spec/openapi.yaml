@@ -113,6 +113,40 @@ paths:
               schema:
                 $ref: "#/components/schemas/AuthServiceUnavailableError"
 
+  /staff/former:
+    get:
+      operationId: listFormerStaff
+      tags: [staff]
+      summary: List archived former staff for administrator rehire
+      responses:
+        "200":
+          description: Former staff records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StaffMember"
+
+  /staff/{id}/rehire:
+    post:
+      operationId: rehireStaffMember
+      tags: [staff]
+      summary: Reactivate a former staff member without enabling sign-in
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Reactivated staff member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffMember"
+
   /staff/{id}:
     put:
       operationId: updateStaffMember

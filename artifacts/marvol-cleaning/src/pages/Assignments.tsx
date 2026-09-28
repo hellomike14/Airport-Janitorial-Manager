@@ -72,12 +72,10 @@ export default function Assignments() {
     });
   };
 
-  const assignmentStaff = (staff ?? []).filter((person) => person.role === "staff");
+  const assignmentStaff = staff ?? [];
   const eligibleStaff = assignmentStaff.filter((person) => {
-    const access = person as typeof person & { loginEnabled?: boolean; formerEmployee?: boolean };
-    return access.active && access.loginEnabled === true && access.formerEmployee !== true;
+    return person.active && person.formerEmployee !== true;
   });
-  const unavailableStaffCount = assignmentStaff.length - eligibleStaff.length;
 
   const updateForm = (changes: Partial<typeof formData>) => {
     setCreateError(null);
@@ -149,11 +147,9 @@ export default function Assignments() {
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
-                {unavailableStaffCount > 0 && (
-                  <p className="mt-2 text-xs leading-relaxed text-indigo-700" data-testid="text-unavailable-assignment-staff">
-                    {t("assignments.unavailableStaffHint")}
-                  </p>
-                )}
+                <p className="mt-2 text-xs leading-relaxed text-indigo-700">
+                  {t("assignments.activeStaffHint")}
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-semibold text-indigo-900 mb-1">{t("assignments.selectArea")}</label>

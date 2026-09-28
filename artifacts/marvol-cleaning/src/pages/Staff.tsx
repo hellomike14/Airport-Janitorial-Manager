@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { useListStaff, useCreateStaffMember, useDeleteStaffMember, useUpdateStaffMember } from "@workspace/api-client-react";
+import { useListStaff, useListFormerStaff, getListFormerStaffQueryKey, useRehireStaffMember, useCreateStaffMember, useDeleteStaffMember, useUpdateStaffMember } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { UserPlus, Shield, User, Trash2, Lock, ArrowUpDown, LogOut, MailWarning, CheckCircle2, Mail, Phone } from "lucide-react";
+import { UserPlus, Shield, User, Trash2, Lock, ArrowUpDown, LogOut, MailWarning, CheckCircle2, Mail, Phone, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useTranslation } from "react-i18next";
@@ -13,6 +13,7 @@ export default function Staff() {
   const { effectiveRole } = useAuth();
   const readOnly = effectiveRole === "supervisor";
   const { data: staff, isLoading } = useListStaff();
+  const { data: formerStaff } = useListFormerStaff({ query: { queryKey: getListFormerStaffQueryKey(), enabled: effectiveRole === "admin" } });
   const { currentUser, logout } = useAuth();
   const queryClient = useQueryClient();
   const [isAdding, setIsAdding] = useState(false);
@@ -44,6 +45,16 @@ export default function Staff() {
         alert(err?.data?.error ?? err?.message ?? t("staff.saveFailed", "Could not save the staff member.")),
     },
   });
+  const rehireMutation = useRehireStaffMember({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/staff/former"] });
+      },
+      onError: (err: any) =>
+        alert(err?.data?.error ?? err?.message ?? t("staff.rehireFailed")),
+    },
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,7 +70,7 @@ export default function Staff() {
   const handleSetEmail = (person: any) => {
     const email = window.prompt(
       t("staff.setEmailPrompt", "Login email for {{name}}:", { name: person.name }),
-      ""
+      person.email?.trim() ?? ""
     );
     if (email === null) return;
     const trimmed = email.trim();
@@ -68,6 +79,12 @@ export default function Staff() {
       return;
     }
     updateMutation.mutate({ id: person.id, data: { email: trimmed } as any });
+  };
+
+  const handleRehire = (person: { id: number; name: string }) => {
+    if (confirm(t("staff.rehireConfirm", { name: person.name }))) {
+      rehireMutation.mutate({ id: person.id });
+    }
   };
 
   const handleToggleRole = (person: any) => {
@@ -243,6 +260,23 @@ export default function Staff() {
           ))}
         </div>
       </div>
+      {effectiveRole === "admin" && formerStaff && formerStaff.length > 0 && (
+        <section className="pt-4 border-t border-slate-200">
+          <h2 className="text-xl font-display font-bold text-slate-800 mb-2">{t("staff.formerStaff")}</h2>
+          <p className="text-sm text-slate-500 mb-4">{t("staff.rehireHint")}</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {formerStaff.map((person) => (
+              <div key={person.id} className="rounded-xl border border-slate-200 bg-white p-4 flex items-center justify-between gap-3">
+                <span className="font-semibold text-slate-800">{person.name}</span>
+                <Button type="button" variant="outline" disabled={rehireMutation.isPending}
+                  onClick={() => handleRehire(person)}>
+                  <RotateCcw className="w-4 h-4 mr-2" />{t("staff.rehire")}
+                </Button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

@@ -9,8 +9,8 @@ export function canManageAssignments(actor: ActorPolicy): boolean {
   return actor.role === "supervisor" || actor.role === "admin";
 }
 
-export function isAssignmentTargetEligible(target: { active: boolean; loginEnabled: boolean; formerEmployee: boolean }): boolean {
-  return target.active && target.loginEnabled && !target.formerEmployee;
+export function isAssignmentTargetEligible(target: { active: boolean; formerEmployee: boolean }): boolean {
+  return target.active && !target.formerEmployee;
 }
 
 export function canReadPrivateObject(input: {

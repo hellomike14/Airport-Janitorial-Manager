@@ -308,7 +308,8 @@
     "assignedByCol": "Assigned By",
     "createFailed": "Could not create the assignment. Check the selected staff member and try again.",
     "deleteFailed": "Could not remove the assignment. Please try again.",
-    "unavailableStaffHint": "Staff with disabled sign-in are unavailable for assignments. An admin must edit and save their email to enable eligible active staff."
+    "unavailableStaffHint": "Inactive or former staff cannot be assigned.",
+    "activeStaffHint": "All active staff can be assigned, including staff without app sign-in."
   },
   "staff": {
     "staffDirectory": "Staff Directory",
@@ -327,6 +328,11 @@
     "administrators": "Administrators",
     "supervisors": "Supervisors",
     "cleaningStaff": "Cleaning Staff",
+    "formerStaff": "Former staff",
+    "rehire": "Rehire",
+    "rehireHint": "Rehire restores the existing record and history. Sign-in stays disabled until an admin confirms and saves the staff member’s email.",
+    "rehireConfirm": "Rehire {{name}}? Their past work will be preserved and sign-in will remain disabled.",
+    "rehireFailed": "Could not rehire this staff member.",
     "noPhoneAdded": "No phone added",
     "noEmailAdded": "No email added",
     "removeStaffMember": "Remove this staff member?",

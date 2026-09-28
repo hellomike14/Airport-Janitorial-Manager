@@ -308,7 +308,8 @@
     "assignedByCol": "Asignado Por",
     "createFailed": "No se pudo crear la asignación. Verifique el miembro del personal seleccionado e inténtelo de nuevo.",
     "deleteFailed": "No se pudo eliminar la asignación. Inténtelo de nuevo.",
-    "unavailableStaffHint": "El personal con el inicio de sesión deshabilitado no está disponible para asignaciones. Un administrador debe editar y guardar su correo para habilitar al personal activo elegible."
+    "unavailableStaffHint": "El personal inactivo o antiguo no puede recibir asignaciones.",
+    "activeStaffHint": "Todo el personal activo puede recibir asignaciones, incluso sin acceso a la aplicación."
   },
   "staff": {
     "staffDirectory": "Directorio de Personal",
@@ -327,6 +328,11 @@
     "administrators": "Administradores",
     "supervisors": "Supervisores",
     "cleaningStaff": "Personal de Limpieza",
+    "formerStaff": "Antiguos empleados",
+    "rehire": "Recontratar",
+    "rehireHint": "La recontratación conserva el historial. El acceso seguirá deshabilitado hasta que un administrador confirme y guarde el correo.",
+    "rehireConfirm": "¿Recontratar a {{name}}? Se conservará su historial y el acceso seguirá deshabilitado.",
+    "rehireFailed": "No se pudo recontratar a este empleado.",
     "noPhoneAdded": "Sin teléfono agregado",
     "noEmailAdded": "Sin correo agregado",
     "removeStaffMember": "¿Eliminar este miembro del personal?",

@@ -6,6 +6,7 @@ import { renameSharedAreaName, AREA_RENAME_MAP } from "./area-renames";
 import { AREA_SPECIFIC_TASKS, AREAS_REPLACING_DEFAULTS } from "./area-tasks";
 import { DEPRECATED_MCO_AREA_IDENTITIES, MCO_TERMINAL_AREAS } from "@workspace/db/area-catalog";
 import { SEED_STAFF, REMOVED_STAFF_NAMES, isSeedLoginEnabled } from "./seed-data";
+import { loginEnabledAfterSeedReconciliation } from "./lib/staffLoginPolicy";
 import { sweepOverdueInspectorAssignments } from "./lib/inspectorTaskWorkflow";
 import { drainOutbox } from "./lib/messageEmailOutboxWorker";
 import { inspectorRuntimeConfig } from "./lib/inspectorRuntimeConfig";
@@ -429,7 +430,12 @@ async function seed() {
     // Only current, named seed identities receive seed login policy.  This
     // intentionally leaves arbitrary legacy inactive rows unchanged.
     if (seedEntry && existing.active && seedEntry.name === existing.name) {
-      const loginEnabled = isSeedLoginEnabled(seedEntry);
+      const loginEnabled = loginEnabledAfterSeedReconciliation({
+        active: existing.active,
+        loginEnabled: existing.loginEnabled,
+        formerEmployee: existing.formerEmployee,
+        seedLoginEnabled: seedEntry.loginEnabled,
+      });
       if (existing.loginEnabled !== loginEnabled) {
         await db.update(staffTable).set({ loginEnabled }).where(eq(staffTable.id, existing.id));
       }

@@ -94,6 +94,79 @@ export const GetCurrentStaffMemberResponse = zod.object({
 });
 
 /**
+ * @summary List archived former staff for administrator rehire
+ */
+export const ListFormerStaffResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  role: zod.enum(["staff", "supervisor", "admin", "inspector"]),
+  hasEmail: zod
+    .boolean()
+    .describe("Whether the staff member has a configured sign-in email."),
+  email: zod
+    .string()
+    .nullish()
+    .describe(
+      "Saved email, returned in the staff directory only to administrators and supervisors.",
+    ),
+  phone: zod
+    .string()
+    .nullish()
+    .describe(
+      "Saved phone number, returned in the staff directory only to administrators and supervisors.",
+    ),
+  active: zod.boolean(),
+  loginEnabled: zod
+    .boolean()
+    .describe("Whether this staff member is currently eligible to sign in."),
+  formerEmployee: zod
+    .boolean()
+    .describe(
+      "Whether this retained historical record belongs to a former employee.",
+    ),
+  createdAt: zod.string(),
+});
+export const ListFormerStaffResponse = zod.array(ListFormerStaffResponseItem);
+
+/**
+ * @summary Reactivate a former staff member without enabling sign-in
+ */
+export const RehireStaffMemberParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const RehireStaffMemberResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  role: zod.enum(["staff", "supervisor", "admin", "inspector"]),
+  hasEmail: zod
+    .boolean()
+    .describe("Whether the staff member has a configured sign-in email."),
+  email: zod
+    .string()
+    .nullish()
+    .describe(
+      "Saved email, returned in the staff directory only to administrators and supervisors.",
+    ),
+  phone: zod
+    .string()
+    .nullish()
+    .describe(
+      "Saved phone number, returned in the staff directory only to administrators and supervisors.",
+    ),
+  active: zod.boolean(),
+  loginEnabled: zod
+    .boolean()
+    .describe("Whether this staff member is currently eligible to sign in."),
+  formerEmployee: zod
+    .boolean()
+    .describe(
+      "Whether this retained historical record belongs to a former employee.",
+    ),
+  createdAt: zod.string(),
+});
+
+/**
  * @summary Update a staff member
  */
 export const UpdateStaffMemberParams = zod.object({

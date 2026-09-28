@@ -308,7 +308,8 @@
     "assignedByCol": "Assigné Par",
     "createFailed": "Impossible de créer l'affectation. Vérifiez le membre du personnel sélectionné et réessayez.",
     "deleteFailed": "Impossible de supprimer l'affectation. Veuillez réessayer.",
-    "unavailableStaffHint": "Le personnel dont la connexion est désactivée ne peut pas être affecté. Un administrateur doit modifier et enregistrer son e-mail pour activer le personnel actif admissible."
+    "unavailableStaffHint": "Le personnel inactif ou ancien ne peut pas être affecté.",
+    "activeStaffHint": "Tout le personnel actif peut être affecté, même sans accès à l’application."
   },
   "staff": {
     "staffDirectory": "Répertoire du Personnel",
@@ -327,6 +328,11 @@
     "administrators": "Administrateurs",
     "supervisors": "Superviseurs",
     "cleaningStaff": "Personnel de Nettoyage",
+    "formerStaff": "Anciens employés",
+    "rehire": "Réembaucher",
+    "rehireHint": "La réembauche conserve l’historique. La connexion reste désactivée jusqu’à ce qu’un administrateur confirme et enregistre l’e-mail.",
+    "rehireConfirm": "Réembaucher {{name}} ? Son historique sera conservé et la connexion restera désactivée.",
+    "rehireFailed": "Impossible de réembaucher ce membre du personnel.",
     "noPhoneAdded": "Aucun téléphone ajouté",
     "noEmailAdded": "Aucun email ajouté",
     "removeStaffMember": "Supprimer ce membre du personnel ?",

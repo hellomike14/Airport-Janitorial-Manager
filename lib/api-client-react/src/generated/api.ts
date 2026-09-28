@@ -416,6 +416,165 @@ export function useGetCurrentStaffMember<
 }
 
 /**
+ * @summary List archived former staff for administrator rehire
+ */
+export const getListFormerStaffUrl = () => {
+  return `/api/staff/former`;
+};
+
+export const listFormerStaff = async (
+  options?: RequestInit,
+): Promise<StaffMember[]> => {
+  return customFetch<StaffMember[]>(getListFormerStaffUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListFormerStaffQueryKey = () => {
+  return [`/api/staff/former`] as const;
+};
+
+export const getListFormerStaffQueryOptions = <
+  TData = Awaited<ReturnType<typeof listFormerStaff>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listFormerStaff>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListFormerStaffQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listFormerStaff>>> = ({
+    signal,
+  }) => listFormerStaff({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listFormerStaff>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListFormerStaffQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listFormerStaff>>
+>;
+export type ListFormerStaffQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List archived former staff for administrator rehire
+ */
+
+export function useListFormerStaff<
+  TData = Awaited<ReturnType<typeof listFormerStaff>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listFormerStaff>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListFormerStaffQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Reactivate a former staff member without enabling sign-in
+ */
+export const getRehireStaffMemberUrl = (id: number) => {
+  return `/api/staff/${id}/rehire`;
+};
+
+export const rehireStaffMember = async (
+  id: number,
+  options?: RequestInit,
+): Promise<StaffMember> => {
+  return customFetch<StaffMember>(getRehireStaffMemberUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getRehireStaffMemberMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof rehireStaffMember>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof rehireStaffMember>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["rehireStaffMember"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof rehireStaffMember>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return rehireStaffMember(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RehireStaffMemberMutationResult = NonNullable<
+  Awaited<ReturnType<typeof rehireStaffMember>>
+>;
+
+export type RehireStaffMemberMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Reactivate a former staff member without enabling sign-in
+ */
+export const useRehireStaffMember = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof rehireStaffMember>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof rehireStaffMember>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getRehireStaffMemberMutationOptions(options));
+};
+
+/**
  * @summary Update a staff member
  */
 export const getUpdateStaffMemberUrl = (id: number) => {
