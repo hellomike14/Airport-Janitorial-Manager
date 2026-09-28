@@ -7,10 +7,14 @@ export const areasTable = pgTable("areas", {
   name: text("name").notNull(),
   terminal: text("terminal").notNull(),
   location: text("location").notNull(),
+  coverage: text("coverage"),
+  additionalCoverage: text("additional_coverage"),
   sortOrder: integer("sort_order").notNull().default(0),
   archived: boolean("archived").notNull().default(false),
 });
 
-export const insertAreaSchema = createInsertSchema(areasTable).omit({ id: true });
+export const insertAreaSchema = createInsertSchema(areasTable).omit({
+  id: true,
+});
 export type InsertArea = z.infer<typeof insertAreaSchema>;
 export type Area = typeof areasTable.$inferSelect;

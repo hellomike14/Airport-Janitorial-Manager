@@ -1384,6 +1384,11 @@ components:
           type: string
         location:
           type: string
+        coverage:
+          type: string
+        additionalCoverage:
+          type: string
+          nullable: true
         sortOrder:
           type: integer
       required:
@@ -1391,6 +1396,8 @@ components:
         - name
         - terminal
         - location
+        - coverage
+        - additionalCoverage
         - sortOrder
 
     Task:

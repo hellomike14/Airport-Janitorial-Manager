@@ -23,13 +23,13 @@ pnpm workspace monorepo using TypeScript. This is the **Marvol Facility Cleaning
 
 A comprehensive janitorial cleaning management web app for Marvol Facility at MCO International Airport.
 
-**Coverage Areas (31 total, grouped by terminal side):**
-- Terminal A - East: East Garage, P1-P4, R1-R2
-- Terminal A - West: West Garage, P1-P4, R1-R2
-- Terminal B - East: East Garage, P1-P4, R1-R2
-- Terminal B - West: West Garage, P1-P4, R1-R2
-- Terminal C: Levels 1,3,5 / Levels 2,4,6
-- Top Terminal: Levels 4-11
+**Coverage Areas (43 total, grouped by terminal side):**
+- Terminal A East: Levels 1-4, R1-R2, Taxis, Checkpoint, Garden
+- Terminal A West: Levels 1-4, R1-R2
+- Terminal B East: Levels 1-4, R1-R2
+- Terminal B West: Levels 1-4, R1-R2, Taxis, Garden
+- Terminal C: Group 1 Levels 1, 3, 5 and Group 2 Levels 2, 4, 6
+- Top Terminal: Levels 4-11 with Side A and Side B coverage
 
 **Team (14 total):**
 - 1 Admin (System Administrator)
@@ -184,4 +184,4 @@ Every package extends `tsconfig.base.json` which sets `composite: true`. The roo
 
 Run `pnpm --filter @workspace/scripts run seed` to populate:
 - 13 staff members (1 admin + 2 supervisors + 10 cleaning staff)
-- 7 cleaning areas at MCO Airport
+- 43 cleaning areas at MCO Airport

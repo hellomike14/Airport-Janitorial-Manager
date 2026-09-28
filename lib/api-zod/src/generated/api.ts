@@ -88,6 +88,8 @@ export const ListAreasResponseItem = zod.object({
   name: zod.string(),
   terminal: zod.string(),
   location: zod.string(),
+  coverage: zod.string(),
+  additionalCoverage: zod.string().nullable(),
   sortOrder: zod.number(),
 });
 export const ListAreasResponse = zod.array(ListAreasResponseItem);
