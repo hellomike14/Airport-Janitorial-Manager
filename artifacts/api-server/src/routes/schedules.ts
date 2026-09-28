@@ -1,4 +1,4 @@
-import { Router, type IRouter, type Request, type Response } from "express";
+import { Router, type IRouter, type NextFunction, type Request, type Response } from "express";
 import { createHash } from "node:crypto";
 import { db } from "@workspace/db";
 import { schedulesTable, staffTable, areasTable } from "@workspace/db/schema";
@@ -172,6 +172,19 @@ router.get("/", async (req: Request, res: Response) => {
   res.json(schedules);
 });
 
+const requireScheduleEditor = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  const actor = await resolveActor(req);
+  if (!actor) {
+    res.status(401).json({ error: "Login session required" });
+    return;
+  }
+  if (actor.role !== "admin" && actor.role !== "supervisor") {
+    res.status(403).json({ error: "Supervisor access required" });
+    return;
+  }
+  next();
+};
+
 const timeRegex = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 const ScheduleFields = z.object({
@@ -188,7 +201,7 @@ const UpdateScheduleBody = ScheduleFields.partial().refine(
   { message: "startTime must be before endTime" },
 );
 
-router.post("/", async (req: Request, res: Response) => {
+router.post("/", requireScheduleEditor, async (req: Request, res: Response) => {
   const body = CreateScheduleBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: "Invalid request", details: body.error.flatten() });
@@ -218,7 +231,7 @@ const BulkCreateBody = z.object({
   schedules: z.array(CreateScheduleBody),
 });
 
-router.post("/bulk", async (req: Request, res: Response) => {
+router.post("/bulk", requireScheduleEditor, async (req: Request, res: Response) => {
   const body = BulkCreateBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: "Invalid request" });
@@ -247,7 +260,7 @@ router.post("/bulk", async (req: Request, res: Response) => {
   res.json(results);
 });
 
-router.put("/:id", async (req: Request, res: Response) => {
+router.put("/:id", requireScheduleEditor, async (req: Request, res: Response) => {
   const id = Number(req.params.id);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid id" });
@@ -275,7 +288,7 @@ router.put("/:id", async (req: Request, res: Response) => {
   res.json(updated);
 });
 
-router.delete("/:id", async (req: Request, res: Response) => {
+router.delete("/:id", requireScheduleEditor, async (req: Request, res: Response) => {
   const id = Number(req.params.id);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid id" });
@@ -295,7 +308,7 @@ router.delete("/:id", async (req: Request, res: Response) => {
   res.json({ success: true });
 });
 
-router.delete("/staff/:staffId/clear", async (req: Request, res: Response) => {
+router.delete("/staff/:staffId/clear", requireScheduleEditor, async (req: Request, res: Response) => {
   const staffId = Number(req.params.staffId);
   if (isNaN(staffId)) {
     res.status(400).json({ error: "Invalid staffId" });

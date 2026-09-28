@@ -9,6 +9,56 @@ import type { SQL } from "drizzle-orm";
 
 type Row = { id: number; staffId: number; areaId: number; dayOfWeek: number; startTime: string; endTime: string; notes: string | null; updatedAt: Date; staffName: string; areaName: string };
 
+test("direct schedule writers require a supervisor or admin before validation or database writes", async () => {
+  let role: "staff" | "supervisor" | "admin" | null = null;
+  let transactions = 0;
+  const database = {
+    transaction: async () => {
+      transactions++;
+      throw new Error("Unauthorized request reached the database");
+    },
+  };
+  const app = express();
+  app.use(express.json());
+  app.use("/api/schedules", createSchedulesRouter(database as never, (async () => role ? { id: 7, role } : null) as never));
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise<void>((resolve) => server.once("listening", resolve));
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/schedules`;
+  const writes = [
+    { method: "POST", path: "/", body: {} },
+    { method: "POST", path: "/bulk", body: { schedules: [] } },
+    { method: "PUT", path: "/123", body: {} },
+    { method: "DELETE", path: "/123" },
+    { method: "DELETE", path: "/staff/7/clear" },
+  ] as const;
+  const send = (write: typeof writes[number]) => fetch(`${base}${write.path}`, {
+    method: write.method,
+    ...("body" in write ? { headers: { "content-type": "application/json" }, body: JSON.stringify(write.body) } : {}),
+  });
+  try {
+    for (const deniedRole of [null, "staff"] as const) {
+      role = deniedRole;
+      for (const write of writes) {
+        const response = await send(write);
+        assert.equal(response.status, deniedRole === null ? 401 : 403, `${deniedRole ?? "unauthenticated"} ${write.method} ${write.path}`);
+        assert.deepEqual(await response.json(), {
+          error: deniedRole === null ? "Login session required" : "Supervisor access required",
+        });
+      }
+    }
+    assert.equal(transactions, 0, "denied writes must not reach the database");
+    for (const allowedRole of ["supervisor", "admin"] as const) {
+      role = allowedRole;
+      const response = await send(writes[1]);
+      assert.equal(response.status, 200, `${allowedRole} can use the bulk writer`);
+      assert.deepEqual(await response.json(), []);
+    }
+    assert.equal(transactions, 0, "empty bulk create does not start a transaction");
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((err) => err ? reject(err) : resolve()));
+  }
+});
+
 test("reviewed weekly move authorizes supervisors, rejects stale/overlapping reviews and changes only schedule owners", async () => {
   // All tables here are in-memory fixtures, not the existing site database.
   const area = { id: 987654, name: "Weekly move fixture", terminal: "Terminal A - East", location: "Fixture" };
