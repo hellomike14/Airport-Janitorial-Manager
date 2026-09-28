@@ -1,4 +1,5 @@
 import { renameSharedAreaName } from "./area-renames";
+import { MCO_TERMINAL_AREAS } from "@workspace/db/area-catalog";
 
 // Audit notes (shared area names that exist in both Terminal A and Terminal B):
 //   - "Level P1 - East" / "Level P1 - West" / "Level P2 - East" / "Level P2 - West"
@@ -270,6 +271,13 @@ const TERMINALS_FOR_OLD_KEY: Record<string, string[]> = {
   "Level R2 - West": ["Terminal A - West", "Terminal B - West"],
 };
 
+function canonicalAreaName(terminal: string, oldAreaName: string): string {
+  const match = MCO_TERMINAL_AREAS.find(
+    (area) => area.terminal === terminal && (area.name === oldAreaName || area.legacyNames.includes(oldAreaName)),
+  );
+  return match?.name ?? renameSharedAreaName(oldAreaName, terminal);
+}
+
 // Areas whose area-specific bin list fully replaces the 13 default task types.
 // Keys are raw (pre-rename) qualified keys "Terminal::AreaName"; expanded to
 // post-rename keys below so they line up with what ensureTasksForDate looks up.
@@ -285,7 +293,7 @@ export const AREAS_REPLACING_DEFAULTS: Set<string> = new Set(
     const sep = raw.indexOf("::");
     const terminal = raw.slice(0, sep);
     const oldAreaName = raw.slice(sep + 2);
-    return `${terminal}::${renameSharedAreaName(oldAreaName, terminal)}`;
+    return `${terminal}::${canonicalAreaName(terminal, oldAreaName)}`;
   }),
 );
 
@@ -299,7 +307,7 @@ export const AREA_SPECIFIC_TASKS: Record<string, { taskName: string; taskOrder: 
     if (sep !== -1) {
       const terminal = rawKey.slice(0, sep);
       const oldAreaName = rawKey.slice(sep + 2);
-      out[`${terminal}::${renameSharedAreaName(oldAreaName, terminal)}`] = tasks;
+      out[`${terminal}::${canonicalAreaName(terminal, oldAreaName)}`] = tasks;
       continue;
     }
 
@@ -311,7 +319,7 @@ export const AREA_SPECIFIC_TASKS: Record<string, { taskName: string; taskOrder: 
       continue;
     }
     for (const terminal of terminals) {
-      out[renameSharedAreaName(rawKey, terminal)] = tasks;
+      out[`${terminal}::${canonicalAreaName(terminal, rawKey)}`] = tasks;
     }
   }
   return out;

@@ -1,9 +1,10 @@
 import app from "./app";
 import { db } from "@workspace/db";
-import { staffTable, areasTable, taskTypesTable, notificationsTable, staffLocationsTable, tasksTable, taskExclusionsTable, assignmentsTable, schedulesTable, issuesTable, sharedPhotosTable, conversationsTable, messagesTable, conversationParticipantsTable } from "@workspace/db/schema";
+import { staffTable, areasTable, taskTypesTable, notificationsTable, staffLocationsTable, tasksTable, taskExclusionsTable, assignmentsTable, schedulesTable, issuesTable, sharedPhotosTable, objectUploadsTable, conversationsTable, messagesTable, conversationParticipantsTable } from "@workspace/db/schema";
 import { eq, and, count, inArray, or, gte, like, ne, sql } from "drizzle-orm";
 import { renameSharedAreaName, AREA_RENAME_MAP } from "./area-renames";
 import { AREA_SPECIFIC_TASKS, AREAS_REPLACING_DEFAULTS } from "./area-tasks";
+import { DEPRECATED_MCO_AREA_IDENTITIES, MCO_TERMINAL_AREAS } from "@workspace/db/area-catalog";
 import { SEED_STAFF, REMOVED_STAFF_NAMES, isSeedLoginEnabled } from "./seed-data";
 import { sweepOverdueInspectorAssignments } from "./lib/inspectorTaskWorkflow";
 import { drainOutbox } from "./lib/messageEmailOutboxWorker";
@@ -24,7 +25,7 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-const RAW_SEED_AREAS = [
+const LEGACY_SEED_AREAS = [
   { name: "P4 - Row L-H",                terminal: "Terminal A - East", location: "East",         sortOrder: 1 },
   { name: "Terminal A — P3 Row H-P",     terminal: "Terminal A - East", location: "East",         sortOrder: 2 },
   { name: "Terminal A — P2 Row H-P",     terminal: "Terminal A - East", location: "East",         sortOrder: 3 },
@@ -80,11 +81,6 @@ const RAW_SEED_AREAS = [
   { name: "Top Terminal — Level 11", terminal: "Top Terminal", location: "Level 11", sortOrder: 53 },
 ];
 
-const SEED_AREAS = RAW_SEED_AREAS.map((a) => ({
-  ...a,
-  name: renameSharedAreaName(a.name, a.terminal),
-}));
-
 const SEED_TASK_TYPES = [
   { taskName: "Routine sweep of all levels — remove debris, trash, and litter", taskOrder: 1 },
   { taskName: "Mop and sanitize all floor surfaces — extra attention to high-traffic zones", taskOrder: 2 },
@@ -119,6 +115,8 @@ async function seed() {
   await db.execute(
     sql`ALTER TABLE "areas" ADD COLUMN IF NOT EXISTS "archived" boolean NOT NULL DEFAULT false`
   );
+  await db.execute(sql`ALTER TABLE "areas" ADD COLUMN IF NOT EXISTS "coverage" text`);
+  await db.execute(sql`ALTER TABLE "areas" ADD COLUMN IF NOT EXISTS "additional_coverage" text`);
 
   // Startup-safe DDL guard for the in-app messaging tables. Idempotent.
   await db.execute(sql`
@@ -525,6 +523,18 @@ async function seed() {
       await tx.update(schedulesTable).set({ areaId: toId }).where(eq(schedulesTable.areaId, fromRow.id));
       await tx.update(issuesTable).set({ areaId: toId }).where(eq(issuesTable.areaId, fromRow.id));
       await tx.update(sharedPhotosTable).set({ areaId: toId }).where(eq(sharedPhotosTable.areaId, fromRow.id));
+      await tx.update(objectUploadsTable).set({ areaId: toId }).where(eq(objectUploadsTable.areaId, fromRow.id));
+      const exclusions = await tx
+        .select({ taskName: taskExclusionsTable.taskName, createdById: taskExclusionsTable.createdById })
+        .from(taskExclusionsTable)
+        .where(eq(taskExclusionsTable.areaId, fromRow.id));
+      if (exclusions.length > 0) {
+        await tx
+          .insert(taskExclusionsTable)
+          .values(exclusions.map((entry) => ({ ...entry, areaId: toId })))
+          .onConflictDoNothing();
+        await tx.delete(taskExclusionsTable).where(eq(taskExclusionsTable.areaId, fromRow.id));
+      }
       await tx.delete(areasTable).where(eq(areasTable.id, fromRow.id));
       console.log(`Merged area #${fromRow.id} (${from.name} / ${from.terminal}) → #${toId} (${to.name} / ${to.terminal})`);
     }
@@ -606,38 +616,74 @@ async function seed() {
     }
   }
 
-  const existingAreas = await tx.select({ id: areasTable.id, name: areasTable.name, terminal: areasTable.terminal, sortOrder: areasTable.sortOrder }).from(areasTable);
-  const areaKey = (name: string, terminal: string) => `${name}||${terminal}`;
-  const existingAreaKeys = new Map(existingAreas.map((a) => [areaKey(a.name, a.terminal), a]));
+  // Reconcile every workbook-defined area in place. A legacy row becomes the
+  // canonical row whenever possible so historical references retain their id;
+  // any same-area duplicates are merged into it before deletion.
+  for (const catalogArea of MCO_TERMINAL_AREAS) {
+    const candidateNames = [catalogArea.name, ...catalogArea.legacyNames];
+    const candidates = await tx
+      .select({ id: areasTable.id, name: areasTable.name })
+      .from(areasTable)
+      .where(and(eq(areasTable.terminal, catalogArea.terminal), inArray(areasTable.name, candidateNames)));
 
-  for (const area of existingAreas) {
-    const seedArea = SEED_AREAS.find((a) => a.name === area.name && a.terminal === area.terminal);
-    if (seedArea && seedArea.sortOrder !== area.sortOrder) {
-      await tx.update(areasTable).set({ sortOrder: seedArea.sortOrder }).where(eq(areasTable.id, area.id));
-      console.log(`Updated area ${area.name} (${area.terminal}): sortOrder → ${seedArea.sortOrder}`);
+    let canonical = candidates.find((row) => row.name === catalogArea.name) ?? candidates[0];
+    const values = {
+      name: catalogArea.name,
+      terminal: catalogArea.terminal,
+      location: catalogArea.location,
+      coverage: catalogArea.coverage,
+      additionalCoverage: catalogArea.additionalCoverage,
+      sortOrder: catalogArea.sortOrder,
+      archived: false,
+    };
+
+    if (!canonical) {
+      [canonical] = await tx.insert(areasTable).values(values).returning({ id: areasTable.id, name: areasTable.name });
+      console.log(`Added workbook area ${catalogArea.name} (${catalogArea.terminal})`);
+    } else {
+      await tx.update(areasTable).set(values).where(eq(areasTable.id, canonical.id));
     }
-  }
 
-  for (const area of existingAreas) {
-    const matchByName = SEED_AREAS.find((a) => a.name === area.name);
-    if (matchByName && matchByName.terminal !== area.terminal) {
-      const newKey = areaKey(area.name, matchByName.terminal);
-      if (!existingAreaKeys.has(newKey)) {
-        await tx.update(areasTable).set({ terminal: matchByName.terminal, sortOrder: matchByName.sortOrder }).where(eq(areasTable.id, area.id));
-        existingAreaKeys.set(newKey, area);
-        existingAreaKeys.delete(areaKey(area.name, area.terminal));
-        console.log(`Updated area ${area.name}: terminal ${area.terminal} → ${matchByName.terminal}`);
+    for (const duplicate of candidates) {
+      if (duplicate.id === canonical.id) continue;
+
+      await tx.update(tasksTable).set({ areaId: canonical.id }).where(eq(tasksTable.areaId, duplicate.id));
+      await tx.update(assignmentsTable).set({ areaId: canonical.id }).where(eq(assignmentsTable.areaId, duplicate.id));
+      await tx.update(schedulesTable).set({ areaId: canonical.id }).where(eq(schedulesTable.areaId, duplicate.id));
+      await tx.update(issuesTable).set({ areaId: canonical.id }).where(eq(issuesTable.areaId, duplicate.id));
+      await tx.update(sharedPhotosTable).set({ areaId: canonical.id }).where(eq(sharedPhotosTable.areaId, duplicate.id));
+      await tx.update(objectUploadsTable).set({ areaId: canonical.id }).where(eq(objectUploadsTable.areaId, duplicate.id));
+
+      const exclusions = await tx
+        .select({ taskName: taskExclusionsTable.taskName, createdById: taskExclusionsTable.createdById })
+        .from(taskExclusionsTable)
+        .where(eq(taskExclusionsTable.areaId, duplicate.id));
+      if (exclusions.length > 0) {
+        await tx
+          .insert(taskExclusionsTable)
+          .values(exclusions.map((entry) => ({ ...entry, areaId: canonical.id })))
+          .onConflictDoNothing();
+        await tx.delete(taskExclusionsTable).where(eq(taskExclusionsTable.areaId, duplicate.id));
       }
+
+      await tx.delete(areasTable).where(eq(areasTable.id, duplicate.id));
+      console.log(`Merged legacy area #${duplicate.id} into #${canonical.id} ${catalogArea.name} (${catalogArea.terminal})`);
     }
   }
 
-  const newAreas = SEED_AREAS.filter((a) => !existingAreaKeys.has(areaKey(a.name, a.terminal)));
-  if (existingAreas.length === 0) {
-    await tx.insert(areasTable).values(SEED_AREAS);
-    console.log(`Seeded: ${SEED_AREAS.length} areas`);
-  } else if (newAreas.length > 0) {
-    await tx.insert(areasTable).values(newAreas);
-    console.log(`Added areas: ${newAreas.map((a) => `${a.name} (${a.terminal})`).join(", ")}`);
+  // Group headers and garage summary rows are no longer operational areas in
+  // the workbook. Archive them so historical records remain queryable.
+  for (const deprecated of DEPRECATED_MCO_AREA_IDENTITIES) {
+    await tx
+      .update(areasTable)
+      .set({ archived: true })
+      .where(and(eq(areasTable.name, deprecated.name), eq(areasTable.terminal, deprecated.terminal)));
+  }
+  for (const legacy of LEGACY_SEED_AREAS) {
+    await tx
+      .update(areasTable)
+      .set({ archived: true })
+      .where(and(eq(areasTable.name, legacy.name), eq(areasTable.terminal, legacy.terminal)));
   }
   });
 
@@ -654,12 +700,12 @@ async function seed() {
   // Names are queried in their renamed form (post AREA_RENAME_MAP migration).
   const STRAY_LUNCH_BIN_AREAS: Array<{ name: string; terminal: string; label: string }> = [
     {
-      name: renameSharedAreaName("Level R1 - West", "Terminal B - West"),
+      name: "R1",
       terminal: "Terminal B - West",
       label: "R1-West bin tasks from Terminal B - West",
     },
     {
-      name: renameSharedAreaName("Level R2 - East", "Terminal B - East"),
+      name: "R2",
       terminal: "Terminal B - East",
       label: "R2-East bin tasks from Terminal B - East",
     },
@@ -691,7 +737,7 @@ async function seed() {
     }
   }
 
-  // Trim Terminal A - West / Level P1 West down to bins #1–#4. Any previously
+  // Trim Terminal A - West / Level 1 down to bins #1–#4. Any previously
   // generated "Clean trash bin #5" … "#11" rows for this area on any date are
   // removed (only the un-completed ones, to preserve historical completion
   // records the same way exclusions do for today's sheet).
@@ -709,7 +755,7 @@ async function seed() {
     .from(areasTable)
     .where(
       and(
-        eq(areasTable.name, renameSharedAreaName("Level P1 - West", "Terminal A - West")),
+        eq(areasTable.name, "Level 1"),
         eq(areasTable.terminal, "Terminal A - West"),
       ),
     );

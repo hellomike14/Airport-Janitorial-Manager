@@ -2,12 +2,13 @@ import React from "react";
 import { useListAreas } from "@workspace/api-client-react";
 import { Link } from "wouter";
 import { MapPin, ChevronRight } from "lucide-react";
-import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useTranslation } from "react-i18next";
 
 const TERMINAL_HEADINGS: Record<string, string> = {
   "Terminal A - East": "Terminal A East",
+  "Terminal A - West": "Terminal A West",
   "Terminal B - East": "Terminal B East",
+  "Terminal B - West": "Terminal B West",
 };
 
 export default function AreasList() {
@@ -43,12 +44,21 @@ export default function AreasList() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {terminalAreas.map((area: any) => (
                 <Link key={area.id} href={`/areas/${area.id}`}>
-                  <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md hover:border-accent hover:-translate-y-1 transition-all duration-200 group cursor-pointer flex items-center justify-between">
-                    <div>
+                  <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md hover:border-accent hover:-translate-y-1 transition-all duration-200 group cursor-pointer flex items-start justify-between gap-4 h-full">
+                    <div className="min-w-0">
                       <h3 className="font-bold text-lg text-slate-900 group-hover:text-accent transition-colors">{area.name}</h3>
-                      <p className="text-sm text-slate-500 mt-1">{area.location}</p>
+                      <p className="text-sm text-slate-600 mt-2 leading-relaxed">
+                        <span className="font-semibold text-slate-700">Coverage:</span>{" "}
+                        {area.coverage ?? area.location}
+                      </p>
+                      {area.additionalCoverage && (
+                        <p className="text-sm text-slate-500 mt-1.5 leading-relaxed">
+                          <span className="font-semibold text-slate-600">Additional coverage:</span>{" "}
+                          {area.additionalCoverage}
+                        </p>
+                      )}
                     </div>
-                    <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-accent group-hover:text-white text-slate-400 transition-colors">
+                    <div className="w-10 h-10 shrink-0 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-accent group-hover:text-white text-slate-400 transition-colors">
                       <ChevronRight className="w-5 h-5" />
                     </div>
                   </div>
