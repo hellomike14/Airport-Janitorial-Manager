@@ -8,3 +8,5 @@
 - [Staff access ownership](staff-access-ownership.md) — seed defaults must not undo administrator-managed login eligibility; former-worker restrictions remain authoritative.
 - [Access verification boundaries](access-verification.md) — distinguish local checks from production sign-in; preserve messaging data during interactive schema pushes.
 - [Group reassignment scope](group-reassignment-scope.md) — one-day group moves leave task ownership and weekly schedules unchanged; avoid inferring recurring intent.
+- [Inspector email scope](inspector-email-scope.md) — managers explicitly choose one or all recipients; approved inspectors may also start new email, not just reply.
+- [Managed workflow port collisions](workflow-port-collisions.md) — a restart can leave an old Vite listener alive; verify the preview uses the managed port, not a fallback.

@@ -77,7 +77,7 @@
   },
   "messages": {
     "inspectorMessages": "Messages de l’inspecteur",
-    "inspectorEmailHelp": "Partagé avec les administrateurs et superviseurs. Choisissez un inspecteur ou les dix lors d’un envoi depuis inspector@marvolenterprises.com ; leurs réponses apparaissent ici.",
+    "inspectorEmailHelp": "Partagé avec les administrateurs et superviseurs. Choisissez un inspecteur ou les dix lors d’un envoi depuis inspector@marvolenterprises.com. Leurs nouveaux e-mails et réponses apparaissent ici.",
     "inspectorEmailIdentity": "Expéditeur : inspector@marvolenterprises.com",
     "inspectorDeliveryNote": "L’acceptation par le fournisseur ne confirme pas la lecture. Le statut concerne tous les destinataires choisis.",
     "emailRecipient": "Envoyer à",

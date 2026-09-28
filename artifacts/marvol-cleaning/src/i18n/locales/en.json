@@ -77,7 +77,7 @@
   },
   "messages": {
     "inspectorMessages": "Inspector Messages",
-    "inspectorEmailHelp": "Shared with admins and supervisors. Choose one inspector or all ten when sending from inspector@marvolenterprises.com; their replies appear here.",
+    "inspectorEmailHelp": "Shared with admins and supervisors. Choose one inspector or all ten when sending from inspector@marvolenterprises.com. New emails and replies from approved inspectors appear here.",
     "inspectorEmailIdentity": "Email sender: inspector@marvolenterprises.com",
     "inspectorDeliveryNote": "Provider acceptance is not a read confirmation. Delivery status reflects all chosen recipients.",
     "emailRecipient": "Email to",

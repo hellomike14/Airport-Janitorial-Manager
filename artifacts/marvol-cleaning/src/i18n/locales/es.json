@@ -77,7 +77,7 @@
   },
   "messages": {
     "inspectorMessages": "Mensajes del inspector",
-    "inspectorEmailHelp": "Compartido con administradores y supervisores. Elige un inspector o los diez al enviar desde inspector@marvolenterprises.com; sus respuestas aparecen aquí.",
+    "inspectorEmailHelp": "Compartido con administradores y supervisores. Elige un inspector o los diez al enviar desde inspector@marvolenterprises.com. Aquí aparecen sus nuevos correos y respuestas.",
     "inspectorEmailIdentity": "Remitente: inspector@marvolenterprises.com",
     "inspectorDeliveryNote": "La aceptación del proveedor no confirma la lectura. El estado refleja a todos los destinatarios elegidos.",
     "emailRecipient": "Enviar correo a",

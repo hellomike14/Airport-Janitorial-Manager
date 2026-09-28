@@ -19,7 +19,7 @@ import {
 import { eq, and, or, desc, asc, ne, count, gt, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { actorStaffFromRequest } from "../lib/actorSession";
-import { INSPECTOR_EMAIL, INSPECTOR_RECIPIENT_EMAILS, aggregateInspectorEmailStatus, groupInspectorEmailRecipients, normalizedEmail, outboundEmailStatus, resolveInspectorRecipients, isAuthorizedInspectorEmailSender, verifyInboundWebhookSecret, verifyReplyToken, inboundProviderMessageId } from "../lib/sendgridEmailBridge";
+import { INSPECTOR_EMAIL, INSPECTOR_RECIPIENT_EMAILS, aggregateInspectorEmailStatus, classifyInboundInspectorEmailTarget, groupInspectorEmailRecipients, normalizedEmail, outboundEmailStatus, resolveInspectorRecipients, isAuthorizedInspectorEmailSender, verifyInboundWebhookSecret, verifyReplyToken, inboundProviderMessageId } from "../lib/sendgridEmailBridge";
 import { autoAssignInboundInspectorMessage } from "../lib/inspectorTaskWorkflow";
 
 const router: IRouter = Router();
@@ -82,6 +82,53 @@ async function inspectorForConversation(convo: ConversationRow) {
   if (convo.isGroup) return undefined;
   const people = await db.select().from(staffTable).where(inArray(staffTable.id, [convo.participantAId!, convo.participantBId!]));
   return sharedInspector(convo, people);
+}
+
+async function directInboundInspectorThread() {
+  return db.transaction(async (tx) => {
+    // Lock active inspector rows so concurrent direct inbound deliveries make
+    // one canonical-thread decision at a time.
+    const activeInspectors = await tx.select().from(staffTable).where(and(
+      eq(staffTable.role, "inspector"),
+      eq(staffTable.active, true),
+    )).orderBy(asc(staffTable.id)).for("update");
+    const matchingInspectors = activeInspectors.filter((person) => normalizedEmail(person.email) === INSPECTOR_EMAIL);
+    const managers = await tx.select().from(staffTable).where(and(
+      inArray(staffTable.role, ["admin", "supervisor"]),
+      eq(staffTable.active, true),
+      eq(staffTable.loginEnabled, true),
+      eq(staffTable.formerEmployee, false),
+    )).orderBy(asc(staffTable.id)).for("update");
+    if (matchingInspectors.length !== 1 || !matchingInspectors[0]!.loginEnabled ||
+        matchingInspectors[0]!.formerEmployee || managers.length === 0) return null;
+
+    const inspector = matchingInspectors[0]!;
+    const candidates = await tx.select().from(conversationsTable).where(and(
+      eq(conversationsTable.isGroup, false),
+      or(eq(conversationsTable.participantAId, inspector.id), eq(conversationsTable.participantBId, inspector.id)),
+    )).orderBy(asc(conversationsTable.id));
+    const people = await tx.select().from(staffTable);
+    const activeManagers = new Map(managers.map((manager) => [manager.id, manager]));
+    let conversation = candidates.find((candidate) => {
+      const otherId = candidate.participantAId === inspector.id ? candidate.participantBId : candidate.participantAId;
+      return otherId != null && activeManagers.has(otherId) &&
+        sharedInspector(candidate, people)?.id === inspector.id;
+    });
+    let supervisor = conversation
+      ? activeManagers.get(conversation.participantAId === inspector.id ? conversation.participantBId! : conversation.participantAId!)!
+      : managers[0]!;
+    if (!conversation) {
+      const [participantAId, participantBId] = [inspector.id, supervisor.id].sort((left, right) => left - right);
+      const [created] = await tx.insert(conversationsTable).values({ participantAId, participantBId })
+        .onConflictDoNothing({ target: [conversationsTable.participantAId, conversationsTable.participantBId] })
+        .returning();
+      conversation = created ?? (await tx.select().from(conversationsTable).where(and(
+        eq(conversationsTable.participantAId, participantAId),
+        eq(conversationsTable.participantBId, participantBId),
+      )).then((rows) => rows[0]));
+    }
+    return conversation ? { inspector, supervisor, conversation } : null;
+  });
 }
 
 async function readPosition(conversationId: number, staffId: number) {
@@ -263,26 +310,57 @@ inboundSendgridRouter.post("/", async (req: Request, res: Response) => {
   const body = InboundReplyBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid inbound email" }); return; }
   const domain = process.env.SENDGRID_INBOUND_DOMAIN?.trim().toLowerCase();
-  const recipient = body.data.envelope.to.map(normalizedEmail).find((address) => address?.startsWith("reply+") && address.endsWith(`@${domain}`));
-  const token = recipient?.slice("reply+".length, recipient.lastIndexOf("@"));
-  const claims = token ? verifyReplyToken(token, process.env.SENDGRID_REPLY_TOKEN_SECRET) : null;
-  if (!claims) { res.status(403).json({ error: "Invalid or expired reply address" }); return; }
+  const target = classifyInboundInspectorEmailTarget(body.data.envelope.to, domain);
+  if (target.kind === "invalid") {
+    res.status(403).json({ error: "Inbound recipient is not authorized" });
+    return;
+  }
   const inboundSenderEmail = isAuthorizedInspectorEmailSender(body.data.from, body.data.envelope.from, body.data.SPF, body.data.dkim);
-  const [inspector, supervisor, conversation] = await Promise.all([
-    getStaff(claims.inspectorId), getStaff(claims.supervisorId),
-    db.select().from(conversationsTable).where(eq(conversationsTable.id, claims.conversationId)).then((rows) => rows[0]),
-  ]);
-  if (!inspector || !supervisor || !conversation || conversation.isGroup ||
-      inspector.role !== "inspector" || !isInspectorManager(supervisor.role) ||
-      !inspector.active || !inspector.loginEnabled || !supervisor.active || !supervisor.loginEnabled ||
-      normalizedEmail(inspector.email) !== INSPECTOR_EMAIL ||
-      !inboundSenderEmail) {
-    res.status(403).json({ error: "Inbound sender is not authorized" }); return;
+  if (!inboundSenderEmail) {
+    res.status(403).json({ error: "Inbound sender is not authorized" });
+    return;
   }
-  if (!new Set([conversation.participantAId, conversation.participantBId]).has(inspector.id) ||
-      !(await inspectorForConversation(conversation))) {
-    res.status(403).json({ error: "Conversation is not authorized" }); return;
+
+  let inspector: StaffRow;
+  let supervisor: StaffRow;
+  let conversation: ConversationRow;
+  if (target.kind === "reply") {
+    const claims = verifyReplyToken(target.token, process.env.SENDGRID_REPLY_TOKEN_SECRET);
+    if (!claims) {
+      res.status(403).json({ error: "Invalid or expired reply address" });
+      return;
+    }
+    const [replyInspector, replySupervisor, replyConversation] = await Promise.all([
+      getStaff(claims.inspectorId),
+      getStaff(claims.supervisorId),
+      db.select().from(conversationsTable).where(eq(conversationsTable.id, claims.conversationId)).then((rows) => rows[0]),
+    ]);
+    if (!replyInspector || !replySupervisor || !replyConversation || replyConversation.isGroup ||
+        replyInspector.role !== "inspector" || !isInspectorManager(replySupervisor.role) ||
+        !replyInspector.active || !replyInspector.loginEnabled || !replySupervisor.active || !replySupervisor.loginEnabled ||
+        normalizedEmail(replyInspector.email) !== INSPECTOR_EMAIL) {
+      res.status(403).json({ error: "Inbound sender is not authorized" });
+      return;
+    }
+    if (!new Set([replyConversation.participantAId, replyConversation.participantBId]).has(replyInspector.id) ||
+        !(await inspectorForConversation(replyConversation))) {
+      res.status(403).json({ error: "Conversation is not authorized" });
+      return;
+    }
+    inspector = replyInspector;
+    supervisor = replySupervisor;
+    conversation = replyConversation;
+  } else {
+    const directThread = await directInboundInspectorThread();
+    if (!directThread) {
+      res.status(503).json({ error: "Active shared inspector identity or manager is unavailable" });
+      return;
+    }
+    inspector = directThread.inspector;
+    supervisor = directThread.supervisor;
+    conversation = directThread.conversation;
   }
+
   const providerMessageId = inboundProviderMessageId(body.data.headers, body.data);
   const result = await db.transaction(async (tx) => {
     const [claim] = await tx.insert(inboundEmailMessagesTable)
@@ -292,14 +370,14 @@ inboundSendgridRouter.post("/", async (req: Request, res: Response) => {
       const [existing] = await tx.select({ messageId: inboundEmailMessagesTable.messageId }).from(inboundEmailMessagesTable).where(eq(inboundEmailMessagesTable.providerMessageId, providerMessageId));
       return { duplicate: true, messageId: existing?.messageId ?? null };
     }
-      const [message] = await tx.insert(messagesTable).values({
-        conversationId: conversation.id,
-        senderId: inspector.id,
-        body: `From inspector: ${inboundSenderEmail}\n\n${body.data.text}`,
-      }).returning();
+    const [message] = await tx.insert(messagesTable).values({
+      conversationId: conversation.id,
+      senderId: inspector.id,
+      body: `From inspector: ${inboundSenderEmail}\n\n${body.data.text}`,
+    }).returning();
     await tx.update(inboundEmailMessagesTable).set({ messageId: message.id }).where(eq(inboundEmailMessagesTable.providerMessageId, providerMessageId));
     const managers = await inspectorManagers();
-    if (managers.length) await tx.insert(notificationsTable).values(managers.map(manager => ({ staffId: manager.id, type: "inspector_to_supervisor" as const, message: "URGENT: Inspector email reply received", isRead: false })));
+    if (managers.length) await tx.insert(notificationsTable).values(managers.map(manager => ({ staffId: manager.id, type: "inspector_to_supervisor" as const, message: "URGENT: Inspector email message received", isRead: false })));
     return { duplicate: false, messageId: message.id };
   });
   // A provider retry repairs a prior post-commit assignment failure. The
@@ -453,11 +531,13 @@ router.post("/conversations", async (req: Request, res: Response) => {
   }
   // Reuse the oldest inspector thread for new messages. Existing threads stay readable.
   if (isInspectorManager(sender.role) && recipient.role === "inspector" && normalizedEmail(recipient.email) === INSPECTOR_EMAIL) {
-    const candidates = await db.select().from(conversationsTable).where(and(eq(conversationsTable.isGroup, false), or(
-      eq(conversationsTable.participantAId, recipient.id), eq(conversationsTable.participantBId, recipient.id)))).orderBy(asc(conversationsTable.id));
-    const people = await db.select().from(staffTable);
-    const shared = candidates.find(convo => canReadSharedInspector(sender, convo, people));
-    if (shared) { res.json(await buildSummary(shared, sender.id)); return; }
+    const canonical = await directInboundInspectorThread();
+    if (!canonical) {
+      res.status(503).json({ error: "Active shared inspector identity or manager is unavailable" });
+      return;
+    }
+    res.json(await buildSummary(canonical.conversation, sender.id));
+    return;
   }
   const [aId, bId] = sender.id < recipientId ? [sender.id, recipientId] : [recipientId, sender.id];
   const [inserted] = await db

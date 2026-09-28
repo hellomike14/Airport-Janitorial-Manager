@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   aggregateInspectorEmailStatus,
+  classifyInboundInspectorEmailTarget,
   createReplyToken,
   INSPECTOR_EMAIL,
   INSPECTOR_RECIPIENT_EMAILS,
@@ -44,6 +45,27 @@ test("inbound inspector senders must be allowlisted, envelope-matched, and authe
   assert.equal(isAuthorizedInspectorEmailSender("amber.nordick@goaa.org", "arcolon@goaa.org", "pass"), null);
   assert.equal(isAuthorizedInspectorEmailSender("unknown@goaa.org", "unknown@goaa.org", "pass"), null);
   assert.equal(isAuthorizedInspectorEmailSender("amber.nordick@goaa.org", "amber.nordick@goaa.org", "fail", "unverified"), null);
+});
+
+test("inbound target classification allows signed replies and exact direct recipients only", () => {
+  const domain = "mail.marvolenterprises.com";
+  const token = createReplyToken({ conversationId: 7, inspectorId: 8, supervisorId: 9, expiresAt: 200 }, key);
+  const replyAddress = `reply+${token}@${domain}`;
+  const replyTarget = classifyInboundInspectorEmailTarget([replyAddress], domain);
+  assert.deepEqual(replyTarget, { kind: "reply", token });
+  if (replyTarget.kind === "reply") {
+    assert.deepEqual(verifyReplyToken(replyTarget.token, key, 199), { conversationId: 7, inspectorId: 8, supervisorId: 9 });
+  }
+
+  assert.deepEqual(classifyInboundInspectorEmailTarget([INSPECTOR_EMAIL], domain), { kind: "direct" });
+  assert.deepEqual(classifyInboundInspectorEmailTarget([`INSPECTOR@${domain}`], domain), { kind: "direct" });
+  assert.deepEqual(classifyInboundInspectorEmailTarget([`inspector@${domain}`], undefined), { kind: "invalid" });
+  assert.deepEqual(classifyInboundInspectorEmailTarget(["unknown@example.com"], domain), { kind: "invalid" });
+
+  const invalidReply = classifyInboundInspectorEmailTarget([`reply+unsigned@${domain}`, INSPECTOR_EMAIL], domain);
+  assert.deepEqual(invalidReply, { kind: "reply", token: "unsigned" });
+  if (invalidReply.kind === "reply") assert.equal(verifyReplyToken(invalidReply.token, key, 199), null);
+  assert.deepEqual(classifyInboundInspectorEmailTarget([`reply+${token}@attacker.example`], domain), { kind: "invalid" });
 });
 
 test("outbound mail must be configured from the shared inspector identity", () => {

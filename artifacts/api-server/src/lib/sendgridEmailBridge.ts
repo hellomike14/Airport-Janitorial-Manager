@@ -42,6 +42,32 @@ export function isAuthorizedInspectorEmailSender(from: string, envelopeFrom: str
   return sender;
 }
 
+export type InboundInspectorEmailTarget =
+  | { kind: "reply"; token: string }
+  | { kind: "direct" }
+  | { kind: "invalid" };
+
+export function classifyInboundInspectorEmailTarget(recipients: readonly string[], inboundDomain: string | undefined): InboundInspectorEmailTarget {
+  const normalizedRecipients = recipients.map(normalizedEmail).filter((email): email is string => email !== null);
+  const replyRecipients = normalizedRecipients.filter((address) => address.startsWith("reply+"));
+  if (replyRecipients.length > 0) {
+    const domain = inboundDomain?.trim().toLowerCase() ?? "";
+    const validDomain = normalizedEmail(`webhook@${domain}`)?.split("@")[1];
+    if (replyRecipients.length !== 1 || !validDomain) return { kind: "invalid" };
+    const suffix = `@${validDomain}`;
+    const recipient = replyRecipients[0]!;
+    if (!recipient.endsWith(suffix)) return { kind: "invalid" };
+    const token = recipient.slice("reply+".length, -suffix.length);
+    return token ? { kind: "reply", token } : { kind: "invalid" };
+  }
+
+  if (normalizedRecipients.includes(INSPECTOR_EMAIL)) return { kind: "direct" };
+  const domain = inboundDomain?.trim().toLowerCase() ?? "";
+  const forwardingAddress = normalizedEmail(`inspector@${domain}`);
+  if (forwardingAddress && normalizedRecipients.includes(forwardingAddress)) return { kind: "direct" };
+  return { kind: "invalid" };
+}
+
 export type AggregateEmailStatus = "pending" | "sending" | "retrying" | "accepted" | "disabled" | "not_configured" | "failed";
 
 /** Collapse the per-recipient durable deliveries into the message-level status. */
