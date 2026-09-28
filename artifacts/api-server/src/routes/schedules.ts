@@ -2,14 +2,13 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { createHash } from "node:crypto";
 import { db } from "@workspace/db";
 import { schedulesTable, staffTable, areasTable } from "@workspace/db/schema";
-import { eq, and, inArray, sql } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { MoveTerminalGroupScheduleBody, PreviewTerminalGroupScheduleMoveQueryParams } from "@workspace/api-zod";
 import { actorStaffFromRequest } from "../lib/actorSession";
 import { isAssignmentTargetEligible } from "../lib/workflowPolicies";
 import { areaBelongsToGroup, TERMINAL_GROUP_KEYS, type TerminalGroupKey } from "../lib/assignmentGroups";
-
-const router: IRouter = Router();
+import { lockScheduleWrites, scheduleGroupLock } from "../lib/scheduleLocks";
 
 // The preview includes every schedule in active group areas, including rows
 // already owned by the target. This lets the save detect additions and edits
@@ -92,7 +91,7 @@ groupRouter.post("/group/preview", async (req, res) => {
   }
   const { groupKey, staffId, snapshot } = parsed.data;
   const result = await database.transaction(async (tx) => {
-    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"schedule:" + groupKey}))`);
+    await tx.execute(scheduleGroupLock(groupKey as TerminalGroupKey));
     const [target] = await tx.select({ id: staffTable.id, active: staffTable.active, formerEmployee: staffTable.formerEmployee })
       .from(staffTable).where(eq(staffTable.id, staffId));
     if (!target || !isAssignmentTargetEligible(target)) return { status: "invalid" as const };
@@ -119,14 +118,18 @@ groupRouter.post("/group/preview", async (req, res) => {
 });
 return groupRouter;
 }
-router.use(createGroupScheduleMoveRouter());
-
+export function createSchedulesRouter(
+  database: typeof db = db,
+  resolveActor: typeof actorStaffFromRequest = actorStaffFromRequest,
+): IRouter {
+const router: IRouter = Router();
+router.use(createGroupScheduleMoveRouter(database, resolveActor));
 router.get("/", async (req: Request, res: Response) => {
   const staffId = req.query.staffId ? Number(req.query.staffId) : undefined;
 
   let schedules;
   if (staffId) {
-    schedules = await db
+    schedules = await database
       .select({
         id: schedulesTable.id,
         staffId: schedulesTable.staffId,
@@ -146,7 +149,7 @@ router.get("/", async (req: Request, res: Response) => {
       .where(eq(schedulesTable.staffId, staffId))
       .orderBy(schedulesTable.dayOfWeek, schedulesTable.startTime);
   } else {
-    schedules = await db
+    schedules = await database
       .select({
         id: schedulesTable.id,
         staffId: schedulesTable.staffId,
@@ -193,17 +196,17 @@ router.post("/", async (req: Request, res: Response) => {
   }
 
   try {
-    const [schedule] = await db
-      .insert(schedulesTable)
-      .values({
+    const [schedule] = await database.transaction(async (tx) => {
+      await lockScheduleWrites(tx);
+      return tx.insert(schedulesTable).values({
         staffId: body.data.staffId,
         areaId: body.data.areaId ?? null,
         dayOfWeek: body.data.dayOfWeek,
         startTime: body.data.startTime,
         endTime: body.data.endTime,
         notes: body.data.notes ?? null,
-      })
-      .returning();
+      }).returning();
+    });
 
     res.json(schedule);
   } catch (err: any) {
@@ -227,9 +230,9 @@ router.post("/bulk", async (req: Request, res: Response) => {
     return;
   }
 
-  const results = await db
-    .insert(schedulesTable)
-    .values(
+  const results = await database.transaction(async (tx) => {
+    await lockScheduleWrites(tx);
+    return tx.insert(schedulesTable).values(
       body.data.schedules.map((s) => ({
         staffId: s.staffId,
         areaId: s.areaId ?? null,
@@ -238,8 +241,8 @@ router.post("/bulk", async (req: Request, res: Response) => {
         endTime: s.endTime,
         notes: s.notes ?? null,
       }))
-    )
-    .returning();
+    ).returning();
+  });
 
   res.json(results);
 });
@@ -257,11 +260,12 @@ router.put("/:id", async (req: Request, res: Response) => {
     return;
   }
 
-  const [updated] = await db
-    .update(schedulesTable)
-    .set({ ...body.data, updatedAt: new Date() })
-    .where(eq(schedulesTable.id, id))
-    .returning();
+  const [updated] = await database.transaction(async (tx) => {
+    await lockScheduleWrites(tx);
+    return tx.update(schedulesTable)
+      .set({ ...body.data, updatedAt: new Date() })
+      .where(eq(schedulesTable.id, id)).returning();
+  });
 
   if (!updated) {
     res.status(404).json({ error: "Schedule not found" });
@@ -278,10 +282,10 @@ router.delete("/:id", async (req: Request, res: Response) => {
     return;
   }
 
-  const [deleted] = await db
-    .delete(schedulesTable)
-    .where(eq(schedulesTable.id, id))
-    .returning();
+  const [deleted] = await database.transaction(async (tx) => {
+    await lockScheduleWrites(tx);
+    return tx.delete(schedulesTable).where(eq(schedulesTable.id, id)).returning();
+  });
 
   if (!deleted) {
     res.status(404).json({ error: "Schedule not found" });
@@ -298,12 +302,14 @@ router.delete("/staff/:staffId/clear", async (req: Request, res: Response) => {
     return;
   }
 
-  const result = await db
-    .delete(schedulesTable)
-    .where(eq(schedulesTable.staffId, staffId))
-    .returning();
+  const result = await database.transaction(async (tx) => {
+    await lockScheduleWrites(tx);
+    return tx.delete(schedulesTable).where(eq(schedulesTable.staffId, staffId)).returning();
+  });
 
   res.json({ deleted: result.length });
 });
+return router;
+}
 
-export default router;
+export default createSchedulesRouter();

@@ -12,6 +12,7 @@ import {
 import { actorStaffFromRequest } from "../lib/actorSession";
 import { isAssignmentTargetEligible } from "../lib/workflowPolicies";
 import { areaBelongsToGroup, groupAssignmentLock, groupForArea, planGroupAssignment, planGroupReassignment, TERMINAL_GROUP_KEYS } from "../lib/assignmentGroups";
+import { lockScheduleWrites } from "../lib/scheduleLocks";
 
 const router: IRouter = Router();
 
@@ -107,6 +108,7 @@ router.post("/", async (req, res) => {
       notes: body.notes ?? null,
       isSpecial: body.isSpecial,
     }).returning();
+    await lockScheduleWrites(tx);
     const dayOfWeek = new Date(body.assignmentDate + "T12:00:00").getDay();
     const existing = await tx.select({ id: schedulesTable.id }).from(schedulesTable)
       .where(and(eq(schedulesTable.staffId, body.staffId),
@@ -196,6 +198,7 @@ router.post("/group", async (req, res) => {
       })));
     }
 
+    await lockScheduleWrites(tx);
     const dayOfWeek = new Date(body.assignmentDate + "T12:00:00").getDay();
     const scheduled = await tx.select({ areaId: schedulesTable.areaId })
       .from(schedulesTable).where(and(

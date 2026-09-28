@@ -3,7 +3,9 @@ import test from "node:test";
 import express from "express";
 import { type AddressInfo } from "node:net";
 import { areasTable, schedulesTable, staffTable } from "@workspace/db/schema";
-import { createGroupScheduleMoveRouter } from "./schedules";
+import { createGroupScheduleMoveRouter, createSchedulesRouter } from "./schedules";
+import { PgDialect } from "drizzle-orm/pg-core";
+import type { SQL } from "drizzle-orm";
 
 type Row = { id: number; staffId: number; areaId: number; dayOfWeek: number; startTime: string; endTime: string; notes: string | null; updatedAt: Date; staffName: string; areaName: string };
 
@@ -106,5 +108,126 @@ test("reviewed weekly move authorizes supervisors, rejects stale/overlapping rev
     assert.deepEqual(datedTasks, originalTasks);
   } finally {
     await new Promise<void>((resolve, reject) => server.close((err) => err ? reject(err) : resolve()));
+  }
+});
+
+test("a simultaneous schedule edit or insert cannot slip past group confirmation", async () => {
+  for (const change of ["edit", "insert"] as const) {
+    const area = { id: 987655, name: "Concurrent move fixture", terminal: "Terminal A - East", location: "Fixture" };
+    const first: Row = {
+      id: 1001, staffId: 11, areaId: area.id, dayOfWeek: 1,
+      startTime: "06:15", endTime: "13:45", notes: null,
+      updatedAt: new Date("2026-01-01"), staffName: "Original", areaName: area.name,
+    };
+    let rows = [first];
+    let releaseWrite!: () => void;
+    const writeGate = new Promise<void>((resolve) => { releaseWrite = resolve; });
+    let writerPaused!: () => void;
+    const paused = new Promise<void>((resolve) => { writerPaused = resolve; });
+    let confirmationWaiting!: () => void;
+    const waiting = new Promise<void>((resolve) => { confirmationWaiting = resolve; });
+    const dialect = new PgDialect();
+    const held = new Map<string, Promise<void>>();
+    let lockAttempts = 0;
+    const database = {
+      select: () => ({
+        from(table: unknown) {
+          const read = () => {
+            if (table === staffTable) return [{ id: 99, active: true, formerEmployee: false }];
+            if (table === areasTable) return [area];
+            if (table === schedulesTable) return rows.map((row) => ({ ...row }));
+            throw new Error("Unexpected table");
+          };
+          const query = {
+            where: () => query, innerJoin: () => query, for: () => query,
+            then: (resolve: (value: unknown[]) => unknown, reject: (reason: unknown) => unknown) =>
+              Promise.resolve().then(read).then(resolve, reject),
+          };
+          return query;
+        },
+      }),
+      transaction: async (callback: (tx: unknown) => Promise<unknown>) => {
+        const releases: Array<() => void> = [];
+        const tx = {
+          ...database,
+          execute: async (query: SQL) => {
+            const { sql, params } = dialect.sqlToQuery(query);
+            assert.match(sql, /pg_advisory_xact_lock/);
+            const key = String(params[0]);
+            const previous = held.get(key);
+            let release!: () => void;
+            held.set(key, new Promise<void>((resolve) => { release = resolve; }));
+            // The confirming request tries this lock while the writer holds it.
+            if (key === "schedule:terminal-a-east" && ++lockAttempts === 2) confirmationWaiting();
+            if (previous) await previous;
+            releases.push(release);
+          },
+          insert: (table: unknown) => {
+            assert.equal(table, schedulesTable);
+            return {
+              values(values: { staffId: number; areaId: number; dayOfWeek: number; startTime: string; endTime: string; notes: string | null }) {
+                return { returning: async () => {
+                  writerPaused();
+                  await writeGate;
+                  const row = { ...first, ...values, id: 1002 };
+                  rows.push(row);
+                  return [row];
+                } };
+              },
+            };
+          },
+          update: (table: unknown) => {
+            assert.equal(table, schedulesTable);
+            return {
+              set(values: Partial<Row>) {
+                return { where: () => ({ returning: async () => {
+                  writerPaused();
+                  await writeGate;
+                  rows = rows.map((row) => ({ ...row, ...values }));
+                  return rows;
+                } }) };
+              },
+            };
+          },
+        };
+        try {
+          return await callback(tx);
+        } finally {
+          for (const release of releases) release();
+        }
+      },
+    };
+    const app = express();
+    app.use(express.json());
+    app.use("/api/schedules", createSchedulesRouter(database as never, (async () => ({ id: 7, role: "supervisor" })) as never));
+    const server = app.listen(0, "127.0.0.1");
+    await new Promise<void>((resolve) => server.once("listening", resolve));
+    const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/schedules`;
+    try {
+      const { snapshot } = await (await fetch(`${base}/group/preview?groupKey=terminal-a-east&staffId=99`)).json() as { snapshot: string };
+      const writer = change === "edit"
+        ? fetch(`${base}/1001`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ notes: "Concurrent edit" }) })
+        : fetch(base, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
+          staffId: 12, areaId: area.id, dayOfWeek: 2, startTime: "14:00", endTime: "22:00",
+        }) });
+      await paused;
+      const confirmation = fetch(`${base}/group/preview`, {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ groupKey: "terminal-a-east", staffId: 99, snapshot }),
+      });
+      await Promise.race([waiting, new Promise((_, reject) => setTimeout(() => reject(new Error("confirmation did not reach the group lock")), 3000))]);
+      let confirmed = false;
+      void confirmation.then(() => { confirmed = true; });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      assert.equal(confirmed, false, "confirmation waits for the schedule writer");
+      releaseWrite();
+      assert.equal((await writer).status, 200);
+      assert.equal((await confirmation).status, 409, `${change} invalidates the reviewed snapshot`);
+      assert.equal(rows[0].staffId, 11, "confirmation must not move rows after a concurrent change");
+      if (change === "insert") assert.equal(rows.length, 2, "the inserted row remains owned by its creator");
+    } finally {
+      releaseWrite();
+      await new Promise<void>((resolve, reject) => server.close((err) => err ? reject(err) : resolve()));
+    }
   }
 });

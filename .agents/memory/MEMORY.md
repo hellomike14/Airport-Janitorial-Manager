@@ -10,3 +10,4 @@
 - [Group reassignment scope](group-reassignment-scope.md) — one-day group moves leave task ownership and weekly schedules unchanged; avoid inferring recurring intent.
 - [Inspector email scope](inspector-email-scope.md) — managers explicitly choose one or all recipients; approved inspectors may also start new email, not just reply.
 - [Managed workflow port collisions](workflow-port-collisions.md) — a restart can leave an old Vite listener alive; verify the preview uses the managed port, not a fallback.
+- [Schedule group locking](schedule-locking.md) — weekly schedule writes lock all terminal groups before touching rows so reviewed moves cannot miss concurrent changes.
