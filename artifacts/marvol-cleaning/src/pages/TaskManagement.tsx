@@ -41,6 +41,22 @@ function getColors(terminal: string) {
   return TERMINAL_COLORS[terminal] ?? { ring: "ring-slate-200", bg: "bg-slate-50", dot: "bg-slate-400", bar: "bg-slate-400" };
 }
 
+const TERMINAL_HEADINGS: Record<string, string> = {
+  "Terminal A - East": "TERMINAL A EAST",
+  "Terminal A - West": "TERMINAL A WEST",
+  "Terminal B - East": "TERMINAL B EAST",
+  "Terminal B - West": "TERMINAL B WEST",
+  "Top Terminal": "TOP TERMINAL",
+};
+
+function terminalHeading(area: { terminal: string; name: string }) {
+  if (area.terminal === "Terminal C") {
+    if (area.name.startsWith("Group 1")) return "TERMINAL C 1,3,5";
+    if (area.name.startsWith("Group 2")) return "TERMINAL C 2,4,6";
+  }
+  return TERMINAL_HEADINGS[area.terminal] ?? area.terminal.toUpperCase();
+}
+
 export default function TaskManagement() {
   const { t, i18n } = useTranslation();
   const dateLocale = getDateLocale(i18n.language);
@@ -280,8 +296,10 @@ export default function TaskManagement() {
         </div>
       ) : (
         <div className="space-y-4">
-          {grouped.map(({ area, tasks: areaTasks, total, completed }) => {
+          {grouped.map(({ area, tasks: areaTasks, total, completed }, index) => {
             const col = getColors(area.terminal);
+            const heading = terminalHeading(area);
+            const startsSection = index === 0 || terminalHeading(grouped[index - 1].area) !== heading;
             const pctArea = total > 0 ? Math.round((completed / total) * 100) : 0;
             const allDone = total > 0 && completed === total;
             const isCollapsed = collapsed[area.id];
@@ -290,7 +308,13 @@ export default function TaskManagement() {
             const displayTasks = statusFilter === "pending" ? pending : statusFilter === "completed" ? done : areaTasks;
 
             return (
-              <div key={area.id} className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${allDone ? "border-emerald-200" : "border-slate-200"}`}>
+              <React.Fragment key={area.id}>
+              {startsSection && (
+                <h2 className="pt-3 text-xl font-extrabold tracking-wide text-slate-900">
+                  {heading}
+                </h2>
+              )}
+              <div className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${allDone ? "border-emerald-200" : "border-slate-200"}`}>
                 <div
                   className={`flex items-center gap-4 px-5 py-4 cursor-pointer hover:bg-slate-50/60 transition-colors ${allDone ? "bg-emerald-50/60" : ""}`}
                   onClick={() => toggleCollapse(area.id)}
@@ -300,7 +324,7 @@ export default function TaskManagement() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 flex-wrap">
                       <h2 className="font-bold text-slate-800">{area.name}</h2>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${col.bg} ${col.ring} ring-1 text-slate-600`}>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${col.bg} ${col.ring} ring-1 text-slate-600`}>
                         {area.terminal}
                       </span>
                       {allDone && (
@@ -405,6 +429,7 @@ export default function TaskManagement() {
                   </>
                 )}
               </div>
+              </React.Fragment>
             );
           })}
         </div>
