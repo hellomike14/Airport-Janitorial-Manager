@@ -22,6 +22,13 @@ test("inspector task completion requires its current assignee", () => {
   assert.equal(canMutateTask(supervisor, 1, true), false);
   assert.equal(canMutateTask(admin, 1, true), false);
 });
+test("a staff member assigned to an area may complete its regular tasks, not someone else's or inspector tasks", () => {
+  assert.equal(canMutateTask(staff, null, false, true), true);
+  assert.equal(canMutateTask(staff, null, false, false), false);
+  assert.equal(canMutateTask(staff, 2, false, true), false);
+  assert.equal(canMutateTask(staff, null, true, true), false);
+  assert.equal(canMutateTask(supervisor, null, false), true);
+});
 test("former assignee loses complete and uncomplete authority after locked SLA reassignment", () => {
   const formerAssignee = { id: 10, role: "staff" as const };
   const replacement = { id: 11, role: "staff" as const };

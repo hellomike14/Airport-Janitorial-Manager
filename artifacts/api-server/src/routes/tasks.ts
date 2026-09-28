@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { tasksTable, staffTable, areasTable, issuesTable, notificationsTable, assignmentsTable, inspectorTaskLinksTable, messagesTable, messageEmailOutboxTable, objectUploadsTable } from "@workspace/db/schema";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { ensureTasksForDate } from "../lib/ensureTasksForDate";
+import { canMutateTask } from "../lib/workflowPolicies";
 import {
   ListTasksQueryParams,
   CompleteTaskParams,
@@ -377,8 +378,14 @@ router.post("/:id/complete", async (req, res) => {
     const [link] = await tx.select().from(inspectorTaskLinksTable).where(eq(inspectorTaskLinksTable.taskId, id)).for("update");
     // This decision is made only from locked rows, so a concurrent SLA
     // reassignment cannot leave a stale assignee authorized.
-    if (link && lockedTask.assignedToId !== actor.id) return { status: "forbidden" as const };
-    if (!link && actor.role !== "admin" && actor.role !== "supervisor" && lockedTask.assignedToId !== actor.id) {
+    const [areaAssignment] = !link && lockedTask.assignedToId === null
+      ? await tx.select({ id: assignmentsTable.id }).from(assignmentsTable).where(and(
+          eq(assignmentsTable.staffId, actor.id),
+          eq(assignmentsTable.areaId, lockedTask.areaId),
+          eq(assignmentsTable.assignmentDate, lockedTask.taskDate),
+        )).limit(1).for("share")
+      : [];
+    if (!canMutateTask(actor, lockedTask.assignedToId, Boolean(link), Boolean(areaAssignment))) {
       return { status: "forbidden" as const };
     }
     if (lockedTask.completed) return { status: "ok" as const, task: lockedTask, changed: false };
@@ -452,8 +459,14 @@ router.post("/:id/uncomplete", async (req, res) => {
     const [lockedTask] = await tx.select().from(tasksTable).where(eq(tasksTable.id, id)).for("update");
     if (!lockedTask) return { status: "not_found" as const };
     const [link] = await tx.select().from(inspectorTaskLinksTable).where(eq(inspectorTaskLinksTable.taskId, id)).for("update");
-    if (link && lockedTask.assignedToId !== actor.id) return { status: "forbidden" as const };
-    if (!link && actor.role !== "admin" && actor.role !== "supervisor" && lockedTask.assignedToId !== actor.id) return { status: "forbidden" as const };
+    const [areaAssignment] = !link && lockedTask.assignedToId === null
+      ? await tx.select({ id: assignmentsTable.id }).from(assignmentsTable).where(and(
+          eq(assignmentsTable.staffId, actor.id),
+          eq(assignmentsTable.areaId, lockedTask.areaId),
+          eq(assignmentsTable.assignmentDate, lockedTask.taskDate),
+        )).limit(1).for("share")
+      : [];
+    if (!canMutateTask(actor, lockedTask.assignedToId, Boolean(link), Boolean(areaAssignment))) return { status: "forbidden" as const };
     if (!lockedTask.completed) return { status: "ok" as const, task: lockedTask };
     const [task] = await tx.update(tasksTable).set({
       completed: false,
@@ -485,9 +498,21 @@ router.patch("/:id/images", async (req, res) => {
   }
   const actor = await actorStaffFromRequest(req);
   if (!actor) return res.status(401).json({ error: "Login session required" });
-  const [authorizationTask] = await db.select({ assignedToId: tasksTable.assignedToId }).from(tasksTable).where(eq(tasksTable.id, id));
+  const [authorizationTask] = await db.select({
+    assignedToId: tasksTable.assignedToId,
+    areaId: tasksTable.areaId,
+    taskDate: tasksTable.taskDate,
+  }).from(tasksTable).where(eq(tasksTable.id, id));
   if (!authorizationTask) return res.status(404).json({ error: "Task not found" });
-  if (actor.role !== "admin" && actor.role !== "supervisor" && authorizationTask.assignedToId !== actor.id) return res.status(403).json({ error: "Only the assignee or management may attach task images" });
+  const [[link], [areaAssignment]] = await Promise.all([
+    db.select({ taskId: inspectorTaskLinksTable.taskId }).from(inspectorTaskLinksTable).where(eq(inspectorTaskLinksTable.taskId, id)).limit(1),
+    db.select({ id: assignmentsTable.id }).from(assignmentsTable).where(and(
+      eq(assignmentsTable.staffId, actor.id),
+      eq(assignmentsTable.areaId, authorizationTask.areaId),
+      eq(assignmentsTable.assignmentDate, authorizationTask.taskDate),
+    )).limit(1),
+  ]);
+  if (!canMutateTask(actor, authorizationTask.assignedToId, Boolean(link), Boolean(areaAssignment))) return res.status(403).json({ error: "Only the assigned staff member may attach task images" });
 
   const { beforeImagePath, afterImagePath } = req.body;
   for (const [path, purpose] of [[beforeImagePath, "task_before"], [afterImagePath, "task_after"]] as const) {

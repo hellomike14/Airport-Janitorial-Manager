@@ -8,9 +8,10 @@ import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage"
 import { ObjectPermission } from "../lib/objectAcl";
 import { actorStaffFromRequest } from "../lib/actorSession";
 import { db } from "@workspace/db";
-import { objectUploadsTable, tasksTable, conversationsTable, conversationParticipantsTable, issuesTable, areasTable } from "@workspace/db/schema";
+import { objectUploadsTable, tasksTable, assignmentsTable, inspectorTaskLinksTable, conversationsTable, conversationParticipantsTable, issuesTable, areasTable } from "@workspace/db/schema";
 import { and, eq, or } from "drizzle-orm";
 import { randomUUID } from "crypto";
+import { canMutateTask } from "../lib/workflowPolicies";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
@@ -49,9 +50,22 @@ router.post("/storage/uploads/request-url", async (req: Request, res: Response) 
     }
 
     if (taskId) {
-      const [task] = await db.select({ assignedToId: tasksTable.assignedToId }).from(tasksTable).where(eq(tasksTable.id, taskId));
+      if (!actor) { res.status(401).json({ error: "Login session required" }); return; }
+      const [task] = await db.select({
+        assignedToId: tasksTable.assignedToId, areaId: tasksTable.areaId, taskDate: tasksTable.taskDate,
+      }).from(tasksTable).where(eq(tasksTable.id, taskId));
       if (!task) { res.status(404).json({ error: "Upload target not found" }); return; }
-      if (actor!.role === "staff" && task.assignedToId !== actor!.id) { res.status(403).json({ error: "Upload target access denied" }); return; }
+      const [[link], [areaAssignment]] = await Promise.all([
+        db.select({ taskId: inspectorTaskLinksTable.taskId }).from(inspectorTaskLinksTable).where(eq(inspectorTaskLinksTable.taskId, taskId)).limit(1),
+        db.select({ id: assignmentsTable.id }).from(assignmentsTable).where(and(
+          eq(assignmentsTable.staffId, actor.id),
+          eq(assignmentsTable.areaId, task.areaId),
+          eq(assignmentsTable.assignmentDate, task.taskDate),
+        )).limit(1),
+      ]);
+      if (!canMutateTask(actor, task.assignedToId, Boolean(link), Boolean(areaAssignment))) {
+        res.status(403).json({ error: "Upload target access denied" }); return;
+      }
     }
     if (conversationId) {
       const [conversation] = await db.select({ id: conversationsTable.id }).from(conversationsTable)
