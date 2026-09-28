@@ -64,6 +64,7 @@ export * from "./getInspectorWorkflow200Status";
 export * from "./getInspectorWorkflow200Task";
 export * from "./groupConversationStartInput";
 export * from "./healthStatus";
+export * from "./inspectorEmailRecipientsResponse";
 export * from "./invalidDiagnosticCodeError";
 export * from "./invalidDiagnosticCodeErrorError";
 export * from "./issue";

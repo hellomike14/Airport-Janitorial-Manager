@@ -950,6 +950,14 @@ export const StartConversationResponse = zod.object({
 });
 
 /**
+ * @summary List approved external inspector email recipients for management
+ */
+export const ListInspectorEmailRecipientsResponse = zod.object({
+  inspectorId: zod.number(),
+  emails: zod.array(zod.string().email()),
+});
+
+/**
  * @summary List messages in a conversation
  */
 export const ListConversationMessagesParams = zod.object({
@@ -978,6 +986,11 @@ export const ListConversationMessagesResponseItem = zod.object({
     "failed",
     "not_applicable",
   ]),
+  inspectorEmailRecipients: zod
+    .array(zod.string().email())
+    .describe(
+      "External inspector email addresses recorded for delivery; empty when this message has no email outbox.",
+    ),
   createdAt: zod.string(),
 });
 export const ListConversationMessagesResponse = zod.array(
@@ -993,10 +1006,20 @@ export const SendConversationMessageParams = zod.object({
 
 export const sendConversationMessageBodyBodyMax = 2000;
 
+export const sendConversationMessageBodyInspectorRecipientsMax = 10;
+
 export const SendConversationMessageBody = zod.object({
   senderId: zod.number(),
   body: zod.string().min(1).max(sendConversationMessageBodyBodyMax),
   clientRequestId: zod.string().uuid(),
+  inspectorRecipients: zod
+    .array(zod.string().email())
+    .min(1)
+    .max(sendConversationMessageBodyInspectorRecipientsMax)
+    .optional()
+    .describe(
+      "Optional exact allowlisted recipients for an admin\/supervisor message in the dedicated inspector conversation. Omitted legacy clients broadcast to all approved recipients.",
+    ),
 });
 
 /**

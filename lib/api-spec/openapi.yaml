@@ -854,6 +854,23 @@ paths:
               schema:
                 $ref: "#/components/schemas/ConversationSummary"
 
+  /inspector-email/recipients:
+    get:
+      operationId: listInspectorEmailRecipients
+      tags: [messages]
+      summary: List approved external inspector email recipients for management
+      responses:
+        "200":
+          description: Shared inspector identity and approved recipient addresses
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InspectorEmailRecipientsResponse"
+        "401":
+          description: Login session required
+        "403":
+          description: Admin or supervisor access required
+
   /conversations/{id}/messages:
     get:
       operationId: listConversationMessages
@@ -2285,6 +2302,12 @@ components:
         inspectorEmailDeliveryStatus:
           type: string
           enum: [pending, sending, retrying, accepted, disabled, not_configured, failed, not_applicable]
+        inspectorEmailRecipients:
+          type: array
+          description: External inspector email addresses recorded for delivery; empty when this message has no email outbox.
+          items:
+            type: string
+            format: email
         createdAt:
           type: string
       required:
@@ -2296,6 +2319,7 @@ components:
         - isRead
         - inspectorWorkflowTaskId
         - inspectorEmailDeliveryStatus
+        - inspectorEmailRecipients
         - createdAt
 
     ChatMessageInput:
@@ -2310,10 +2334,31 @@ components:
         clientRequestId:
           type: string
           format: uuid
+        inspectorRecipients:
+          type: array
+          description: Optional exact allowlisted recipients for an admin/supervisor message in the dedicated inspector conversation. Omitted legacy clients broadcast to all approved recipients.
+          minItems: 1
+          maxItems: 10
+          uniqueItems: true
+          items:
+            type: string
+            format: email
       required:
         - senderId
         - body
         - clientRequestId
+
+    InspectorEmailRecipientsResponse:
+      type: object
+      properties:
+        inspectorId:
+          type: integer
+        emails:
+          type: array
+          items:
+            type: string
+            format: email
+      required: [inspectorId, emails]
 
     MarkAllReadRequest:
       type: object

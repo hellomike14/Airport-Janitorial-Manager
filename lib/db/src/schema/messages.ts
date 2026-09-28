@@ -56,7 +56,7 @@ export const messageEmailOutboxTable = pgTable("message_email_outbox", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => [
-  unique("message_email_outbox_message_unique").on(t.messageId),
+  unique("message_email_outbox_message_recipient_unique").on(t.messageId, t.inspectorEmail),
   index("message_email_outbox_ready_idx").on(t.status, t.nextAttemptAt),
   check("message_email_outbox_status_valid", sql`${t.status} IN ('pending','sending','retrying','accepted','disabled','not_configured','failed')`),
 ]);

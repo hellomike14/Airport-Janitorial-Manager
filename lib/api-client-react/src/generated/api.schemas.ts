@@ -555,6 +555,8 @@ export interface ChatMessage {
   /** @nullable */
   inspectorWorkflowTaskId: number | null;
   inspectorEmailDeliveryStatus: ChatMessageInspectorEmailDeliveryStatus;
+  /** External inspector email addresses recorded for delivery; empty when this message has no email outbox. */
+  inspectorEmailRecipients: string[];
   createdAt: string;
 }
 
@@ -566,6 +568,17 @@ export interface ChatMessageInput {
    */
   body: string;
   clientRequestId: string;
+  /**
+   * Optional exact allowlisted recipients for an admin/supervisor message in the dedicated inspector conversation. Omitted legacy clients broadcast to all approved recipients.
+   * @minItems 1
+   * @maxItems 10
+   */
+  inspectorRecipients?: string[];
+}
+
+export interface InspectorEmailRecipientsResponse {
+  inspectorId: number;
+  emails: string[];
 }
 
 export interface MarkAllReadRequest {

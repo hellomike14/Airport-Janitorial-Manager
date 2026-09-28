@@ -2,10 +2,69 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
 const MIN_SECRET_LENGTH = 32;
 const INSPECTOR_EMAIL = "inspector@marvolenterprises.com";
+export const INSPECTOR_RECIPIENT_EMAILS = [
+  "amber.nordick@goaa.org",
+  "arcolon@goaa.org",
+  "ashley.maynard@goaa.org",
+  "ajani.smith@goaa.org",
+  "clarence.randle@goaa.org",
+  "jcampbell@goaa.org",
+  "madaline.miralles@goaa.org",
+  "raquel.santana@goaa.org",
+  "wendy.garrastegui@goaa.org",
+  "yrene.ruizsanchez@goaa.org",
+] as const;
+const INSPECTOR_RECIPIENT_SET = new Set<string>(INSPECTOR_RECIPIENT_EMAILS);
 
 export function normalizedEmail(value: string | null | undefined): string | null {
   const email = value?.trim().toLowerCase() ?? "";
   return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) ? email : null;
+}
+
+/** A missing recipient choice preserves legacy broadcast behavior. */
+export function resolveInspectorRecipients(recipients: readonly string[] | undefined): string[] | null {
+  if (recipients === undefined) return [...INSPECTOR_RECIPIENT_EMAILS];
+  if (recipients.length !== 1 && recipients.length !== INSPECTOR_RECIPIENT_EMAILS.length) return null;
+  const normalized = recipients.map(normalizedEmail);
+  if (normalized.some((email) => !email || !INSPECTOR_RECIPIENT_SET.has(email))) return null;
+  const distinct = [...new Set(normalized as string[])];
+  return distinct.length === normalized.length ? distinct : null;
+}
+
+export function isAuthorizedInspectorEmailSender(from: string, envelopeFrom: string, spf?: string, dkim?: string): string | null {
+  const sender = normalizedEmail(from);
+  if (
+    !sender ||
+    !INSPECTOR_RECIPIENT_SET.has(sender) ||
+    normalizedEmail(envelopeFrom) !== sender ||
+    !inboundAuthenticationPasses(spf, dkim, sender)
+  ) return null;
+  return sender;
+}
+
+export type AggregateEmailStatus = "pending" | "sending" | "retrying" | "accepted" | "disabled" | "not_configured" | "failed";
+
+/** Collapse the per-recipient durable deliveries into the message-level status. */
+export function aggregateInspectorEmailStatus(statuses: readonly string[]): AggregateEmailStatus | null {
+  if (statuses.length === 0) return null;
+  if (statuses.includes("failed")) return "failed";
+  if (statuses.every((status) => status === "accepted")) return "accepted";
+  if (statuses.includes("sending")) return "sending";
+  if (statuses.includes("pending")) return "pending";
+  if (statuses.includes("retrying")) return "retrying";
+  if (statuses.includes("not_configured")) return "not_configured";
+  if (statuses.includes("disabled")) return "disabled";
+  return "pending";
+}
+
+export function groupInspectorEmailRecipients(rows: readonly { messageId: number; inspectorEmail: string }[]): Map<number, string[]> {
+  const recipientsByMessageId = new Map<number, string[]>();
+  for (const row of rows) {
+    const recipients = recipientsByMessageId.get(row.messageId) ?? [];
+    if (!recipients.includes(row.inspectorEmail)) recipients.push(row.inspectorEmail);
+    recipientsByMessageId.set(row.messageId, recipients);
+  }
+  return recipientsByMessageId;
 }
 
 function secret(value: string | undefined): string | null {
@@ -19,7 +78,7 @@ function equal(left: string, right: string): boolean {
 
 export function outboundEmailStatus(env: Record<string, string | undefined> = process.env): "pending" | "disabled" | "not_configured" {
   if (["false", "0", "off"].includes(env.SENDGRID_EMAIL_BRIDGE_ENABLED?.trim().toLowerCase() ?? "")) return "disabled";
-  return env.SENDGRID_API_KEY?.trim() && normalizedEmail(env.SENDGRID_FROM_EMAIL) &&
+  return env.SENDGRID_API_KEY?.trim() && normalizedEmail(env.SENDGRID_FROM_EMAIL) === INSPECTOR_EMAIL &&
     env.SENDGRID_INBOUND_DOMAIN?.trim() && secret(env.SENDGRID_REPLY_TOKEN_SECRET) &&
     secret(env.SENDGRID_INBOUND_WEBHOOK_SECRET) ? "pending" : "not_configured";
 }

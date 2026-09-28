@@ -37,6 +37,7 @@ import {
   setConversationArchive,
   listStaff,
   listArchivedConversations,
+  listInspectorEmailRecipients,
   type ConversationSummary,
 } from "@workspace/api-client-react";
 
@@ -86,11 +87,12 @@ type DialogMode = "individual" | "group";
 interface NewConvoDialogProps {
   senderRole: string;
   staffId: number;
+  inspectorId?: number;
   onClose: () => void;
   onStarted: (convo: ConversationSummary) => void;
 }
 
-function NewConvoDialog({ senderRole, staffId, onClose, onStarted }: NewConvoDialogProps) {
+function NewConvoDialog({ senderRole, staffId, inspectorId, onClose, onStarted }: NewConvoDialogProps) {
   const { t } = useTranslation();
   const canGroup = senderRole === "admin" || senderRole === "supervisor";
   // Admins/supervisors land straight on the group/checkbox view
@@ -124,7 +126,7 @@ function NewConvoDialog({ senderRole, staffId, onClose, onStarted }: NewConvoDia
   // configured address before it queues external delivery.
   const dedicatedInspector =
     (senderRole === "supervisor" || senderRole === "admin")
-      ? allowedRecipients.find((s) => s.role === "inspector" && s.hasEmail)
+      ? allowedRecipients.find((s) => s.id === inspectorId && s.role === "inspector" && s.hasEmail)
       : undefined;
 
   const individualMutation = useMutation({
@@ -422,11 +424,19 @@ export default function Messages() {
   const qc = useQueryClient();
   const staffId = currentUser?.id ?? 0;
   const senderRole = currentUser?.role ?? "staff";
+  const canEmailInspector = senderRole === "admin" || senderRole === "supervisor";
+  const { data: inspectorContacts, isLoading: contactsLoading, isError: contactsError } = useQuery({
+    queryKey: ["/api/inspector-email/recipients", staffId],
+    queryFn: () => listInspectorEmailRecipients(),
+    enabled: canEmailInspector && staffId > 0,
+    staleTime: 60_000,
+  });
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showNewConvo, setShowNewConvo] = useState(false);
   const [showFlyer, setShowFlyer] = useState(false);
   const [draft, setDraft] = useState("");
+  const [inspectorRecipient, setInspectorRecipient] = useState("");
   const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
@@ -436,6 +446,7 @@ export default function Messages() {
     conversationId: number;
     body: string;
     clientRequestId: string;
+    inspectorRecipients?: string[];
   } | null>(null);
 
   const { data: conversations = [], isLoading: convosLoading, error: convosError } = useQuery({
@@ -467,6 +478,8 @@ export default function Messages() {
   });
 
   const selectedConvo = visibleConversations.find((c) => c.id === selectedId) ?? null;
+  const isSharedInspectorThread = canEmailInspector && !selectedConvo?.isGroup &&
+    selectedConvo?.otherStaffId === inspectorContacts?.inspectorId;
 
   const unreadInSelected = useMemo(
     () => messages.some((m) => m.senderId !== staffId && !m.isRead),
@@ -498,25 +511,29 @@ export default function Messages() {
     setEditingMessageId(null);
     setEditDraft("");
     setEditError(null);
+    setInspectorRecipient("");
   }, [selectedId]);
 
   const sendMutation = useMutation({
-    mutationFn: (submission: { conversationId: number; body: string; clientRequestId: string }) =>
+    mutationFn: (submission: { conversationId: number; body: string; clientRequestId: string; inspectorRecipients?: string[] }) =>
       sendConversationMessage(submission.conversationId, {
         senderId: staffId,
         body: submission.body,
         clientRequestId: submission.clientRequestId,
+        ...(submission.inspectorRecipients ? { inspectorRecipients: submission.inspectorRecipients } : {}),
       }),
     onSuccess: (_message, submission) => {
       if (composeRequestRef.current?.clientRequestId === submission.clientRequestId) {
         composeRequestRef.current = null;
       }
       if (selectedId === submission.conversationId) setDraft("");
+      if (submission.inspectorRecipients && selectedId === submission.conversationId) setInspectorRecipient("");
       trackEvent("message_sent", {
         conversation_type: selectedConvo?.otherStaffRole === "inspector" ? "inspector" : "standard",
         sender_role: senderRole,
       });
       qc.invalidateQueries({ queryKey: [CONVERSATIONS_KEY] });
+      qc.invalidateQueries({ queryKey: [CONVERSATIONS_KEY, submission.conversationId, "messages"] });
     },
   });
 
@@ -562,20 +579,31 @@ export default function Messages() {
   const handleSend = () => {
     const body = draft.trim();
     if (!body || selectedId === null || sendMutation.isPending) return;
+    if (selectedConvo?.otherStaffRole === "inspector" && canEmailInspector &&
+        (!inspectorContacts || contactsError || !isSharedInspectorThread)) return;
+    if (isSharedInspectorThread && !inspectorRecipient) return;
+    const inspectorRecipients = isSharedInspectorThread
+      ? inspectorRecipient === "all"
+        ? inspectorContacts!.emails
+        : [inspectorRecipient]
+      : undefined;
     const prior = composeRequestRef.current;
     const submission =
-      prior?.conversationId === selectedId && prior.body === body
+      prior?.conversationId === selectedId && prior.body === body &&
+      JSON.stringify(prior.inspectorRecipients) === JSON.stringify(inspectorRecipients)
         ? prior
         : {
             conversationId: selectedId,
             body,
             clientRequestId: crypto.randomUUID(),
+            inspectorRecipients,
           };
     composeRequestRef.current = submission;
     sendMutation.mutate({
       conversationId: submission.conversationId,
       body: submission.body,
       clientRequestId: submission.clientRequestId,
+      inspectorRecipients: submission.inspectorRecipients,
     });
   };
 
@@ -614,11 +642,10 @@ export default function Messages() {
     setShowArchived((current) => !current);
   };
 
-  const canEmailInspector = senderRole === "admin" || senderRole === "supervisor";
   const inspectorMutation = useMutation({
     mutationFn: async () => {
-      const staff = await listStaff();
-      const inspector = staff.find((s) => s.active && s.role === "inspector" && s.hasEmail);
+      const [staff, contacts] = await Promise.all([listStaff(), listInspectorEmailRecipients()]);
+      const inspector = staff.find((s) => s.id === contacts.inspectorId && s.active && s.role === "inspector" && s.hasEmail);
       if (!inspector) throw new Error(t("messages.inspectorUnavailable"));
       const convo = await startConversation({ staffId, recipientId: inspector.id });
       await setConversationArchive(convo.id, { staffId, archived: false });
@@ -848,14 +875,14 @@ export default function Messages() {
                     {showArchived ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
                   </button>
               </div>
-                {selectedConvo.otherStaffRole === "inspector" && (
+                {isSharedInspectorThread && (
                   <div className="mx-4 mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
                     <div className="flex items-center gap-1 font-semibold">
                       <Mail className="w-3.5 h-3.5" />
-                      Inspector email identity: inspector@marvolenterprises.com
+                      {t("messages.inspectorEmailIdentity")}
                     </div>
                     <p className="mt-0.5">
-                      Each applicable message shows its provider delivery state. “Accepted by provider” is not a read confirmation; pending, disabled, not configured, and failed are not sent.
+                      {t("messages.inspectorDeliveryNote")}
                     </p>
                   </div>
                 )}
@@ -979,6 +1006,21 @@ export default function Messages() {
                         ) : (
                           <p className="text-sm whitespace-pre-wrap break-words">{m.body}</p>
                         )}
+                        {mine && m.inspectorEmailRecipients.length > 0 && (
+                          <div className="mt-2 text-[11px] text-emerald-100 break-all">
+                            {t("messages.emailRecipient")}: {m.inspectorEmailRecipients.length === 1
+                              ? m.inspectorEmailRecipients[0]
+                              : t("messages.allInspectorRecipients", { count: m.inspectorEmailRecipients.length })}
+                            {m.inspectorEmailRecipients.length > 1 && (
+                              <details className="mt-0.5">
+                                <summary className="cursor-pointer underline">{t("messages.viewEmailRecipients")}</summary>
+                                <ul className="mt-1 space-y-0.5">
+                                  {m.inspectorEmailRecipients.map((email) => <li key={email}>{email}</li>)}
+                                </ul>
+                              </details>
+                            )}
+                          </div>
+                        )}
                         <p className={`text-[10px] mt-1 ${mine ? "text-emerald-100" : "text-slate-400"}`}>
                           {format(new Date(m.createdAt), "MMM d, h:mm a")}
                         </p>
@@ -1000,6 +1042,28 @@ export default function Messages() {
 
               {/* Composer */}
               <div className="p-3 border-t border-slate-100 shrink-0">
+                {isSharedInspectorThread && (
+                  <div className="mb-2">
+                    <label htmlFor="inspector-email-recipient" className="block text-xs font-semibold text-slate-700 mb-1">
+                      {t("messages.emailRecipient")}
+                    </label>
+                    <select id="inspector-email-recipient" data-testid="inspector-email-recipient"
+                      value={inspectorRecipient} onChange={(e) => setInspectorRecipient(e.target.value)}
+                      className="w-full rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                      <option value="">{t("messages.chooseEmailRecipient")}</option>
+                      <option value="all">{t("messages.allInspectorRecipients", { count: inspectorContacts?.emails.length ?? 0 })}</option>
+                      {inspectorContacts?.emails.map((email) => <option key={email} value={email}>{email}</option>)}
+                    </select>
+                  </div>
+                )}
+                {selectedConvo.otherStaffRole === "inspector" && canEmailInspector && (contactsLoading || contactsError) && (
+                  <p role={contactsError ? "alert" : "status"} className="mb-2 text-xs text-amber-800">
+                    {contactsError ? t("messages.inspectorRecipientsUnavailable") : t("common.loading")}
+                  </p>
+                )}
+                {sendMutation.isError && (
+                  <p role="alert" className="mb-2 text-xs text-rose-700">{t("messages.sendFailed")}</p>
+                )}
                 <div className="flex items-end gap-2">
                   <textarea
                     value={draft}
@@ -1017,7 +1081,9 @@ export default function Messages() {
                   />
                   <button
                     onClick={handleSend}
-                    disabled={!draft.trim() || sendMutation.isPending}
+                    disabled={!draft.trim() || sendMutation.isPending ||
+                      (isSharedInspectorThread && !inspectorRecipient) ||
+                      (selectedConvo.otherStaffRole === "inspector" && canEmailInspector && !isSharedInspectorThread)}
                     className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white rounded-xl p-2.5 transition-colors shrink-0"
                     aria-label={t("messages.send")}
                   >
@@ -1034,6 +1100,7 @@ export default function Messages() {
         <NewConvoDialog
           senderRole={senderRole}
           staffId={staffId}
+          inspectorId={inspectorContacts?.inspectorId}
           onClose={() => setShowNewConvo(false)}
           onStarted={handleStarted}
         />

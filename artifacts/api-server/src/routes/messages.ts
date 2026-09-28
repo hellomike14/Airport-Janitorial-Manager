@@ -19,7 +19,7 @@ import {
 import { eq, and, or, desc, asc, ne, count, gt, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { actorStaffFromRequest } from "../lib/actorSession";
-import { INSPECTOR_EMAIL, normalizedEmail, outboundEmailStatus, verifyInboundWebhookSecret, verifyReplyToken, inboundProviderMessageId, inboundAuthenticationPasses } from "../lib/sendgridEmailBridge";
+import { INSPECTOR_EMAIL, INSPECTOR_RECIPIENT_EMAILS, aggregateInspectorEmailStatus, groupInspectorEmailRecipients, normalizedEmail, outboundEmailStatus, resolveInspectorRecipients, isAuthorizedInspectorEmailSender, verifyInboundWebhookSecret, verifyReplyToken, inboundProviderMessageId } from "../lib/sendgridEmailBridge";
 import { autoAssignInboundInspectorMessage } from "../lib/inspectorTaskWorkflow";
 
 const router: IRouter = Router();
@@ -38,7 +38,9 @@ const MessageBody = z.object({
   senderId: z.number(),
   body: z.string().trim().min(1).max(2000),
   clientRequestId: z.string().uuid().optional(),
+  inspectorRecipients: z.array(z.string()).min(1).max(INSPECTOR_RECIPIENT_EMAILS.length).optional(),
 });
+const EditMessageBody = MessageBody.omit({ inspectorRecipients: true });
 const ReadBody = z.object({ staffId: z.coerce.number() });
 const MessageParams = z.object({ id: z.coerce.number(), msgId: z.coerce.number() });
 const InspectorWorkflowParams = z.object({ taskId: z.coerce.number().int().positive() });
@@ -93,6 +95,21 @@ async function inspectorManagers() {
     inArray(staffTable.role, ["admin", "supervisor"]), eq(staffTable.active, true),
     eq(staffTable.loginEnabled, true), eq(staffTable.formerEmployee, false)));
 }
+
+router.get("/inspector-email/recipients", async (req: Request, res: Response) => {
+  const actor = await actorStaffFromRequest(req);
+  if (!actor) return res.status(401).json({ error: "Login session required" });
+  if (!isInspectorManager(actor.role)) return res.status(403).json({ error: "Supervisor access required" });
+  const eligibleInspectors = await db.select({ id: staffTable.id, email: staffTable.email }).from(staffTable).where(and(
+    eq(staffTable.role, "inspector"),
+    eq(staffTable.active, true),
+    eq(staffTable.loginEnabled, true),
+    eq(staffTable.formerEmployee, false),
+  ));
+  const dedicatedInspectors = eligibleInspectors.filter((person) => normalizedEmail(person.email) === INSPECTOR_EMAIL);
+  if (dedicatedInspectors.length !== 1) return res.status(503).json({ error: "Shared inspector identity is not configured uniquely" });
+  return res.json({ inspectorId: dedicatedInspectors[0]!.id, emails: [...INSPECTOR_RECIPIENT_EMAILS] });
+});
 
 // ── 1-on-1 pair rules ─────────────────────────────────────────────────────────
 
@@ -250,6 +267,7 @@ inboundSendgridRouter.post("/", async (req: Request, res: Response) => {
   const token = recipient?.slice("reply+".length, recipient.lastIndexOf("@"));
   const claims = token ? verifyReplyToken(token, process.env.SENDGRID_REPLY_TOKEN_SECRET) : null;
   if (!claims) { res.status(403).json({ error: "Invalid or expired reply address" }); return; }
+  const inboundSenderEmail = isAuthorizedInspectorEmailSender(body.data.from, body.data.envelope.from, body.data.SPF, body.data.dkim);
   const [inspector, supervisor, conversation] = await Promise.all([
     getStaff(claims.inspectorId), getStaff(claims.supervisorId),
     db.select().from(conversationsTable).where(eq(conversationsTable.id, claims.conversationId)).then((rows) => rows[0]),
@@ -258,9 +276,7 @@ inboundSendgridRouter.post("/", async (req: Request, res: Response) => {
       inspector.role !== "inspector" || !isInspectorManager(supervisor.role) ||
       !inspector.active || !inspector.loginEnabled || !supervisor.active || !supervisor.loginEnabled ||
       normalizedEmail(inspector.email) !== INSPECTOR_EMAIL ||
-      normalizedEmail(body.data.from) !== INSPECTOR_EMAIL ||
-      normalizedEmail(body.data.envelope.from) !== INSPECTOR_EMAIL ||
-      !inboundAuthenticationPasses(body.data.SPF, body.data.dkim, INSPECTOR_EMAIL)) {
+      !inboundSenderEmail) {
     res.status(403).json({ error: "Inbound sender is not authorized" }); return;
   }
   if (!new Set([conversation.participantAId, conversation.participantBId]).has(inspector.id) ||
@@ -276,7 +292,11 @@ inboundSendgridRouter.post("/", async (req: Request, res: Response) => {
       const [existing] = await tx.select({ messageId: inboundEmailMessagesTable.messageId }).from(inboundEmailMessagesTable).where(eq(inboundEmailMessagesTable.providerMessageId, providerMessageId));
       return { duplicate: true, messageId: existing?.messageId ?? null };
     }
-    const [message] = await tx.insert(messagesTable).values({ conversationId: conversation.id, senderId: inspector.id, body: body.data.text }).returning();
+      const [message] = await tx.insert(messagesTable).values({
+        conversationId: conversation.id,
+        senderId: inspector.id,
+        body: `From inspector: ${inboundSenderEmail}\n\n${body.data.text}`,
+      }).returning();
     await tx.update(inboundEmailMessagesTable).set({ messageId: message.id }).where(eq(inboundEmailMessagesTable.providerMessageId, providerMessageId));
     const managers = await inspectorManagers();
     if (managers.length) await tx.insert(notificationsTable).values(managers.map(manager => ({ staffId: manager.id, type: "inspector_to_supervisor" as const, message: "URGENT: Inspector email reply received", isRead: false })));
@@ -318,7 +338,7 @@ router.get("/inspector-workflow/:taskId", async (req: Request, res: Response) =>
   if (!isParticipant && !isAuthorizedManager && actor.id !== row.assignedStaffId) {
     res.status(403).json({ error: "Not authorized for this inspector workflow" }); return;
   }
-  const [completionOutbox] = row.completionMessageId
+  const completionOutbox = row.completionMessageId
     ? await db.select({ status: messageEmailOutboxTable.status }).from(messageEmailOutboxTable).where(eq(messageEmailOutboxTable.messageId, row.completionMessageId))
     : [];
   const history = await db.select({
@@ -339,7 +359,7 @@ router.get("/inspector-workflow/:taskId", async (req: Request, res: Response) =>
     status: row.completed ? "completed" : row.escalatedAt ? "escalated" : row.dueAt.getTime() <= now ? "overdue" : "assigned",
     escalatedAt: row.escalatedAt?.toISOString() ?? null,
     history: history.map((item) => ({ ...item, createdAt: item.createdAt.toISOString() })),
-    completionEmailDeliveryStatus: completionOutbox?.status ?? null,
+    completionEmailDeliveryStatus: aggregateInspectorEmailStatus(completionOutbox.map(({ status }) => status)) ?? null,
   });
 });
 
@@ -540,21 +560,33 @@ router.get("/conversations/:id/messages", async (req: Request, res: Response) =>
       sourceMessageId: inspectorTaskLinksTable.sourceMessageId,
       completionMessageId: inspectorTaskLinksTable.completionMessageId,
     }).from(inspectorTaskLinksTable).where(eq(inspectorTaskLinksTable.conversationId, params.data.id)),
-    db.select({ messageId: messageEmailOutboxTable.messageId, status: messageEmailOutboxTable.status })
-      .from(messageEmailOutboxTable).where(eq(messageEmailOutboxTable.conversationId, params.data.id)),
+    db.select({
+      messageId: messageEmailOutboxTable.messageId,
+      inspectorEmail: messageEmailOutboxTable.inspectorEmail,
+      status: messageEmailOutboxTable.status,
+    }).from(messageEmailOutboxTable)
+      .where(eq(messageEmailOutboxTable.conversationId, params.data.id))
+      .orderBy(asc(messageEmailOutboxTable.id)),
   ]);
   const workflowTaskByMessageId = new Map<number, number>();
   workflowLinks.forEach((link) => {
     workflowTaskByMessageId.set(link.sourceMessageId, link.taskId);
     if (link.completionMessageId) workflowTaskByMessageId.set(link.completionMessageId, link.taskId);
   });
-  const deliveryByMessageId = new Map(outboxRows.map((row) => [row.messageId, row.status]));
+  const statusesByMessageId = new Map<number, string[]>();
+  const inspectorEmailRecipientsByMessageId = groupInspectorEmailRecipients(outboxRows);
+  for (const row of outboxRows) {
+    const statuses = statusesByMessageId.get(row.messageId) ?? [];
+    statuses.push(row.status);
+    statusesByMessageId.set(row.messageId, statuses);
+  }
   res.json(rows.map((m) => ({
     ...m,
     isRead: shared ? sharedMessageIsRead(m, actor.id, lastReadAt) : m.isRead,
     createdAt: m.createdAt.toISOString(),
     inspectorWorkflowTaskId: workflowTaskByMessageId.get(m.id) ?? null,
-    inspectorEmailDeliveryStatus: deliveryByMessageId.get(m.id) ?? "not_applicable",
+    inspectorEmailDeliveryStatus: aggregateInspectorEmailStatus(statusesByMessageId.get(m.id) ?? []) ?? "not_applicable",
+    inspectorEmailRecipients: inspectorEmailRecipientsByMessageId.get(m.id) ?? [],
   })));
 });
 
@@ -578,6 +610,15 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
   }
   const { convo } = result;
   const shared = await inspectorForConversation(convo);
+  const selectedInspectorRecipients = body.data.inspectorRecipients === undefined
+    ? undefined
+    : resolveInspectorRecipients(body.data.inspectorRecipients);
+  if (body.data.inspectorRecipients !== undefined && !selectedInspectorRecipients) {
+    return res.status(400).json({ error: "Inspector email recipients must be distinct addresses from the approved list" });
+  }
+  if (body.data.inspectorRecipients !== undefined && (!shared || !isInspectorManager(sender.role))) {
+    return res.status(400).json({ error: "Inspector email recipients can only be selected by management in the shared inspector conversation" });
+  }
 
   // Validate sender is still allowed to send (1:1 only; group membership was
   // validated at creation time so no further pair-check is needed).
@@ -598,8 +639,19 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
     const [prior] = await db.select().from(messagesTable).where(and(eq(messagesTable.senderId, sender.id), eq(messagesTable.clientRequestId, body.data.clientRequestId)));
     if (prior) {
       if (prior.conversationId !== convo.id) return res.status(409).json({ error: "clientRequestId was already used for another conversation" });
-      const [priorOutbox] = await db.select({ status: messageEmailOutboxTable.status }).from(messageEmailOutboxTable).where(eq(messageEmailOutboxTable.messageId, prior.id));
-      return res.status(200).json({ id: prior.id, conversationId: prior.conversationId, senderId: prior.senderId, senderName: sender.name, body: prior.body, isRead: prior.isRead, createdAt: prior.createdAt.toISOString(), inspectorWorkflowTaskId: null, inspectorEmailDeliveryStatus: priorOutbox?.status ?? "not_applicable" });
+      const priorOutbox = await db.select({
+        status: messageEmailOutboxTable.status,
+        inspectorEmail: messageEmailOutboxTable.inspectorEmail,
+      }).from(messageEmailOutboxTable)
+        .where(eq(messageEmailOutboxTable.messageId, prior.id))
+        .orderBy(asc(messageEmailOutboxTable.id));
+      return res.status(200).json({
+        id: prior.id, conversationId: prior.conversationId, senderId: prior.senderId,
+        senderName: sender.name, body: prior.body, isRead: prior.isRead,
+        createdAt: prior.createdAt.toISOString(), inspectorWorkflowTaskId: null,
+        inspectorEmailDeliveryStatus: aggregateInspectorEmailStatus(priorOutbox.map(({ status }) => status)) ?? "not_applicable",
+        inspectorEmailRecipients: priorOutbox.map(({ inspectorEmail }) => inspectorEmail),
+      });
     }
   }
 
@@ -630,11 +682,13 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
         inspector.loginEnabled &&
         normalizedEmail(inspector.email) === INSPECTOR_EMAIL
       ) {
-        await tx.insert(messageEmailOutboxTable).values({
-          messageId: created.id, conversationId: convo.id, inspectorId: inspector.id,
-          supervisorId: sender.id, inspectorEmail: inspector.email!, inspectorName: inspector.name,
-          supervisorName: sender.name, messageBody: body.data.body, status: outboundEmailStatus(),
-        });
+        await tx.insert(messageEmailOutboxTable).values(
+          (selectedInspectorRecipients ?? [...INSPECTOR_RECIPIENT_EMAILS]).map((inspectorEmail) => ({
+            messageId: created.id, conversationId: convo.id, inspectorId: inspector.id,
+            supervisorId: sender.id, inspectorEmail, inspectorName: inspector.name,
+            supervisorName: sender.name, messageBody: body.data.body, status: outboundEmailStatus(),
+          }))
+        );
       }
     }
     return { message: created, replayed: false };
@@ -673,8 +727,12 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
     });
   }
 
-  const [outbox] = await db.select({ status: messageEmailOutboxTable.status })
-    .from(messageEmailOutboxTable).where(eq(messageEmailOutboxTable.messageId, message.id));
+  const outbox = await db.select({
+    status: messageEmailOutboxTable.status,
+    inspectorEmail: messageEmailOutboxTable.inspectorEmail,
+  }).from(messageEmailOutboxTable)
+    .where(eq(messageEmailOutboxTable.messageId, message.id))
+    .orderBy(asc(messageEmailOutboxTable.id));
   return res.status(replayed ? 200 : 201).json({
     id: message.id,
     conversationId: message.conversationId,
@@ -686,7 +744,8 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
     // Status represents the durable provider-delivery intent only. "accepted"
     // (when a worker later records it) is not a claim that the recipient read
     // the message.
-    inspectorEmailDeliveryStatus: outbox?.status ?? "not_applicable",
+    inspectorEmailDeliveryStatus: aggregateInspectorEmailStatus(outbox.map(({ status }) => status)) ?? "not_applicable",
+    inspectorEmailRecipients: outbox.map(({ inspectorEmail }) => inspectorEmail),
     createdAt: message.createdAt.toISOString(),
   });
 });
@@ -697,7 +756,7 @@ router.patch("/conversations/:id/messages/:msgId", async (req: Request, res: Res
     res.status(400).json({ error: "Invalid request" });
     return;
   }
-  const body = MessageBody.safeParse(req.body);
+  const body = EditMessageBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: "Message must be between 1 and 2000 characters" });
     return;

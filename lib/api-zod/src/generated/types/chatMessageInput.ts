@@ -14,4 +14,10 @@ export interface ChatMessageInput {
    */
   body: string;
   clientRequestId: string;
+  /**
+   * Optional exact allowlisted recipients for an admin/supervisor message in the dedicated inspector conversation. Omitted legacy clients broadcast to all approved recipients.
+   * @minItems 1
+   * @maxItems 10
+   */
+  inspectorRecipients?: string[];
 }

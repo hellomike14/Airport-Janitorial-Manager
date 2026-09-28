@@ -15,7 +15,7 @@ import {
   CreateSpecialTaskBody,
 } from "@workspace/api-zod";
 import { actorStaffFromRequest } from "../lib/actorSession";
-import { INSPECTOR_EMAIL, normalizedEmail, outboundEmailStatus } from "../lib/sendgridEmailBridge";
+import { INSPECTOR_EMAIL, INSPECTOR_RECIPIENT_EMAILS, normalizedEmail, outboundEmailStatus } from "../lib/sendgridEmailBridge";
 
 const router: IRouter = Router();
 
@@ -401,7 +401,11 @@ router.post("/:id/complete", async (req, res) => {
       if (inspector && supervisor && normalizedEmail(inspector.email) === INSPECTOR_EMAIL) {
         const completionBody = `COMPLETED — Inspector special assignment\nArea: ${area?.name ?? "Assigned area"}\nCompleted by: ${actor.name}`;
         const [message] = await tx.insert(messagesTable).values({ conversationId: link.conversationId, senderId: supervisor.id, body: completionBody }).returning();
-        await tx.insert(messageEmailOutboxTable).values({ messageId: message.id, conversationId: link.conversationId, inspectorId: inspector.id, supervisorId: supervisor.id, inspectorEmail: inspector.email!, inspectorName: inspector.name, supervisorName: supervisor.name, messageBody: completionBody, status: outboundEmailStatus() });
+        await tx.insert(messageEmailOutboxTable).values(INSPECTOR_RECIPIENT_EMAILS.map((inspectorEmail) => ({
+          messageId: message.id, conversationId: link.conversationId, inspectorId: inspector.id,
+          supervisorId: supervisor.id, inspectorEmail, inspectorName: inspector.name,
+          supervisorName: supervisor.name, messageBody: completionBody, status: outboundEmailStatus(),
+        })));
         await tx.update(inspectorTaskLinksTable).set({ completionMessageId: message.id }).where(and(eq(inspectorTaskLinksTable.taskId, task.id), sql`${inspectorTaskLinksTable.completionMessageId} IS NULL`));
       }
     }

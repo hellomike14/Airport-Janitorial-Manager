@@ -17,5 +17,7 @@ export interface ChatMessage {
   /** @nullable */
   inspectorWorkflowTaskId: number | null;
   inspectorEmailDeliveryStatus: ChatMessageInspectorEmailDeliveryStatus;
+  /** External inspector email addresses recorded for delivery; empty when this message has no email outbox. */
+  inspectorEmailRecipients: string[];
   createdAt: string;
 }

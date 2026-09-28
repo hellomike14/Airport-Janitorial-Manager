@@ -49,6 +49,7 @@ import type {
   GetDashboardParams,
   GetInspectorWorkflow200,
   HealthStatus,
+  InspectorEmailRecipientsResponse,
   InvalidDiagnosticCodeError,
   Issue,
   JobApplication,
@@ -3453,6 +3454,86 @@ export const useStartConversation = <
 > => {
   return useMutation(getStartConversationMutationOptions(options));
 };
+
+/**
+ * @summary List approved external inspector email recipients for management
+ */
+export const getListInspectorEmailRecipientsUrl = () => {
+  return `/api/inspector-email/recipients`;
+};
+
+export const listInspectorEmailRecipients = async (
+  options?: RequestInit,
+): Promise<InspectorEmailRecipientsResponse> => {
+  return customFetch<InspectorEmailRecipientsResponse>(
+    getListInspectorEmailRecipientsUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListInspectorEmailRecipientsQueryKey = () => {
+  return [`/api/inspector-email/recipients`] as const;
+};
+
+export const getListInspectorEmailRecipientsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listInspectorEmailRecipients>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listInspectorEmailRecipients>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListInspectorEmailRecipientsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listInspectorEmailRecipients>>
+  > = ({ signal }) =>
+    listInspectorEmailRecipients({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listInspectorEmailRecipients>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListInspectorEmailRecipientsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listInspectorEmailRecipients>>
+>;
+export type ListInspectorEmailRecipientsQueryError = ErrorType<void>;
+
+/**
+ * @summary List approved external inspector email recipients for management
+ */
+
+export function useListInspectorEmailRecipients<
+  TData = Awaited<ReturnType<typeof listInspectorEmailRecipients>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listInspectorEmailRecipients>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListInspectorEmailRecipientsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary List messages in a conversation
