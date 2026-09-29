@@ -13,4 +13,10 @@ export const NotificationType = {
   new_issue: "new_issue",
   issue_assigned: "issue_assigned",
   issue_completed: "issue_completed",
+  inspector_to_supervisor: "inspector_to_supervisor",
+  supervisor_to_inspector: "supervisor_to_inspector",
+  task_completed: "task_completed",
+  direct_alert: "direct_alert",
+  photo_shared: "photo_shared",
+  new_message: "new_message",
 } as const;

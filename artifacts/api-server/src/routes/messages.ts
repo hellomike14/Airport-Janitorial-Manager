@@ -15,6 +15,7 @@ import {
   inspectorTaskAssignmentHistoryTable,
   tasksTable,
   areasTable,
+  objectUploadsTable,
 } from "@workspace/db/schema";
 import { eq, and, or, desc, asc, ne, count, gt, inArray, lt, notExists } from "drizzle-orm";
 import { z } from "zod";
@@ -37,10 +38,12 @@ const GroupStartBody = z.object({
 const MessageBody = z.object({
   senderId: z.number(),
   body: z.string().trim().min(1).max(2000),
+  beforeImagePath: z.string().optional(),
+  afterImagePath: z.string().optional(),
   clientRequestId: z.string().uuid().optional(),
   inspectorRecipients: z.array(z.string()).min(1).max(INSPECTOR_RECIPIENT_EMAILS.length).optional(),
 });
-const EditMessageBody = MessageBody.omit({ inspectorRecipients: true });
+const EditMessageBody = MessageBody.omit({ inspectorRecipients: true, beforeImagePath: true, afterImagePath: true });
 const ReadBody = z.object({ staffId: z.coerce.number() });
 const MessageParams = z.object({ id: z.coerce.number(), msgId: z.coerce.number() });
 const InspectorWorkflowParams = z.object({ taskId: z.coerce.number().int().positive() });
@@ -635,6 +638,8 @@ router.get("/conversations/:id/messages", async (req: Request, res: Response) =>
       senderId: messagesTable.senderId,
       senderName: staffTable.name,
       body: messagesTable.body,
+      beforeImagePath: messagesTable.beforeImagePath,
+      afterImagePath: messagesTable.afterImagePath,
       isRead: messagesTable.isRead,
       createdAt: messagesTable.createdAt,
     })
@@ -661,6 +666,15 @@ router.get("/conversations/:id/messages", async (req: Request, res: Response) =>
     workflowTaskByMessageId.set(link.sourceMessageId, link.taskId);
     if (link.completionMessageId) workflowTaskByMessageId.set(link.completionMessageId, link.taskId);
   });
+  const linkedTaskIds = [...new Set(workflowLinks.map((link) => link.taskId))];
+  const workflowTaskPhotos = linkedTaskIds.length
+    ? await db.select({
+        id: tasksTable.id,
+        beforeImagePath: tasksTable.beforeImagePath,
+        afterImagePath: tasksTable.afterImagePath,
+      }).from(tasksTable).where(inArray(tasksTable.id, linkedTaskIds))
+    : [];
+  const workflowTaskPhotosById = new Map(workflowTaskPhotos.map((task) => [task.id, task]));
   const statusesByMessageId = new Map<number, string[]>();
   const inspectorEmailRecipientsByMessageId = groupInspectorEmailRecipients(outboxRows);
   for (const row of outboxRows) {
@@ -668,14 +682,21 @@ router.get("/conversations/:id/messages", async (req: Request, res: Response) =>
     statuses.push(row.status);
     statusesByMessageId.set(row.messageId, statuses);
   }
-  res.json(rows.map((m) => ({
-    ...m,
-    isRead: shared ? sharedMessageIsRead(m, actor.id, lastReadAt) : m.isRead,
-    createdAt: m.createdAt.toISOString(),
-    inspectorWorkflowTaskId: workflowTaskByMessageId.get(m.id) ?? null,
-    inspectorEmailDeliveryStatus: aggregateInspectorEmailStatus(statusesByMessageId.get(m.id) ?? []) ?? "not_applicable",
-    inspectorEmailRecipients: inspectorEmailRecipientsByMessageId.get(m.id) ?? [],
-  })));
+  res.json(rows.map((m) => {
+    const inspectorWorkflowTaskId = workflowTaskByMessageId.get(m.id) ?? null;
+    const taskPhotos = inspectorWorkflowTaskId === null ? undefined : workflowTaskPhotosById.get(inspectorWorkflowTaskId);
+    const useWorkflowTaskPhotos = inspectorWorkflowTaskId !== null && !m.beforeImagePath && !m.afterImagePath;
+    return {
+      ...m,
+      beforeImagePath: useWorkflowTaskPhotos ? taskPhotos?.beforeImagePath ?? null : m.beforeImagePath,
+      afterImagePath: useWorkflowTaskPhotos ? taskPhotos?.afterImagePath ?? null : m.afterImagePath,
+      isRead: shared ? sharedMessageIsRead(m, actor.id, lastReadAt) : m.isRead,
+      createdAt: m.createdAt.toISOString(),
+      inspectorWorkflowTaskId,
+      inspectorEmailDeliveryStatus: aggregateInspectorEmailStatus(statusesByMessageId.get(m.id) ?? []) ?? "not_applicable",
+      inspectorEmailRecipients: inspectorEmailRecipientsByMessageId.get(m.id) ?? [],
+    };
+  }));
 });
 
 router.post("/conversations/:id/messages", async (req: Request, res: Response) => {
@@ -708,6 +729,22 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
     return res.status(400).json({ error: "Inspector email recipients can only be selected by management in the shared inspector conversation" });
   }
 
+  for (const imagePath of [body.data.beforeImagePath, body.data.afterImagePath]) {
+    if (imagePath === undefined) continue;
+    const [upload] = await db.select({
+      objectPath: objectUploadsTable.objectPath,
+      ownerStaffId: objectUploadsTable.ownerStaffId,
+      purpose: objectUploadsTable.purpose,
+      conversationId: objectUploadsTable.conversationId,
+      mimeType: objectUploadsTable.mimeType,
+    }).from(objectUploadsTable).where(eq(objectUploadsTable.objectPath, imagePath));
+    if (!upload || upload.ownerStaffId !== sender.id || upload.purpose !== "conversation_attachment" ||
+        upload.conversationId !== convo.id ||
+        !["image/jpeg", "image/png", "image/webp"].includes(upload.mimeType)) {
+      return res.status(400).json({ error: "Photo must be an image uploaded by you for this conversation" });
+    }
+  }
+
   // Validate sender is still allowed to send (1:1 only; group membership was
   // validated at creation time so no further pair-check is needed).
   if (!convo.isGroup) {
@@ -736,6 +773,7 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
       return res.status(200).json({
         id: prior.id, conversationId: prior.conversationId, senderId: prior.senderId,
         senderName: sender.name, body: prior.body, isRead: prior.isRead,
+        beforeImagePath: prior.beforeImagePath, afterImagePath: prior.afterImagePath,
         createdAt: prior.createdAt.toISOString(), inspectorWorkflowTaskId: null,
         inspectorEmailDeliveryStatus: aggregateInspectorEmailStatus(priorOutbox.map(({ status }) => status)) ?? "not_applicable",
         inspectorEmailRecipients: priorOutbox.map(({ inspectorEmail }) => inspectorEmail),
@@ -749,7 +787,12 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
   const { message, replayed } = await db.transaction(async (tx) => {
     const [created] = await tx
       .insert(messagesTable)
-      .values({ conversationId: convo.id, senderId: sender.id, body: body.data.body, clientRequestId: body.data.clientRequestId ?? null })
+      .values({
+        conversationId: convo.id, senderId: sender.id, body: body.data.body,
+        beforeImagePath: body.data.beforeImagePath ?? null,
+        afterImagePath: body.data.afterImagePath ?? null,
+        clientRequestId: body.data.clientRequestId ?? null,
+      })
       .onConflictDoNothing()
       .returning();
     if (!created) {
@@ -841,6 +884,8 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
     senderName: sender.name,
     body: message.body,
     isRead: message.isRead,
+    beforeImagePath: message.beforeImagePath,
+    afterImagePath: message.afterImagePath,
     inspectorWorkflowTaskId: null,
     // Status represents the durable provider-delivery intent only. "accepted"
     // (when a worker later records it) is not a claim that the recipient read
@@ -911,6 +956,8 @@ router.patch("/conversations/:id/messages/:msgId", async (req: Request, res: Res
     senderName: actor.name,
     body: updated.body,
     isRead: updated.isRead,
+    beforeImagePath: updated.beforeImagePath,
+    afterImagePath: updated.afterImagePath,
     createdAt: updated.createdAt.toISOString(),
   });
 });

@@ -8,13 +8,27 @@ import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage"
 import { ObjectPermission } from "../lib/objectAcl";
 import { actorStaffFromRequest } from "../lib/actorSession";
 import { db } from "@workspace/db";
-import { objectUploadsTable, tasksTable, assignmentsTable, inspectorTaskLinksTable, conversationsTable, conversationParticipantsTable, issuesTable, areasTable } from "@workspace/db/schema";
-import { and, eq, or } from "drizzle-orm";
+import { objectUploadsTable, tasksTable, assignmentsTable, inspectorTaskLinksTable, conversationsTable, conversationParticipantsTable, issuesTable, areasTable, staffTable, notificationsTable } from "@workspace/db/schema";
+import { and, eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { canMutateTask } from "../lib/workflowPolicies";
+import { canReadSharedInspector } from "../lib/sharedInspectorConversation";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
+
+async function canAccessConversation(conversationId: number, actor: NonNullable<Awaited<ReturnType<typeof actorStaffFromRequest>>>) {
+  const [conversation] = await db.select().from(conversationsTable).where(eq(conversationsTable.id, conversationId));
+  if (!conversation) return false;
+  if (conversation.isGroup) {
+    const [participant] = await db.select({ id: conversationParticipantsTable.id }).from(conversationParticipantsTable)
+      .where(and(eq(conversationParticipantsTable.conversationId, conversationId), eq(conversationParticipantsTable.staffId, actor.id)));
+    return Boolean(participant);
+  }
+  if (conversation.participantAId === actor.id || conversation.participantBId === actor.id) return true;
+  const people = await db.select().from(staffTable);
+  return canReadSharedInspector(actor, conversation, people);
+}
 
 /**
  * POST /storage/uploads/request-url
@@ -37,7 +51,7 @@ router.post("/storage/uploads/request-url", async (req: Request, res: Response) 
 
   try {
     const { name, size, contentType, purpose, taskId, conversationId, issueId, areaId } = parsed.data;
-    const imagePurpose = ["task_before", "task_after", "issue_before", "issue_after", "shared_photo"].includes(purpose);
+    const imagePurpose = ["task_before", "task_after", "issue_before", "issue_after", "conversation_attachment", "shared_photo"].includes(purpose);
     if (!["image/jpeg", "image/png", "image/webp", "application/pdf"].includes(contentType) ||
         (imagePurpose && !["image/jpeg", "image/png", "image/webp"].includes(contentType)) ||
         size > 10 * 1024 * 1024 ||
@@ -68,10 +82,7 @@ router.post("/storage/uploads/request-url", async (req: Request, res: Response) 
       }
     }
     if (conversationId) {
-      const [conversation] = await db.select({ id: conversationsTable.id }).from(conversationsTable)
-        .leftJoin(conversationParticipantsTable, eq(conversationParticipantsTable.conversationId, conversationsTable.id))
-        .where(and(eq(conversationsTable.id, conversationId), or(eq(conversationsTable.participantAId, actor!.id), eq(conversationsTable.participantBId, actor!.id), eq(conversationParticipantsTable.staffId, actor!.id))));
-      if (!conversation) { res.status(403).json({ error: "Upload target access denied" }); return; }
+      if (!await canAccessConversation(conversationId, actor!)) { res.status(403).json({ error: "Upload target access denied" }); return; }
     }
     if (issueId) {
       const [issue] = await db.select({ reportedById: issuesTable.reportedById, assignedToId: issuesTable.assignedToId }).from(issuesTable).where(eq(issuesTable.id, issueId));
@@ -156,27 +167,64 @@ router.get("/storage/objects/*path", async (req: Request, res: Response) => {
     const [metadata] = await db.select().from(objectUploadsTable).where(eq(objectUploadsTable.objectPath, objectPath));
     let allowed = actor.role === "admin";
     if (metadata) {
-      allowed ||= metadata.ownerStaffId === actor.id;
-      if (!allowed && metadata.taskId) {
-        const [task] = await db.select({ assignedToId: tasksTable.assignedToId }).from(tasksTable).where(eq(tasksTable.id, metadata.taskId));
-        allowed = task?.assignedToId === actor.id;
-      }
-      if (!allowed && metadata.conversationId) {
-        const [conversation] = await db.select().from(conversationsTable).where(and(eq(conversationsTable.id, metadata.conversationId), or(eq(conversationsTable.participantAId, actor.id), eq(conversationsTable.participantBId, actor.id))));
-        allowed = !!conversation;
-      }
-      if (!allowed && metadata.issueId) {
-        const [issue] = await db.select({ reportedById: issuesTable.reportedById, assignedToId: issuesTable.assignedToId }).from(issuesTable).where(eq(issuesTable.id, metadata.issueId));
-        allowed = actor.role === "supervisor" || actor.role === "inspector" || issue?.reportedById === actor.id || issue?.assignedToId === actor.id;
-      }
-      if (!allowed && metadata.purpose === "issue_before" && metadata.areaId) {
-        allowed = actor.role === "supervisor" || actor.role === "inspector";
-      }
-      if (!allowed && metadata.purpose === "shared_photo") {
-        allowed = true;
-      }
-      if (!allowed && metadata.purpose === "application_document" && metadata.claimedAt) {
-        allowed = actor.role === "supervisor";
+      if (metadata.purpose === "conversation_attachment") {
+        // Conversation photos are only readable by people authorized to read
+        // that exact thread; uploader ownership must not bypass membership.
+        allowed = metadata.conversationId !== null && await canAccessConversation(metadata.conversationId, actor);
+      } else {
+        allowed ||= metadata.ownerStaffId === actor.id;
+        if (!allowed && metadata.taskId && (metadata.purpose === "task_before" || metadata.purpose === "task_after")) {
+          const [task] = await db.select({
+            assignedToId: tasksTable.assignedToId,
+            beforeImagePath: tasksTable.beforeImagePath,
+            afterImagePath: tasksTable.afterImagePath,
+          }).from(tasksTable).where(eq(tasksTable.id, metadata.taskId));
+          const isAttachedPhoto = metadata.purpose === "task_before"
+            ? task?.beforeImagePath === objectPath
+            : task?.afterImagePath === objectPath;
+          allowed = Boolean(isAttachedPhoto && (
+            task?.assignedToId === actor.id ||
+            actor.role === "supervisor" ||
+            actor.role === "inspector"
+          ));
+        }
+        if (!allowed && metadata.conversationId) {
+          allowed = await canAccessConversation(metadata.conversationId, actor);
+        }
+        if (!allowed && (metadata.purpose === "issue_before" || metadata.purpose === "issue_after")) {
+          const isBeforePhoto = metadata.purpose === "issue_before";
+          const [issue] = await db.select({
+            id: issuesTable.id,
+            reportedById: issuesTable.reportedById,
+            assignedToId: issuesTable.assignedToId,
+          }).from(issuesTable).where(and(
+            isBeforePhoto
+              ? eq(issuesTable.beforeImagePath, objectPath)
+              : eq(issuesTable.afterImagePath, objectPath),
+            metadata.issueId !== null ? eq(issuesTable.id, metadata.issueId) : undefined,
+          ));
+
+          if (issue && (actor.role === "supervisor" || actor.role === "inspector" ||
+              issue.reportedById === actor.id || issue.assignedToId === actor.id)) {
+            allowed = true;
+          } else if (issue) {
+            const [assignmentNotification] = await db.select({ id: notificationsTable.id })
+              .from(notificationsTable)
+              .where(and(
+                eq(notificationsTable.staffId, actor.id),
+                eq(notificationsTable.issueId, issue.id),
+                eq(notificationsTable.type, "issue_assigned"),
+              ))
+              .limit(1);
+            allowed = Boolean(assignmentNotification);
+          }
+        }
+        if (!allowed && metadata.purpose === "shared_photo") {
+          allowed = true;
+        }
+        if (!allowed && metadata.purpose === "application_document" && metadata.claimedAt) {
+          allowed = actor.role === "supervisor";
+        }
       }
     }
     if (!allowed) { res.status(403).json({ error: "Object access denied" }); return; }

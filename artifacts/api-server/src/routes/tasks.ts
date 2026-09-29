@@ -438,6 +438,7 @@ router.post("/:id/complete", async (req, res) => {
     await db.insert(notificationsTable).values(
       recipients.map((r) => ({
         staffId: r.id,
+        taskId: updated.id,
         type: "task_completed" as const,
         message: `${completedBy} completed "${updated.taskName}" in ${area.name}`,
       }))

@@ -13,6 +13,10 @@ export interface ChatMessage {
   senderId: number;
   senderName: string;
   body: string;
+  /** @nullable */
+  beforeImagePath: string | null;
+  /** @nullable */
+  afterImagePath: string | null;
   isRead: boolean;
   /** @nullable */
   inspectorWorkflowTaskId: number | null;

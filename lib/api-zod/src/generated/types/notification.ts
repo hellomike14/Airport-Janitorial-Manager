@@ -11,6 +11,12 @@ export interface Notification {
   id: number;
   staffId: number;
   issueId?: number | null;
+  /** @nullable */
+  taskId: number | null;
+  /** @nullable */
+  beforeImagePath: string | null;
+  /** @nullable */
+  afterImagePath: string | null;
   type: NotificationType;
   message: string;
   isRead: boolean;

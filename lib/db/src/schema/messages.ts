@@ -29,6 +29,8 @@ export const messagesTable = pgTable("messages", {
   // old conversations.
   clientRequestId: text("client_request_id"),
   body: text("body").notNull(),
+  beforeImagePath: text("before_image_path"),
+  afterImagePath: text("after_image_path"),
   isRead: boolean("is_read").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => [unique("messages_sender_client_request_unique").on(t.senderId, t.clientRequestId)]);

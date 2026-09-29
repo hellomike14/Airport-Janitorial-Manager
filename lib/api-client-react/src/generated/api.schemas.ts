@@ -526,12 +526,24 @@ export const NotificationType = {
   new_issue: "new_issue",
   issue_assigned: "issue_assigned",
   issue_completed: "issue_completed",
+  inspector_to_supervisor: "inspector_to_supervisor",
+  supervisor_to_inspector: "supervisor_to_inspector",
+  task_completed: "task_completed",
+  direct_alert: "direct_alert",
+  photo_shared: "photo_shared",
+  new_message: "new_message",
 } as const;
 
 export interface Notification {
   id: number;
   staffId: number;
   issueId?: number | null;
+  /** @nullable */
+  taskId: number | null;
+  /** @nullable */
+  beforeImagePath: string | null;
+  /** @nullable */
+  afterImagePath: string | null;
   type: NotificationType;
   message: string;
   isRead: boolean;
@@ -596,6 +608,10 @@ export interface ChatMessage {
   senderId: number;
   senderName: string;
   body: string;
+  /** @nullable */
+  beforeImagePath: string | null;
+  /** @nullable */
+  afterImagePath: string | null;
   isRead: boolean;
   /** @nullable */
   inspectorWorkflowTaskId: number | null;
@@ -612,6 +628,10 @@ export interface ChatMessageInput {
    * @maxLength 2000
    */
   body: string;
+  /** Uploaded conversation attachment labeled Before. */
+  beforeImagePath?: string;
+  /** Uploaded conversation attachment labeled After. */
+  afterImagePath?: string;
   clientRequestId: string;
   /**
    * Optional exact allowlisted recipients for an admin/supervisor message in the dedicated inspector conversation. Omitted legacy clients broadcast to all approved recipients.

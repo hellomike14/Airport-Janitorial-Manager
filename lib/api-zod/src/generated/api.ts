@@ -925,7 +925,20 @@ export const ListNotificationsResponseItem = zod.object({
   id: zod.number(),
   staffId: zod.number(),
   issueId: zod.number().nullish(),
-  type: zod.enum(["new_issue", "issue_assigned", "issue_completed"]),
+  taskId: zod.number().nullable(),
+  beforeImagePath: zod.string().nullable(),
+  afterImagePath: zod.string().nullable(),
+  type: zod.enum([
+    "new_issue",
+    "issue_assigned",
+    "issue_completed",
+    "inspector_to_supervisor",
+    "supervisor_to_inspector",
+    "task_completed",
+    "direct_alert",
+    "photo_shared",
+    "new_message",
+  ]),
   message: zod.string(),
   isRead: zod.boolean(),
   createdAt: zod.string(),
@@ -945,7 +958,20 @@ export const MarkNotificationReadResponse = zod.object({
   id: zod.number(),
   staffId: zod.number(),
   issueId: zod.number().nullish(),
-  type: zod.enum(["new_issue", "issue_assigned", "issue_completed"]),
+  taskId: zod.number().nullable(),
+  beforeImagePath: zod.string().nullable(),
+  afterImagePath: zod.string().nullable(),
+  type: zod.enum([
+    "new_issue",
+    "issue_assigned",
+    "issue_completed",
+    "inspector_to_supervisor",
+    "supervisor_to_inspector",
+    "task_completed",
+    "direct_alert",
+    "photo_shared",
+    "new_message",
+  ]),
   message: zod.string(),
   isRead: zod.boolean(),
   createdAt: zod.string(),
@@ -1035,6 +1061,8 @@ export const ListConversationMessagesResponseItem = zod.object({
   senderId: zod.number(),
   senderName: zod.string(),
   body: zod.string(),
+  beforeImagePath: zod.string().nullable(),
+  afterImagePath: zod.string().nullable(),
   isRead: zod.boolean(),
   inspectorWorkflowTaskId: zod.number().nullable(),
   inspectorEmailDeliveryStatus: zod.enum([
@@ -1072,6 +1100,14 @@ export const sendConversationMessageBodyInspectorRecipientsMax = 10;
 export const SendConversationMessageBody = zod.object({
   senderId: zod.number(),
   body: zod.string().min(1).max(sendConversationMessageBodyBodyMax),
+  beforeImagePath: zod
+    .string()
+    .optional()
+    .describe("Uploaded conversation attachment labeled Before."),
+  afterImagePath: zod
+    .string()
+    .optional()
+    .describe("Uploaded conversation attachment labeled After."),
   clientRequestId: zod.string().uuid(),
   inspectorRecipients: zod
     .array(zod.string().email())

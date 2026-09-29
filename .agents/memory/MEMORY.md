@@ -11,3 +11,4 @@
 - [Inspector email scope](inspector-email-scope.md) — managers explicitly choose one or all recipients; approved inspectors may also start new email, not just reply.
 - [Managed workflow port collisions](workflow-port-collisions.md) — a restart can leave an old Vite listener alive; verify the preview uses the managed port, not a fallback.
 - [Schedule group locking](schedule-locking.md) — weekly schedule writes lock all terminal groups before touching rows so reviewed moves cannot miss concurrent changes.
+- [Marvol photo alert privacy](marvol-photo-alert-privacy.md) — bell previews must match object-read permissions; general message alerts cannot expose private chat images.
