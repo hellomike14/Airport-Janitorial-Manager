@@ -27,6 +27,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { StaffName } from "@/components/StaffName";
 import { InspectorWorkflowCard } from "@/components/InspectorWorkflowCard";
+import { TaskPhotoThumbnails, TaskPhotoToggle } from "@/components/TaskPhotos";
 import { getTerminalColors } from "@/lib/terminalColors";
 
 type StatusFilter = "all" | "pending" | "completed";
@@ -413,6 +414,18 @@ export default function TaskManagement() {
                             {task.inspectorWorkflowTaskId && (
                               <InspectorWorkflowCard taskId={task.inspectorWorkflowTaskId} />
                             )}
+                            <TaskPhotoThumbnails
+                              beforeImagePath={task.beforeImagePath ?? null}
+                              afterImagePath={task.afterImagePath ?? null}
+                            />
+                            <div className="mt-1">
+                              <TaskPhotoToggle
+                                taskId={task.id}
+                                beforeImagePath={task.beforeImagePath ?? null}
+                                afterImagePath={task.afterImagePath ?? null}
+                                compact
+                              />
+                            </div>
                           </div>
 
                           <div className="shrink-0 text-right pt-0.5">

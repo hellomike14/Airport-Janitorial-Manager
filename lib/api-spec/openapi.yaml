@@ -1904,6 +1904,10 @@ components:
         notes:
           type: string
           nullable: true
+        beforeImagePath:
+          type: ["string", "null"]
+        afterImagePath:
+          type: ["string", "null"]
       required:
         - id
         - areaId
@@ -1913,6 +1917,8 @@ components:
         - completed
         - isSpecial
         - inspectorWorkflowTaskId
+        - beforeImagePath
+        - afterImagePath
 
     SpecialTask:
       type: object

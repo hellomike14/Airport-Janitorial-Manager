@@ -78,7 +78,7 @@ function PhotoSlot({
   const isDone = !!objectPath;
 
   return (
-    <div className="flex-1 min-w-0">
+    <div className={compact ? "w-[88px] shrink-0" : "flex-1 min-w-0"}>
       {label && <p className="text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">{label}</p>}
 
       {displaySrc ? (
@@ -207,7 +207,7 @@ export function TaskPhotoPanel({
   };
 
   return (
-    <div className="flex gap-3 items-start">
+    <div className="flex gap-2 items-start">
       <PhotoSlot
         label="Before"
         objectPath={before}
@@ -267,7 +267,7 @@ export function TaskPhotoToggle({
       </button>
 
       {expanded && (
-        <div className="mt-3 p-4 bg-slate-50 rounded-xl border border-slate-100" onClick={(e) => e.stopPropagation()}>
+        <div className="mt-2 w-fit max-w-full overflow-x-auto p-2 sm:p-3 bg-slate-50 rounded-xl border border-slate-100" onClick={(e) => e.stopPropagation()}>
           <TaskPhotoPanel
             taskId={taskId}
             beforeImagePath={beforeImagePath}
@@ -293,21 +293,27 @@ export function TaskPhotoThumbnails({
 
   return (
     <>
-      <div className="flex gap-2 mt-1">
+      <div className="flex flex-wrap gap-2 mt-2">
         {beforeImagePath && (
           <button
+            type="button"
+            aria-label="View before photo"
             onClick={(e) => { e.stopPropagation(); setLightbox(imageUrl(beforeImagePath)); }}
-            className="w-10 h-10 rounded-lg overflow-hidden border border-blue-200 shadow-sm hover:ring-2 hover:ring-blue-300 transition-all"
+            className="flex flex-col items-center gap-0.5 text-[10px] font-semibold text-slate-600"
           >
-            <img src={imageUrl(beforeImagePath)} alt="Before" className="w-full h-full object-cover" />
+            <img src={imageUrl(beforeImagePath)} alt="" className="w-12 h-12 rounded-lg object-cover border border-blue-200 shadow-sm hover:ring-2 hover:ring-blue-300 transition-all" />
+            <span>Before</span>
           </button>
         )}
         {afterImagePath && (
           <button
+            type="button"
+            aria-label="View after photo"
             onClick={(e) => { e.stopPropagation(); setLightbox(imageUrl(afterImagePath)); }}
-            className="w-10 h-10 rounded-lg overflow-hidden border border-emerald-200 shadow-sm hover:ring-2 hover:ring-emerald-300 transition-all"
+            className="flex flex-col items-center gap-0.5 text-[10px] font-semibold text-slate-600"
           >
-            <img src={imageUrl(afterImagePath)} alt="After" className="w-full h-full object-cover" />
+            <img src={imageUrl(afterImagePath)} alt="" className="w-12 h-12 rounded-lg object-cover border border-emerald-200 shadow-sm hover:ring-2 hover:ring-emerald-300 transition-all" />
+            <span>After</span>
           </button>
         )}
       </div>

@@ -26,4 +26,8 @@ export interface Task {
   inspectorWorkflowTaskId: number | null;
   isSpecial: boolean;
   notes?: string | null;
+  /** @nullable */
+  beforeImagePath: string | null;
+  /** @nullable */
+  afterImagePath: string | null;
 }

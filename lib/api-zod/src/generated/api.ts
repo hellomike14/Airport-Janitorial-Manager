@@ -322,6 +322,8 @@ export const ListTasksResponseItem = zod.object({
     ),
   isSpecial: zod.boolean(),
   notes: zod.string().nullish(),
+  beforeImagePath: zod.string().nullable(),
+  afterImagePath: zod.string().nullable(),
 });
 export const ListTasksResponse = zod.array(ListTasksResponseItem);
 
@@ -417,6 +419,8 @@ export const CompleteTaskResponse = zod.object({
     ),
   isSpecial: zod.boolean(),
   notes: zod.string().nullish(),
+  beforeImagePath: zod.string().nullable(),
+  afterImagePath: zod.string().nullable(),
 });
 
 /**
@@ -458,6 +462,8 @@ export const UncompleteTaskResponse = zod.object({
     ),
   isSpecial: zod.boolean(),
   notes: zod.string().nullish(),
+  beforeImagePath: zod.string().nullable(),
+  afterImagePath: zod.string().nullable(),
 });
 
 /**

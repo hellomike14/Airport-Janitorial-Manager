@@ -18,7 +18,7 @@ import { Check, Clock, User, AlertCircle, ArrowLeft, Camera, ToggleLeft, ToggleR
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { TaskPhotoToggle } from "@/components/TaskPhotos";
+import { TaskPhotoThumbnails, TaskPhotoToggle } from "@/components/TaskPhotos";
 import { StaffName } from "@/components/StaffName";
 import { useAuth } from "@/contexts/AuthContext";
 import { trackEvent } from "@/lib/analytics";
@@ -190,8 +190,9 @@ export default function AreaTasks() {
           {tasks?.map((task) => (
             <li 
               key={task.id} 
-              className={`p-4 sm:p-5 transition-colors hover:bg-slate-50 flex items-start sm:items-center gap-4 ${task.completed ? 'bg-slate-50/50' : ''}`}
+              className={`p-4 sm:p-5 transition-colors hover:bg-slate-50 ${task.completed ? 'bg-slate-50/50' : ''}`}
             >
+              <div className="flex items-start sm:items-center gap-4">
               <button
                 onClick={() => toggleTask(task)}
                 disabled={completeMutation.isPending || uncompleteMutation.isPending}
@@ -235,6 +236,13 @@ export default function AreaTasks() {
                 ) : (
                   <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">{t("common.pending")}</span>
                 )}
+              </div>
+              </div>
+              <div className="pl-12 pt-2">
+                <TaskPhotoThumbnails
+                  beforeImagePath={(task as any).beforeImagePath ?? null}
+                  afterImagePath={(task as any).afterImagePath ?? null}
+                />
                 <TaskPhotoToggle
                   taskId={task.id}
                   beforeImagePath={(task as any).beforeImagePath ?? null}
