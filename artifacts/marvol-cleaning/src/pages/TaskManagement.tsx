@@ -27,23 +27,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { StaffName } from "@/components/StaffName";
 import { InspectorWorkflowCard } from "@/components/InspectorWorkflowCard";
+import { getTerminalColors } from "@/lib/terminalColors";
 
 type StatusFilter = "all" | "pending" | "completed";
-
-const TERMINAL_COLORS: Record<string, { ring: string; bg: string; dot: string; bar: string; text: string }> = {
-  "Terminal A": { ring: "ring-orange-200", bg: "bg-orange-50", dot: "bg-orange-500", bar: "bg-orange-500", text: "text-orange-700" },
-  "Terminal B": { ring: "ring-green-200", bg: "bg-green-50", dot: "bg-green-500", bar: "bg-green-500", text: "text-green-700" },
-  "Terminal C": { ring: "ring-blue-200", bg: "bg-blue-50", dot: "bg-blue-500", bar: "bg-blue-500", text: "text-blue-700" },
-  "Top Terminal": { ring: "ring-amber-200", bg: "bg-amber-50", dot: "bg-amber-500", bar: "bg-amber-500", text: "text-amber-700" },
-};
-
-function getColors(terminal: string) {
-  const group = terminal.startsWith("Terminal A") ? "Terminal A"
-    : terminal.startsWith("Terminal B") ? "Terminal B"
-    : terminal.startsWith("Terminal C") ? "Terminal C"
-    : terminal;
-  return TERMINAL_COLORS[group] ?? { ring: "ring-slate-200", bg: "bg-slate-50", dot: "bg-slate-400", bar: "bg-slate-400", text: "text-slate-700" };
-}
 
 const TERMINAL_HEADINGS: Record<string, string> = {
   "Terminal A - East": "TERMINAL A EAST",
@@ -326,7 +312,7 @@ export default function TaskManagement() {
       ) : (
         <div className="space-y-4">
           {grouped.map(({ area, tasks: areaTasks, total, completed }, index) => {
-            const col = getColors(area.terminal);
+            const col = getTerminalColors(area.terminal);
             const heading = terminalHeading(area);
             const startsSection = index === 0 || terminalHeading(grouped[index - 1].area) !== heading;
             const pctArea = total > 0 ? Math.round((completed / total) * 100) : 0;

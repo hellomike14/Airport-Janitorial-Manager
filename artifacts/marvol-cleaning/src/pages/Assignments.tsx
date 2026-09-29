@@ -13,6 +13,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, Calendar, Trash2, Plus, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { WeeklyGroupScheduleMove } from "@/components/WeeklyGroupScheduleMove";
+import { getTerminalColors } from "@/lib/terminalColors";
 
 const terminalGroups = [
   ["terminal-a-east", "terminalAEast"],
@@ -307,11 +308,12 @@ export default function Assignments() {
                 {groupOrder.map((group) => {
                   const rows = groupedByGroup[group];
                   const label = terminalGroups.find(([key]) => key === group)?.[1];
+                  const terminalColors = getTerminalColors(rows[0]?.terminal ?? group);
                   return (
                     <section key={group} className="p-0">
-                      <header className="px-6 py-3 bg-slate-50 border-b border-slate-200">
+                      <header className={`px-6 py-3 border-b border-slate-200 ${terminalColors.bg}`}>
                         <div className="flex items-center justify-between gap-3">
-                          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                          <h2 className={`text-xs font-bold uppercase tracking-wider ${terminalColors.text}`}>
                             {label ? t(`assignments.groups.${label}`) : group}
                           </h2>
                           {label && <Button type="button" variant="outline" size="sm"
