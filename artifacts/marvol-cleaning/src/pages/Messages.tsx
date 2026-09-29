@@ -99,6 +99,7 @@ function NewConvoDialog({ senderRole, staffId, inspectorId, onClose, onStarted }
   const [mode, setMode] = useState<DialogMode>(canGroup ? "group" : "individual");
   const [groupName, setGroupName] = useState("");
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [selectedStaffId, setSelectedStaffId] = useState<number | null>(null);
 
   const { data: staffList = [], isLoading } = useQuery({
     queryKey: ["/api/staff"],
@@ -119,6 +120,9 @@ function NewConvoDialog({ senderRole, staffId, inspectorId, onClose, onStarted }
     canGroup ? staffList.filter((s) => s.id !== staffId) : allowedRecipients;
 
   const staffGroup = groupRecipients.filter((s) => s.role === "staff");
+  const individualStaffRecipients = allowedRecipients
+    .filter((s) => s.role === "staff")
+    .sort((a, b) => a.name.localeCompare(b.name));
   const supervisorGroup = groupRecipients.filter((s) => s.role === "supervisor");
   const inspectorGroup = groupRecipients.filter((s) => s.role === "inspector");
   const adminGroup = groupRecipients.filter((s) => s.role === "admin");
@@ -236,8 +240,43 @@ function NewConvoDialog({ senderRole, staffId, inspectorId, onClose, onStarted }
                   </span>
                 </button>
               )}
+              {individualStaffRecipients.length > 0 && (
+                <div className="p-4 border-b border-slate-100">
+                  <label htmlFor="new-conversation-staff" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    {t("messages.chooseStaff")}
+                  </label>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <select
+                      id="new-conversation-staff"
+                      data-testid="new-conversation-staff"
+                      value={individualStaffRecipients.some((s) => s.id === selectedStaffId) ? selectedStaffId! : ""}
+                      onChange={(e) => setSelectedStaffId(e.target.value ? Number(e.target.value) : null)}
+                      disabled={individualMutation.isPending}
+                      className="min-w-0 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    >
+                      <option value="">{t("messages.selectStaffName")}</option>
+                      {individualStaffRecipients.map((s) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      data-testid="start-staff-conversation"
+                      disabled={individualMutation.isPending || !individualStaffRecipients.some((s) => s.id === selectedStaffId)}
+                      onClick={() => {
+                        if (selectedStaffId !== null && individualStaffRecipients.some((s) => s.id === selectedStaffId)) {
+                          individualMutation.mutate(selectedStaffId);
+                        }
+                      }}
+                      className="shrink-0 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-40"
+                    >
+                      {t("messages.startConversation")}
+                    </button>
+                  </div>
+                </div>
+              )}
               {allowedRecipients
-                .filter((s) => s.id !== dedicatedInspector?.id)
+                .filter((s) => s.role !== "staff" && s.id !== dedicatedInspector?.id)
                 .map((s) => (
                 <button
                   key={s.id}
@@ -258,6 +297,9 @@ function NewConvoDialog({ senderRole, staffId, inspectorId, onClose, onStarted }
                   <ChevronRight className="w-4 h-4 text-slate-300" />
                 </button>
               ))}
+              {individualMutation.isError && (
+                <p role="alert" className="p-4 text-sm text-rose-700">{t("messages.conversationOpenFailed")}</p>
+              )}
             </>
           )}
 
