@@ -252,7 +252,7 @@ function NotificationBell({ staffId }: { staffId: number }) {
       const URGENT_TYPES = new Set([
         "inspector_to_supervisor", "supervisor_to_inspector",
         "new_issue", "issue_assigned", "issue_completed",
-        "task_completed", "direct_alert", "photo_shared",
+        "task_completed", "direct_alert", "photo_shared", "new_message",
       ]);
       const hasUrgent = newNotifications.some((n) => URGENT_TYPES.has(n.type));
       playNotificationSound(hasUrgent);
@@ -292,7 +292,7 @@ function NotificationBell({ staffId }: { staffId: number }) {
   const URGENT_TYPES_BADGE = new Set([
     "inspector_to_supervisor", "supervisor_to_inspector",
     "new_issue", "issue_assigned", "issue_completed",
-    "task_completed", "direct_alert", "photo_shared",
+    "task_completed", "direct_alert", "photo_shared", "new_message",
   ]);
   const hasUrgentUnread = unread.some((n) => URGENT_TYPES_BADGE.has(n.type));
 

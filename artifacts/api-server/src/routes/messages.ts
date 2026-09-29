@@ -378,6 +378,14 @@ inboundSendgridRouter.post("/", async (req: Request, res: Response) => {
     await tx.update(inboundEmailMessagesTable).set({ messageId: message.id }).where(eq(inboundEmailMessagesTable.providerMessageId, providerMessageId));
     const managers = await inspectorManagers();
     if (managers.length) await tx.insert(notificationsTable).values(managers.map(manager => ({ staffId: manager.id, type: "inspector_to_supervisor" as const, message: "URGENT: Inspector email message received", isRead: false })));
+    const managerIds = new Set(managers.map(manager => manager.id));
+    const staff = await tx.select({ id: staffTable.id }).from(staffTable).where(and(
+      eq(staffTable.active, true), eq(staffTable.loginEnabled, true), ne(staffTable.id, inspector.id),
+    ));
+    const otherStaff = staff.filter(person => !managerIds.has(person.id));
+    if (otherStaff.length) await tx.insert(notificationsTable).values(otherStaff.map(person => ({
+      staffId: person.id, type: "new_message" as const, message: "New message in Marvol",
+    })));
     return { duplicate: false, messageId: message.id };
   });
   // A provider retry repairs a prior post-commit assignment failure. The
@@ -779,8 +787,10 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
 
   // Notify only for the winning insert; concurrent idempotent retries must not
   // duplicate notifications.
+  const notifiedIds = new Set<number>();
   if (!replayed && shared) {
     const recipients = [...new Set([shared.id, ...(await inspectorManagers()).map(manager => manager.id)])].filter(id => id !== sender.id);
+    recipients.forEach(id => notifiedIds.add(id));
     if (recipients.length) await db.insert(notificationsTable).values(recipients.map(id => ({ staffId: id, type: "new_message" as const, message: "Inspector messages — " + sender.name + ": " + preview })));
   } else if (!replayed && convo.isGroup) {
     const parts = await db
@@ -788,6 +798,7 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
       .from(conversationParticipantsTable)
       .where(eq(conversationParticipantsTable.conversationId, convo.id));
     const others = parts.filter((p) => p.staffId !== sender.id);
+    others.forEach(person => notifiedIds.add(person.staffId));
     if (others.length > 0) {
       await db.insert(notificationsTable).values(
         others.map((p) => ({
@@ -800,11 +811,21 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
   } else if (!replayed) {
     const recipientId =
       convo.participantAId === sender.id ? convo.participantBId! : convo.participantAId!;
+    notifiedIds.add(recipientId);
     await db.insert(notificationsTable).values({
       staffId: recipientId,
       type: "new_message" as const,
       message: `💬 New message from ${sender.name}: ${preview}`,
     });
+  }
+  if (!replayed) {
+    const staff = await db.select({ id: staffTable.id }).from(staffTable).where(and(
+      eq(staffTable.active, true), eq(staffTable.loginEnabled, true), ne(staffTable.id, sender.id),
+    ));
+    const otherStaff = staff.filter(person => !notifiedIds.has(person.id));
+    if (otherStaff.length) await db.insert(notificationsTable).values(otherStaff.map(person => ({
+      staffId: person.id, type: "new_message" as const, message: "New message in Marvol",
+    })));
   }
 
   const outbox = await db.select({
