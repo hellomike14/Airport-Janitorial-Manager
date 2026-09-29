@@ -46,6 +46,8 @@ export * from "./createStaffMemberRequest";
 export * from "./createStaffMemberRequestRole";
 export * from "./createTaskTypeRequest";
 export * from "./dashboardStats";
+export * from "./deleteOldConversationMessages200";
+export * from "./deleteOldConversationMessagesParams";
 export * from "./deleteResponse";
 export * from "./diagnosticStoreUnavailableError";
 export * from "./diagnosticStoreUnavailableErrorError";

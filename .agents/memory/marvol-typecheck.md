@@ -22,3 +22,11 @@ The generated `use*` query hooks type their options as `UseQueryOptions` which *
 # Orval TS2308 with path+query param operations
 
 An operation with BOTH a path param and query params makes Orval emit two same-named `<OpIdPascal>Params` exports (a zod object in `api-zod/generated/api.ts` and a query-params type in `generated/types/`), breaking the `export *` barrel with TS2308. Fix: add an explicit `export type { XParams } from "./generated/types";` line in `lib/api-zod/src/index.ts` (barrel is hand-maintained; orval only cleans `generated/`).
+
+# Date-time query validation
+
+For a date-time query parameter, Orval's generated Zod schema expects a `Date`, while Express supplies a string. The server's direct `zod` import is v3 and has no `z.iso` namespace.
+
+**Why:** Reusing the generated query schema directly or using a v4-only date helper causes either a runtime validation failure or a typecheck failure.
+
+**How to apply:** Parse ISO date-time query strings at the HTTP boundary with `z.string().datetime({ offset: true })`, then construct and validate the `Date` explicitly.

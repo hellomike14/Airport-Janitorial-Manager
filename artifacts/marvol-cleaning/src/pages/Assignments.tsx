@@ -14,6 +14,7 @@ import { AlertCircle, Calendar, Trash2, Plus, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { WeeklyGroupScheduleMove } from "@/components/WeeklyGroupScheduleMove";
 import { getTerminalColors } from "@/lib/terminalColors";
+import { calendarDate, facilityDateKey } from "@/lib/facilityDate";
 
 const terminalGroups = [
   ["terminal-a-east", "terminalAEast"],
@@ -44,7 +45,7 @@ function assignmentGroup(terminal: string, areaName: string): string {
 export default function Assignments() {
   const { t, i18n } = useTranslation();
   const dateLocale = getDateLocale(i18n.language);
-  const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [selectedDate, setSelectedDate] = useState(facilityDateKey);
   const queryClient = useQueryClient();
   const [isAdding, setIsAdding] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -179,7 +180,7 @@ export default function Assignments() {
               type="date" 
               value={selectedDate}
               onChange={(e) => {
-                setSelectedDate(e.target.value);
+                if (e.target.value) setSelectedDate(e.target.value);
                 setCreateError(null);
                 setDeleteError(null);
                 setReassignGroup(null);
@@ -205,7 +206,7 @@ export default function Assignments() {
 
       {isAdding && (
         <div className="bg-indigo-50/50 rounded-3xl p-6 border border-indigo-100 shadow-sm animate-fade-in-up">
-          <h3 className="text-lg font-bold text-indigo-900 mb-4">{t("assignments.createAssignment", { date: format(new Date(selectedDate), "MMM do", { locale: dateLocale }) })}</h3>
+          <h3 className="text-lg font-bold text-indigo-900 mb-4">{t("assignments.createAssignment", { date: format(calendarDate(selectedDate), "MMM do", { locale: dateLocale }) })}</h3>
           <form onSubmit={handleSubmit} className="space-y-4">
             {createError && (
               <div
@@ -285,7 +286,7 @@ export default function Assignments() {
           <div className="p-8 text-center text-slate-500 animate-pulse">{t("assignments.loadingAssignments")}</div>
         ) : (!assignments || assignments.length === 0) ? (
           <div className="px-6 py-12 text-center text-slate-500 font-medium">
-            {t("assignments.noAssignments", { date: format(new Date(selectedDate), "MMM do", { locale: dateLocale }) })}
+            {t("assignments.noAssignments", { date: format(calendarDate(selectedDate), "MMM do", { locale: dateLocale }) })}
           </div>
         ) : (
           (() => {

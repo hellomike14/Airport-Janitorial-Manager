@@ -942,6 +942,18 @@ export type ListConversationMessagesParams = {
   staffId: number;
 };
 
+export type DeleteOldConversationMessagesParams = {
+  /**
+   * Exclusive cutoff as an ISO date-time with timezone.
+   */
+  before: string;
+};
+
+export type DeleteOldConversationMessages200 = {
+  deleted: number;
+  retained: number;
+};
+
 export type GetDashboardParams = {
   date?: string;
 };

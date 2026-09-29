@@ -1078,6 +1078,25 @@ export const SendConversationMessageBody = zod.object({
 });
 
 /**
+ * Admin only. Messages linked to inspector tasks or awaiting email delivery are retained.
+ * @summary Permanently remove messages before a date from one conversation
+ */
+export const DeleteOldConversationMessagesParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const DeleteOldConversationMessagesQueryParams = zod.object({
+  before: zod
+    .date()
+    .describe("Exclusive cutoff as an ISO date-time with timezone."),
+});
+
+export const DeleteOldConversationMessagesResponse = zod.object({
+  deleted: zod.number(),
+  retained: zod.number(),
+});
+
+/**
  * @summary Mark all messages in a conversation as read for a staff member
  */
 export const MarkConversationReadParams = zod.object({

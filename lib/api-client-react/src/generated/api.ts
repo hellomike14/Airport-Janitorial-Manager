@@ -43,6 +43,8 @@ import type {
   CreateStaffMemberRequest,
   CreateTaskTypeRequest,
   DashboardStats,
+  DeleteOldConversationMessages200,
+  DeleteOldConversationMessagesParams,
   DeleteResponse,
   DiagnosticStoreUnavailableError,
   ErrorEnvelope,
@@ -3941,6 +3943,110 @@ export const useSendConversationMessage = <
   TContext
 > => {
   return useMutation(getSendConversationMessageMutationOptions(options));
+};
+
+/**
+ * Admin only. Messages linked to inspector tasks or awaiting email delivery are retained.
+ * @summary Permanently remove messages before a date from one conversation
+ */
+export const getDeleteOldConversationMessagesUrl = (
+  id: number,
+  params: DeleteOldConversationMessagesParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/conversations/${id}/old-messages?${stringifiedParams}`
+    : `/api/conversations/${id}/old-messages`;
+};
+
+export const deleteOldConversationMessages = async (
+  id: number,
+  params: DeleteOldConversationMessagesParams,
+  options?: RequestInit,
+): Promise<DeleteOldConversationMessages200> => {
+  return customFetch<DeleteOldConversationMessages200>(
+    getDeleteOldConversationMessagesUrl(id, params),
+    {
+      ...options,
+      method: "DELETE",
+    },
+  );
+};
+
+export const getDeleteOldConversationMessagesMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteOldConversationMessages>>,
+    TError,
+    { id: number; params: DeleteOldConversationMessagesParams },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteOldConversationMessages>>,
+  TError,
+  { id: number; params: DeleteOldConversationMessagesParams },
+  TContext
+> => {
+  const mutationKey = ["deleteOldConversationMessages"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteOldConversationMessages>>,
+    { id: number; params: DeleteOldConversationMessagesParams }
+  > = (props) => {
+    const { id, params } = props ?? {};
+
+    return deleteOldConversationMessages(id, params, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteOldConversationMessagesMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteOldConversationMessages>>
+>;
+
+export type DeleteOldConversationMessagesMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Permanently remove messages before a date from one conversation
+ */
+export const useDeleteOldConversationMessages = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteOldConversationMessages>>,
+    TError,
+    { id: number; params: DeleteOldConversationMessagesParams },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteOldConversationMessages>>,
+  TError,
+  { id: number; params: DeleteOldConversationMessagesParams },
+  TContext
+> => {
+  return useMutation(getDeleteOldConversationMessagesMutationOptions(options));
 };
 
 /**

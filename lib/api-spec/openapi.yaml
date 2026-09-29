@@ -955,6 +955,34 @@ paths:
               schema:
                 $ref: "#/components/schemas/ChatMessage"
 
+  /conversations/{id}/old-messages:
+    delete:
+      operationId: deleteOldConversationMessages
+      tags: [messages]
+      summary: Permanently remove messages before a date from one conversation
+      description: Admin only. Messages linked to inspector tasks or awaiting email delivery are retained.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: before
+          in: query
+          required: true
+          description: Exclusive cutoff as an ISO date-time with timezone.
+          schema: { type: string, format: date-time }
+      responses:
+        "200":
+          description: Number of deleted and protected messages
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted, retained]
+                properties:
+                  deleted: { type: integer }
+                  retained: { type: integer }
+
   /conversations/{id}/read:
     post:
       operationId: markConversationRead

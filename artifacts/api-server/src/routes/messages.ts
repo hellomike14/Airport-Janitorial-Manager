@@ -16,7 +16,7 @@ import {
   tasksTable,
   areasTable,
 } from "@workspace/db/schema";
-import { eq, and, or, desc, asc, ne, count, gt, inArray } from "drizzle-orm";
+import { eq, and, or, desc, asc, ne, count, gt, inArray, lt, notExists } from "drizzle-orm";
 import { z } from "zod";
 import { actorStaffFromRequest } from "../lib/actorSession";
 import { INSPECTOR_EMAIL, INSPECTOR_RECIPIENT_EMAILS, aggregateInspectorEmailStatus, classifyInboundInspectorEmailTarget, groupInspectorEmailRecipients, normalizedEmail, outboundEmailStatus, resolveInspectorRecipients, isAuthorizedInspectorEmailSender, verifyInboundWebhookSecret, verifyReplyToken, inboundProviderMessageId } from "../lib/sendgridEmailBridge";
@@ -892,6 +892,55 @@ router.patch("/conversations/:id/messages/:msgId", async (req: Request, res: Res
     isRead: updated.isRead,
     createdAt: updated.createdAt.toISOString(),
   });
+});
+
+router.delete("/conversations/:id/old-messages", async (req: Request, res: Response) => {
+  const params = IdParams.safeParse(req.params);
+  const query = z.object({ before: z.string().datetime({ offset: true }) }).safeParse(req.query);
+  if (!params.success || !query.success) {
+    res.status(400).json({ error: "A valid conversation and cutoff date are required" });
+    return;
+  }
+  const cutoff = new Date(query.data.before);
+  if (Number.isNaN(cutoff.getTime()) || cutoff.getTime() > Date.now()) {
+    res.status(400).json({ error: "Cutoff date must not be in the future" });
+    return;
+  }
+  const actor = await actorStaffFromRequest(req);
+  if (!actor) { res.status(401).json({ error: "Login session required" }); return; }
+  if (actor.role !== "admin") {
+    res.status(403).json({ error: "Only administrators can delete old messages" });
+    return;
+  }
+  const access = await loadConversationForParticipant(params.data.id, actor.id);
+  if (access.status !== undefined) { sendConvoError(res, access.status); return; }
+
+  const eligible = and(
+    eq(messagesTable.conversationId, params.data.id),
+    lt(messagesTable.createdAt, cutoff),
+  );
+  // Do not erase task provenance or cancel an inspector email still awaiting
+  // delivery. Those records keep their original messages and are reported.
+  const unprotected = and(
+    notExists(db.select({ taskId: inspectorTaskLinksTable.taskId })
+      .from(inspectorTaskLinksTable)
+      .where(or(
+        eq(inspectorTaskLinksTable.sourceMessageId, messagesTable.id),
+        eq(inspectorTaskLinksTable.completionMessageId, messagesTable.id),
+      ))),
+    notExists(db.select({ id: messageEmailOutboxTable.id })
+      .from(messageEmailOutboxTable)
+      .where(and(
+        eq(messageEmailOutboxTable.messageId, messagesTable.id),
+        inArray(messageEmailOutboxTable.status, ["pending", "sending", "retrying", "not_configured"]),
+      ))),
+  );
+  const [total] = await db.select({ count: count() }).from(messagesTable).where(eligible);
+  const removed = await db.delete(messagesTable)
+    .where(and(eligible, unprotected))
+    .returning({ id: messagesTable.id });
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ deleted: removed.length, retained: total.count - removed.length });
 });
 
 router.delete("/conversations/:id/messages/:msgId", async (req: Request, res: Response) => {

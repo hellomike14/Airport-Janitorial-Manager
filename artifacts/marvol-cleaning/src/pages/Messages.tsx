@@ -33,6 +33,7 @@ import {
   sendConversationMessage,
   markConversationRead,
   deleteConversationMessage,
+  deleteOldConversationMessages,
   updateConversationMessage,
   setConversationArchive,
   listStaff,
@@ -483,6 +484,9 @@ export default function Messages() {
   const [editDraft, setEditDraft] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  const [cleanupConversationId, setCleanupConversationId] = useState<number | null>(null);
+  const [cleanupDate, setCleanupDate] = useState("");
+  const [cleanupResult, setCleanupResult] = useState<{ id: number; deleted: number; retained: number } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const composeRequestRef = useRef<{
     conversationId: number;
@@ -597,6 +601,18 @@ export default function Messages() {
     },
   });
 
+  const cleanupMutation = useMutation({
+    mutationFn: ({ id, before }: { id: number; before: string }) =>
+      deleteOldConversationMessages(id, { before }),
+    onSuccess: (result, { id }) => {
+      setCleanupConversationId(null);
+      setCleanupDate("");
+      setCleanupResult({ id, ...result });
+      qc.invalidateQueries({ queryKey: [CONVERSATIONS_KEY] });
+      qc.invalidateQueries({ queryKey: [CONVERSATIONS_KEY, id, "messages"] });
+    },
+  });
+
   const editMutation = useMutation({
     mutationFn: ({ convoId, msgId, body }: { convoId: number; msgId: number; body: string }) =>
       updateConversationMessage(convoId, msgId, { senderId: staffId, body }),
@@ -616,6 +632,14 @@ export default function Messages() {
     if (selectedId === null) return;
     if (!window.confirm(t("messages.confirmDelete"))) return;
     deleteMutation.mutate({ convoId: selectedId, msgId });
+  };
+
+  const handleDeleteOld = () => {
+    if (selectedId === null || cleanupConversationId !== selectedId || !cleanupDate || cleanupMutation.isPending) return;
+    const before = new Date(`${cleanupDate}T00:00:00`);
+    if (Number.isNaN(before.getTime()) || before.getTime() > Date.now()) return;
+    if (!window.confirm(t("messages.confirmDeleteOld", { date: cleanupDate }))) return;
+    cleanupMutation.mutate({ id: selectedId, before: before.toISOString() });
   };
 
   const handleSend = () => {
@@ -683,6 +707,9 @@ export default function Messages() {
     setSelectedId(null);
     setShowArchived((current) => !current);
   };
+
+  const today = new Date();
+  const latestCleanupDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
   const inspectorMutation = useMutation({
     mutationFn: async () => {
@@ -916,7 +943,74 @@ export default function Messages() {
                   >
                     {showArchived ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
                   </button>
+                  {senderRole === "admin" && (
+                    <button
+                      type="button"
+                      data-testid="toggle-delete-old-messages"
+                      onClick={() => {
+                        if (cleanupConversationId === selectedConvo.id) {
+                          setCleanupConversationId(null);
+                        } else {
+                          setCleanupConversationId(selectedConvo.id);
+                          setCleanupDate("");
+                          setCleanupResult(null);
+                          cleanupMutation.reset();
+                        }
+                      }}
+                      disabled={cleanupMutation.isPending}
+                      className="rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-50"
+                      aria-label={t("messages.deleteOldMessages")}
+                      title={t("messages.deleteOldMessages")}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
               </div>
+                {senderRole === "admin" && cleanupConversationId === selectedConvo.id && (
+                  <div className="mx-4 mb-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-950">
+                    <label htmlFor="old-message-cutoff" className="block font-semibold mb-2">
+                      {t("messages.deleteBeforeDate")}
+                    </label>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        id="old-message-cutoff"
+                        data-testid="old-message-cutoff"
+                        type="date"
+                        max={latestCleanupDate}
+                        value={cleanupDate}
+                        onChange={(event) => setCleanupDate(event.target.value)}
+                        disabled={cleanupMutation.isPending}
+                        className="min-w-0 rounded-lg border border-rose-300 bg-white px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-rose-400"
+                      />
+                      <button
+                        type="button"
+                        data-testid="confirm-delete-old-messages"
+                        disabled={!cleanupDate || cleanupDate > latestCleanupDate || cleanupMutation.isPending}
+                        onClick={handleDeleteOld}
+                        className="rounded-lg bg-rose-700 px-3 py-2 font-semibold text-white hover:bg-rose-800 disabled:opacity-40"
+                      >
+                        {t("messages.deleteOldMessages")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCleanupConversationId(null)}
+                        disabled={cleanupMutation.isPending}
+                        className="rounded-lg px-3 py-2 font-medium text-slate-700 hover:bg-rose-100 disabled:opacity-40"
+                      >
+                        {t("messages.cancel")}
+                      </button>
+                    </div>
+                    <p className="mt-2 text-xs leading-relaxed">{t("messages.oldMessageCleanupHelp")}</p>
+                    {cleanupMutation.isError && (
+                      <p role="alert" className="mt-2 font-medium">{t("messages.oldMessageCleanupFailed")}</p>
+                    )}
+                  </div>
+                )}
+                {cleanupResult?.id === selectedConvo.id && (
+                  <p role="status" className="mx-4 mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+                    {t("messages.oldMessageCleanupDone", cleanupResult)}
+                  </p>
+                )}
                 {isSharedInspectorThread && (
                   <div className="mx-4 mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
                     <div className="flex items-center gap-1 font-semibold">
