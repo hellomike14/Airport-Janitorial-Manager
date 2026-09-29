@@ -1074,10 +1074,12 @@ export default function Messages() {
                         handleSend();
                       }
                     }}
-                    rows={1}
+                    rows={selectedConvo.otherStaffRole === "inspector" ? 4 : 1}
                     maxLength={2000}
                     placeholder={t("messages.typeMessage")}
-                    className="flex-1 resize-none rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 max-h-32"
+                    className={`flex-1 min-w-0 rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 ${
+                      selectedConvo.otherStaffRole === "inspector" ? "resize-y min-h-24 max-h-48" : "resize-none max-h-32"
+                    }`}
                   />
                   <button
                     onClick={handleSend}
