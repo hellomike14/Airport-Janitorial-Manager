@@ -124,8 +124,30 @@ export function createSchedulesRouter(
 ): IRouter {
 const router: IRouter = Router();
 router.use(createGroupScheduleMoveRouter(database, resolveActor));
-router.get("/", async (req: Request, res: Response) => {
-  const staffId = req.query.staffId ? Number(req.query.staffId) : undefined;
+router.get("/", async (req: Request, res: Response): Promise<void> => {
+  const actor = await resolveActor(req);
+  if (!actor) {
+    res.status(401).json({ error: "Login session required" });
+    return;
+  }
+  if (actor.role !== "staff" && actor.role !== "supervisor" && actor.role !== "admin") {
+    res.status(403).json({ error: "Schedule access required" });
+    return;
+  }
+
+  const parsed = z.object({ staffId: z.coerce.number().int().positive().optional() }).safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid staff ID" });
+    return;
+  }
+  const requestedStaffId = parsed.data.staffId;
+  if (actor.role === "staff" && requestedStaffId !== undefined && requestedStaffId !== actor.id) {
+    res.status(403).json({ error: "Cannot view another employee's schedule" });
+    return;
+  }
+  // Staff can omit the filter, but must still only receive their own rows.
+  // Supervisors and admins may request everyone or filter by an employee.
+  const staffId = actor.role === "staff" ? actor.id : requestedStaffId;
 
   let schedules;
   if (staffId) {

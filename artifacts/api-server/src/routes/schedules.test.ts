@@ -10,6 +10,79 @@ import type { SQL } from "drizzle-orm";
 
 type Row = { id: number; staffId: number; areaId: number; dayOfWeek: number; startTime: string; endTime: string; notes: string | null; updatedAt: Date; staffName: string; areaName: string };
 
+test("weekly schedule reads are scoped to staff, while supervisors and admins can filter or view all", async () => {
+  let actor: { id: number; role: "staff" | "supervisor" | "admin" | "inspector" } | null = null;
+  let reads = 0;
+  const rows = [
+    { id: 101, staffId: 7, dayOfWeek: 1, startTime: "08:00" },
+    { id: 102, staffId: 8, dayOfWeek: 2, startTime: "09:00" },
+  ];
+  const dialect = new PgDialect();
+  const database = {
+    select: () => ({
+      from(table: unknown) {
+        assert.equal(table, schedulesTable);
+        reads++;
+        let filterId: number | undefined;
+        const query = {
+          leftJoin: () => query,
+          where: (condition: SQL) => {
+            const { sql, params } = dialect.sqlToQuery(condition);
+            assert.match(sql, /"schedules"."staff_id" = \$1/);
+            assert.equal(params.length, 1);
+            filterId = params[0] as number;
+            return query;
+          },
+          orderBy: () => query,
+          then: (resolve: (value: typeof rows) => unknown, reject: (reason: unknown) => unknown) =>
+            Promise.resolve(filterId === undefined ? rows : rows.filter((row) => row.staffId === filterId)).then(resolve, reject),
+        };
+        return query;
+      },
+    }),
+  };
+  const app = express();
+  app.use("/api/schedules", createSchedulesRouter(database as never, (async () => actor) as never));
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise<void>((resolve) => server.once("listening", resolve));
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/schedules`;
+  const check = async (suffix: string, status: number, expectedIds?: number[]) => {
+    const response = await fetch(`${base}${suffix}`);
+    assert.equal(response.status, status, `${actor?.role ?? "unauthenticated"} ${suffix}`);
+    if (expectedIds) {
+      const result = await response.json() as typeof rows;
+      assert.deepEqual(result.map((row) => row.id), expectedIds);
+    }
+  };
+  try {
+    await check("", 401);
+    await check("?staffId=7", 401);
+    assert.equal(reads, 0, "unauthenticated requests cannot query schedules");
+    actor = { id: 7, role: "staff" };
+    await check("", 200, [101]);
+    await check("?staffId=7", 200, [101]);
+    const staffReads = reads;
+    await check("?staffId=8", 403);
+    await check("?staffId=0", 400);
+    await check("?staffId=not-a-number", 400);
+    assert.equal(reads, staffReads, "invalid and forbidden staff requests cannot query schedules");
+    actor = { id: 7, role: "inspector" };
+    await check("", 403);
+    await check("?staffId=7", 403);
+    await check("?staffId=8", 403);
+    assert.equal(reads, staffReads, "inspectors cannot query schedules");
+    for (const role of ["supervisor", "admin"] as const) {
+      actor = { id: 7, role };
+      await check("", 200, [101, 102]);
+      await check("?staffId=7", 200, [101]);
+      await check("?staffId=8", 200, [102]);
+      await check("?staffId=0", 400);
+    }
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((err) => err ? reject(err) : resolve()));
+  }
+});
+
 test("direct schedule writers require a supervisor or admin before validation or database writes", async () => {
   let role: "staff" | "supervisor" | "admin" | null = null;
   let transactions = 0;
