@@ -8,7 +8,7 @@ import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage"
 import { ObjectPermission } from "../lib/objectAcl";
 import { actorStaffFromRequest } from "../lib/actorSession";
 import { db } from "@workspace/db";
-import { objectUploadsTable, tasksTable, conversationsTable, conversationParticipantsTable, issuesTable, areasTable } from "@workspace/db/schema";
+import { objectUploadsTable, tasksTable, conversationsTable, conversationParticipantsTable, issuesTable, areasTable, assignmentsTable } from "@workspace/db/schema";
 import { and, eq, or } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
@@ -49,9 +49,12 @@ router.post("/storage/uploads/request-url", async (req: Request, res: Response) 
     }
 
     if (taskId) {
-      const [task] = await db.select({ assignedToId: tasksTable.assignedToId }).from(tasksTable).where(eq(tasksTable.id, taskId));
+      const [task] = await db.select().from(tasksTable).where(eq(tasksTable.id, taskId));
       if (!task) { res.status(404).json({ error: "Upload target not found" }); return; }
-      if (actor!.role === "staff" && task.assignedToId !== actor!.id) { res.status(403).json({ error: "Upload target access denied" }); return; }
+      if (actor!.role === "staff" && task.assignedToId !== actor!.id) {
+        const [assignment] = await db.select({ id: assignmentsTable.id }).from(assignmentsTable).where(and(eq(assignmentsTable.staffId, actor!.id), eq(assignmentsTable.areaId, task.areaId), eq(assignmentsTable.assignmentDate, task.taskDate)));
+        if (!assignment || task.isSpecial) { res.status(403).json({ error: "Upload target access denied" }); return; }
+      }
     }
     if (conversationId) {
       const [conversation] = await db.select({ id: conversationsTable.id }).from(conversationsTable)
@@ -144,8 +147,12 @@ router.get("/storage/objects/*path", async (req: Request, res: Response) => {
     if (metadata) {
       allowed ||= metadata.ownerStaffId === actor.id;
       if (!allowed && metadata.taskId) {
-        const [task] = await db.select({ assignedToId: tasksTable.assignedToId }).from(tasksTable).where(eq(tasksTable.id, metadata.taskId));
-        allowed = task?.assignedToId === actor.id;
+        const [task] = await db.select().from(tasksTable).where(eq(tasksTable.id, metadata.taskId));
+        allowed = actor.role === "supervisor" || actor.role === "inspector" || task?.assignedToId === actor.id;
+        if (!allowed && task && !task.isSpecial) {
+          const [assignment] = await db.select({ id: assignmentsTable.id }).from(assignmentsTable).where(and(eq(assignmentsTable.staffId, actor.id), eq(assignmentsTable.areaId, task.areaId), eq(assignmentsTable.assignmentDate, task.taskDate)));
+          allowed = !!assignment;
+        }
       }
       if (!allowed && metadata.conversationId) {
         const [conversation] = await db.select().from(conversationsTable).where(and(eq(conversationsTable.id, metadata.conversationId), or(eq(conversationsTable.participantAId, actor.id), eq(conversationsTable.participantBId, actor.id))));

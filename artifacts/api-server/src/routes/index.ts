@@ -18,6 +18,7 @@ import applicationsRouter from "./applications";
 import onboardingRouter from "./onboarding";
 import quickbooksRouter from "./quickbooks";
 import authDiagnosticsRouter from "./authDiagnostics";
+import operationsRouter from "./operations";
 import { requireStaffSession } from "../middlewares/requireStaffSession";
 import { requireStaffRole } from "../middlewares/requireStaffRole";
 
@@ -38,6 +39,7 @@ router.use(taskTypesRouter);
 router.use(storageRouter);
 router.use(locationsRouter);
 router.use("/schedules", schedulesRouter);
+router.use("/operations", operationsRouter);
 router.use("/shared-photos", sharedPhotosRouter);
 router.use("/weekly-report", requireStaffRole("admin"), weeklyReportRouter);
 router.use("/applications", applicationsRouter);

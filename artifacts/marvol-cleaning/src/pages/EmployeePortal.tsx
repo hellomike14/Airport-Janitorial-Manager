@@ -17,6 +17,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { TimeClock } from "./Operations";
 import RefreshButton from "@/components/RefreshButton";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
@@ -40,6 +41,7 @@ type StaffMember = {
   name: string;
   role: string;
   active: boolean;
+  formerEmployee?: boolean;
 };
 
 type Area = {
@@ -54,6 +56,7 @@ function useSchedules(staffId?: number) {
     queryFn: async () => {
       const params = staffId ? `?staffId=${staffId}` : "";
       const res = await fetch(`${BASE_URL}/api/schedules${params}`);
+      if (!res.ok) throw new Error("Unable to load records");
       return res.json();
     },
   });
@@ -64,6 +67,7 @@ function useStaffList() {
     queryKey: ["/api/staff"],
     queryFn: async () => {
       const res = await fetch(`${BASE_URL}/api/staff`);
+      if (!res.ok) throw new Error("Unable to load records");
       return res.json();
     },
   });
@@ -74,6 +78,7 @@ function useAreas() {
     queryKey: ["/api/areas"],
     queryFn: async () => {
       const res = await fetch(`${BASE_URL}/api/areas`);
+      if (!res.ok) throw new Error("Unable to load records");
       return res.json();
     },
   });
@@ -139,7 +144,7 @@ function AddScheduleModal({
     t("portal.wednesday"), t("portal.thursday"), t("portal.friday"), t("portal.saturday"),
   ];
 
-  const activeStaff = staffList.filter((s) => s.active && s.role === "staff");
+  const activeStaff = staffList.filter((s) => s.active && !s.formerEmployee && s.role === "staff");
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
@@ -317,10 +322,11 @@ export default function EmployeePortal() {
   }, [schedules]);
 
   const selectedStaff = staffList.find((s) => s.id === selectedStaffId);
-  const activeStaff = staffList.filter((s) => s.active && s.role === "staff");
+  const activeStaff = staffList.filter((s) => s.active && !s.formerEmployee && s.role === "staff");
 
   return (
     <div className="space-y-6">
+      <TimeClock />
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-3">

@@ -1,4 +1,5 @@
 import app from "./app";
+import { generatePreviousMonthlyReport } from "./lib/monthlyOperationsReport";
 import { db } from "@workspace/db";
 import { staffTable, areasTable, taskTypesTable, notificationsTable, staffLocationsTable, tasksTable, taskExclusionsTable, assignmentsTable, schedulesTable, issuesTable, sharedPhotosTable, objectUploadsTable, conversationsTable, messagesTable, conversationParticipantsTable } from "@workspace/db/schema";
 import { eq, and, count, inArray, or, gte, like, ne, sql } from "drizzle-orm";
@@ -820,6 +821,8 @@ async function seed() {
 app.listen(port, async () => {
   console.log(`Server listening on port ${port}`);
   await seed().catch((err) => console.error("Seed error:", err));
+  void generatePreviousMonthlyReport().catch(() => console.error("Monthly operations report could not be generated"));
+  setInterval(() => void generatePreviousMonthlyReport().catch(() => console.error("Monthly operations report could not be generated")), 60 * 60 * 1000).unref();
   const inspectorConfig = inspectorRuntimeConfig();
   // A lock-protected sweep is safe to run on every instance; deployments
   // should additionally invoke it from their scheduler for sleep resilience.

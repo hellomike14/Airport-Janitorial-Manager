@@ -29,6 +29,7 @@ export const tasksTable = pgTable("tasks", {
   notes: text("notes"),
   beforeImagePath: text("before_image_path"),
   afterImagePath: text("after_image_path"),
+  photoRequired: boolean("photo_required").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

@@ -156,6 +156,7 @@ router.get("/", async (req, res) => {
       notes: tasksTable.notes,
       beforeImagePath: tasksTable.beforeImagePath,
       afterImagePath: tasksTable.afterImagePath,
+      photoRequired: tasksTable.photoRequired,
     })
     .from(tasksTable)
     .leftJoin(staffTable, eq(tasksTable.completedById, staffTable.id))
@@ -358,6 +359,7 @@ router.post("/complete-all", async (req, res) => {
         eq(tasksTable.areaId, body.areaId),
         eq(tasksTable.taskDate, body.date),
         eq(tasksTable.completed, false),
+        sql`(${tasksTable.photoRequired} = false OR ${tasksTable.afterImagePath} IS NOT NULL)`,
         sql`NOT EXISTS (SELECT 1 FROM inspector_task_links itl WHERE itl.task_id = ${tasksTable.id})`
       )
     );
@@ -379,9 +381,11 @@ router.post("/:id/complete", async (req, res) => {
     // reassignment cannot leave a stale assignee authorized.
     if (link && lockedTask.assignedToId !== actor.id) return { status: "forbidden" as const };
     if (!link && actor.role !== "admin" && actor.role !== "supervisor" && lockedTask.assignedToId !== actor.id) {
-      return { status: "forbidden" as const };
+      const [assignment] = await tx.select({ id: assignmentsTable.id }).from(assignmentsTable).where(and(eq(assignmentsTable.staffId, actor.id), eq(assignmentsTable.areaId, lockedTask.areaId), eq(assignmentsTable.assignmentDate, lockedTask.taskDate)));
+      if (!assignment || lockedTask.isSpecial) return { status: "forbidden" as const };
     }
     if (lockedTask.completed) return { status: "ok" as const, task: lockedTask, changed: false };
+    if (lockedTask.photoRequired && !lockedTask.afterImagePath) return { status: "photo_required" as const };
     const [task] = await tx.update(tasksTable).set({ completed: true, completedAt: new Date(), completedById: actor.id })
       .where(and(eq(tasksTable.id, id), eq(tasksTable.completed, false))).returning();
     if (!task) return { status: "conflict" as const };
@@ -402,6 +406,7 @@ router.post("/:id/complete", async (req, res) => {
   });
   if (completion.status === "not_found") return res.status(404).json({ error: "Task not found" });
   if (completion.status === "forbidden") return res.status(403).json({ error: "Inspector workflow completion requires the locked current assignee" });
+  if (completion.status === "photo_required") return res.status(400).json({ error: "Attach an after photo before completing this task" });
   if (completion.status === "conflict") return res.status(409).json({ error: "Task completion changed concurrently" });
   const updated = completion.task;
 
@@ -453,7 +458,10 @@ router.post("/:id/uncomplete", async (req, res) => {
     if (!lockedTask) return { status: "not_found" as const };
     const [link] = await tx.select().from(inspectorTaskLinksTable).where(eq(inspectorTaskLinksTable.taskId, id)).for("update");
     if (link && lockedTask.assignedToId !== actor.id) return { status: "forbidden" as const };
-    if (!link && actor.role !== "admin" && actor.role !== "supervisor" && lockedTask.assignedToId !== actor.id) return { status: "forbidden" as const };
+    if (!link && actor.role !== "admin" && actor.role !== "supervisor" && lockedTask.assignedToId !== actor.id) {
+      const [assignment] = await tx.select({ id: assignmentsTable.id }).from(assignmentsTable).where(and(eq(assignmentsTable.staffId, actor.id), eq(assignmentsTable.areaId, lockedTask.areaId), eq(assignmentsTable.assignmentDate, lockedTask.taskDate)));
+      if (!assignment || lockedTask.isSpecial) return { status: "forbidden" as const };
+    }
     if (!lockedTask.completed) return { status: "ok" as const, task: lockedTask };
     const [task] = await tx.update(tasksTable).set({
       completed: false,
@@ -485,9 +493,12 @@ router.patch("/:id/images", async (req, res) => {
   }
   const actor = await actorStaffFromRequest(req);
   if (!actor) return res.status(401).json({ error: "Login session required" });
-  const [authorizationTask] = await db.select({ assignedToId: tasksTable.assignedToId }).from(tasksTable).where(eq(tasksTable.id, id));
+  const [authorizationTask] = await db.select().from(tasksTable).where(eq(tasksTable.id, id));
   if (!authorizationTask) return res.status(404).json({ error: "Task not found" });
-  if (actor.role !== "admin" && actor.role !== "supervisor" && authorizationTask.assignedToId !== actor.id) return res.status(403).json({ error: "Only the assignee or management may attach task images" });
+  if (actor.role !== "admin" && actor.role !== "supervisor" && authorizationTask.assignedToId !== actor.id) {
+    const [assignment] = await db.select({ id: assignmentsTable.id }).from(assignmentsTable).where(and(eq(assignmentsTable.staffId, actor.id), eq(assignmentsTable.areaId, authorizationTask.areaId), eq(assignmentsTable.assignmentDate, authorizationTask.taskDate)));
+    if (!assignment || authorizationTask.isSpecial) return res.status(403).json({ error: "Only the assignee or management may attach task images" });
+  }
 
   const { beforeImagePath, afterImagePath } = req.body;
   for (const [path, purpose] of [[beforeImagePath, "task_before"], [afterImagePath, "task_after"]] as const) {
@@ -504,14 +515,11 @@ router.patch("/:id/images", async (req, res) => {
     return res.status(400).json({ error: "No image fields provided" });
   }
 
-  const [updated] = await db
-    .update(tasksTable)
-    .set(updates)
-    .where(eq(tasksTable.id, id))
-    .returning();
+  const [updated] = await db.update(tasksTable).set(updates)
+    .where(and(eq(tasksTable.id, id), afterImagePath === null ? sql`NOT (${tasksTable.completed} AND ${tasksTable.photoRequired})` : undefined)).returning();
 
   if (!updated) {
-    return res.status(404).json({ error: "Task not found" });
+    return res.status(409).json({ error: "Uncomplete this task before removing required evidence" });
   }
 
   return res.json({

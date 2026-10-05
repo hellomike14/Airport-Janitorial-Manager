@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { assignmentsTable, staffTable, areasTable, schedulesTable } from "@workspace/db/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { assignmentsTable, staffTable, areasTable } from "@workspace/db/schema";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import {
   ListAssignmentsQueryParams,
   CreateAssignmentBody,
@@ -37,7 +37,7 @@ router.get("/", async (req, res) => {
     .from(assignmentsTable)
     .innerJoin(
       staffTable,
-      and(eq(assignmentsTable.staffId, staffTable.id), eq(staffTable.active, true))
+      and(eq(assignmentsTable.staffId, staffTable.id), eq(staffTable.active, true), eq(staffTable.formerEmployee, false))
     )
     .innerJoin(areasTable, eq(assignmentsTable.areaId, areasTable.id))
     .where(
@@ -77,52 +77,17 @@ router.post("/", async (req, res) => {
     db.select({ id: areasTable.id }).from(areasTable).where(and(eq(areasTable.id, body.areaId), eq(areasTable.archived, false))),
   ]);
   if (!target || !targetArea) return res.status(400).json({ error: "Target staff or area is not eligible" });
-  const [created] = await db
-    .insert(assignmentsTable)
-    .values({
-      staffId: body.staffId,
-      areaId: body.areaId,
-      assignmentDate: body.assignmentDate,
-      assignedById: actor.id,
-      notes: body.notes ?? null,
-      isSpecial: body.isSpecial,
-    })
-    .returning();
-
-  const assignDate = new Date(body.assignmentDate + "T12:00:00");
-  const dayOfWeek = assignDate.getDay();
-
-  const existing = await db
-    .select({ id: schedulesTable.id })
-    .from(schedulesTable)
-    .where(
-      and(
-        eq(schedulesTable.staffId, body.staffId),
-        eq(schedulesTable.dayOfWeek, dayOfWeek),
-        eq(schedulesTable.areaId, body.areaId)
-      )
-    )
-    .limit(1);
-
-  if (existing.length === 0) {
-    const existingShift = await db
-      .select({ startTime: schedulesTable.startTime, endTime: schedulesTable.endTime })
-      .from(schedulesTable)
-      .where(eq(schedulesTable.staffId, body.staffId))
-      .limit(1);
-
-    const startTime = existingShift[0]?.startTime ?? "14:00";
-    const endTime = existingShift[0]?.endTime ?? "22:00";
-
-    await db.insert(schedulesTable).values({
-      staffId: body.staffId,
-      areaId: body.areaId,
-      dayOfWeek,
-      startTime,
-      endTime,
-      notes: body.notes ?? null,
-    });
-  }
+  const created = await db.transaction(async tx => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(${body.staffId}, hashtext(${body.assignmentDate}))`);
+    const [existing] = await tx.select().from(assignmentsTable).where(and(eq(assignmentsTable.staffId, body.staffId), eq(assignmentsTable.areaId, body.areaId), eq(assignmentsTable.assignmentDate, body.assignmentDate)));
+    if (existing) return existing;
+    const [assignment] = await tx.insert(assignmentsTable).values({
+      staffId: body.staffId, areaId: body.areaId, assignmentDate: body.assignmentDate,
+      assignedById: actor.id, notes: body.notes ?? null, isSpecial: body.isSpecial,
+    }).returning();
+    return assignment;
+  });
+  // Area assignments are dated work coverage, never recurring payroll shifts.
 
   const [staff] = await db
     .select({ name: staffTable.name })

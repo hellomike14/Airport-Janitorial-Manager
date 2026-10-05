@@ -74,10 +74,12 @@ export default function AreaTasks() {
     }
   };
 
+  const [taskError, setTaskError] = useState("");
   const currentUserId = currentUser?.id ?? 1;
 
   const completeMutation = useCompleteTask({
     mutation: {
+      onError: (error) => setTaskError(error.message),
       onSuccess: () => {
         trackEvent("task_completed", {
           task_kind: "standard",
@@ -97,6 +99,7 @@ export default function AreaTasks() {
 
   const completeAllMutation = useCompleteAllTasks({
     mutation: {
+      onError: (error) => setTaskError(error.message),
       onSuccess: () => {
         trackEvent("task_completed", {
           task_kind: "standard",
@@ -112,6 +115,8 @@ export default function AreaTasks() {
     if (task.completed) {
       uncompleteMutation.mutate({ id: task.id });
     } else {
+      if (task.photoRequired && !task.afterImagePath) { setTaskError("Attach an after photo before completing this task."); return; }
+      setTaskError("");
       completeMutation.mutate({ id: task.id, data: { completedById: currentUserId } });
     }
   };
@@ -220,6 +225,7 @@ export default function AreaTasks() {
               </div>
 
               <div className="shrink-0 text-right flex flex-col items-end gap-2">
+                {(task as any).photoRequired && <p className="text-xs text-amber-700">After photo required</p>}
                 {task.completed ? (
                   <div className="flex flex-col items-end">
                     <span className="text-xs font-bold text-emerald-600 flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-md">

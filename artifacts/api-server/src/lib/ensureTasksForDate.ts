@@ -1,5 +1,5 @@
 import { db } from "@workspace/db";
-import { tasksTable, areasTable, taskTypesTable, taskExclusionsTable } from "@workspace/db/schema";
+import { tasksTable, areasTable, taskTypesTable, taskExclusionsTable, areaChecklistsTable } from "@workspace/db/schema";
 import { eq, and, asc, sql } from "drizzle-orm";
 import { AREA_SPECIFIC_TASKS, AREAS_REPLACING_DEFAULTS } from "../area-tasks";
 
@@ -36,7 +36,9 @@ export async function getAreaSpecificTasks(area: { name: string; terminal: strin
   return AREA_SPECIFIC_TASKS[qualifiedKey] ?? AREA_SPECIFIC_TASKS[area.name] ?? [];
 }
 
-export async function getEffectiveTasksForArea(areaId: number): Promise<{ taskName: string; taskOrder: number }[]> {
+export async function getEffectiveTasksForArea(areaId: number): Promise<{ taskName: string; taskOrder: number; photoRequired?: boolean }[]> {
+  const [profile] = await db.select().from(areaChecklistsTable).where(eq(areaChecklistsTable.areaId, areaId));
+  if (profile) return profile.items.map((item, i) => ({ ...item, taskOrder: i + 1 }));
   const [area] = await db
     .select({ name: areasTable.name, terminal: areasTable.terminal })
     .from(areasTable)
@@ -48,7 +50,7 @@ export async function getEffectiveTasksForArea(areaId: number): Promise<{ taskNa
 
   const activeTypes = replacesDefaults ? [] : await getActiveTaskTypes();
   const extraTasks = await getAreaSpecificTasks(area);
-  const allTasks = [...activeTypes, ...extraTasks];
+  const allTasks = [...new Map([...activeTypes, ...extraTasks].map(t => [t.taskName.trim().toLowerCase(), t])).values()];
 
   const exclusions = await db
     .select({ taskName: taskExclusionsTable.taskName })
@@ -69,11 +71,13 @@ export async function ensureTasksForDate(areaId: number, date: string) {
     const existing = await tx
       .select({ id: tasksTable.id })
       .from(tasksTable)
-      .where(and(eq(tasksTable.areaId, areaId), eq(tasksTable.taskDate, date)))
+      .where(and(eq(tasksTable.areaId, areaId), eq(tasksTable.taskDate, date), eq(tasksTable.isSpecial, false)))
       .limit(1);
 
     if (existing.length > 0) return;
 
+    const [area] = await tx.select({ archived: areasTable.archived }).from(areasTable).where(eq(areasTable.id, areaId));
+    if (!area || area.archived) return;
     const allTasks = await getEffectiveTasksForArea(areaId);
     if (allTasks.length === 0) return;
 
@@ -85,6 +89,7 @@ export async function ensureTasksForDate(areaId: number, date: string) {
         taskOrder: t.taskOrder,
         completed: false,
         isSpecial: false,
+        photoRequired: t.photoRequired ?? false,
       }))
     );
   });

@@ -31,6 +31,7 @@ const WeeklyReport = lazy(() => import("./pages/WeeklyReport"));
 const SpecialRequests = lazy(() => import("./pages/SpecialRequests"));
 const Employment = lazy(() => import("./pages/Employment"));
 const Apply = lazy(() => import("./pages/Apply"));
+const Operations = lazy(() => import("./pages/Operations"));
 const Messages = lazy(() => import("./pages/Messages"));
 import { LoginRecovery } from "./components/LoginRecovery";
 import { AuthBootstrapGate } from "./components/AuthBootstrapGate";
@@ -174,6 +175,7 @@ function ProtectedRoutes() {
     <AppLayout>
       {effectiveRole === "staff" && <OfflineBanner />}
       <Switch>
+        {effectiveRole !== "inspector" && <Route path="/operations" component={Operations} />}
         {/* Admin-only routes */}
         {effectiveRole === "admin" && (
           <>
