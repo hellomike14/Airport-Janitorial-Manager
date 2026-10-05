@@ -4,46 +4,75 @@ import { useTranslation } from "react-i18next";
 import { getDateLocale } from "@/i18n/dateLocale";
 import { 
   useListAssignments, 
-  useCreateAssignment, 
+  useAssignTerminalGroup,
+  useReassignTerminalGroup,
   useDeleteAssignment,
-  useListStaff,
-  useListAreas
+  useListStaff
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, Calendar, Trash2, Plus, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/contexts/AuthContext";
+import { WeeklyGroupScheduleMove } from "@/components/WeeklyGroupScheduleMove";
+import { getTerminalColors } from "@/lib/terminalColors";
+import { calendarDate, facilityDateKey } from "@/lib/facilityDate";
+
+const terminalGroups = [
+  ["terminal-a-east", "terminalAEast"],
+  ["terminal-a-west", "terminalAWest"],
+  ["terminal-b-east", "terminalBEast"],
+  ["terminal-b-west", "terminalBWest"],
+  ["terminal-c-135", "terminalC135"],
+  ["terminal-c-246", "terminalC246"],
+  ["top-terminal", "topTerminal"],
+] as const;
+
+function assignmentGroup(terminal: string, areaName: string): string {
+  const directGroup: Record<string, string> = {
+    "Terminal A - East": "terminal-a-east",
+    "Terminal A - West": "terminal-a-west",
+    "Terminal B - East": "terminal-b-east",
+    "Terminal B - West": "terminal-b-west",
+    "Top Terminal": "top-terminal",
+  };
+  if (directGroup[terminal]) return directGroup[terminal];
+  if (terminal === "Terminal C") {
+    if (/^(Group 1|Terminal C - Levels 1|Level [135]\b)/.test(areaName)) return "terminal-c-135";
+    if (/^(Group 2|Terminal C - Levels 2|Level [246]\b)/.test(areaName)) return "terminal-c-246";
+  }
+  return terminal || "—";
+}
 
 export default function Assignments() {
   const { t, i18n } = useTranslation();
   const dateLocale = getDateLocale(i18n.language);
-  const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [selectedDate, setSelectedDate] = useState(facilityDateKey);
   const queryClient = useQueryClient();
   const [isAdding, setIsAdding] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const { currentUser } = useAuth();
-  
+  const [reassignError, setReassignError] = useState<string | null>(null);
+  const [reassignGroup, setReassignGroup] = useState<string | null>(null);
+  const [reassignStaffId, setReassignStaffId] = useState("");
+
   const { data: assignments, isLoading } = useListAssignments({ date: selectedDate });
   const { data: staff } = useListStaff();
-  const { data: areas } = useListAreas();
-
-  const currentUserId = currentUser?.id ?? 0;
 
   const [formData, setFormData] = useState({
-    staffId: '', areaId: '', notes: '', isSpecial: false
+    staffId: '', groupKey: '', notes: '', isSpecial: false
   });
 
-  const createMutation = useCreateAssignment({
+  const createMutation = useAssignTerminalGroup({
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
         queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
         setIsAdding(false);
-        setFormData({ staffId: '', areaId: '', notes: '', isSpecial: false });
+        setFormData({ staffId: '', groupKey: '', notes: '', isSpecial: false });
         setCreateError(null);
       },
-      onError: () => setCreateError(t("assignments.createFailed")),
+      onError: (error) => setCreateError(error?.status === 409
+        ? t("assignments.groupConflict")
+        : t("assignments.createFailed")),
     }
   });
 
@@ -57,27 +86,46 @@ export default function Assignments() {
     }
   });
 
+  const reassignMutation = useReassignTerminalGroup({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+        setReassignGroup(null);
+        setReassignStaffId("");
+        setReassignError(null);
+      },
+      onError: (error) => {
+        setReassignError(error?.status === 409
+          ? t("assignments.reassignConflict")
+          : t("assignments.reassignFailed"));
+        queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
+      },
+    },
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setCreateError(null);
+    if (!formData.staffId || !formData.groupKey) {
+      setCreateError(t("assignments.chooseStaffAndGroup"));
+      return;
+    }
     createMutation.mutate({
       data: {
-        staffId: parseInt(formData.staffId),
-        areaId: parseInt(formData.areaId),
+        staffId: Number(formData.staffId),
+        groupKey: formData.groupKey as (typeof terminalGroups)[number][0],
         assignmentDate: selectedDate,
-        assignedById: currentUserId,
         notes: formData.notes,
         isSpecial: formData.isSpecial
       }
     });
   };
 
-  const assignmentStaff = (staff ?? []).filter((person) => person.role === "staff");
+  const assignmentStaff = staff ?? [];
   const eligibleStaff = assignmentStaff.filter((person) => {
-    const access = person as typeof person & { loginEnabled?: boolean; formerEmployee?: boolean };
-    return access.active && access.loginEnabled === true && access.formerEmployee !== true;
+    return person.active && person.formerEmployee !== true;
   });
-  const unavailableStaffCount = assignmentStaff.length - eligibleStaff.length;
 
   const updateForm = (changes: Partial<typeof formData>) => {
     setCreateError(null);
@@ -89,6 +137,32 @@ export default function Assignments() {
       setDeleteError(null);
       deleteMutation.mutate({ id });
     }
+  };
+
+  const reassign = (groupKey: string, rows: NonNullable<typeof assignments>) => {
+    if (!reassignStaffId || !selectedDate || reassignMutation.isPending) return;
+    const target = eligibleStaff.find((person) => person.id === Number(reassignStaffId));
+    if (!target || rows.every((row) => row.staffId === target.id)) {
+      setReassignError(t("assignments.reassignChooseDifferent"));
+      return;
+    }
+    const label = terminalGroups.find(([key]) => key === groupKey)?.[1];
+    const owners = [...new Set(rows.map((row) => row.staffName))].join(", ");
+    if (!confirm(t("assignments.reassignConfirm", {
+      group: label ? t(`assignments.groups.${label}`) : groupKey,
+      date: selectedDate,
+      owners,
+      target: target.name,
+    }))) return;
+    setReassignError(null);
+    reassignMutation.mutate({
+      data: {
+        groupKey: groupKey as (typeof terminalGroups)[number][0],
+        assignmentDate: selectedDate,
+        staffId: target.id,
+        expectedAssignments: rows.map(({ id, staffId }) => ({ id, staffId })),
+      },
+    });
   };
 
   return (
@@ -106,9 +180,11 @@ export default function Assignments() {
               type="date" 
               value={selectedDate}
               onChange={(e) => {
-                setSelectedDate(e.target.value);
+                if (e.target.value) setSelectedDate(e.target.value);
                 setCreateError(null);
                 setDeleteError(null);
+                setReassignGroup(null);
+                setReassignError(null);
               }}
               className="font-bold text-slate-700 bg-transparent outline-none cursor-pointer"
             />
@@ -126,9 +202,11 @@ export default function Assignments() {
         </div>
       </div>
 
+      <WeeklyGroupScheduleMove groups={terminalGroups} staff={eligibleStaff} />
+
       {isAdding && (
         <div className="bg-indigo-50/50 rounded-3xl p-6 border border-indigo-100 shadow-sm animate-fade-in-up">
-          <h3 className="text-lg font-bold text-indigo-900 mb-4">{t("assignments.createAssignment", { date: format(new Date(selectedDate), "MMM do", { locale: dateLocale }) })}</h3>
+          <h3 className="text-lg font-bold text-indigo-900 mb-4">{t("assignments.createAssignment", { date: format(calendarDate(selectedDate), "MMM do", { locale: dateLocale }) })}</h3>
           <form onSubmit={handleSubmit} className="space-y-4">
             {createError && (
               <div
@@ -149,20 +227,19 @@ export default function Assignments() {
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
-                {unavailableStaffCount > 0 && (
-                  <p className="mt-2 text-xs leading-relaxed text-indigo-700" data-testid="text-unavailable-assignment-staff">
-                    {t("assignments.unavailableStaffHint")}
-                  </p>
-                )}
+                <p className="mt-2 text-xs leading-relaxed text-indigo-700">
+                  {t("assignments.activeStaffHint")}
+                </p>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-indigo-900 mb-1">{t("assignments.selectArea")}</label>
-                <select required value={formData.areaId} onChange={e => updateForm({ areaId: e.target.value })} className="w-full bg-white border border-indigo-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
-                  <option value="">{t("assignments.chooseArea")}</option>
-                  {areas?.map(a => (
-                    <option key={a.id} value={a.id}>{a.name} ({a.terminal})</option>
+                <label className="block text-sm font-semibold text-indigo-900 mb-1" htmlFor="assignment-group">{t("assignments.selectGroup")}</label>
+                <select id="assignment-group" required value={formData.groupKey} onChange={e => updateForm({ groupKey: e.target.value })} className="w-full bg-white border border-indigo-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
+                  <option value="">{t("assignments.chooseGroup")}</option>
+                  {terminalGroups.map(([key, label]) => (
+                    <option key={key} value={key}>{t(`assignments.groups.${label}`)}</option>
                   ))}
                 </select>
+                <p className="mt-2 text-xs leading-relaxed text-indigo-700">{t("assignments.groupHint")}</p>
               </div>
             </div>
             
@@ -209,35 +286,73 @@ export default function Assignments() {
           <div className="p-8 text-center text-slate-500 animate-pulse">{t("assignments.loadingAssignments")}</div>
         ) : (!assignments || assignments.length === 0) ? (
           <div className="px-6 py-12 text-center text-slate-500 font-medium">
-            {t("assignments.noAssignments", { date: format(new Date(selectedDate), "MMM do", { locale: dateLocale }) })}
+            {t("assignments.noAssignments", { date: format(calendarDate(selectedDate), "MMM do", { locale: dateLocale }) })}
           </div>
         ) : (
           (() => {
-            // Group assignments by terminal so each terminal only shows the
-            // areas that actually have a shift assignment for the selected
-            // date. Terminals with zero assignments are hidden entirely (per
-            // task #38: stop showing the long jumbled list of unassigned
-            // rows for Terminals A and B).
-            const groupedByTerminal = assignments.reduce<
+            // Keep the two Terminal C groups separate when showing saved areas.
+            const groupedByGroup = assignments.reduce<
               Record<string, typeof assignments>
             >((acc, a) => {
-              const key = a.terminal || "—";
+              const key = assignmentGroup(a.terminal, a.areaName);
               if (!acc[key]) acc[key] = [];
               acc[key].push(a);
               return acc;
             }, {});
-            const terminalOrder = Object.keys(groupedByTerminal).sort();
+            const groupOrder = Object.keys(groupedByGroup).sort((a, b) => {
+              const aIndex = terminalGroups.findIndex(([key]) => key === a);
+              const bIndex = terminalGroups.findIndex(([key]) => key === b);
+              return (aIndex < 0 ? 99 : aIndex) - (bIndex < 0 ? 99 : bIndex) || a.localeCompare(b);
+            });
             return (
               <div className="divide-y divide-slate-100">
-                {terminalOrder.map((terminal) => {
-                  const rows = groupedByTerminal[terminal];
+                {groupOrder.map((group) => {
+                  const rows = groupedByGroup[group];
+                  const label = terminalGroups.find(([key]) => key === group)?.[1];
+                  const terminalColors = getTerminalColors(rows[0]?.terminal ?? group);
                   return (
-                    <section key={terminal} className="p-0">
-                      <header className="px-6 py-3 bg-slate-50 border-b border-slate-200">
-                        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                          {terminal}
-                        </h2>
+                    <section key={group} className="p-0">
+                      <header className={`px-6 py-3 border-b border-slate-200 ${terminalColors.bg}`}>
+                        <div className="flex items-center justify-between gap-3">
+                          <h2 className={`text-xs font-bold uppercase tracking-wider ${terminalColors.text}`}>
+                            {label ? t(`assignments.groups.${label}`) : group}
+                          </h2>
+                          {label && <Button type="button" variant="outline" size="sm"
+                            onClick={() => {
+                              setReassignGroup(reassignGroup === group ? null : group);
+                              setReassignStaffId("");
+                              setReassignError(null);
+                            }}>
+                            {t("assignments.reassignGroup")}
+                          </Button>}
+                        </div>
                       </header>
+                      {reassignGroup === group && (
+                        <div className="p-4 bg-indigo-50 border-b border-indigo-100 space-y-3">
+                          <p className="text-sm font-semibold text-indigo-900">{t("assignments.reassignFrom", {
+                            owners: [...new Set(rows.map((row) => row.staffName))].join(", "),
+                            date: selectedDate,
+                          })}</p>
+                          <p className="text-xs text-indigo-800">{t("assignments.reassignScope")}</p>
+                          <label className="block text-sm font-semibold text-indigo-900" htmlFor={`reassign-${group}`}>
+                            {t("assignments.reassignTo")}
+                          </label>
+                          <select id={`reassign-${group}`} value={reassignStaffId}
+                            onChange={(e) => { setReassignStaffId(e.target.value); setReassignError(null); }}
+                            className="w-full sm:max-w-xs bg-white border border-indigo-200 rounded-xl px-4 py-2">
+                            <option value="">{t("assignments.chooseStaffMember")}</option>
+                            {eligibleStaff.map((person) => (
+                              <option key={person.id} value={person.id}>{person.name}</option>
+                            ))}
+                          </select>
+                          {reassignError && <p role="alert" className="text-sm font-semibold text-rose-700">{reassignError}</p>}
+                          <div className="flex gap-2">
+                            <Button type="button" disabled={!reassignStaffId || reassignMutation.isPending}
+                              onClick={() => reassign(group, rows)}>{t("assignments.confirmReassignment")}</Button>
+                            <Button type="button" variant="ghost" onClick={() => setReassignGroup(null)}>{t("common.cancel")}</Button>
+                          </div>
+                        </div>
+                      )}
 
                       <div className="sm:hidden divide-y divide-slate-100">
                         {rows.map((assignment) => (

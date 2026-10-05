@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq, inArray, lte, or } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { messageEmailOutboxTable } from "@workspace/db/schema";
-import { createReplyToken, normalizedEmail, outboundEmailStatus } from "./sendgridEmailBridge";
+import { createReplyToken, normalizedEmail, outboundEmailStatus, resolveInspectorRecipients } from "./sendgridEmailBridge";
 import { inspectorRuntimeConfig } from "./inspectorRuntimeConfig";
 
 export type SendGridTransport = (request: { apiKey: string; from: string; to: string; replyTo: string; subject: string; text: string; outboxId: number; providerMessageKey: string }) => Promise<void>;
@@ -24,7 +24,7 @@ export async function deliverOneOutboxEmail(transport: SendGridTransport = sendG
   const item = await db.transaction(async (tx) => {
     const [row] = await tx.select().from(messageEmailOutboxTable)
       .where(or(
-        and(inArray(messageEmailOutboxTable.status, ["pending", "retrying"]), lte(messageEmailOutboxTable.nextAttemptAt, now)),
+        and(inArray(messageEmailOutboxTable.status, ["pending", "retrying", "not_configured"]), lte(messageEmailOutboxTable.nextAttemptAt, now)),
         and(eq(messageEmailOutboxTable.status, "sending"), lte(messageEmailOutboxTable.lockedAt, expiredLease)),
       ))
       .orderBy(messageEmailOutboxTable.id).limit(1).for("update", { skipLocked: true });
@@ -35,6 +35,9 @@ export async function deliverOneOutboxEmail(transport: SendGridTransport = sendG
   });
   if (!item) return false;
   try {
+    // Older queued rows may still target the former shared mailbox. Never
+    // send a queued email to a recipient outside the current approved list.
+    if (!resolveInspectorRecipients([item.inspectorEmail])) throw new Error("Inspector recipient is no longer approved");
     const apiKey = process.env.SENDGRID_API_KEY!;
     const from = normalizedEmail(process.env.SENDGRID_FROM_EMAIL)!;
     const domain = process.env.SENDGRID_INBOUND_DOMAIN!.trim().toLowerCase();

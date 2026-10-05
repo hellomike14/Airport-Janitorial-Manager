@@ -15,11 +15,12 @@ import {
   inspectorTaskAssignmentHistoryTable,
   tasksTable,
   areasTable,
+  objectUploadsTable,
 } from "@workspace/db/schema";
-import { eq, and, or, desc, asc, ne, count, gt, inArray } from "drizzle-orm";
+import { eq, and, or, desc, asc, ne, count, gt, inArray, lt, notExists } from "drizzle-orm";
 import { z } from "zod";
 import { actorStaffFromRequest } from "../lib/actorSession";
-import { INSPECTOR_EMAIL, normalizedEmail, outboundEmailStatus, verifyInboundWebhookSecret, verifyReplyToken, inboundProviderMessageId, inboundAuthenticationPasses } from "../lib/sendgridEmailBridge";
+import { INSPECTOR_EMAIL, INSPECTOR_RECIPIENT_EMAILS, aggregateInspectorEmailStatus, classifyInboundInspectorEmailTarget, groupInspectorEmailRecipients, normalizedEmail, outboundEmailStatus, resolveInspectorRecipients, isAuthorizedInspectorEmailSender, verifyInboundWebhookSecret, verifyReplyToken, inboundProviderMessageId } from "../lib/sendgridEmailBridge";
 import { autoAssignInboundInspectorMessage } from "../lib/inspectorTaskWorkflow";
 
 const router: IRouter = Router();
@@ -37,14 +38,19 @@ const GroupStartBody = z.object({
 const MessageBody = z.object({
   senderId: z.number(),
   body: z.string().trim().min(1).max(2000),
+  beforeImagePath: z.string().optional(),
+  afterImagePath: z.string().optional(),
   clientRequestId: z.string().uuid().optional(),
+  inspectorRecipients: z.array(z.string()).min(1).max(INSPECTOR_RECIPIENT_EMAILS.length).optional(),
 });
+const EditMessageBody = MessageBody.omit({ inspectorRecipients: true, beforeImagePath: true, afterImagePath: true });
 const ReadBody = z.object({ staffId: z.coerce.number() });
 const MessageParams = z.object({ id: z.coerce.number(), msgId: z.coerce.number() });
 const InspectorWorkflowParams = z.object({ taskId: z.coerce.number().int().positive() });
 const InboundReplyBody = z.object({
   envelope: z.object({ from: z.string(), to: z.array(z.string()).min(1) }),
-  from: z.string(), text: z.string().trim().min(1).max(2000),
+  from: z.string(), text: z.string().trim().min(1).max(60000),
+  subject: z.string().max(1000).optional(),
   headers: z.string().optional(), SPF: z.string().optional(), dkim: z.string().optional(),
 }).strict();
 
@@ -82,6 +88,53 @@ async function inspectorForConversation(convo: ConversationRow) {
   return sharedInspector(convo, people);
 }
 
+async function directInboundInspectorThread() {
+  return db.transaction(async (tx) => {
+    // Lock active inspector rows so concurrent direct inbound deliveries make
+    // one canonical-thread decision at a time.
+    const activeInspectors = await tx.select().from(staffTable).where(and(
+      eq(staffTable.role, "inspector"),
+      eq(staffTable.active, true),
+    )).orderBy(asc(staffTable.id)).for("update");
+    const matchingInspectors = activeInspectors.filter((person) => normalizedEmail(person.email) === INSPECTOR_EMAIL);
+    const managers = await tx.select().from(staffTable).where(and(
+      inArray(staffTable.role, ["admin", "supervisor"]),
+      eq(staffTable.active, true),
+      eq(staffTable.loginEnabled, true),
+      eq(staffTable.formerEmployee, false),
+    )).orderBy(asc(staffTable.id)).for("update");
+    if (matchingInspectors.length !== 1 || !matchingInspectors[0]!.loginEnabled ||
+        matchingInspectors[0]!.formerEmployee || managers.length === 0) return null;
+
+    const inspector = matchingInspectors[0]!;
+    const candidates = await tx.select().from(conversationsTable).where(and(
+      eq(conversationsTable.isGroup, false),
+      or(eq(conversationsTable.participantAId, inspector.id), eq(conversationsTable.participantBId, inspector.id)),
+    )).orderBy(asc(conversationsTable.id));
+    const people = await tx.select().from(staffTable);
+    const activeManagers = new Map(managers.map((manager) => [manager.id, manager]));
+    let conversation = candidates.find((candidate) => {
+      const otherId = candidate.participantAId === inspector.id ? candidate.participantBId : candidate.participantAId;
+      return otherId != null && activeManagers.has(otherId) &&
+        sharedInspector(candidate, people)?.id === inspector.id;
+    });
+    let supervisor = conversation
+      ? activeManagers.get(conversation.participantAId === inspector.id ? conversation.participantBId! : conversation.participantAId!)!
+      : managers[0]!;
+    if (!conversation) {
+      const [participantAId, participantBId] = [inspector.id, supervisor.id].sort((left, right) => left - right);
+      const [created] = await tx.insert(conversationsTable).values({ participantAId, participantBId })
+        .onConflictDoNothing({ target: [conversationsTable.participantAId, conversationsTable.participantBId] })
+        .returning();
+      conversation = created ?? (await tx.select().from(conversationsTable).where(and(
+        eq(conversationsTable.participantAId, participantAId),
+        eq(conversationsTable.participantBId, participantBId),
+      )).then((rows) => rows[0]));
+    }
+    return conversation ? { inspector, supervisor, conversation } : null;
+  });
+}
+
 async function readPosition(conversationId: number, staffId: number) {
   const [position] = await db.select().from(conversationParticipantsTable).where(and(
     eq(conversationParticipantsTable.conversationId, conversationId), eq(conversationParticipantsTable.staffId, staffId)));
@@ -93,6 +146,21 @@ async function inspectorManagers() {
     inArray(staffTable.role, ["admin", "supervisor"]), eq(staffTable.active, true),
     eq(staffTable.loginEnabled, true), eq(staffTable.formerEmployee, false)));
 }
+
+router.get("/inspector-email/recipients", async (req: Request, res: Response) => {
+  const actor = await actorStaffFromRequest(req);
+  if (!actor) return res.status(401).json({ error: "Login session required" });
+  if (!isInspectorManager(actor.role)) return res.status(403).json({ error: "Supervisor access required" });
+  const eligibleInspectors = await db.select({ id: staffTable.id, email: staffTable.email }).from(staffTable).where(and(
+    eq(staffTable.role, "inspector"),
+    eq(staffTable.active, true),
+    eq(staffTable.loginEnabled, true),
+    eq(staffTable.formerEmployee, false),
+  ));
+  const dedicatedInspectors = eligibleInspectors.filter((person) => normalizedEmail(person.email) === INSPECTOR_EMAIL);
+  if (dedicatedInspectors.length !== 1) return res.status(503).json({ error: "Shared inspector identity is not configured uniquely" });
+  return res.json({ inspectorId: dedicatedInspectors[0]!.id, emails: [...INSPECTOR_RECIPIENT_EMAILS] });
+});
 
 // ── 1-on-1 pair rules ─────────────────────────────────────────────────────────
 
@@ -246,27 +314,58 @@ inboundSendgridRouter.post("/", async (req: Request, res: Response) => {
   const body = InboundReplyBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid inbound email" }); return; }
   const domain = process.env.SENDGRID_INBOUND_DOMAIN?.trim().toLowerCase();
-  const recipient = body.data.envelope.to.map(normalizedEmail).find((address) => address?.startsWith("reply+") && address.endsWith(`@${domain}`));
-  const token = recipient?.slice("reply+".length, recipient.lastIndexOf("@"));
-  const claims = token ? verifyReplyToken(token, process.env.SENDGRID_REPLY_TOKEN_SECRET) : null;
-  if (!claims) { res.status(403).json({ error: "Invalid or expired reply address" }); return; }
-  const [inspector, supervisor, conversation] = await Promise.all([
-    getStaff(claims.inspectorId), getStaff(claims.supervisorId),
-    db.select().from(conversationsTable).where(eq(conversationsTable.id, claims.conversationId)).then((rows) => rows[0]),
-  ]);
-  if (!inspector || !supervisor || !conversation || conversation.isGroup ||
-      inspector.role !== "inspector" || !isInspectorManager(supervisor.role) ||
-      !inspector.active || !inspector.loginEnabled || !supervisor.active || !supervisor.loginEnabled ||
-      normalizedEmail(inspector.email) !== INSPECTOR_EMAIL ||
-      normalizedEmail(body.data.from) !== INSPECTOR_EMAIL ||
-      normalizedEmail(body.data.envelope.from) !== INSPECTOR_EMAIL ||
-      !inboundAuthenticationPasses(body.data.SPF, body.data.dkim, INSPECTOR_EMAIL)) {
-    res.status(403).json({ error: "Inbound sender is not authorized" }); return;
+  const target = classifyInboundInspectorEmailTarget(body.data.envelope.to, domain);
+  if (target.kind === "invalid") {
+    res.status(403).json({ error: "Inbound recipient is not authorized" });
+    return;
   }
-  if (!new Set([conversation.participantAId, conversation.participantBId]).has(inspector.id) ||
-      !(await inspectorForConversation(conversation))) {
-    res.status(403).json({ error: "Conversation is not authorized" }); return;
+  const inboundSenderEmail = isAuthorizedInspectorEmailSender(body.data.from, body.data.envelope.from, body.data.SPF, body.data.dkim);
+  if (!inboundSenderEmail) {
+    res.status(403).json({ error: "Inbound sender is not authorized" });
+    return;
   }
+
+  let inspector: StaffRow;
+  let supervisor: StaffRow;
+  let conversation: ConversationRow;
+  if (target.kind === "reply") {
+    const claims = verifyReplyToken(target.token, process.env.SENDGRID_REPLY_TOKEN_SECRET);
+    if (!claims) {
+      res.status(403).json({ error: "Invalid or expired reply address" });
+      return;
+    }
+    const [replyInspector, replySupervisor, replyConversation] = await Promise.all([
+      getStaff(claims.inspectorId),
+      getStaff(claims.supervisorId),
+      db.select().from(conversationsTable).where(eq(conversationsTable.id, claims.conversationId)).then((rows) => rows[0]),
+    ]);
+    if (!replyInspector || !replySupervisor || !replyConversation || replyConversation.isGroup ||
+        replyInspector.role !== "inspector" || !isInspectorManager(replySupervisor.role) ||
+        !replyInspector.active || !replyInspector.loginEnabled || replyInspector.formerEmployee ||
+        !replySupervisor.active || !replySupervisor.loginEnabled || replySupervisor.formerEmployee ||
+        normalizedEmail(replyInspector.email) !== INSPECTOR_EMAIL) {
+      res.status(403).json({ error: "Inbound sender is not authorized" });
+      return;
+    }
+    if (!new Set([replyConversation.participantAId, replyConversation.participantBId]).has(replyInspector.id) ||
+        !(await inspectorForConversation(replyConversation))) {
+      res.status(403).json({ error: "Conversation is not authorized" });
+      return;
+    }
+    inspector = replyInspector;
+    supervisor = replySupervisor;
+    conversation = replyConversation;
+  } else {
+    const directThread = await directInboundInspectorThread();
+    if (!directThread) {
+      res.status(503).json({ error: "Active shared inspector identity or manager is unavailable" });
+      return;
+    }
+    inspector = directThread.inspector;
+    supervisor = directThread.supervisor;
+    conversation = directThread.conversation;
+  }
+
   const providerMessageId = inboundProviderMessageId(body.data.headers, body.data);
   const result = await db.transaction(async (tx) => {
     const [claim] = await tx.insert(inboundEmailMessagesTable)
@@ -276,10 +375,24 @@ inboundSendgridRouter.post("/", async (req: Request, res: Response) => {
       const [existing] = await tx.select({ messageId: inboundEmailMessagesTable.messageId }).from(inboundEmailMessagesTable).where(eq(inboundEmailMessagesTable.providerMessageId, providerMessageId));
       return { duplicate: true, messageId: existing?.messageId ?? null };
     }
-    const [message] = await tx.insert(messagesTable).values({ conversationId: conversation.id, senderId: inspector.id, body: body.data.text }).returning();
+    const [message] = await tx.insert(messagesTable).values({
+      conversationId: conversation.id,
+      senderId: inspector.id,
+      body: `From inspector: ${inboundSenderEmail}\n${body.data.subject ? `Subject: ${body.data.subject}\n` : ""}\n${body.data.text}`,
+    }).returning();
     await tx.update(inboundEmailMessagesTable).set({ messageId: message.id }).where(eq(inboundEmailMessagesTable.providerMessageId, providerMessageId));
+    // A fresh inspector email must be visible even if a manager archived the thread.
+    await tx.delete(conversationArchivesTable).where(eq(conversationArchivesTable.conversationId, conversation.id));
     const managers = await inspectorManagers();
-    if (managers.length) await tx.insert(notificationsTable).values(managers.map(manager => ({ staffId: manager.id, type: "inspector_to_supervisor" as const, message: "URGENT: Inspector email reply received", isRead: false })));
+    if (managers.length) await tx.insert(notificationsTable).values(managers.map(manager => ({ staffId: manager.id, type: "inspector_to_supervisor" as const, message: "URGENT: Inspector email message received", isRead: false })));
+    const managerIds = new Set(managers.map(manager => manager.id));
+    const staff = await tx.select({ id: staffTable.id }).from(staffTable).where(and(
+      eq(staffTable.active, true), eq(staffTable.loginEnabled, true), ne(staffTable.id, inspector.id),
+    ));
+    const otherStaff = staff.filter(person => !managerIds.has(person.id));
+    if (otherStaff.length) await tx.insert(notificationsTable).values(otherStaff.map(person => ({
+      staffId: person.id, type: "new_message" as const, message: "New message in Marvol",
+    })));
     return { duplicate: false, messageId: message.id };
   });
   // A provider retry repairs a prior post-commit assignment failure. The
@@ -318,7 +431,7 @@ router.get("/inspector-workflow/:taskId", async (req: Request, res: Response) =>
   if (!isParticipant && !isAuthorizedManager && actor.id !== row.assignedStaffId) {
     res.status(403).json({ error: "Not authorized for this inspector workflow" }); return;
   }
-  const [completionOutbox] = row.completionMessageId
+  const completionOutbox = row.completionMessageId
     ? await db.select({ status: messageEmailOutboxTable.status }).from(messageEmailOutboxTable).where(eq(messageEmailOutboxTable.messageId, row.completionMessageId))
     : [];
   const history = await db.select({
@@ -339,7 +452,7 @@ router.get("/inspector-workflow/:taskId", async (req: Request, res: Response) =>
     status: row.completed ? "completed" : row.escalatedAt ? "escalated" : row.dueAt.getTime() <= now ? "overdue" : "assigned",
     escalatedAt: row.escalatedAt?.toISOString() ?? null,
     history: history.map((item) => ({ ...item, createdAt: item.createdAt.toISOString() })),
-    completionEmailDeliveryStatus: completionOutbox?.status ?? null,
+    completionEmailDeliveryStatus: aggregateInspectorEmailStatus(completionOutbox.map(({ status }) => status)) ?? null,
   });
 });
 
@@ -433,11 +546,13 @@ router.post("/conversations", async (req: Request, res: Response) => {
   }
   // Reuse the oldest inspector thread for new messages. Existing threads stay readable.
   if (isInspectorManager(sender.role) && recipient.role === "inspector" && normalizedEmail(recipient.email) === INSPECTOR_EMAIL) {
-    const candidates = await db.select().from(conversationsTable).where(and(eq(conversationsTable.isGroup, false), or(
-      eq(conversationsTable.participantAId, recipient.id), eq(conversationsTable.participantBId, recipient.id)))).orderBy(asc(conversationsTable.id));
-    const people = await db.select().from(staffTable);
-    const shared = candidates.find(convo => canReadSharedInspector(sender, convo, people));
-    if (shared) { res.json(await buildSummary(shared, sender.id)); return; }
+    const canonical = await directInboundInspectorThread();
+    if (!canonical) {
+      res.status(503).json({ error: "Active shared inspector identity or manager is unavailable" });
+      return;
+    }
+    res.json(await buildSummary(canonical.conversation, sender.id));
+    return;
   }
   const [aId, bId] = sender.id < recipientId ? [sender.id, recipientId] : [recipientId, sender.id];
   const [inserted] = await db
@@ -527,6 +642,8 @@ router.get("/conversations/:id/messages", async (req: Request, res: Response) =>
       senderId: messagesTable.senderId,
       senderName: staffTable.name,
       body: messagesTable.body,
+      beforeImagePath: messagesTable.beforeImagePath,
+      afterImagePath: messagesTable.afterImagePath,
       isRead: messagesTable.isRead,
       createdAt: messagesTable.createdAt,
     })
@@ -540,22 +657,50 @@ router.get("/conversations/:id/messages", async (req: Request, res: Response) =>
       sourceMessageId: inspectorTaskLinksTable.sourceMessageId,
       completionMessageId: inspectorTaskLinksTable.completionMessageId,
     }).from(inspectorTaskLinksTable).where(eq(inspectorTaskLinksTable.conversationId, params.data.id)),
-    db.select({ messageId: messageEmailOutboxTable.messageId, status: messageEmailOutboxTable.status })
-      .from(messageEmailOutboxTable).where(eq(messageEmailOutboxTable.conversationId, params.data.id)),
+    db.select({
+      messageId: messageEmailOutboxTable.messageId,
+      inspectorEmail: messageEmailOutboxTable.inspectorEmail,
+      status: messageEmailOutboxTable.status,
+    }).from(messageEmailOutboxTable)
+      .where(eq(messageEmailOutboxTable.conversationId, params.data.id))
+      .orderBy(asc(messageEmailOutboxTable.id)),
   ]);
   const workflowTaskByMessageId = new Map<number, number>();
   workflowLinks.forEach((link) => {
     workflowTaskByMessageId.set(link.sourceMessageId, link.taskId);
     if (link.completionMessageId) workflowTaskByMessageId.set(link.completionMessageId, link.taskId);
   });
-  const deliveryByMessageId = new Map(outboxRows.map((row) => [row.messageId, row.status]));
-  res.json(rows.map((m) => ({
-    ...m,
-    isRead: shared ? sharedMessageIsRead(m, actor.id, lastReadAt) : m.isRead,
-    createdAt: m.createdAt.toISOString(),
-    inspectorWorkflowTaskId: workflowTaskByMessageId.get(m.id) ?? null,
-    inspectorEmailDeliveryStatus: deliveryByMessageId.get(m.id) ?? "not_applicable",
-  })));
+  const linkedTaskIds = [...new Set(workflowLinks.map((link) => link.taskId))];
+  const workflowTaskPhotos = linkedTaskIds.length
+    ? await db.select({
+        id: tasksTable.id,
+        beforeImagePath: tasksTable.beforeImagePath,
+        afterImagePath: tasksTable.afterImagePath,
+      }).from(tasksTable).where(inArray(tasksTable.id, linkedTaskIds))
+    : [];
+  const workflowTaskPhotosById = new Map(workflowTaskPhotos.map((task) => [task.id, task]));
+  const statusesByMessageId = new Map<number, string[]>();
+  const inspectorEmailRecipientsByMessageId = groupInspectorEmailRecipients(outboxRows);
+  for (const row of outboxRows) {
+    const statuses = statusesByMessageId.get(row.messageId) ?? [];
+    statuses.push(row.status);
+    statusesByMessageId.set(row.messageId, statuses);
+  }
+  res.json(rows.map((m) => {
+    const inspectorWorkflowTaskId = workflowTaskByMessageId.get(m.id) ?? null;
+    const taskPhotos = inspectorWorkflowTaskId === null ? undefined : workflowTaskPhotosById.get(inspectorWorkflowTaskId);
+    const useWorkflowTaskPhotos = inspectorWorkflowTaskId !== null && !m.beforeImagePath && !m.afterImagePath;
+    return {
+      ...m,
+      beforeImagePath: useWorkflowTaskPhotos ? taskPhotos?.beforeImagePath ?? null : m.beforeImagePath,
+      afterImagePath: useWorkflowTaskPhotos ? taskPhotos?.afterImagePath ?? null : m.afterImagePath,
+      isRead: shared ? sharedMessageIsRead(m, actor.id, lastReadAt) : m.isRead,
+      createdAt: m.createdAt.toISOString(),
+      inspectorWorkflowTaskId,
+      inspectorEmailDeliveryStatus: aggregateInspectorEmailStatus(statusesByMessageId.get(m.id) ?? []) ?? "not_applicable",
+      inspectorEmailRecipients: inspectorEmailRecipientsByMessageId.get(m.id) ?? [],
+    };
+  }));
 });
 
 router.post("/conversations/:id/messages", async (req: Request, res: Response) => {
@@ -578,6 +723,34 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
   }
   const { convo } = result;
   const shared = await inspectorForConversation(convo);
+  if (shared && isInspectorManager(sender.role) && body.data.inspectorRecipients === undefined) {
+    return res.status(400).json({ error: "Choose one inspector or explicitly select all inspectors before sending" });
+  }
+  const selectedInspectorRecipients = body.data.inspectorRecipients === undefined
+    ? undefined
+    : resolveInspectorRecipients(body.data.inspectorRecipients);
+  if (body.data.inspectorRecipients !== undefined && !selectedInspectorRecipients) {
+    return res.status(400).json({ error: "Inspector email recipients must be distinct addresses from the approved list" });
+  }
+  if (body.data.inspectorRecipients !== undefined && (!shared || !isInspectorManager(sender.role))) {
+    return res.status(400).json({ error: "Inspector email recipients can only be selected by management in the shared inspector conversation" });
+  }
+
+  for (const imagePath of [body.data.beforeImagePath, body.data.afterImagePath]) {
+    if (imagePath === undefined) continue;
+    const [upload] = await db.select({
+      objectPath: objectUploadsTable.objectPath,
+      ownerStaffId: objectUploadsTable.ownerStaffId,
+      purpose: objectUploadsTable.purpose,
+      conversationId: objectUploadsTable.conversationId,
+      mimeType: objectUploadsTable.mimeType,
+    }).from(objectUploadsTable).where(eq(objectUploadsTable.objectPath, imagePath));
+    if (!upload || upload.ownerStaffId !== sender.id || upload.purpose !== "conversation_attachment" ||
+        upload.conversationId !== convo.id ||
+        !["image/jpeg", "image/png", "image/webp"].includes(upload.mimeType)) {
+      return res.status(400).json({ error: "Photo must be an image uploaded by you for this conversation" });
+    }
+  }
 
   // Validate sender is still allowed to send (1:1 only; group membership was
   // validated at creation time so no further pair-check is needed).
@@ -598,8 +771,20 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
     const [prior] = await db.select().from(messagesTable).where(and(eq(messagesTable.senderId, sender.id), eq(messagesTable.clientRequestId, body.data.clientRequestId)));
     if (prior) {
       if (prior.conversationId !== convo.id) return res.status(409).json({ error: "clientRequestId was already used for another conversation" });
-      const [priorOutbox] = await db.select({ status: messageEmailOutboxTable.status }).from(messageEmailOutboxTable).where(eq(messageEmailOutboxTable.messageId, prior.id));
-      return res.status(200).json({ id: prior.id, conversationId: prior.conversationId, senderId: prior.senderId, senderName: sender.name, body: prior.body, isRead: prior.isRead, createdAt: prior.createdAt.toISOString(), inspectorWorkflowTaskId: null, inspectorEmailDeliveryStatus: priorOutbox?.status ?? "not_applicable" });
+      const priorOutbox = await db.select({
+        status: messageEmailOutboxTable.status,
+        inspectorEmail: messageEmailOutboxTable.inspectorEmail,
+      }).from(messageEmailOutboxTable)
+        .where(eq(messageEmailOutboxTable.messageId, prior.id))
+        .orderBy(asc(messageEmailOutboxTable.id));
+      return res.status(200).json({
+        id: prior.id, conversationId: prior.conversationId, senderId: prior.senderId,
+        senderName: sender.name, body: prior.body, isRead: prior.isRead,
+        beforeImagePath: prior.beforeImagePath, afterImagePath: prior.afterImagePath,
+        createdAt: prior.createdAt.toISOString(), inspectorWorkflowTaskId: null,
+        inspectorEmailDeliveryStatus: aggregateInspectorEmailStatus(priorOutbox.map(({ status }) => status)) ?? "not_applicable",
+        inspectorEmailRecipients: priorOutbox.map(({ inspectorEmail }) => inspectorEmail),
+      });
     }
   }
 
@@ -609,7 +794,12 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
   const { message, replayed } = await db.transaction(async (tx) => {
     const [created] = await tx
       .insert(messagesTable)
-      .values({ conversationId: convo.id, senderId: sender.id, body: body.data.body, clientRequestId: body.data.clientRequestId ?? null })
+      .values({
+        conversationId: convo.id, senderId: sender.id, body: body.data.body,
+        beforeImagePath: body.data.beforeImagePath ?? null,
+        afterImagePath: body.data.afterImagePath ?? null,
+        clientRequestId: body.data.clientRequestId ?? null,
+      })
       .onConflictDoNothing()
       .returning();
     if (!created) {
@@ -630,11 +820,13 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
         inspector.loginEnabled &&
         normalizedEmail(inspector.email) === INSPECTOR_EMAIL
       ) {
-        await tx.insert(messageEmailOutboxTable).values({
-          messageId: created.id, conversationId: convo.id, inspectorId: inspector.id,
-          supervisorId: sender.id, inspectorEmail: inspector.email!, inspectorName: inspector.name,
-          supervisorName: sender.name, messageBody: body.data.body, status: outboundEmailStatus(),
-        });
+        await tx.insert(messageEmailOutboxTable).values(
+          (selectedInspectorRecipients ?? [...INSPECTOR_RECIPIENT_EMAILS]).map((inspectorEmail) => ({
+            messageId: created.id, conversationId: convo.id, inspectorId: inspector.id,
+            supervisorId: sender.id, inspectorEmail, inspectorName: inspector.name,
+            supervisorName: sender.name, messageBody: body.data.body, status: outboundEmailStatus(),
+          }))
+        );
       }
     }
     return { message: created, replayed: false };
@@ -645,8 +837,10 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
 
   // Notify only for the winning insert; concurrent idempotent retries must not
   // duplicate notifications.
+  const notifiedIds = new Set<number>();
   if (!replayed && shared) {
     const recipients = [...new Set([shared.id, ...(await inspectorManagers()).map(manager => manager.id)])].filter(id => id !== sender.id);
+    recipients.forEach(id => notifiedIds.add(id));
     if (recipients.length) await db.insert(notificationsTable).values(recipients.map(id => ({ staffId: id, type: "new_message" as const, message: "Inspector messages — " + sender.name + ": " + preview })));
   } else if (!replayed && convo.isGroup) {
     const parts = await db
@@ -654,6 +848,7 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
       .from(conversationParticipantsTable)
       .where(eq(conversationParticipantsTable.conversationId, convo.id));
     const others = parts.filter((p) => p.staffId !== sender.id);
+    others.forEach(person => notifiedIds.add(person.staffId));
     if (others.length > 0) {
       await db.insert(notificationsTable).values(
         others.map((p) => ({
@@ -666,15 +861,29 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
   } else if (!replayed) {
     const recipientId =
       convo.participantAId === sender.id ? convo.participantBId! : convo.participantAId!;
+    notifiedIds.add(recipientId);
     await db.insert(notificationsTable).values({
       staffId: recipientId,
       type: "new_message" as const,
       message: `💬 New message from ${sender.name}: ${preview}`,
     });
   }
+  if (!replayed) {
+    const staff = await db.select({ id: staffTable.id }).from(staffTable).where(and(
+      eq(staffTable.active, true), eq(staffTable.loginEnabled, true), ne(staffTable.id, sender.id),
+    ));
+    const otherStaff = staff.filter(person => !notifiedIds.has(person.id));
+    if (otherStaff.length) await db.insert(notificationsTable).values(otherStaff.map(person => ({
+      staffId: person.id, type: "new_message" as const, message: "New message in Marvol",
+    })));
+  }
 
-  const [outbox] = await db.select({ status: messageEmailOutboxTable.status })
-    .from(messageEmailOutboxTable).where(eq(messageEmailOutboxTable.messageId, message.id));
+  const outbox = await db.select({
+    status: messageEmailOutboxTable.status,
+    inspectorEmail: messageEmailOutboxTable.inspectorEmail,
+  }).from(messageEmailOutboxTable)
+    .where(eq(messageEmailOutboxTable.messageId, message.id))
+    .orderBy(asc(messageEmailOutboxTable.id));
   return res.status(replayed ? 200 : 201).json({
     id: message.id,
     conversationId: message.conversationId,
@@ -682,11 +891,14 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
     senderName: sender.name,
     body: message.body,
     isRead: message.isRead,
+    beforeImagePath: message.beforeImagePath,
+    afterImagePath: message.afterImagePath,
     inspectorWorkflowTaskId: null,
     // Status represents the durable provider-delivery intent only. "accepted"
     // (when a worker later records it) is not a claim that the recipient read
     // the message.
-    inspectorEmailDeliveryStatus: outbox?.status ?? "not_applicable",
+    inspectorEmailDeliveryStatus: aggregateInspectorEmailStatus(outbox.map(({ status }) => status)) ?? "not_applicable",
+    inspectorEmailRecipients: outbox.map(({ inspectorEmail }) => inspectorEmail),
     createdAt: message.createdAt.toISOString(),
   });
 });
@@ -697,7 +909,7 @@ router.patch("/conversations/:id/messages/:msgId", async (req: Request, res: Res
     res.status(400).json({ error: "Invalid request" });
     return;
   }
-  const body = MessageBody.safeParse(req.body);
+  const body = EditMessageBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: "Message must be between 1 and 2000 characters" });
     return;
@@ -751,8 +963,59 @@ router.patch("/conversations/:id/messages/:msgId", async (req: Request, res: Res
     senderName: actor.name,
     body: updated.body,
     isRead: updated.isRead,
+    beforeImagePath: updated.beforeImagePath,
+    afterImagePath: updated.afterImagePath,
     createdAt: updated.createdAt.toISOString(),
   });
+});
+
+router.delete("/conversations/:id/old-messages", async (req: Request, res: Response) => {
+  const params = IdParams.safeParse(req.params);
+  const query = z.object({ before: z.string().datetime({ offset: true }) }).safeParse(req.query);
+  if (!params.success || !query.success) {
+    res.status(400).json({ error: "A valid conversation and cutoff date are required" });
+    return;
+  }
+  const cutoff = new Date(query.data.before);
+  if (Number.isNaN(cutoff.getTime()) || cutoff.getTime() > Date.now()) {
+    res.status(400).json({ error: "Cutoff date must not be in the future" });
+    return;
+  }
+  const actor = await actorStaffFromRequest(req);
+  if (!actor) { res.status(401).json({ error: "Login session required" }); return; }
+  if (actor.role !== "admin") {
+    res.status(403).json({ error: "Only administrators can delete old messages" });
+    return;
+  }
+  const access = await loadConversationForParticipant(params.data.id, actor.id);
+  if (access.status !== undefined) { sendConvoError(res, access.status); return; }
+
+  const eligible = and(
+    eq(messagesTable.conversationId, params.data.id),
+    lt(messagesTable.createdAt, cutoff),
+  );
+  // Do not erase task provenance or cancel an inspector email still awaiting
+  // delivery. Those records keep their original messages and are reported.
+  const unprotected = and(
+    notExists(db.select({ taskId: inspectorTaskLinksTable.taskId })
+      .from(inspectorTaskLinksTable)
+      .where(or(
+        eq(inspectorTaskLinksTable.sourceMessageId, messagesTable.id),
+        eq(inspectorTaskLinksTable.completionMessageId, messagesTable.id),
+      ))),
+    notExists(db.select({ id: messageEmailOutboxTable.id })
+      .from(messageEmailOutboxTable)
+      .where(and(
+        eq(messageEmailOutboxTable.messageId, messagesTable.id),
+        inArray(messageEmailOutboxTable.status, ["pending", "sending", "retrying", "not_configured"]),
+      ))),
+  );
+  const [total] = await db.select({ count: count() }).from(messagesTable).where(eligible);
+  const removed = await db.delete(messagesTable)
+    .where(and(eligible, unprotected))
+    .returning({ id: messagesTable.id });
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ deleted: removed.length, retained: total.count - removed.length });
 });
 
 router.delete("/conversations/:id/messages/:msgId", async (req: Request, res: Response) => {

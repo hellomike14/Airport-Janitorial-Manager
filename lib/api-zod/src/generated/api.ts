@@ -94,6 +94,79 @@ export const GetCurrentStaffMemberResponse = zod.object({
 });
 
 /**
+ * @summary List archived former staff for administrator rehire
+ */
+export const ListFormerStaffResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  role: zod.enum(["staff", "supervisor", "admin", "inspector"]),
+  hasEmail: zod
+    .boolean()
+    .describe("Whether the staff member has a configured sign-in email."),
+  email: zod
+    .string()
+    .nullish()
+    .describe(
+      "Saved email, returned in the staff directory only to administrators and supervisors.",
+    ),
+  phone: zod
+    .string()
+    .nullish()
+    .describe(
+      "Saved phone number, returned in the staff directory only to administrators and supervisors.",
+    ),
+  active: zod.boolean(),
+  loginEnabled: zod
+    .boolean()
+    .describe("Whether this staff member is currently eligible to sign in."),
+  formerEmployee: zod
+    .boolean()
+    .describe(
+      "Whether this retained historical record belongs to a former employee.",
+    ),
+  createdAt: zod.string(),
+});
+export const ListFormerStaffResponse = zod.array(ListFormerStaffResponseItem);
+
+/**
+ * @summary Reactivate a former staff member without enabling sign-in
+ */
+export const RehireStaffMemberParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const RehireStaffMemberResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  role: zod.enum(["staff", "supervisor", "admin", "inspector"]),
+  hasEmail: zod
+    .boolean()
+    .describe("Whether the staff member has a configured sign-in email."),
+  email: zod
+    .string()
+    .nullish()
+    .describe(
+      "Saved email, returned in the staff directory only to administrators and supervisors.",
+    ),
+  phone: zod
+    .string()
+    .nullish()
+    .describe(
+      "Saved phone number, returned in the staff directory only to administrators and supervisors.",
+    ),
+  active: zod.boolean(),
+  loginEnabled: zod
+    .boolean()
+    .describe("Whether this staff member is currently eligible to sign in."),
+  formerEmployee: zod
+    .boolean()
+    .describe(
+      "Whether this retained historical record belongs to a former employee.",
+    ),
+  createdAt: zod.string(),
+});
+
+/**
  * @summary Update a staff member
  */
 export const UpdateStaffMemberParams = zod.object({
@@ -249,6 +322,8 @@ export const ListTasksResponseItem = zod.object({
     ),
   isSpecial: zod.boolean(),
   notes: zod.string().nullish(),
+  beforeImagePath: zod.string().nullable(),
+  afterImagePath: zod.string().nullable(),
 });
 export const ListTasksResponse = zod.array(ListTasksResponseItem);
 
@@ -344,6 +419,8 @@ export const CompleteTaskResponse = zod.object({
     ),
   isSpecial: zod.boolean(),
   notes: zod.string().nullish(),
+  beforeImagePath: zod.string().nullable(),
+  afterImagePath: zod.string().nullable(),
 });
 
 /**
@@ -385,6 +462,8 @@ export const UncompleteTaskResponse = zod.object({
     ),
   isSpecial: zod.boolean(),
   notes: zod.string().nullish(),
+  beforeImagePath: zod.string().nullable(),
+  afterImagePath: zod.string().nullable(),
 });
 
 /**
@@ -434,6 +513,108 @@ export const CreateAssignmentBody = zod.object({
   assignedById: zod.number(),
   notes: zod.string().nullish(),
   isSpecial: zod.boolean(),
+});
+
+/**
+ * @summary Assign one active staff member to every area in a terminal group for a date
+ */
+export const AssignTerminalGroupBody = zod.object({
+  staffId: zod.number(),
+  groupKey: zod.enum([
+    "terminal-a-east",
+    "terminal-a-west",
+    "terminal-b-east",
+    "terminal-b-west",
+    "terminal-c-135",
+    "terminal-c-246",
+    "top-terminal",
+  ]),
+  assignmentDate: zod.string(),
+  notes: zod.string().optional(),
+  isSpecial: zod.boolean(),
+});
+
+/**
+ * @summary Confirmed date-only reassignment of a terminal group; tasks and recurring schedules are unchanged
+ */
+export const ReassignTerminalGroupBody = zod.object({
+  staffId: zod.number(),
+  groupKey: zod.enum([
+    "terminal-a-east",
+    "terminal-a-west",
+    "terminal-b-east",
+    "terminal-b-west",
+    "terminal-c-135",
+    "terminal-c-246",
+    "top-terminal",
+  ]),
+  assignmentDate: zod.string(),
+  expectedAssignments: zod.array(
+    zod.object({
+      id: zod.number(),
+      staffId: zod.number(),
+    }),
+  ),
+});
+
+export const ReassignTerminalGroupResponse = zod.object({
+  createdCount: zod.number(),
+  existingCount: zod.number(),
+});
+
+/**
+ * @summary Review recurring schedule rows that would move to another staff member
+ */
+export const PreviewTerminalGroupScheduleMoveQueryParams = zod.object({
+  groupKey: zod.enum([
+    "terminal-a-east",
+    "terminal-a-west",
+    "terminal-b-east",
+    "terminal-b-west",
+    "terminal-c-135",
+    "terminal-c-246",
+    "top-terminal",
+  ]),
+  staffId: zod.coerce.number(),
+});
+
+export const PreviewTerminalGroupScheduleMoveResponse = zod.object({
+  snapshot: zod.string(),
+  rows: zod.array(
+    zod.object({
+      id: zod.number(),
+      staffId: zod.number(),
+      staffName: zod.string(),
+      areaId: zod.number(),
+      areaName: zod.string(),
+      dayOfWeek: zod.number(),
+      startTime: zod.string(),
+      endTime: zod.string(),
+    }),
+  ),
+  conflict: zod.boolean(),
+});
+
+/**
+ * @summary Move reviewed recurring schedules only; dated assignments and tasks remain unchanged
+ */
+
+export const MoveTerminalGroupScheduleBody = zod.object({
+  groupKey: zod.enum([
+    "terminal-a-east",
+    "terminal-a-west",
+    "terminal-b-east",
+    "terminal-b-west",
+    "terminal-c-135",
+    "terminal-c-246",
+    "top-terminal",
+  ]),
+  staffId: zod.number(),
+  snapshot: zod.string().min(1),
+});
+
+export const MoveTerminalGroupScheduleResponse = zod.object({
+  movedCount: zod.number(),
 });
 
 /**
@@ -744,7 +925,20 @@ export const ListNotificationsResponseItem = zod.object({
   id: zod.number(),
   staffId: zod.number(),
   issueId: zod.number().nullish(),
-  type: zod.enum(["new_issue", "issue_assigned", "issue_completed"]),
+  taskId: zod.number().nullable(),
+  beforeImagePath: zod.string().nullable(),
+  afterImagePath: zod.string().nullable(),
+  type: zod.enum([
+    "new_issue",
+    "issue_assigned",
+    "issue_completed",
+    "inspector_to_supervisor",
+    "supervisor_to_inspector",
+    "task_completed",
+    "direct_alert",
+    "photo_shared",
+    "new_message",
+  ]),
   message: zod.string(),
   isRead: zod.boolean(),
   createdAt: zod.string(),
@@ -764,7 +958,20 @@ export const MarkNotificationReadResponse = zod.object({
   id: zod.number(),
   staffId: zod.number(),
   issueId: zod.number().nullish(),
-  type: zod.enum(["new_issue", "issue_assigned", "issue_completed"]),
+  taskId: zod.number().nullable(),
+  beforeImagePath: zod.string().nullable(),
+  afterImagePath: zod.string().nullable(),
+  type: zod.enum([
+    "new_issue",
+    "issue_assigned",
+    "issue_completed",
+    "inspector_to_supervisor",
+    "supervisor_to_inspector",
+    "task_completed",
+    "direct_alert",
+    "photo_shared",
+    "new_message",
+  ]),
   message: zod.string(),
   isRead: zod.boolean(),
   createdAt: zod.string(),
@@ -830,6 +1037,14 @@ export const StartConversationResponse = zod.object({
 });
 
 /**
+ * @summary List approved external inspector email recipients for management
+ */
+export const ListInspectorEmailRecipientsResponse = zod.object({
+  inspectorId: zod.number(),
+  emails: zod.array(zod.string().email()),
+});
+
+/**
  * @summary List messages in a conversation
  */
 export const ListConversationMessagesParams = zod.object({
@@ -846,6 +1061,8 @@ export const ListConversationMessagesResponseItem = zod.object({
   senderId: zod.number(),
   senderName: zod.string(),
   body: zod.string(),
+  beforeImagePath: zod.string().nullable(),
+  afterImagePath: zod.string().nullable(),
   isRead: zod.boolean(),
   inspectorWorkflowTaskId: zod.number().nullable(),
   inspectorEmailDeliveryStatus: zod.enum([
@@ -858,6 +1075,11 @@ export const ListConversationMessagesResponseItem = zod.object({
     "failed",
     "not_applicable",
   ]),
+  inspectorEmailRecipients: zod
+    .array(zod.string().email())
+    .describe(
+      "External inspector email addresses recorded for delivery; empty when this message has no email outbox.",
+    ),
   createdAt: zod.string(),
 });
 export const ListConversationMessagesResponse = zod.array(
@@ -873,10 +1095,47 @@ export const SendConversationMessageParams = zod.object({
 
 export const sendConversationMessageBodyBodyMax = 2000;
 
+export const sendConversationMessageBodyInspectorRecipientsMax = 10;
+
 export const SendConversationMessageBody = zod.object({
   senderId: zod.number(),
   body: zod.string().min(1).max(sendConversationMessageBodyBodyMax),
+  beforeImagePath: zod
+    .string()
+    .optional()
+    .describe("Uploaded conversation attachment labeled Before."),
+  afterImagePath: zod
+    .string()
+    .optional()
+    .describe("Uploaded conversation attachment labeled After."),
   clientRequestId: zod.string().uuid(),
+  inspectorRecipients: zod
+    .array(zod.string().email())
+    .min(1)
+    .max(sendConversationMessageBodyInspectorRecipientsMax)
+    .optional()
+    .describe(
+      "Optional exact allowlisted recipients for an admin\/supervisor message in the dedicated inspector conversation. Omitted legacy clients broadcast to all approved recipients.",
+    ),
+});
+
+/**
+ * Admin only. Messages linked to inspector tasks or awaiting email delivery are retained.
+ * @summary Permanently remove messages before a date from one conversation
+ */
+export const DeleteOldConversationMessagesParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const DeleteOldConversationMessagesQueryParams = zod.object({
+  before: zod
+    .date()
+    .describe("Exclusive cutoff as an ISO date-time with timezone."),
+});
+
+export const DeleteOldConversationMessagesResponse = zod.object({
+  deleted: zod.number(),
+  retained: zod.number(),
 });
 
 /**

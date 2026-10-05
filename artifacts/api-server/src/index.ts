@@ -6,10 +6,11 @@ import { renameSharedAreaName, AREA_RENAME_MAP } from "./area-renames";
 import { AREA_SPECIFIC_TASKS, AREAS_REPLACING_DEFAULTS } from "./area-tasks";
 import { DEPRECATED_MCO_AREA_IDENTITIES, MCO_TERMINAL_AREAS } from "@workspace/db/area-catalog";
 import { SEED_STAFF, REMOVED_STAFF_NAMES, isSeedLoginEnabled } from "./seed-data";
+import { loginEnabledAfterSeedReconciliation } from "./lib/staffLoginPolicy";
 import { sweepOverdueInspectorAssignments } from "./lib/inspectorTaskWorkflow";
 import { drainOutbox } from "./lib/messageEmailOutboxWorker";
 import { inspectorRuntimeConfig } from "./lib/inspectorRuntimeConfig";
-import { loginEnabledAfterSeedReconciliation } from "./lib/staffLoginPolicy";
+import { withStartupScheduleLocks } from "./lib/scheduleLocks";
 
 const rawPort = process.env["PORT"];
 
@@ -245,7 +246,9 @@ async function seed() {
   // transaction so the merge either fully completes or rolls back.
   const MGMT_ROLES = new Set(["admin", "inspector", "supervisor"]);
   const mgmtSeedNames = SEED_STAFF.filter((s) => MGMT_ROLES.has(s.role)).map((s) => s.name);
-  await db.transaction(async (tx) => {
+  await withStartupScheduleLocks(db, async (tx) => {
+    // Lock before any FK updates, so a reviewed schedule move cannot overlap
+    // this staff merge or acquire schedule/other row locks in reverse order.
     for (const seedName of mgmtSeedNames) {
       const dupes = existingStaff.filter(
         (s) => s.name === seedName && s.active && MGMT_ROLES.has(s.role)
@@ -285,7 +288,7 @@ async function seed() {
   // "JeanFranco Perez", creating two active records in production. Keep the
   // canonical profile (and its Clerk email) while moving all historical
   // references from the typo row before removing it.
-  await db.transaction(async (tx) => {
+  await withStartupScheduleLocks(db, async (tx) => {
     const [canonical] = await tx
       .select()
       .from(staffTable)
@@ -427,9 +430,9 @@ async function seed() {
       await db.update(staffTable).set({ email: seedEntry.email }).where(eq(staffTable.id, existing.id));
       console.log(`Updated ${existing.name}: email`);
     }
-    // Only named seed identities receive seed login safety policy. Arbitrary
-    // legacy rows remain unchanged, while inactive/former seed rows stay off.
-    if (seedEntry && seedEntry.name === existing.name) {
+    // Only current, named seed identities receive seed login policy.  This
+    // intentionally leaves arbitrary legacy inactive rows unchanged.
+    if (seedEntry && existing.active && seedEntry.name === existing.name) {
       const loginEnabled = loginEnabledAfterSeedReconciliation({
         active: existing.active,
         loginEnabled: existing.loginEnabled,
@@ -451,7 +454,9 @@ async function seed() {
   // Run the rename + merge + archive cleanup in a single transaction so
   // either every reference is re-pointed and every duplicate cleared, or
   // none of it lands.
-  await db.transaction(async (tx) => {
+  await withStartupScheduleLocks(db, async (tx) => {
+  // Take the same ordered locks as ordinary schedule writers before area
+  // renames/merges; moving schedule area IDs can cross terminal groups.
   for (const { oldName, terminal, newName } of AREA_RENAME_MAP) {
     if (oldName === newName) continue;
     const result = await tx
@@ -685,6 +690,22 @@ async function seed() {
       .set({ archived: true })
       .where(and(eq(areasTable.name, legacy.name), eq(areasTable.terminal, legacy.terminal)));
   }
+
+  // The workbook is the complete operating-area list, not just a source of
+  // additional rows. Preserve unmatched historical areas and their references,
+  // but never expose them as extra or duplicate cleaning zones.
+  const operatingAreaKeys = new Set(
+    MCO_TERMINAL_AREAS.map((area) => `${area.terminal}\u0000${area.name}`),
+  );
+  const allAreas = await tx
+    .select({ id: areasTable.id, terminal: areasTable.terminal, name: areasTable.name, archived: areasTable.archived })
+    .from(areasTable);
+  for (const existing of allAreas) {
+    if (!existing.archived && !operatingAreaKeys.has(`${existing.terminal}\u0000${existing.name}`)) {
+      await tx.update(areasTable).set({ archived: true }).where(eq(areasTable.id, existing.id));
+      console.log(`Archived non-workbook area #${existing.id} ${existing.name} (${existing.terminal})`);
+    }
+  }
   });
 
   const [{ value: ttCount }] = await db.select({ value: count() }).from(taskTypesTable);
@@ -814,6 +835,43 @@ async function seed() {
         console.log(`Cleaned up ${deleted.length} default tasks from ${terminal} / ${name} (area ${area.id})`);
       }
     }
+  }
+
+  // Legacy P2 West and the workbook's Level 2 used to be separate areas. When
+  // their history was merged, both daily checklists ended up on the same area.
+  // Keep a completed (otherwise the oldest) copy, and remove only untouched
+  // standard-task duplicates. Never discard notes, images, assignments, or
+  // records referenced by inspector work or uploaded files.
+  const [p2West] = await db
+    .select({ id: areasTable.id })
+    .from(areasTable)
+    .where(and(eq(areasTable.terminal, "Terminal A - West"), eq(areasTable.name, "Level 2")));
+  if (p2West) {
+    await db.execute(sql`
+      WITH ranked AS (
+        SELECT id, row_number() OVER (
+          PARTITION BY task_date, task_name
+          ORDER BY completed DESC, completed_at DESC NULLS LAST, id ASC
+        ) AS copy_number
+        FROM tasks
+        WHERE area_id = ${p2West.id} AND is_special = false
+      )
+      DELETE FROM tasks AS duplicate
+      USING ranked
+      WHERE duplicate.id = ranked.id
+        AND ranked.copy_number > 1
+        AND duplicate.completed = false
+        AND duplicate.completed_at IS NULL
+        AND duplicate.completed_by_id IS NULL
+        AND duplicate.assigned_to_id IS NULL
+        AND duplicate.created_by_id IS NULL
+        AND duplicate.notes IS NULL
+        AND duplicate.before_image_path IS NULL
+        AND duplicate.after_image_path IS NULL
+        AND NOT EXISTS (SELECT 1 FROM inspector_task_links WHERE task_id = duplicate.id)
+        AND NOT EXISTS (SELECT 1 FROM inspector_task_assignment_history WHERE task_id = duplicate.id)
+        AND NOT EXISTS (SELECT 1 FROM object_uploads WHERE task_id = duplicate.id)
+    `);
   }
 }
 

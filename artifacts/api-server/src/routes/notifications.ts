@@ -1,8 +1,9 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db } from "@workspace/db";
-import { notificationsTable, staffTable } from "@workspace/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { notificationsTable, staffTable, issuesTable, tasksTable } from "@workspace/db/schema";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import { z } from "zod";
+import { actorStaffFromRequest } from "../lib/actorSession";
 
 const router: IRouter = Router();
 
@@ -22,6 +23,9 @@ function formatNotification(n: any) {
   return {
     ...n,
     createdAt: n.createdAt.toISOString(),
+    taskId: n.taskId ?? null,
+    beforeImagePath: n.beforeImagePath ?? null,
+    afterImagePath: n.afterImagePath ?? null,
   };
 }
 
@@ -32,6 +36,16 @@ router.get("/notifications", async (req: Request, res: Response) => {
     return;
   }
 
+  const actor = await actorStaffFromRequest(req);
+  if (!actor) {
+    res.status(401).json({ error: "Login session required" });
+    return;
+  }
+  if (actor.id !== query.data.staffId) {
+    res.status(403).json({ error: "Cannot view another staff member's notifications" });
+    return;
+  }
+
   const notifications = await db
     .select()
     .from(notificationsTable)
@@ -39,7 +53,40 @@ router.get("/notifications", async (req: Request, res: Response) => {
     .orderBy(desc(notificationsTable.createdAt))
     .limit(50);
 
-  res.json(notifications.map(formatNotification));
+  const issueNotificationIds = notifications
+    .filter((n) => n.issueId != null && ["new_issue", "issue_assigned", "issue_completed", "inspector_to_supervisor", "supervisor_to_inspector"].includes(n.type))
+    .map((n) => n.issueId!);
+  const taskNotificationIds = notifications
+    .filter((n) => n.taskId != null && n.type === "task_completed")
+    .map((n) => n.taskId!);
+  const [issuePhotos, taskPhotos] = await Promise.all([
+    issueNotificationIds.length
+      ? db.select({ id: issuesTable.id, beforeImagePath: issuesTable.beforeImagePath, afterImagePath: issuesTable.afterImagePath })
+        .from(issuesTable).where(inArray(issuesTable.id, issueNotificationIds))
+      : [],
+    taskNotificationIds.length
+      ? db.select({ id: tasksTable.id, beforeImagePath: tasksTable.beforeImagePath, afterImagePath: tasksTable.afterImagePath })
+        .from(tasksTable).where(inArray(tasksTable.id, taskNotificationIds))
+      : [],
+  ]);
+  const issuePhotoById = new Map(issuePhotos.map((row) => [row.id, row]));
+  const taskPhotoById = new Map(taskPhotos.map((row) => [row.id, row]));
+
+  res.json(notifications.map((notification) => {
+    const isIssueNotification = notification.issueId != null &&
+      ["new_issue", "issue_assigned", "issue_completed", "inspector_to_supervisor", "supervisor_to_inspector"].includes(notification.type);
+    const isTaskNotification = notification.taskId != null && notification.type === "task_completed";
+    const photos = isIssueNotification
+      ? issuePhotoById.get(notification.issueId!)
+      : isTaskNotification
+        ? taskPhotoById.get(notification.taskId!)
+        : undefined;
+    return formatNotification({
+      ...notification,
+      beforeImagePath: photos?.beforeImagePath ?? null,
+      afterImagePath: photos?.afterImagePath ?? null,
+    });
+  }));
 });
 
 router.patch("/notifications/:id/read", async (req: Request, res: Response) => {
@@ -49,10 +96,16 @@ router.patch("/notifications/:id/read", async (req: Request, res: Response) => {
     return;
   }
 
+  const actor = await actorStaffFromRequest(req);
+  if (!actor) {
+    res.status(401).json({ error: "Login session required" });
+    return;
+  }
+
   const [updated] = await db
     .update(notificationsTable)
     .set({ isRead: true })
-    .where(eq(notificationsTable.id, params.data.id))
+    .where(and(eq(notificationsTable.id, params.data.id), eq(notificationsTable.staffId, actor.id)))
     .returning();
 
   if (!updated) {
@@ -67,6 +120,15 @@ router.post("/notifications/mark-all-read", async (req: Request, res: Response) 
   const body = MarkAllReadBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: "staffId is required" });
+    return;
+  }
+  const actor = await actorStaffFromRequest(req);
+  if (!actor) {
+    res.status(401).json({ error: "Login session required" });
+    return;
+  }
+  if (actor.id !== body.data.staffId) {
+    res.status(403).json({ error: "Cannot update another staff member's notifications" });
     return;
   }
 

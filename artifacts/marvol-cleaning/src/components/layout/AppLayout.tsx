@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,
@@ -219,6 +220,7 @@ function vibrateDevice(urgent: boolean = false) {
 function NotificationBell({ staffId }: { staffId: number }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const qc = useQueryClient();
   const prevUnreadIdsRef = useRef<Set<number>>(new Set());
@@ -252,7 +254,7 @@ function NotificationBell({ staffId }: { staffId: number }) {
       const URGENT_TYPES = new Set([
         "inspector_to_supervisor", "supervisor_to_inspector",
         "new_issue", "issue_assigned", "issue_completed",
-        "task_completed", "direct_alert", "photo_shared",
+        "task_completed", "direct_alert", "photo_shared", "new_message",
       ]);
       const hasUrgent = newNotifications.some((n) => URGENT_TYPES.has(n.type));
       playNotificationSound(hasUrgent);
@@ -276,6 +278,7 @@ function NotificationBell({ staffId }: { staffId: number }) {
   const handleMarkAllRead = () => {
     markAllRead.mutate({ data: { staffId } });
   };
+  const imageUrl = (path: string) => `${BASE}/api/storage${path}`;
 
   const typeIcon = (type: string) => {
     if (type === "issue_assigned") return <User className="w-3.5 h-3.5 text-blue-500 shrink-0" />;
@@ -292,7 +295,7 @@ function NotificationBell({ staffId }: { staffId: number }) {
   const URGENT_TYPES_BADGE = new Set([
     "inspector_to_supervisor", "supervisor_to_inspector",
     "new_issue", "issue_assigned", "issue_completed",
-    "task_completed", "direct_alert", "photo_shared",
+    "task_completed", "direct_alert", "photo_shared", "new_message",
   ]);
   const hasUrgentUnread = unread.some((n) => URGENT_TYPES_BADGE.has(n.type));
 
@@ -334,12 +337,22 @@ function NotificationBell({ staffId }: { staffId: number }) {
               </div>
             )}
             {notifications.slice(0, 20).map((n) => (
-              <button
+              <div
                 key={n.id}
+                role="button"
+                tabIndex={0}
                 className={`w-full text-left px-4 py-3 flex gap-3 items-start transition-colors hover:bg-slate-50 ${!n.isRead ? "bg-blue-50/60" : ""}`}
                 onClick={() => {
                   if (!n.isRead) markRead.mutate({ id: n.id });
                   setOpen(false);
+                }}
+                onKeyDown={(event) => {
+                  if (event.target !== event.currentTarget) return;
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    if (!n.isRead) markRead.mutate({ id: n.id });
+                    setOpen(false);
+                  }
                 }}
               >
                 <div className="mt-0.5">{typeIcon(n.type)}</div>
@@ -350,14 +363,71 @@ function NotificationBell({ staffId }: { staffId: number }) {
                   <p className="text-[10px] text-slate-400 mt-1">
                     {format(new Date(n.createdAt), "MMM d, h:mm a")}
                   </p>
+                  {(n.beforeImagePath || n.afterImagePath) && (
+                    <div className="flex gap-2 mt-2">
+                      {n.beforeImagePath && (
+                        <button
+                          type="button"
+                          aria-label="View before photo"
+                          className="flex flex-col items-center gap-0.5 text-[10px] font-semibold text-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setLightboxImage(imageUrl(n.beforeImagePath!));
+                          }}
+                        >
+                          <img src={imageUrl(n.beforeImagePath)} alt="Before" className="w-12 h-12 rounded-md object-cover border border-blue-200" />
+                          <span>Before</span>
+                        </button>
+                      )}
+                      {n.afterImagePath && (
+                        <button
+                          type="button"
+                          aria-label="View after photo"
+                          className="flex flex-col items-center gap-0.5 text-[10px] font-semibold text-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setLightboxImage(imageUrl(n.afterImagePath!));
+                          }}
+                        >
+                          <img src={imageUrl(n.afterImagePath)} alt="After" className="w-12 h-12 rounded-md object-cover border border-emerald-200" />
+                          <span>After</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
                 {!n.isRead && (
                   <div className="w-2 h-2 rounded-full bg-blue-500 shrink-0 mt-1" />
                 )}
-              </button>
+              </div>
             ))}
           </div>
         </div>
+      )}
+      {lightboxImage && createPortal(
+        <div
+          className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Notification photo"
+          onClick={() => setLightboxImage(null)}
+        >
+          <button
+            type="button"
+            className="absolute top-4 right-4 text-white/80 hover:text-white"
+            aria-label="Close photo"
+            onClick={() => setLightboxImage(null)}
+          >
+            <X className="w-7 h-7" />
+          </button>
+          <img
+            src={lightboxImage}
+            alt="Notification photo"
+            className="max-w-full max-h-full rounded-xl object-contain"
+            onClick={(event) => event.stopPropagation()}
+          />
+        </div>,
+        document.body
       )}
     </div>
   );

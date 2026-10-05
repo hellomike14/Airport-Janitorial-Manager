@@ -22,6 +22,13 @@ test("inspector task completion requires its current assignee", () => {
   assert.equal(canMutateTask(supervisor, 1, true), false);
   assert.equal(canMutateTask(admin, 1, true), false);
 });
+test("a staff member assigned to an area may complete its regular tasks, not someone else's or inspector tasks", () => {
+  assert.equal(canMutateTask(staff, null, false, true), true);
+  assert.equal(canMutateTask(staff, null, false, false), false);
+  assert.equal(canMutateTask(staff, 2, false, true), false);
+  assert.equal(canMutateTask(staff, null, true, true), false);
+  assert.equal(canMutateTask(supervisor, null, false), true);
+});
 test("former assignee loses complete and uncomplete authority after locked SLA reassignment", () => {
   const formerAssignee = { id: 10, role: "staff" as const };
   const replacement = { id: 11, role: "staff" as const };
@@ -47,11 +54,10 @@ test("only management can mutate roster assignments and assignedBy is server act
   const clientAssignedBy = 999; const persistedAssignedBy = supervisor.id;
   assert.notEqual(clientAssignedBy, persistedAssignedBy);
 });
-test("former, inactive, and login-disabled assignment targets are rejected", () => {
-  assert.equal(isAssignmentTargetEligible({ active: true, loginEnabled: true, formerEmployee: false }), true);
-  assert.equal(isAssignmentTargetEligible({ active: false, loginEnabled: true, formerEmployee: false }), false);
-  assert.equal(isAssignmentTargetEligible({ active: true, loginEnabled: false, formerEmployee: false }), false);
-  assert.equal(isAssignmentTargetEligible({ active: true, loginEnabled: true, formerEmployee: true }), false);
+test("former and inactive staff cannot be assigned, but active staff without login can", () => {
+  assert.equal(isAssignmentTargetEligible({ active: true, formerEmployee: false }), true);
+  assert.equal(isAssignmentTargetEligible({ active: false, formerEmployee: false }), false);
+  assert.equal(isAssignmentTargetEligible({ active: true, formerEmployee: true }), false);
 });
 test("private object ACL permits only owner, assignment, participant, or admin", () => {
   assert.equal(canReadPrivateObject({ actor: staff, ownerStaffId: 1 }), true);
@@ -97,7 +103,7 @@ test("webhook secret accepts identical query or header values only", () => {
 });
 test("multipart fields normalize and malformed/raw MIME inputs fail closed", () => {
   assert.deepEqual(normalizeInboundParseFields({ envelope: '{"from":"a@b.co","to":["x@y.co"]}', from: "a@b.co", text: "ok", spf: "pass" }), {
-    envelope: { from: "a@b.co", to: ["x@y.co"] }, from: "a@b.co", text: "ok", headers: undefined, SPF: "pass", dkim: undefined,
+    envelope: { from: "a@b.co", to: ["x@y.co"] }, from: "a@b.co", text: "ok", subject: undefined, headers: undefined, SPF: "pass", dkim: undefined,
   });
   assert.throws(() => normalizeInboundParseFields({ envelope: "{" }));
   assert.throws(() => normalizeInboundParseFields({ email: "raw", envelope: "{}" }));

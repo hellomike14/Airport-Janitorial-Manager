@@ -25,7 +25,7 @@ import {
   ChevronRight,
   Camera,
 } from "lucide-react";
-import { TaskPhotoToggle } from "@/components/TaskPhotos";
+import { TaskPhotoThumbnails, TaskPhotoToggle } from "@/components/TaskPhotos";
 import { StaffName } from "@/components/StaffName";
 import { InspectorWorkflowCard } from "@/components/InspectorWorkflowCard";
 import { trackEvent } from "@/lib/analytics";
@@ -354,6 +354,10 @@ export default function MyTasks() {
                     </div>
                   </button>
                   <div className="px-5 pb-2 -mt-1">
+                    <TaskPhotoThumbnails
+                      beforeImagePath={(task as any).beforeImagePath ?? null}
+                      afterImagePath={(task as any).afterImagePath ?? null}
+                    />
                     <TaskPhotoToggle
                       taskId={task.id}
                       beforeImagePath={(task as any).beforeImagePath ?? null}
@@ -410,6 +414,10 @@ export default function MyTasks() {
                   </div>
                 </button>
                 <div className="px-5 pb-2 -mt-1">
+                  <TaskPhotoThumbnails
+                    beforeImagePath={(task as any).beforeImagePath ?? null}
+                    afterImagePath={(task as any).afterImagePath ?? null}
+                  />
                   <TaskPhotoToggle
                     taskId={task.id}
                     beforeImagePath={(task as any).beforeImagePath ?? null}

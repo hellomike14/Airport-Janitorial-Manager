@@ -290,6 +290,10 @@ export interface Task {
   inspectorWorkflowTaskId: number | null;
   isSpecial: boolean;
   notes?: string | null;
+  /** @nullable */
+  beforeImagePath: string | null;
+  /** @nullable */
+  afterImagePath: string | null;
 }
 
 export interface SpecialTask {
@@ -357,6 +361,98 @@ export interface CreateAssignmentRequest {
   assignedById: number;
   notes?: string | null;
   isSpecial: boolean;
+}
+
+export type TerminalGroupAssignmentInputGroupKey =
+  (typeof TerminalGroupAssignmentInputGroupKey)[keyof typeof TerminalGroupAssignmentInputGroupKey];
+
+export const TerminalGroupAssignmentInputGroupKey = {
+  "terminal-a-east": "terminal-a-east",
+  "terminal-a-west": "terminal-a-west",
+  "terminal-b-east": "terminal-b-east",
+  "terminal-b-west": "terminal-b-west",
+  "terminal-c-135": "terminal-c-135",
+  "terminal-c-246": "terminal-c-246",
+  "top-terminal": "top-terminal",
+} as const;
+
+export interface TerminalGroupAssignmentInput {
+  staffId: number;
+  groupKey: TerminalGroupAssignmentInputGroupKey;
+  assignmentDate: string;
+  notes?: string;
+  isSpecial: boolean;
+}
+
+export interface TerminalGroupAssignmentResult {
+  createdCount: number;
+  existingCount: number;
+}
+
+export type TerminalGroupReassignmentInputGroupKey =
+  (typeof TerminalGroupReassignmentInputGroupKey)[keyof typeof TerminalGroupReassignmentInputGroupKey];
+
+export const TerminalGroupReassignmentInputGroupKey = {
+  "terminal-a-east": "terminal-a-east",
+  "terminal-a-west": "terminal-a-west",
+  "terminal-b-east": "terminal-b-east",
+  "terminal-b-west": "terminal-b-west",
+  "terminal-c-135": "terminal-c-135",
+  "terminal-c-246": "terminal-c-246",
+  "top-terminal": "top-terminal",
+} as const;
+
+export type TerminalGroupReassignmentInputExpectedAssignmentsItem = {
+  id: number;
+  staffId: number;
+};
+
+export interface TerminalGroupReassignmentInput {
+  staffId: number;
+  groupKey: TerminalGroupReassignmentInputGroupKey;
+  assignmentDate: string;
+  expectedAssignments: TerminalGroupReassignmentInputExpectedAssignmentsItem[];
+}
+
+export type TerminalGroupKey =
+  (typeof TerminalGroupKey)[keyof typeof TerminalGroupKey];
+
+export const TerminalGroupKey = {
+  "terminal-a-east": "terminal-a-east",
+  "terminal-a-west": "terminal-a-west",
+  "terminal-b-east": "terminal-b-east",
+  "terminal-b-west": "terminal-b-west",
+  "terminal-c-135": "terminal-c-135",
+  "terminal-c-246": "terminal-c-246",
+  "top-terminal": "top-terminal",
+} as const;
+
+export interface TerminalGroupScheduleRow {
+  id: number;
+  staffId: number;
+  staffName: string;
+  areaId: number;
+  areaName: string;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+}
+
+export interface TerminalGroupSchedulePreview {
+  snapshot: string;
+  rows: TerminalGroupScheduleRow[];
+  conflict: boolean;
+}
+
+export interface TerminalGroupScheduleMoveInput {
+  groupKey: TerminalGroupKey;
+  staffId: number;
+  /** @minLength 1 */
+  snapshot: string;
+}
+
+export interface TerminalGroupScheduleMoveResult {
+  movedCount: number;
 }
 
 export type IssueSeverity = (typeof IssueSeverity)[keyof typeof IssueSeverity];
@@ -430,12 +526,24 @@ export const NotificationType = {
   new_issue: "new_issue",
   issue_assigned: "issue_assigned",
   issue_completed: "issue_completed",
+  inspector_to_supervisor: "inspector_to_supervisor",
+  supervisor_to_inspector: "supervisor_to_inspector",
+  task_completed: "task_completed",
+  direct_alert: "direct_alert",
+  photo_shared: "photo_shared",
+  new_message: "new_message",
 } as const;
 
 export interface Notification {
   id: number;
   staffId: number;
   issueId?: number | null;
+  /** @nullable */
+  taskId: number | null;
+  /** @nullable */
+  beforeImagePath: string | null;
+  /** @nullable */
+  afterImagePath: string | null;
   type: NotificationType;
   message: string;
   isRead: boolean;
@@ -500,10 +608,16 @@ export interface ChatMessage {
   senderId: number;
   senderName: string;
   body: string;
+  /** @nullable */
+  beforeImagePath: string | null;
+  /** @nullable */
+  afterImagePath: string | null;
   isRead: boolean;
   /** @nullable */
   inspectorWorkflowTaskId: number | null;
   inspectorEmailDeliveryStatus: ChatMessageInspectorEmailDeliveryStatus;
+  /** External inspector email addresses recorded for delivery; empty when this message has no email outbox. */
+  inspectorEmailRecipients: string[];
   createdAt: string;
 }
 
@@ -514,7 +628,22 @@ export interface ChatMessageInput {
    * @maxLength 2000
    */
   body: string;
+  /** Uploaded conversation attachment labeled Before. */
+  beforeImagePath?: string;
+  /** Uploaded conversation attachment labeled After. */
+  afterImagePath?: string;
   clientRequestId: string;
+  /**
+   * Optional exact allowlisted recipients for an admin/supervisor message in the dedicated inspector conversation. Omitted legacy clients broadcast to all approved recipients.
+   * @minItems 1
+   * @maxItems 10
+   */
+  inspectorRecipients?: string[];
+}
+
+export interface InspectorEmailRecipientsResponse {
+  inspectorId: number;
+  emails: string[];
 }
 
 export interface MarkAllReadRequest {
@@ -806,6 +935,11 @@ export type ListAssignmentsParams = {
   staffId?: number;
 };
 
+export type PreviewTerminalGroupScheduleMoveParams = {
+  groupKey: TerminalGroupKey;
+  staffId: number;
+};
+
 export type ListIssuesParams = {
   date?: string;
   /**
@@ -830,6 +964,18 @@ export type ListConversationsParams = {
 
 export type ListConversationMessagesParams = {
   staffId: number;
+};
+
+export type DeleteOldConversationMessagesParams = {
+  /**
+   * Exclusive cutoff as an ISO date-time with timezone.
+   */
+  before: string;
+};
+
+export type DeleteOldConversationMessages200 = {
+  deleted: number;
+  retained: number;
 };
 
 export type GetDashboardParams = {

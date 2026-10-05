@@ -27,18 +27,25 @@ import {
 import { Button } from "@/components/ui/button";
 import { StaffName } from "@/components/StaffName";
 import { InspectorWorkflowCard } from "@/components/InspectorWorkflowCard";
+import { TaskPhotoThumbnails, TaskPhotoToggle } from "@/components/TaskPhotos";
+import { getTerminalColors } from "@/lib/terminalColors";
 
 type StatusFilter = "all" | "pending" | "completed";
 
-const TERMINAL_COLORS: Record<string, { ring: string; bg: string; dot: string; bar: string }> = {
-  "Terminal A": { ring: "ring-blue-200", bg: "bg-blue-50", dot: "bg-blue-500", bar: "bg-blue-500" },
-  "Terminal B": { ring: "ring-violet-200", bg: "bg-violet-50", dot: "bg-violet-500", bar: "bg-violet-500" },
-  "Terminal C": { ring: "ring-emerald-200", bg: "bg-emerald-50", dot: "bg-emerald-500", bar: "bg-emerald-500" },
-  "Top Terminal": { ring: "ring-amber-200", bg: "bg-amber-50", dot: "bg-amber-500", bar: "bg-amber-500" },
+const TERMINAL_HEADINGS: Record<string, string> = {
+  "Terminal A - East": "TERMINAL A EAST",
+  "Terminal A - West": "TERMINAL A WEST",
+  "Terminal B - East": "TERMINAL B EAST",
+  "Terminal B - West": "TERMINAL B WEST",
+  "Top Terminal": "TOP TERMINAL",
 };
 
-function getColors(terminal: string) {
-  return TERMINAL_COLORS[terminal] ?? { ring: "ring-slate-200", bg: "bg-slate-50", dot: "bg-slate-400", bar: "bg-slate-400" };
+function terminalHeading(area: { terminal: string; name: string }) {
+  if (area.terminal === "Terminal C") {
+    if (area.name.startsWith("Group 1")) return "TERMINAL C 1,3,5";
+    if (area.name.startsWith("Group 2")) return "TERMINAL C 2,4,6";
+  }
+  return TERMINAL_HEADINGS[area.terminal] ?? area.terminal.toUpperCase();
 }
 
 export default function TaskManagement() {
@@ -48,6 +55,7 @@ export default function TaskManagement() {
   const qc = useQueryClient();
 
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [terminalFilter, setTerminalFilter] = useState<string | "all">("all");
   const [areaFilter, setAreaFilter] = useState<number | "all">("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
@@ -58,6 +66,8 @@ export default function TaskManagement() {
 
   const { data: areas } = useListAreas();
   const { data: tasks, isLoading } = useListTasks({ date });
+  const terminals = useMemo(() => [...new Set((areas ?? []).map(terminalHeading))], [areas]);
+  const visibleAreas = (areas ?? []).filter((area) => terminalFilter === "all" || terminalHeading(area) === terminalFilter);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -116,7 +126,8 @@ export default function TaskManagement() {
     const areaList = areas ?? [];
 
     return areaList
-      .filter((a) => areaFilter === "all" || a.id === areaFilter)
+      .filter((a) => (areaFilter === "all" || a.id === areaFilter) &&
+        (terminalFilter === "all" || terminalHeading(a) === terminalFilter))
       .map((area) => {
         let areaTasks = taskList.filter((t) => t.areaId === area.id);
         if (statusFilter === "pending") areaTasks = areaTasks.filter((t) => !t.completed);
@@ -129,8 +140,8 @@ export default function TaskManagement() {
         const completed = taskList.filter((t) => t.areaId === area.id && t.completed).length;
         return { area, tasks: areaTasks, total, completed };
       })
-      .filter((g) => g.tasks.length > 0 || (areaFilter !== "all" && g.area.id === areaFilter));
-  }, [tasks, areas, areaFilter, statusFilter, search]);
+      .filter((g) => g.tasks.length > 0 || terminalFilter !== "all" || (areaFilter !== "all" && g.area.id === areaFilter));
+  }, [tasks, areas, terminalFilter, areaFilter, statusFilter, search]);
 
   const totalTasks = (tasks ?? []).length;
   const totalCompleted = (tasks ?? []).filter((t) => t.completed).length;
@@ -211,6 +222,27 @@ export default function TaskManagement() {
         <span className="text-sm font-bold text-slate-600 shrink-0 min-w-[40px] text-right">{pct}%</span>
       </div>
 
+      <div className="flex flex-wrap gap-2" aria-label={t("taskManagement.allTerminals")}>
+        {(["all", ...terminals] as string[]).map((terminal) => (
+          <button
+            key={terminal}
+            type="button"
+            aria-pressed={terminalFilter === terminal}
+            onClick={() => {
+              setTerminalFilter(terminal);
+              setAreaFilter("all");
+            }}
+            className={`px-3 py-2 rounded-lg text-xs font-bold transition-colors ${
+              terminalFilter === terminal
+                ? "bg-slate-900 text-white shadow-sm"
+                : "bg-white border border-slate-200 text-slate-600 hover:border-slate-400"
+            }`}
+          >
+            {terminal === "all" ? t("taskManagement.allTerminals") : terminal}
+          </button>
+        ))}
+      </div>
+
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -238,7 +270,7 @@ export default function TaskManagement() {
           >
             {t("taskManagement.allAreas")}
           </button>
-          {(areas ?? []).map((a) => (
+          {visibleAreas.map((a) => (
             <button
               key={a.id}
               ref={(el) => {
@@ -248,7 +280,7 @@ export default function TaskManagement() {
               onClick={() => setAreaFilter(a.id)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${areaFilter === a.id ? "bg-slate-900 text-white shadow" : "text-slate-500 hover:text-slate-800"}`}
             >
-              {a.name.replace("Terminal ", "T").replace(" Garage", "").replace("Levels ", "L")}
+              {terminalFilter === "all" ? `${terminalHeading(a)} · ${a.name}` : a.name}
             </button>
           ))}
         </div>
@@ -280,8 +312,10 @@ export default function TaskManagement() {
         </div>
       ) : (
         <div className="space-y-4">
-          {grouped.map(({ area, tasks: areaTasks, total, completed }) => {
-            const col = getColors(area.terminal);
+          {grouped.map(({ area, tasks: areaTasks, total, completed }, index) => {
+            const col = getTerminalColors(area.terminal);
+            const heading = terminalHeading(area);
+            const startsSection = index === 0 || terminalHeading(grouped[index - 1].area) !== heading;
             const pctArea = total > 0 ? Math.round((completed / total) * 100) : 0;
             const allDone = total > 0 && completed === total;
             const isCollapsed = collapsed[area.id];
@@ -290,17 +324,23 @@ export default function TaskManagement() {
             const displayTasks = statusFilter === "pending" ? pending : statusFilter === "completed" ? done : areaTasks;
 
             return (
-              <div key={area.id} className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${allDone ? "border-emerald-200" : "border-slate-200"}`}>
+              <React.Fragment key={area.id}>
+              {startsSection && (
+                <h2 className={`pt-3 text-xl font-extrabold tracking-wide ${col.text}`}>
+                  {heading}
+                </h2>
+              )}
+              <div className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${allDone ? "border-emerald-200" : "border-slate-200"}`}>
                 <div
                   className={`flex items-center gap-4 px-5 py-4 cursor-pointer hover:bg-slate-50/60 transition-colors ${allDone ? "bg-emerald-50/60" : ""}`}
                   onClick={() => toggleCollapse(area.id)}
                 >
-                  <div className={`w-3 h-3 rounded-full ${allDone ? "bg-emerald-500" : col.dot} shrink-0`} />
+                  <div className={`w-3 h-3 rounded-full ${col.dot} shrink-0`} />
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 flex-wrap">
                       <h2 className="font-bold text-slate-800">{area.name}</h2>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${col.bg} ${col.ring} ring-1 text-slate-600`}>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${col.bg} ${col.ring} ${col.text} ring-1`}>
                         {area.terminal}
                       </span>
                       {allDone && (
@@ -312,7 +352,7 @@ export default function TaskManagement() {
                     <div className="flex items-center gap-3 mt-1.5">
                       <div className="flex-1 max-w-[200px] h-1.5 bg-slate-100 rounded-full overflow-hidden">
                         <div
-                          className={`h-full rounded-full transition-all duration-500 ${allDone ? "bg-emerald-500" : col.bar}`}
+                          className={`h-full rounded-full transition-all duration-500 ${col.bar}`}
                           style={{ width: `${pctArea}%` }}
                         />
                       </div>
@@ -374,6 +414,18 @@ export default function TaskManagement() {
                             {task.inspectorWorkflowTaskId && (
                               <InspectorWorkflowCard taskId={task.inspectorWorkflowTaskId} />
                             )}
+                            <TaskPhotoThumbnails
+                              beforeImagePath={task.beforeImagePath ?? null}
+                              afterImagePath={task.afterImagePath ?? null}
+                            />
+                            <div className="mt-1">
+                              <TaskPhotoToggle
+                                taskId={task.id}
+                                beforeImagePath={task.beforeImagePath ?? null}
+                                afterImagePath={task.afterImagePath ?? null}
+                                compact
+                              />
+                            </div>
                           </div>
 
                           <div className="shrink-0 text-right pt-0.5">
@@ -405,6 +457,7 @@ export default function TaskManagement() {
                   </>
                 )}
               </div>
+              </React.Fragment>
             );
           })}
         </div>
