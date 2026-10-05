@@ -1,12 +1,13 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { assignmentsTable, staffTable, areasTable, schedulesTable } from "@workspace/db/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { assignmentsTable, staffTable, areasTable } from "@workspace/db/schema";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import {
   ListAssignmentsQueryParams,
   CreateAssignmentBody,
   DeleteAssignmentParams,
 } from "@workspace/api-zod";
+import { actorStaffFromRequest } from "../lib/actorSession";
 
 const router: IRouter = Router();
 
@@ -36,7 +37,7 @@ router.get("/", async (req, res) => {
     .from(assignmentsTable)
     .innerJoin(
       staffTable,
-      and(eq(assignmentsTable.staffId, staffTable.id), eq(staffTable.active, true))
+      and(eq(assignmentsTable.staffId, staffTable.id), eq(staffTable.active, true), eq(staffTable.formerEmployee, false))
     )
     .innerJoin(areasTable, eq(assignmentsTable.areaId, areasTable.id))
     .where(
@@ -66,53 +67,27 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
+  const actor = await actorStaffFromRequest(req);
+  if (!actor) return res.status(401).json({ error: "Login session required" });
+  if (actor.role !== "admin" && actor.role !== "supervisor") return res.status(403).json({ error: "Supervisor access required" });
   const body = CreateAssignmentBody.parse(req.body);
-  const [created] = await db
-    .insert(assignmentsTable)
-    .values({
-      staffId: body.staffId,
-      areaId: body.areaId,
-      assignmentDate: body.assignmentDate,
-      assignedById: body.assignedById,
-      notes: body.notes ?? null,
-      isSpecial: body.isSpecial,
-    })
-    .returning();
-
-  const assignDate = new Date(body.assignmentDate + "T12:00:00");
-  const dayOfWeek = assignDate.getDay();
-
-  const existing = await db
-    .select({ id: schedulesTable.id })
-    .from(schedulesTable)
-    .where(
-      and(
-        eq(schedulesTable.staffId, body.staffId),
-        eq(schedulesTable.dayOfWeek, dayOfWeek),
-        eq(schedulesTable.areaId, body.areaId)
-      )
-    )
-    .limit(1);
-
-  if (existing.length === 0) {
-    const existingShift = await db
-      .select({ startTime: schedulesTable.startTime, endTime: schedulesTable.endTime })
-      .from(schedulesTable)
-      .where(eq(schedulesTable.staffId, body.staffId))
-      .limit(1);
-
-    const startTime = existingShift[0]?.startTime ?? "14:00";
-    const endTime = existingShift[0]?.endTime ?? "22:00";
-
-    await db.insert(schedulesTable).values({
-      staffId: body.staffId,
-      areaId: body.areaId,
-      dayOfWeek,
-      startTime,
-      endTime,
-      notes: body.notes ?? null,
-    });
-  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(body.assignmentDate)) return res.status(400).json({ error: "Invalid assignment date" });
+  const [[target], [targetArea]] = await Promise.all([
+    db.select({ id: staffTable.id }).from(staffTable).where(and(eq(staffTable.id, body.staffId), eq(staffTable.active, true), eq(staffTable.loginEnabled, true), eq(staffTable.formerEmployee, false))),
+    db.select({ id: areasTable.id }).from(areasTable).where(and(eq(areasTable.id, body.areaId), eq(areasTable.archived, false))),
+  ]);
+  if (!target || !targetArea) return res.status(400).json({ error: "Target staff or area is not eligible" });
+  const created = await db.transaction(async tx => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(${body.staffId}, hashtext(${body.assignmentDate}))`);
+    const [existing] = await tx.select().from(assignmentsTable).where(and(eq(assignmentsTable.staffId, body.staffId), eq(assignmentsTable.areaId, body.areaId), eq(assignmentsTable.assignmentDate, body.assignmentDate)));
+    if (existing) return existing;
+    const [assignment] = await tx.insert(assignmentsTable).values({
+      staffId: body.staffId, areaId: body.areaId, assignmentDate: body.assignmentDate,
+      assignedById: actor.id, notes: body.notes ?? null, isSpecial: body.isSpecial,
+    }).returning();
+    return assignment;
+  });
+  // Area assignments are dated work coverage, never recurring payroll shifts.
 
   const [staff] = await db
     .select({ name: staffTable.name })
@@ -129,7 +104,7 @@ router.post("/", async (req, res) => {
     .from(staffTable)
     .where(eq(staffTable.id, created.assignedById));
 
-  res.status(201).json({
+  return res.status(201).json({
     ...created,
     staffName: staff?.name ?? "",
     areaName: area?.name ?? "",
@@ -139,9 +114,12 @@ router.post("/", async (req, res) => {
 });
 
 router.delete("/:id", async (req, res) => {
+  const actor = await actorStaffFromRequest(req);
+  if (!actor) return res.status(401).json({ error: "Login session required" });
+  if (actor.role !== "admin" && actor.role !== "supervisor") return res.status(403).json({ error: "Supervisor access required" });
   const { id } = DeleteAssignmentParams.parse({ id: req.params.id });
   await db.delete(assignmentsTable).where(eq(assignmentsTable.id, id));
-  res.json({ success: true });
+  return res.json({ success: true });
 });
 
 export default router;

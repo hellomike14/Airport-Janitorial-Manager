@@ -21,6 +21,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { TaskPhotoToggle } from "@/components/TaskPhotos";
 import { StaffName } from "@/components/StaffName";
 import { useAuth } from "@/contexts/AuthContext";
+import { trackEvent } from "@/lib/analytics";
 
 export default function AreaTasks() {
   const { t, i18n } = useTranslation();
@@ -37,11 +38,11 @@ export default function AreaTasks() {
   const areaInfo = areas?.find(a => a.id === areaId);
 
   const { data: tasks, isLoading } = useListTasks({ areaId, date: selectedDate }, {
-    query: { enabled: !!areaId }
+    query: { queryKey: ["/api/tasks", { areaId, date: selectedDate }], enabled: !!areaId }
   });
 
   const { data: effectiveTasks, refetch: refetchEffective } = useListAreaEffectiveTasks(areaId, {
-    query: { enabled: !!areaId && isAdmin },
+    query: { queryKey: [`/api/areas/${areaId}/effective-tasks`], enabled: !!areaId && isAdmin },
   });
 
   const onExclusionChange = () => {
@@ -73,11 +74,20 @@ export default function AreaTasks() {
     }
   };
 
+  const [taskError, setTaskError] = useState("");
   const currentUserId = currentUser?.id ?? 1;
 
   const completeMutation = useCompleteTask({
     mutation: {
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/tasks"] })
+      onError: (error) => setTaskError(error.message),
+      onSuccess: () => {
+        trackEvent("task_completed", {
+          task_kind: "standard",
+          completion_mode: "single",
+          offline: false,
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      }
     }
   });
 
@@ -89,7 +99,15 @@ export default function AreaTasks() {
 
   const completeAllMutation = useCompleteAllTasks({
     mutation: {
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/tasks"] })
+      onError: (error) => setTaskError(error.message),
+      onSuccess: () => {
+        trackEvent("task_completed", {
+          task_kind: "standard",
+          completion_mode: "bulk",
+          offline: false,
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      }
     }
   });
 
@@ -97,6 +115,8 @@ export default function AreaTasks() {
     if (task.completed) {
       uncompleteMutation.mutate({ id: task.id });
     } else {
+      if (task.photoRequired && !task.afterImagePath) { setTaskError("Attach an after photo before completing this task."); return; }
+      setTaskError("");
       completeMutation.mutate({ id: task.id, data: { completedById: currentUserId } });
     }
   };
@@ -117,6 +137,7 @@ export default function AreaTasks() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-12">
+      {taskError && <p role="alert" className="p-3 rounded-lg bg-red-50 text-red-700">{taskError}</p>}
       <Link href="/areas" className="inline-flex items-center text-sm font-medium text-slate-500 hover:text-accent transition-colors">
         <ArrowLeft className="w-4 h-4 mr-1" /> {t("areaTasks.backToAreaList")}
       </Link>
@@ -200,11 +221,12 @@ export default function AreaTasks() {
                   </span>
                 )}
                 {task.notes && (
-                  <p className="text-sm text-slate-500 mt-1 italic">"{task.notes}"</p>
+                  <details className="text-sm text-slate-500 mt-1"><summary className="cursor-pointer">Cleaning duties</summary><p className="whitespace-pre-line mt-2">{task.notes}</p></details>
                 )}
               </div>
 
               <div className="shrink-0 text-right flex flex-col items-end gap-2">
+                {(task as any).photoRequired && <p className="text-xs text-amber-700">After photo required</p>}
                 {task.completed ? (
                   <div className="flex flex-col items-end">
                     <span className="text-xs font-bold text-emerald-600 flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-md">

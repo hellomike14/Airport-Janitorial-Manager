@@ -18,6 +18,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow, format } from "date-fns";
 import { getDateLocale } from "@/i18n/dateLocale";
 import RefreshButton from "@/components/RefreshButton";
+import { requestUploadUrl } from "@workspace/api-client-react";
+import { trackEvent } from "@/lib/analytics";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -52,18 +54,13 @@ function imageUrl(objectPath: string) {
   return `${BASE_URL}/api/storage${objectPath}`;
 }
 
-async function requestPresignedUrl(file: File): Promise<{ uploadURL: string; objectPath: string }> {
-  const res = await fetch(`${BASE_URL}/api/storage/uploads/request-url`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
-  });
-  if (!res.ok) throw new Error("Failed to get upload URL");
-  return res.json();
-}
-
 async function uploadFile(file: File): Promise<string> {
-  const { uploadURL, objectPath } = await requestPresignedUrl(file);
+  const { uploadURL, objectPath } = await requestUploadUrl({
+    name: file.name,
+    size: file.size,
+    contentType: file.type,
+    purpose: "shared_photo",
+  });
   const putRes = await fetch(uploadURL, {
     method: "PUT",
     headers: { "Content-Type": file.type },
@@ -250,6 +247,12 @@ export default function PhotoShare() {
         }),
       });
       if (!res.ok) throw new Error("Failed to share photo");
+      trackEvent("photo_shared", {
+        has_area: areaId !== null,
+        has_gps: geoPosition !== null,
+        gps_available: !geoError,
+        role: currentUser.role,
+      });
       setPreview(null);
       setSelectedFile(null);
       setCaption("");

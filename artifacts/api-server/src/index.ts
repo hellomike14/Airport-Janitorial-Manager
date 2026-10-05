@@ -1,10 +1,17 @@
 import app from "./app";
+import { applyOperationsMigration } from "./lib/operationsMigration";
+import { generatePreviousMonthlyReport } from "./lib/monthlyOperationsReport";
 import { db } from "@workspace/db";
-import { staffTable, areasTable, taskTypesTable, notificationsTable, staffLocationsTable, tasksTable, taskExclusionsTable, assignmentsTable, schedulesTable, issuesTable, sharedPhotosTable, conversationsTable, messagesTable, conversationParticipantsTable } from "@workspace/db/schema";
-import { eq, and, count, inArray, or, gte, like, sql } from "drizzle-orm";
+import { staffTable, areasTable, taskTypesTable, notificationsTable, staffLocationsTable, tasksTable, taskExclusionsTable, assignmentsTable, schedulesTable, issuesTable, sharedPhotosTable, objectUploadsTable, conversationsTable, messagesTable, conversationParticipantsTable } from "@workspace/db/schema";
+import { eq, and, count, inArray, or, gte, like, ne, sql } from "drizzle-orm";
 import { renameSharedAreaName, AREA_RENAME_MAP } from "./area-renames";
-import { AREAS_REPLACING_DEFAULTS } from "./area-tasks";
-import { SEED_STAFF, REMOVED_STAFF_NAMES } from "./seed-data";
+import { AREA_SPECIFIC_TASKS, AREAS_REPLACING_DEFAULTS } from "./area-tasks";
+import { DEPRECATED_MCO_AREA_IDENTITIES, MCO_TERMINAL_AREAS } from "@workspace/db/area-catalog";
+import { SEED_STAFF, REMOVED_STAFF_NAMES, isSeedLoginEnabled } from "./seed-data";
+import { sweepOverdueInspectorAssignments } from "./lib/inspectorTaskWorkflow";
+import { drainOutbox } from "./lib/messageEmailOutboxWorker";
+import { inspectorRuntimeConfig } from "./lib/inspectorRuntimeConfig";
+import { loginEnabledAfterSeedReconciliation } from "./lib/staffLoginPolicy";
 
 const rawPort = process.env["PORT"];
 
@@ -20,59 +27,61 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-const RAW_SEED_AREAS = [
-  { name: "Level 4 - Row L-H",           terminal: "Terminal A - East", location: "East",         sortOrder: 1 },
-  { name: "Level 3 - Row H-P",           terminal: "Terminal A - East", location: "East",         sortOrder: 2 },
-  { name: "Level 2 - Row H-P",           terminal: "Terminal A - East", location: "East",         sortOrder: 3 },
-  { name: "Level 1 - Row H-P",           terminal: "Terminal A - East", location: "East",         sortOrder: 4 },
+const LEGACY_SEED_AREAS = [
+  { name: "P4 - Row L-H",                terminal: "Terminal A - East", location: "East",         sortOrder: 1 },
+  { name: "Terminal A — P3 Row H-P",     terminal: "Terminal A - East", location: "East",         sortOrder: 2 },
+  { name: "Terminal A — P2 Row H-P",     terminal: "Terminal A - East", location: "East",         sortOrder: 3 },
+  { name: "Terminal A — P1 Row H-P",     terminal: "Terminal A - East", location: "East",         sortOrder: 4 },
   { name: "R2 - Avis",                   terminal: "Terminal A - East", location: "East",         sortOrder: 5 },
   { name: "R1 - Avis",                   terminal: "Terminal A - East", location: "East",         sortOrder: 6 },
   { name: "Taxis",                       terminal: "Terminal A - East", location: "East",         sortOrder: 7 },
   { name: "Check point",                 terminal: "Terminal A - East", location: "East",         sortOrder: 8 },
   { name: "Garden",                      terminal: "Terminal A - East", location: "East",         sortOrder: 9 },
-  { name: "Level 4 - Row C-G",           terminal: "Terminal A - West", location: "West",         sortOrder: 10 },
-  { name: "Level 3 - Row A-G",           terminal: "Terminal A - West", location: "West",         sortOrder: 11 },
-  { name: "Level 2 - Row A-G",           terminal: "Terminal A - West", location: "West",         sortOrder: 12 },
-  { name: "Level 1 - Row D-G",           terminal: "Terminal A - West", location: "West",         sortOrder: 13 },
-  { name: "R1 - Enterprises",            terminal: "Terminal A - West", location: "West",         sortOrder: 14 },
-  { name: "R1 - Hertz",                  terminal: "Terminal A - West", location: "West",         sortOrder: 15 },
-  { name: "Level 4 - Row C-G",                                terminal: "Terminal B - East", location: "East",         sortOrder: 16 },
-  { name: "Level 3 - Row A-G",                                terminal: "Terminal B - East", location: "East",         sortOrder: 17 },
-  { name: "Level 2 - Row A-G",                                terminal: "Terminal B - East", location: "East",         sortOrder: 18 },
-  { name: "Level 1 - Row D-G",                                terminal: "Terminal B - East", location: "East",         sortOrder: 19 },
+  { name: "Terminal A — P2 Row A-G",     terminal: "Terminal A - West", location: "West",         sortOrder: 12 },
+  { name: "Terminal A — P2 West",        terminal: "Terminal A - West", location: "West",         sortOrder: 13 },
+  { name: "Terminal A — P1 Row D-G",     terminal: "Terminal A - West", location: "West",         sortOrder: 14 },
+  { name: "Terminal A — P1 West",        terminal: "Terminal A - West", location: "West",         sortOrder: 15 },
+  { name: "R1 - Enterprises",            terminal: "Terminal A - West", location: "West",         sortOrder: 16 },
+  { name: "R1 - Hertz",                  terminal: "Terminal A - West", location: "West",         sortOrder: 17 },
+  { name: "Terminal B — P4 Row C-G",                           terminal: "Terminal B - East", location: "East",         sortOrder: 16 },
+  { name: "Terminal B — P3 Row A-G",                           terminal: "Terminal B - East", location: "East",         sortOrder: 17 },
+  { name: "Terminal B — P2 Row A-G",                           terminal: "Terminal B - East", location: "East",         sortOrder: 18 },
+  { name: "Terminal B — P1 Row D-G",                           terminal: "Terminal B - East", location: "East",         sortOrder: 19 },
   { name: "R2 - Avis",                                        terminal: "Terminal B - East", location: "East",         sortOrder: 20 },
   { name: "R1 - Hertz/Enterprise Return",                     terminal: "Terminal B - East", location: "East",         sortOrder: 21 },
-  { name: "Level 4 - Row H-M",                                terminal: "Terminal B - West", location: "West",         sortOrder: 22 },
-  { name: "Level 3 - Row H-P",                                terminal: "Terminal B - West", location: "West",         sortOrder: 23 },
-  { name: "Level 2 - Row H-P",                                terminal: "Terminal B - West", location: "West",         sortOrder: 24 },
-  { name: "Level 1 - Row H-P",                                terminal: "Terminal B - West", location: "West",         sortOrder: 25 },
+  { name: "P4 - Row H-M",                                     terminal: "Terminal B - West", location: "West",         sortOrder: 22 },
+  { name: "Terminal B — P3 Row H-P",                           terminal: "Terminal B - West", location: "West",         sortOrder: 23 },
+  { name: "Terminal B — P2 Row H-P",                           terminal: "Terminal B - West", location: "West",         sortOrder: 24 },
+  { name: "Terminal B — P1 Row H-P",                           terminal: "Terminal B - West", location: "West",         sortOrder: 25 },
   { name: "R2 - Hertz",                                       terminal: "Terminal B - West", location: "West",         sortOrder: 26 },
   { name: "R1 - Aloma/Enterprise Pick up",                    terminal: "Terminal B - West", location: "West",         sortOrder: 27 },
   { name: "Taxis",                                            terminal: "Terminal B - West", location: "West",         sortOrder: 28 },
   { name: "Garden",                                           terminal: "Terminal B - West", location: "West",         sortOrder: 29 },
   { name: "Terminal C - Levels 1, 3, 5", terminal: "Terminal C", location: "Levels 1, 3, 5", sortOrder: 30 },
-  { name: "Terminal C - Levels 2, 4, 6", terminal: "Terminal C", location: "Levels 2, 4, 6", sortOrder: 31 },
-  { name: "Level 6 - C6 C59-C69",                             terminal: "Terminal C", location: "Level 6", sortOrder: 32 },
-  { name: "Level 5 - C5 C59-C69",                             terminal: "Terminal C", location: "Level 5", sortOrder: 33 },
-  { name: "Level 5 - Pedestrian Crossing",                    terminal: "Terminal C", location: "Level 5", sortOrder: 34 },
-  { name: "Level 4 - C4 C59-C69",                             terminal: "Terminal C", location: "Level 4", sortOrder: 35 },
-  { name: "Level 4 - Driveway",                               terminal: "Terminal C", location: "Level 4", sortOrder: 36 },
-  { name: "Level 3 - C3 C59-C69",                             terminal: "Terminal C", location: "Level 3", sortOrder: 37 },
-  { name: "Level 3 - Driveway/Pedestrian Walkway to trains",  terminal: "Terminal C", location: "Level 3", sortOrder: 38 },
-  { name: "Level 3 - Pedestrian Walkway",                     terminal: "Terminal C", location: "Level 3", sortOrder: 39 },
+  { name: "Level 1 - C1 Enterprise Return",                   terminal: "Terminal C", location: "Level 1", sortOrder: 31 },
+  { name: "Level 1 - Sixt Return/Pick up",                    terminal: "Terminal C", location: "Level 1", sortOrder: 32 },
+  { name: "Level 1 - Pedestrian Walkway",                     terminal: "Terminal C", location: "Level 1", sortOrder: 33 },
+  { name: "Level 3 - C3 C59-C69",                             terminal: "Terminal C", location: "Level 3", sortOrder: 34 },
+  { name: "Level 3 - Driveway/Pedestrian Walkway to trains",  terminal: "Terminal C", location: "Level 3", sortOrder: 35 },
+  { name: "Level 3 - Pedestrian Walkway",                     terminal: "Terminal C", location: "Level 3", sortOrder: 36 },
+  { name: "Level 5 - C5 C59-C69",                             terminal: "Terminal C", location: "Level 5", sortOrder: 37 },
+  { name: "Level 5 - Pedestrian Crossing",                    terminal: "Terminal C", location: "Level 5", sortOrder: 38 },
+  { name: "Terminal C - Levels 2, 4, 6", terminal: "Terminal C", location: "Levels 2, 4, 6", sortOrder: 39 },
   { name: "Level 2 - C2 Avis",                                terminal: "Terminal C", location: "Level 2", sortOrder: 40 },
   { name: "Level 2 - Pick up/Return Hertz, Return Hertz Pick up", terminal: "Terminal C", location: "Level 2", sortOrder: 41 },
   { name: "Level 2 - Pedestrian Walkway",                     terminal: "Terminal C", location: "Level 2", sortOrder: 42 },
-  { name: "Level 1 - C1 Enterprise Return",                   terminal: "Terminal C", location: "Level 1", sortOrder: 43 },
-  { name: "Level 1 - Sixt Return/Pick up",                    terminal: "Terminal C", location: "Level 1", sortOrder: 44 },
-  { name: "Level 1 - Pedestrian Walkway",                     terminal: "Terminal C", location: "Level 1", sortOrder: 45 },
-  { name: "Top Terminal - Levels 4-11",  terminal: "Top Terminal", location: "Levels 4-11", sortOrder: 46 },
+  { name: "Level 4 - C4 C59-C69",                             terminal: "Terminal C", location: "Level 4", sortOrder: 43 },
+  { name: "Level 4 - Driveway",                               terminal: "Terminal C", location: "Level 4", sortOrder: 44 },
+  { name: "Level 6 - C6 C59-C69",                             terminal: "Terminal C", location: "Level 6", sortOrder: 45 },
+  { name: "Top Terminal — Level 4",  terminal: "Top Terminal", location: "Level 4", sortOrder: 46 },
+  { name: "Top Terminal — Level 5",  terminal: "Top Terminal", location: "Level 5", sortOrder: 47 },
+  { name: "Top Terminal — Level 6",  terminal: "Top Terminal", location: "Level 6", sortOrder: 48 },
+  { name: "Top Terminal — Level 7",  terminal: "Top Terminal", location: "Level 7", sortOrder: 49 },
+  { name: "Top Terminal — Level 8",  terminal: "Top Terminal", location: "Level 8", sortOrder: 50 },
+  { name: "Top Terminal — Level 9",  terminal: "Top Terminal", location: "Level 9", sortOrder: 51 },
+  { name: "Top Terminal — Level 10", terminal: "Top Terminal", location: "Level 10", sortOrder: 52 },
+  { name: "Top Terminal — Level 11", terminal: "Top Terminal", location: "Level 11", sortOrder: 53 },
 ];
-
-const SEED_AREAS = RAW_SEED_AREAS.map((a) => ({
-  ...a,
-  name: renameSharedAreaName(a.name, a.terminal),
-}));
 
 const SEED_TASK_TYPES = [
   { taskName: "Routine sweep of all levels — remove debris, trash, and litter", taskOrder: 1 },
@@ -90,6 +99,16 @@ const SEED_TASK_TYPES = [
   { taskName: "Clean/remove cigarette butts in terminal", taskOrder: 13 },
 ];
 
+const LEGACY_STAFF_RENAMES = [
+  {
+    oldName: "Reynaldo Hernandez Suarez",
+    oldEmail: "Cnuevo986@gmail.co",
+    name: "Reynaldo Hernandez",
+    role: "supervisor" as const,
+    email: "cnuevo986@gmail.com",
+  },
+];
+
 
 
 async function seed() {
@@ -98,6 +117,8 @@ async function seed() {
   await db.execute(
     sql`ALTER TABLE "areas" ADD COLUMN IF NOT EXISTS "archived" boolean NOT NULL DEFAULT false`
   );
+  await db.execute(sql`ALTER TABLE "areas" ADD COLUMN IF NOT EXISTS "coverage" text`);
+  await db.execute(sql`ALTER TABLE "areas" ADD COLUMN IF NOT EXISTS "additional_coverage" text`);
 
   // Startup-safe DDL guard for the in-app messaging tables. Idempotent.
   await db.execute(sql`
@@ -157,23 +178,35 @@ async function seed() {
   // no PIN hashes linger in any environment (dev or production).
   await db.execute(sql`ALTER TABLE "staff" DROP COLUMN IF EXISTS "password"`);
 
-  // Email is the join key between Clerk accounts and staff records, so it
-  // must be unambiguous among active staff. Clear duplicate emails first
-  // (keep the lowest id; the others are flagged as "no email" in the admin
-  // Staff page), then enforce case-insensitive uniqueness going forward.
-  await db.execute(sql`
-    UPDATE "staff" s SET "email" = NULL
-    WHERE s."active" = true AND s."email" IS NOT NULL
-      AND EXISTS (
-        SELECT 1 FROM "staff" o
-        WHERE o."active" = true AND o."email" IS NOT NULL
-          AND lower(o."email") = lower(s."email") AND o."id" < s."id"
-      )
-  `);
-  await db.execute(sql`
-    CREATE UNIQUE INDEX IF NOT EXISTS "staff_email_active_unique"
-      ON "staff" (lower("email")) WHERE "email" IS NOT NULL AND "active" = true
-  `);
+  // Preserve existing staff history when a seeded management profile is
+  // corrected after it has already been inserted in an environment.
+  for (const legacy of LEGACY_STAFF_RENAMES) {
+    const [canonical] = await db
+      .select({ id: staffTable.id })
+      .from(staffTable)
+      .where(eq(staffTable.name, legacy.name))
+      .limit(1);
+    if (canonical) continue;
+
+    const [existing] = await db
+      .select({ id: staffTable.id })
+      .from(staffTable)
+      .where(or(eq(staffTable.name, legacy.oldName), eq(staffTable.email, legacy.oldEmail)))
+      .limit(1);
+    if (!existing) continue;
+
+    await db
+      .update(staffTable)
+      .set({
+        name: legacy.name,
+        role: legacy.role,
+        email: legacy.email,
+        active: true,
+        loginEnabled: isSeedLoginEnabled({ ...legacy }),
+      })
+      .where(eq(staffTable.id, existing.id));
+    console.log(`Updated legacy staff profile "${legacy.oldName}" → "${legacy.name}"`);
+  }
 
   const seedNames = new Set(SEED_STAFF.map((s) => s.name));
   const existingStaff = await db.select().from(staffTable);
@@ -188,6 +221,7 @@ async function seed() {
         phone: s.phone ?? null,
         email: s.email ?? null,
         active: true,
+        loginEnabled: isSeedLoginEnabled(s),
       }))
     );
     console.log(`Seeded: ${toInsert.length} staff members (${toInsert.map((s) => s.name).join(", ")})`);
@@ -195,12 +229,9 @@ async function seed() {
 
   const removedStaff = existingStaff.filter((s) => REMOVED_STAFF_NAMES.includes(s.name));
   if (removedStaff.length > 0) {
-    const removedIds = removedStaff.map((s) => s.id);
-    await db.delete(notificationsTable).where(inArray(notificationsTable.staffId, removedIds));
-    await db.delete(staffLocationsTable).where(inArray(staffLocationsTable.staffId, removedIds));
     for (const s of removedStaff) {
-      if (s.active) {
-        await db.update(staffTable).set({ active: false }).where(eq(staffTable.id, s.id));
+      if (s.active || s.loginEnabled) {
+          await db.update(staffTable).set({ active: false, loginEnabled: false, formerEmployee: true }).where(eq(staffTable.id, s.id));
         console.log(`Marked ex-staff inactive: ${s.name}`);
       }
     }
@@ -239,7 +270,7 @@ async function seed() {
         await tx.update(assignmentsTable).set({ staffId: survivor.id }).where(eq(assignmentsTable.staffId, loser.id));
         await tx.update(assignmentsTable).set({ assignedById: survivor.id }).where(eq(assignmentsTable.assignedById, loser.id));
         await tx.update(notificationsTable).set({ staffId: survivor.id }).where(eq(notificationsTable.staffId, loser.id));
-        await tx.delete(staffTable).where(eq(staffTable.id, loser.id));
+        await tx.update(staffTable).set({ active: false, loginEnabled: false }).where(eq(staffTable.id, loser.id));
         console.log(`Merged duplicate ${survivor.role} "${survivor.name}": kept id=${survivor.id}, merged from id=${loser.id}`);
       }
 
@@ -360,7 +391,7 @@ async function seed() {
       await tx.update(assignmentsTable).set({ assignedById: canonical.id }).where(eq(assignmentsTable.assignedById, typoRow.id));
       await tx.update(notificationsTable).set({ staffId: canonical.id }).where(eq(notificationsTable.staffId, typoRow.id));
       await tx.update(messagesTable).set({ senderId: canonical.id }).where(eq(messagesTable.senderId, typoRow.id));
-      await tx.delete(staffTable).where(eq(staffTable.id, typoRow.id));
+      await tx.update(staffTable).set({ active: false, loginEnabled: false }).where(eq(staffTable.id, typoRow.id));
       console.log(`Merged typo staff record "${typoRow.name}" into "${canonical.name}"`);
     }
   });
@@ -398,7 +429,26 @@ async function seed() {
       await db.update(staffTable).set({ email: seedEntry.email }).where(eq(staffTable.id, existing.id));
       console.log(`Updated ${existing.name}: email`);
     }
+    // Only named seed identities receive seed login safety policy. Arbitrary
+    // legacy rows remain unchanged, while inactive/former seed rows stay off.
+    if (seedEntry && seedEntry.name === existing.name) {
+      const loginEnabled = loginEnabledAfterSeedReconciliation({
+        active: existing.active,
+        loginEnabled: existing.loginEnabled,
+        formerEmployee: existing.formerEmployee,
+        seedLoginEnabled: seedEntry.loginEnabled,
+      });
+      if (existing.loginEnabled !== loginEnabled) {
+        await db.update(staffTable).set({ loginEnabled }).where(eq(staffTable.id, existing.id));
+      }
+    }
   }
+
+  // Run after every reconciliation pass (including legacy renames) so former
+  // employees can never be revived by a default-true backfill.  History and
+  // foreign-key rows are deliberately retained.
+  await db.update(staffTable).set({ active: false, loginEnabled: false, formerEmployee: true })
+    .where(inArray(staffTable.name, REMOVED_STAFF_NAMES));
 
   // Run the rename + merge + archive cleanup in a single transaction so
   // either every reference is re-pointed and every duplicate cleared, or
@@ -475,6 +525,18 @@ async function seed() {
       await tx.update(schedulesTable).set({ areaId: toId }).where(eq(schedulesTable.areaId, fromRow.id));
       await tx.update(issuesTable).set({ areaId: toId }).where(eq(issuesTable.areaId, fromRow.id));
       await tx.update(sharedPhotosTable).set({ areaId: toId }).where(eq(sharedPhotosTable.areaId, fromRow.id));
+      await tx.update(objectUploadsTable).set({ areaId: toId }).where(eq(objectUploadsTable.areaId, fromRow.id));
+      const exclusions = await tx
+        .select({ taskName: taskExclusionsTable.taskName, createdById: taskExclusionsTable.createdById })
+        .from(taskExclusionsTable)
+        .where(eq(taskExclusionsTable.areaId, fromRow.id));
+      if (exclusions.length > 0) {
+        await tx
+          .insert(taskExclusionsTable)
+          .values(exclusions.map((entry) => ({ ...entry, areaId: toId })))
+          .onConflictDoNothing();
+        await tx.delete(taskExclusionsTable).where(eq(taskExclusionsTable.areaId, fromRow.id));
+      }
       await tx.delete(areasTable).where(eq(areasTable.id, fromRow.id));
       console.log(`Merged area #${fromRow.id} (${from.name} / ${from.terminal}) → #${toId} (${to.name} / ${to.terminal})`);
     }
@@ -489,6 +551,11 @@ async function seed() {
     { name: "Terminal A - West Garage", terminal: "Terminal A - West" },
     { name: "Terminal B - East Garage", terminal: "Terminal B - East" },
     { name: "Terminal B - West Garage", terminal: "Terminal B - West" },
+    { name: "Level 4 - Row C-G", terminal: "Terminal A - West" },
+    { name: "Terminal A — Level 4 Row C-G", terminal: "Terminal A - West" },
+    { name: "Level 3 - Row A-G", terminal: "Terminal A - West" },
+    { name: "Terminal A — Level 3 Row A-G", terminal: "Terminal A - West" },
+    { name: "Top Terminal - Levels 4-11", terminal: "Top Terminal" },
   ];
   // Per-terminal parking-level archival exception list. Anything NOT in here
   // gets archived. Terminal A - West / Level P1 and Level P2 stay active (with
@@ -509,9 +576,9 @@ async function seed() {
       if (KEEP_ACTIVE_PARKING.has(`${terminal}||${lvl}`)) continue;
       // Pre-rename form, e.g. "Level P1 - East".
       OBSOLETE_AREA_TARGETS.push({ name: `Level ${lvl} - ${side}`, terminal });
-      // Post-rename form, e.g. "Terminal A — Level P1 East".
+      // Post-rename form, e.g. "Terminal A — P1 East".
       const short = terminal.startsWith("Terminal A") ? "Terminal A" : "Terminal B";
-      OBSOLETE_AREA_TARGETS.push({ name: `${short} — Level ${lvl} ${side}`, terminal });
+      OBSOLETE_AREA_TARGETS.push({ name: `${short} — ${lvl} ${side}`, terminal });
     }
   }
   for (const target of OBSOLETE_AREA_TARGETS) {
@@ -533,8 +600,10 @@ async function seed() {
   const REACTIVATE_AREA_TARGETS: Array<{ name: string; terminal: string }> = [
     { name: "Level P1 - West", terminal: "Terminal A - West" },
     { name: "Terminal A — Level P1 West", terminal: "Terminal A - West" },
+    { name: "Terminal A — P1 West", terminal: "Terminal A - West" },
     { name: "Level P2 - West", terminal: "Terminal A - West" },
     { name: "Terminal A — Level P2 West", terminal: "Terminal A - West" },
+    { name: "Terminal A — P2 West", terminal: "Terminal A - West" },
   ];
   for (const target of REACTIVATE_AREA_TARGETS) {
     const matches = await tx
@@ -549,38 +618,74 @@ async function seed() {
     }
   }
 
-  const existingAreas = await tx.select({ id: areasTable.id, name: areasTable.name, terminal: areasTable.terminal, sortOrder: areasTable.sortOrder }).from(areasTable);
-  const areaKey = (name: string, terminal: string) => `${name}||${terminal}`;
-  const existingAreaKeys = new Map(existingAreas.map((a) => [areaKey(a.name, a.terminal), a]));
+  // Reconcile every workbook-defined area in place. A legacy row becomes the
+  // canonical row whenever possible so historical references retain their id;
+  // any same-area duplicates are merged into it before deletion.
+  for (const catalogArea of MCO_TERMINAL_AREAS) {
+    const candidateNames = [catalogArea.name, ...catalogArea.legacyNames];
+    const candidates = await tx
+      .select({ id: areasTable.id, name: areasTable.name })
+      .from(areasTable)
+      .where(and(eq(areasTable.terminal, catalogArea.terminal), inArray(areasTable.name, candidateNames)));
 
-  for (const area of existingAreas) {
-    const seedArea = SEED_AREAS.find((a) => a.name === area.name && a.terminal === area.terminal);
-    if (seedArea && seedArea.sortOrder !== area.sortOrder) {
-      await tx.update(areasTable).set({ sortOrder: seedArea.sortOrder }).where(eq(areasTable.id, area.id));
-      console.log(`Updated area ${area.name} (${area.terminal}): sortOrder → ${seedArea.sortOrder}`);
+    let canonical = candidates.find((row) => row.name === catalogArea.name) ?? candidates[0];
+    const values = {
+      name: catalogArea.name,
+      terminal: catalogArea.terminal,
+      location: catalogArea.location,
+      coverage: catalogArea.coverage,
+      additionalCoverage: catalogArea.additionalCoverage,
+      sortOrder: catalogArea.sortOrder,
+      archived: false,
+    };
+
+    if (!canonical) {
+      [canonical] = await tx.insert(areasTable).values(values).returning({ id: areasTable.id, name: areasTable.name });
+      console.log(`Added workbook area ${catalogArea.name} (${catalogArea.terminal})`);
+    } else {
+      await tx.update(areasTable).set(values).where(eq(areasTable.id, canonical.id));
     }
-  }
 
-  for (const area of existingAreas) {
-    const matchByName = SEED_AREAS.find((a) => a.name === area.name);
-    if (matchByName && matchByName.terminal !== area.terminal) {
-      const newKey = areaKey(area.name, matchByName.terminal);
-      if (!existingAreaKeys.has(newKey)) {
-        await tx.update(areasTable).set({ terminal: matchByName.terminal, sortOrder: matchByName.sortOrder }).where(eq(areasTable.id, area.id));
-        existingAreaKeys.set(newKey, area);
-        existingAreaKeys.delete(areaKey(area.name, area.terminal));
-        console.log(`Updated area ${area.name}: terminal ${area.terminal} → ${matchByName.terminal}`);
+    for (const duplicate of candidates) {
+      if (duplicate.id === canonical.id) continue;
+
+      await tx.update(tasksTable).set({ areaId: canonical.id }).where(eq(tasksTable.areaId, duplicate.id));
+      await tx.update(assignmentsTable).set({ areaId: canonical.id }).where(eq(assignmentsTable.areaId, duplicate.id));
+      await tx.update(schedulesTable).set({ areaId: canonical.id }).where(eq(schedulesTable.areaId, duplicate.id));
+      await tx.update(issuesTable).set({ areaId: canonical.id }).where(eq(issuesTable.areaId, duplicate.id));
+      await tx.update(sharedPhotosTable).set({ areaId: canonical.id }).where(eq(sharedPhotosTable.areaId, duplicate.id));
+      await tx.update(objectUploadsTable).set({ areaId: canonical.id }).where(eq(objectUploadsTable.areaId, duplicate.id));
+
+      const exclusions = await tx
+        .select({ taskName: taskExclusionsTable.taskName, createdById: taskExclusionsTable.createdById })
+        .from(taskExclusionsTable)
+        .where(eq(taskExclusionsTable.areaId, duplicate.id));
+      if (exclusions.length > 0) {
+        await tx
+          .insert(taskExclusionsTable)
+          .values(exclusions.map((entry) => ({ ...entry, areaId: canonical.id })))
+          .onConflictDoNothing();
+        await tx.delete(taskExclusionsTable).where(eq(taskExclusionsTable.areaId, duplicate.id));
       }
+
+      await tx.delete(areasTable).where(eq(areasTable.id, duplicate.id));
+      console.log(`Merged legacy area #${duplicate.id} into #${canonical.id} ${catalogArea.name} (${catalogArea.terminal})`);
     }
   }
 
-  const newAreas = SEED_AREAS.filter((a) => !existingAreaKeys.has(areaKey(a.name, a.terminal)));
-  if (existingAreas.length === 0) {
-    await tx.insert(areasTable).values(SEED_AREAS);
-    console.log(`Seeded: ${SEED_AREAS.length} areas`);
-  } else if (newAreas.length > 0) {
-    await tx.insert(areasTable).values(newAreas);
-    console.log(`Added areas: ${newAreas.map((a) => `${a.name} (${a.terminal})`).join(", ")}`);
+  // Group headers and garage summary rows are no longer operational areas in
+  // the workbook. Archive them so historical records remain queryable.
+  for (const deprecated of DEPRECATED_MCO_AREA_IDENTITIES) {
+    await tx
+      .update(areasTable)
+      .set({ archived: true })
+      .where(and(eq(areasTable.name, deprecated.name), eq(areasTable.terminal, deprecated.terminal)));
+  }
+  for (const legacy of LEGACY_SEED_AREAS) {
+    await tx
+      .update(areasTable)
+      .set({ archived: true })
+      .where(and(eq(areasTable.name, legacy.name), eq(areasTable.terminal, legacy.terminal)));
   }
   });
 
@@ -597,12 +702,12 @@ async function seed() {
   // Names are queried in their renamed form (post AREA_RENAME_MAP migration).
   const STRAY_LUNCH_BIN_AREAS: Array<{ name: string; terminal: string; label: string }> = [
     {
-      name: renameSharedAreaName("Level R1 - West", "Terminal B - West"),
+      name: "R1",
       terminal: "Terminal B - West",
       label: "R1-West bin tasks from Terminal B - West",
     },
     {
-      name: renameSharedAreaName("Level R2 - East", "Terminal B - East"),
+      name: "R2",
       terminal: "Terminal B - East",
       label: "R2-East bin tasks from Terminal B - East",
     },
@@ -634,7 +739,7 @@ async function seed() {
     }
   }
 
-  // Trim Terminal A - West / Level P1 West down to bins #1–#4. Any previously
+  // Trim Terminal A - West / Level 1 down to bins #1–#4. Any previously
   // generated "Clean trash bin #5" … "#11" rows for this area on any date are
   // removed (only the un-completed ones, to preserve historical completion
   // records the same way exclusions do for today's sheet).
@@ -652,7 +757,7 @@ async function seed() {
     .from(areasTable)
     .where(
       and(
-        eq(areasTable.name, renameSharedAreaName("Level P1 - West", "Terminal A - West")),
+        eq(areasTable.name, "Level 1"),
         eq(areasTable.terminal, "Terminal A - West"),
       ),
     );
@@ -672,8 +777,8 @@ async function seed() {
     }
   }
 
-  // Remove the 13 default task-type rows from areas whose area-specific bin
-  // list fully replaces the defaults (Check point, Taxis on Terminal B-West).
+  // Remove default task-type rows from areas whose area-specific list fully
+  // replaces the defaults.
   // Only un-completed rows are removed so historical completion records on
   // these areas stay intact.
   const DEFAULT_TASK_NAMES = SEED_TASK_TYPES.map((t) => t.taskName);
@@ -685,6 +790,13 @@ async function seed() {
     if (sep === -1) continue;
     const terminal = qualifiedKey.slice(0, sep);
     const name = qualifiedKey.slice(sep + 2);
+    const replacementTaskNames = new Set(
+      (AREA_SPECIFIC_TASKS[qualifiedKey] ?? []).map((task) => task.taskName),
+    );
+    const defaultsToRemove = DEFAULT_TASK_NAMES.filter(
+      (taskName) => !replacementTaskNames.has(taskName),
+    );
+    if (defaultsToRemove.length === 0) continue;
     const matches = await db
       .select({ id: areasTable.id })
       .from(areasTable)
@@ -696,7 +808,7 @@ async function seed() {
           and(
             eq(tasksTable.areaId, area.id),
             eq(tasksTable.completed, false),
-            inArray(tasksTable.taskName, DEFAULT_TASK_NAMES),
+            inArray(tasksTable.taskName, defaultsToRemove),
           ),
         )
         .returning({ id: tasksTable.id });
@@ -707,7 +819,24 @@ async function seed() {
   }
 }
 
-app.listen(port, async () => {
+async function start() {
+  await applyOperationsMigration();
+  app.listen(port, async () => {
   console.log(`Server listening on port ${port}`);
   await seed().catch((err) => console.error("Seed error:", err));
-});
+  void generatePreviousMonthlyReport().catch(() => console.error("Monthly operations report could not be generated"));
+  setInterval(() => void generatePreviousMonthlyReport().catch(() => console.error("Monthly operations report could not be generated")), 60 * 60 * 1000).unref();
+  const inspectorConfig = inspectorRuntimeConfig();
+  // A lock-protected sweep is safe to run on every instance; deployments
+  // should additionally invoke it from their scheduler for sleep resilience.
+  setInterval(
+    () => void sweepOverdueInspectorAssignments().catch(() => undefined),
+    inspectorConfig.escalationPollMs,
+  ).unref();
+  setInterval(
+    () => void drainOutbox().catch(() => undefined),
+    inspectorConfig.outboxPollMs,
+  ).unref();
+  });
+}
+void start().catch(error => { console.error("Operations migration failed; server was not started", error); process.exitCode = 1; });

@@ -65,7 +65,7 @@ router.get("/dashboard", async (req, res) => {
   }
 
   const areaProgress = areas.map((area) => {
-    const stats = statsMap.get(area.id) ?? { total: 15, completed: 0 };
+    const stats = statsMap.get(area.id) ?? { total: 0, completed: 0 };
     return {
       areaId: area.id,
       areaName: area.name,

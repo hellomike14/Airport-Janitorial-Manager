@@ -11,5 +11,7 @@ export interface CleaningArea {
   name: string;
   terminal: string;
   location: string;
+  coverage: string;
+  additionalCoverage: string | null;
   sortOrder: number;
 }

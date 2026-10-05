@@ -23,10 +23,28 @@ export const ListStaffResponseItem = zod.object({
   role: zod.enum(["staff", "supervisor", "admin", "inspector"]),
   hasEmail: zod
     .boolean()
+    .describe("Whether the staff member has a configured sign-in email."),
+  email: zod
+    .string()
+    .nullish()
     .describe(
-      "Whether the staff member has a configured sign-in email. The email address itself is never returned.",
+      "Saved email, returned in the staff directory only to administrators and supervisors.",
+    ),
+  phone: zod
+    .string()
+    .nullish()
+    .describe(
+      "Saved phone number, returned in the staff directory only to administrators and supervisors.",
     ),
   active: zod.boolean(),
+  loginEnabled: zod
+    .boolean()
+    .describe("Whether this staff member is currently eligible to sign in."),
+  formerEmployee: zod
+    .boolean()
+    .describe(
+      "Whether this retained historical record belongs to a former employee.",
+    ),
   createdAt: zod.string(),
 });
 export const ListStaffResponse = zod.array(ListStaffResponseItem);
@@ -39,6 +57,40 @@ export const CreateStaffMemberBody = zod.object({
   role: zod.enum(["staff", "supervisor", "admin", "inspector"]),
   phone: zod.string().nullish(),
   email: zod.string().nullish(),
+});
+
+/**
+ * @summary Resolve the authenticated session to a staff member
+ */
+export const GetCurrentStaffMemberResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  role: zod.enum(["staff", "supervisor", "admin", "inspector"]),
+  hasEmail: zod
+    .boolean()
+    .describe("Whether the staff member has a configured sign-in email."),
+  email: zod
+    .string()
+    .nullish()
+    .describe(
+      "Saved email, returned in the staff directory only to administrators and supervisors.",
+    ),
+  phone: zod
+    .string()
+    .nullish()
+    .describe(
+      "Saved phone number, returned in the staff directory only to administrators and supervisors.",
+    ),
+  active: zod.boolean(),
+  loginEnabled: zod
+    .boolean()
+    .describe("Whether this staff member is currently eligible to sign in."),
+  formerEmployee: zod
+    .boolean()
+    .describe(
+      "Whether this retained historical record belongs to a former employee.",
+    ),
+  createdAt: zod.string(),
 });
 
 /**
@@ -62,10 +114,28 @@ export const UpdateStaffMemberResponse = zod.object({
   role: zod.enum(["staff", "supervisor", "admin", "inspector"]),
   hasEmail: zod
     .boolean()
+    .describe("Whether the staff member has a configured sign-in email."),
+  email: zod
+    .string()
+    .nullish()
     .describe(
-      "Whether the staff member has a configured sign-in email. The email address itself is never returned.",
+      "Saved email, returned in the staff directory only to administrators and supervisors.",
+    ),
+  phone: zod
+    .string()
+    .nullish()
+    .describe(
+      "Saved phone number, returned in the staff directory only to administrators and supervisors.",
     ),
   active: zod.boolean(),
+  loginEnabled: zod
+    .boolean()
+    .describe("Whether this staff member is currently eligible to sign in."),
+  formerEmployee: zod
+    .boolean()
+    .describe(
+      "Whether this retained historical record belongs to a former employee.",
+    ),
   createdAt: zod.string(),
 });
 
@@ -88,6 +158,8 @@ export const ListAreasResponseItem = zod.object({
   name: zod.string(),
   terminal: zod.string(),
   location: zod.string(),
+  coverage: zod.string(),
+  additionalCoverage: zod.string().nullable(),
   sortOrder: zod.number(),
 });
 export const ListAreasResponse = zod.array(ListAreasResponseItem);
@@ -146,6 +218,14 @@ export const ListTasksQueryParams = zod.object({
 });
 
 export const ListTasksResponseItem = zod.object({
+  photoRequired: zod
+    .boolean()
+    .optional()
+    .describe(
+      "An after photo must be attached before this task can be completed.",
+    ),
+  beforeImagePath: zod.string().nullish(),
+  afterImagePath: zod.string().nullish(),
   id: zod.number(),
   areaId: zod.number(),
   taskDate: zod.string(),
@@ -168,6 +248,12 @@ export const ListTasksResponseItem = zod.object({
     .nullish()
     .describe(
       "Whether the assigned staff member is still active. Null when no one is assigned.",
+    ),
+  inspectorWorkflowTaskId: zod
+    .number()
+    .nullable()
+    .describe(
+      "Inspector workflow link when this task originated from an inspector reply.",
     ),
   isSpecial: zod.boolean(),
   notes: zod.string().nullish(),
@@ -235,6 +321,14 @@ export const CompleteTaskBody = zod.object({
 });
 
 export const CompleteTaskResponse = zod.object({
+  photoRequired: zod
+    .boolean()
+    .optional()
+    .describe(
+      "An after photo must be attached before this task can be completed.",
+    ),
+  beforeImagePath: zod.string().nullish(),
+  afterImagePath: zod.string().nullish(),
   id: zod.number(),
   areaId: zod.number(),
   taskDate: zod.string(),
@@ -257,6 +351,12 @@ export const CompleteTaskResponse = zod.object({
     .nullish()
     .describe(
       "Whether the assigned staff member is still active. Null when no one is assigned.",
+    ),
+  inspectorWorkflowTaskId: zod
+    .number()
+    .nullable()
+    .describe(
+      "Inspector workflow link when this task originated from an inspector reply.",
     ),
   isSpecial: zod.boolean(),
   notes: zod.string().nullish(),
@@ -270,6 +370,14 @@ export const UncompleteTaskParams = zod.object({
 });
 
 export const UncompleteTaskResponse = zod.object({
+  photoRequired: zod
+    .boolean()
+    .optional()
+    .describe(
+      "An after photo must be attached before this task can be completed.",
+    ),
+  beforeImagePath: zod.string().nullish(),
+  afterImagePath: zod.string().nullish(),
   id: zod.number(),
   areaId: zod.number(),
   taskDate: zod.string(),
@@ -292,6 +400,12 @@ export const UncompleteTaskResponse = zod.object({
     .nullish()
     .describe(
       "Whether the assigned staff member is still active. Null when no one is assigned.",
+    ),
+  inspectorWorkflowTaskId: zod
+    .number()
+    .nullable()
+    .describe(
+      "Inspector workflow link when this task originated from an inspector reply.",
     ),
   isSpecial: zod.boolean(),
   notes: zod.string().nullish(),
@@ -324,6 +438,7 @@ export const ListAssignmentsResponseItem = zod.object({
   staffName: zod.string(),
   areaId: zod.number(),
   areaName: zod.string(),
+  terminal: zod.string(),
   assignmentDate: zod.string(),
   assignedById: zod.number(),
   assignedByName: zod.string(),
@@ -546,6 +661,7 @@ export const CompleteIssueParams = zod.object({
 export const CompleteIssueBody = zod.object({
   completionNotes: zod.string().nullish(),
   completedById: zod.number(),
+  afterImagePath: zod.string().nullish(),
 });
 
 export const CompleteIssueResponse = zod.object({
@@ -755,6 +871,17 @@ export const ListConversationMessagesResponseItem = zod.object({
   senderName: zod.string(),
   body: zod.string(),
   isRead: zod.boolean(),
+  inspectorWorkflowTaskId: zod.number().nullable(),
+  inspectorEmailDeliveryStatus: zod.enum([
+    "pending",
+    "sending",
+    "retrying",
+    "accepted",
+    "disabled",
+    "not_configured",
+    "failed",
+    "not_applicable",
+  ]),
   createdAt: zod.string(),
 });
 export const ListConversationMessagesResponse = zod.array(
@@ -773,6 +900,7 @@ export const sendConversationMessageBodyBodyMax = 2000;
 export const SendConversationMessageBody = zod.object({
   senderId: zod.number(),
   body: zod.string().min(1).max(sendConversationMessageBodyBodyMax),
+  clientRequestId: zod.string().uuid(),
 });
 
 /**
@@ -798,11 +926,31 @@ export const RequestUploadUrlBody = zod.object({
   name: zod.string().min(1),
   size: zod.number().min(1),
   contentType: zod.string().min(1),
+  purpose: zod.enum([
+    "task_before",
+    "task_after",
+    "issue_before",
+    "issue_after",
+    "conversation_attachment",
+    "shared_photo",
+    "application_document",
+  ]),
+  taskId: zod.number().optional(),
+  conversationId: zod.number().optional(),
+  issueId: zod.number().optional(),
+  areaId: zod.number().optional(),
 });
 
 export const RequestUploadUrlResponse = zod.object({
   uploadURL: zod.string().url(),
   objectPath: zod.string(),
+  uploadToken: zod
+    .string()
+    .uuid()
+    .optional()
+    .describe(
+      "Applicant capability returned only for application_document uploads.",
+    ),
 });
 
 /**
@@ -885,11 +1033,17 @@ export const SubmitApplicationBody = zod.object({
   w4Employee: zod.record(zod.string(), zod.unknown()).optional(),
   documents: zod
     .array(
-      zod.object({
-        name: zod.string(),
-        path: zod.string(),
-        contentType: zod.string().optional(),
-      }),
+      zod
+        .object({
+          name: zod.string(),
+          path: zod.string(),
+          contentType: zod.string().optional(),
+        })
+        .and(
+          zod.object({
+            uploadToken: zod.string().uuid(),
+          }),
+        ),
     )
     .optional(),
 });
@@ -1124,4 +1278,164 @@ export const DisconnectQuickbooksResponse = zod.object({
   realmId: zod.string().nullish(),
   companyName: zod.string().nullish(),
   connectedAt: zod.string().nullish(),
+});
+
+/**
+ * @summary Archive or restore a conversation for the authenticated participant
+ */
+export const SetConversationArchiveParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const SetConversationArchiveBody = zod.object({
+  staffId: zod.number(),
+  archived: zod.boolean(),
+});
+
+export const SetConversationArchiveResponse = zod.object({
+  archived: zod.boolean(),
+});
+
+/**
+ * @summary Accept an authenticated inspector email reply
+ */
+export const receiveSendgridInspectorReplyBodyTextMax = 2000;
+
+export const ReceiveSendgridInspectorReplyBody = zod.object({
+  envelope: zod.object({
+    from: zod.string().email(),
+    to: zod.array(zod.string().email()),
+  }),
+  from: zod.string().email(),
+  text: zod.string().max(receiveSendgridInspectorReplyBodyTextMax),
+  headers: zod.string().optional(),
+  SPF: zod.string().optional(),
+  dkim: zod.string().optional(),
+});
+
+/**
+ * @summary Get authorized inspector assignment workflow state and audit history
+ */
+export const GetInspectorWorkflowParams = zod.object({
+  taskId: zod.coerce.number(),
+});
+
+export const getInspectorWorkflowResponseRemainingSecondsMin = 0;
+
+export const GetInspectorWorkflowResponse = zod.object({
+  source: zod.object({
+    conversationId: zod.number().optional(),
+    messageId: zod.number().optional(),
+  }),
+  task: zod.object({
+    id: zod.number(),
+    name: zod.string(),
+    completed: zod.boolean(),
+    completedAt: zod.date().nullable(),
+  }),
+  area: zod.object({
+    id: zod.number(),
+    name: zod.string(),
+  }),
+  assignedStaff: zod
+    .object({
+      id: zod.number(),
+      name: zod.string(),
+    })
+    .nullish(),
+  assignmentMethod: zod.enum(["fresh_gps", "area_roster_workload"]).optional(),
+  assignmentDistanceMeters: zod.number().nullish(),
+  dueAt: zod.date(),
+  remainingSeconds: zod
+    .number()
+    .min(getInspectorWorkflowResponseRemainingSecondsMin),
+  status: zod.enum(["assigned", "overdue", "escalated", "completed"]),
+  escalatedAt: zod.date().nullish(),
+  history: zod.array(
+    zod.object({
+      assignedStaffId: zod.number(),
+      assignedById: zod.number(),
+      event: zod.enum(["assigned", "reassigned"]),
+      method: zod.enum(["fresh_gps", "area_roster_workload"]),
+      distanceMeters: zod.number().nullable(),
+      provenance: zod.string(),
+      createdAt: zod.date(),
+    }),
+  ),
+  completionEmailDeliveryStatus: zod
+    .union([
+      zod.literal("pending"),
+      zod.literal("sending"),
+      zod.literal("retrying"),
+      zod.literal("accepted"),
+      zod.literal("disabled"),
+      zod.literal("not_configured"),
+      zod.literal("failed"),
+      zod.literal(null),
+    ])
+    .nullish(),
+});
+
+/**
+ * Accepts a limited set of diagnostic codes without requiring an authenticated session.
+ * @summary Report a limited authentication availability diagnostic
+ */
+export const ReportAuthDiagnosticEventBody = zod.object({
+  code: zod.enum(["AUTH_SERVICE_UNAVAILABLE", "STAFF_LOOKUP_TIMEOUT"]),
+});
+
+/**
+ * Available only to authenticated administrators.
+ * @summary Get authentication diagnostics and staff access audit history
+ */
+export const getAuthDiagnosticsResponseSummaryItemCountMin = 0;
+
+export const GetAuthDiagnosticsResponse = zod.object({
+  events: zod.array(
+    zod.object({
+      diagnosticId: zod.string(),
+      code: zod.enum([
+        "SESSION_EXPIRED",
+        "NO_STAFF_MATCH",
+        "STAFF_ACCESS_DISABLED",
+        "AUTH_SERVICE_UNAVAILABLE",
+        "STAFF_LOOKUP_TIMEOUT",
+      ]),
+      source: zod.enum(["server", "client"]),
+      createdAt: zod.date(),
+    }),
+  ),
+  summary: zod.array(
+    zod.object({
+      code: zod.enum([
+        "SESSION_EXPIRED",
+        "NO_STAFF_MATCH",
+        "STAFF_ACCESS_DISABLED",
+        "AUTH_SERVICE_UNAVAILABLE",
+        "STAFF_LOOKUP_TIMEOUT",
+      ]),
+      count: zod.number().min(getAuthDiagnosticsResponseSummaryItemCountMin),
+    }),
+  ),
+  accessChanges: zod.array(
+    zod.object({
+      id: zod.number(),
+      actorName: zod.string(),
+      staffName: zod.string(),
+      action: zod.enum(["CREATE", "UPDATE", "DELETE"]),
+      createdAt: zod.date(),
+      before: zod.object({
+        active: zod.boolean(),
+        loginEnabled: zod.boolean(),
+        formerEmployee: zod.boolean(),
+        hasEmail: zod.boolean(),
+      }),
+      after: zod.object({
+        active: zod.boolean(),
+        loginEnabled: zod.boolean(),
+        formerEmployee: zod.boolean(),
+        hasEmail: zod.boolean(),
+      }),
+    }),
+  ),
 });

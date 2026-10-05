@@ -1,11 +1,12 @@
 import React, { useState } from "react";
 import { useListStaff, useCreateStaffMember, useDeleteStaffMember, useUpdateStaffMember } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { UserPlus, Shield, User, Trash2, Lock, ArrowUpDown, LogOut, MailWarning, CheckCircle2 } from "lucide-react";
+import { UserPlus, Shield, User, Trash2, Lock, ArrowUpDown, LogOut, MailWarning, CheckCircle2, Mail, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/AuthContext";
+import { AccessHealthSection } from "@/components/AccessHealthSection";
 
 export default function Staff() {
   const { t } = useTranslation();
@@ -82,7 +83,10 @@ export default function Staff() {
   const admins = staff?.filter((s) => s.role === "admin") || [];
   const supervisors = staff?.filter((s) => s.role === "supervisor") || [];
   const regularStaff = staff?.filter((s) => s.role === "staff") || [];
-  const missingEmailCount = (staff ?? []).filter((s) => !s.hasEmail).length;
+  const loginDisabledCount = (staff ?? []).filter((person) => {
+    const access = person as typeof person & { loginEnabled?: boolean; formerEmployee?: boolean };
+    return access.active && access.formerEmployee !== true && (!access.hasEmail || access.loginEnabled !== true);
+  }).length;
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto pb-12">
@@ -103,17 +107,19 @@ export default function Staff() {
         )}
       </div>
 
-      {missingEmailCount > 0 && (
+      {effectiveRole === "admin" && <AccessHealthSection />}
+
+      {loginDisabledCount > 0 && (
         <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-4">
           <MailWarning className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
           <div className="text-sm text-amber-800">
             <p className="font-semibold">
-              {t("staff.missingEmailBanner", "{{count}} staff member(s) have no email on file and cannot sign in.", { count: missingEmailCount })}
+              {t("staff.missingEmailBanner", { count: loginDisabledCount })}
             </p>
             <p className="mt-1 text-amber-700">
               {t(
                 "staff.migrationHint",
-                "Staff sign in with their email account. Add an email to each profile below, then have the employee create their account with that same email on the sign-up page."
+                "An admin must edit and save each eligible active staff member's email to enable sign-in."
               )}
             </p>
           </div>
@@ -267,6 +273,8 @@ function StaffCard({ person, onDelete, onToggleRole, roleType, onLogout, onSetEm
   const style = ROLE_STYLES[roleType];
   const initials = person.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
   const hasEmail = Boolean(person.hasEmail);
+  const isEligibleForLogin = person.active === true && person.formerEmployee !== true;
+  const canLogIn = isEligibleForLogin && person.loginEnabled === true;
 
   return (
     <div className={`bg-white rounded-2xl p-5 border shadow-sm relative group overflow-hidden ${style.border}`}>
@@ -304,10 +312,47 @@ function StaffCard({ person, onDelete, onToggleRole, roleType, onLogout, onSetEm
         </div>
       </div>
       <div className="space-y-2 text-sm text-slate-500">
-        {hasEmail ? (
+        {person.email?.trim() && (
+          <div className="flex items-start gap-2" data-testid={`staff-email-${person.id}`}>
+            <Mail aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
+            <span className="min-w-0 break-all">{person.email}</span>
+          </div>
+        )}
+        {person.phone?.trim() && (
+          <div className="flex items-start gap-2" data-testid={`staff-phone-${person.id}`}>
+            <Phone aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
+            <span className="min-w-0 break-words">{person.phone}</span>
+          </div>
+        )}
+        {canLogIn ? (
           <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-600">
             <CheckCircle2 className="w-3.5 h-3.5" />
             {t("staff.canLogIn", "Can sign in with this email")}
+          </div>
+        ) : !isEligibleForLogin ? (
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 text-xs text-slate-600">
+            <div className="flex items-center gap-1.5 font-semibold">
+              <MailWarning className="w-3.5 h-3.5 shrink-0" />
+              {t("staff.loginDisabled")}
+            </div>
+            <p className="mt-1 leading-relaxed">{t("staff.inactiveLoginHint")}</p>
+          </div>
+        ) : hasEmail ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-2 text-xs text-amber-800">
+            <div className="flex items-center gap-1.5 font-semibold">
+              <MailWarning className="w-3.5 h-3.5 shrink-0" />
+              {t("staff.loginDisabled")}
+            </div>
+            <p className="mt-1 leading-relaxed">{t("staff.loginDisabledHint")}</p>
+            {onSetEmail && (
+              <button
+                type="button"
+                onClick={onSetEmail}
+                className="mt-2 font-bold text-amber-800 underline underline-offset-2 hover:text-amber-950"
+              >
+                {t("staff.editAndSaveEmail")}
+              </button>
+            )}
           </div>
         ) : (
           <button

@@ -117,19 +117,28 @@ export function useOfflineCreateIssue() {
       photoFile?: File | null
     ) => {
       if (!isOnline) {
-        const photoBlobKeys: string[] = [];
+        const photoUploads = [];
 
         if (photoFile) {
           const blobKey = `beforeImagePath:issue-${Date.now()}`;
           await storePhotoBlob(blobKey, photoFile, photoFile.name, photoFile.type);
-          photoBlobKeys.push(blobKey);
+          photoUploads.push({
+            blobKey,
+            request: {
+              name: photoFile.name,
+              size: photoFile.size,
+              contentType: photoFile.type,
+              purpose: "issue_before" as const,
+              areaId: data.areaId,
+            },
+          });
         }
 
         const queued = await queueMutationIfOffline(
           "POST",
           `/api/issues`,
           data,
-          photoBlobKeys.length > 0 ? photoBlobKeys : undefined
+          photoUploads.length > 0 ? photoUploads : undefined
         );
 
         if (queued) {
@@ -194,19 +203,28 @@ export function useOfflineCompleteIssue() {
       photoFile?: File | null
     ) => {
       if (!isOnline) {
-        const photoBlobKeys: string[] = [];
+        const photoUploads = [];
 
         if (photoFile) {
           const blobKey = `afterImagePath:issue-complete-${Date.now()}`;
           await storePhotoBlob(blobKey, photoFile, photoFile.name, photoFile.type);
-          photoBlobKeys.push(blobKey);
+          photoUploads.push({
+            blobKey,
+            request: {
+              name: photoFile.name,
+              size: photoFile.size,
+              contentType: photoFile.type,
+              purpose: "issue_after" as const,
+              issueId,
+            },
+          });
         }
 
         const queued = await queueMutationIfOffline(
           "POST",
           `/api/issues/${issueId}/complete`,
           data,
-          photoBlobKeys.length > 0 ? photoBlobKeys : undefined
+          photoUploads.length > 0 ? photoUploads : undefined
         );
 
         if (queued) {

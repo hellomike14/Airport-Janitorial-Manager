@@ -7,6 +7,10 @@
  */
 
 export interface Task {
+  /** An after photo must be attached before this task can be completed. */
+  photoRequired?: boolean;
+  beforeImagePath?: string | null;
+  afterImagePath?: string | null;
   id: number;
   areaId: number;
   taskDate: string;
@@ -22,6 +26,8 @@ export interface Task {
   assignedToName?: string | null;
   /** Whether the assigned staff member is still active. Null when no one is assigned. */
   assignedToActive?: boolean | null;
+  /** Inspector workflow link when this task originated from an inspector reply. */
+  inspectorWorkflowTaskId: number | null;
   isSpecial: boolean;
   notes?: string | null;
 }

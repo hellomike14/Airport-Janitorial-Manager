@@ -1,4 +1,6 @@
-import express, { type Express } from "express";
+import express, { type Express, type ErrorRequestHandler } from "express";
+import { AuthServiceUnavailable } from "./lib/authAvailability";
+import multer from "multer";
 import cors from "cors";
 import { clerkMiddleware } from "@clerk/express";
 import { publishableKeyFromHost } from "@clerk/shared/keys";
@@ -8,12 +10,31 @@ import {
   getClerkProxyHost,
 } from "./middlewares/clerkProxyMiddleware";
 import router from "./routes";
+import { inboundSendgridRouter } from "./routes/messages";
+import internalRouter from "./routes/internal";
+import { normalizeInboundParseFields } from "./lib/inboundParsePolicy";
+import { safeRecordServerDiagnostic } from "./lib/authDiagnostics";
 
 const app: Express = express();
+const inboundParse = multer({ storage: multer.memoryStorage(), limits: { fields: 12, fieldSize: 64 * 1024, files: 0, fileSize: 1 } }).none();
 
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 
 app.use(cors({ credentials: true, origin: true }));
+// SendGrid cannot hold a Clerk session. This narrow route is parsed with a
+// bounded JSON body and authenticates exclusively through its signed webhook
+// credentials in the handler.
+app.use("/api/webhooks/sendgrid/inbound", (req, res, next) => {
+  if (req.is("multipart/form-data")) return inboundParse(req, res, (error) => {
+    if (error) return res.status(413).json({ error: "Inbound payload rejected" });
+    try {
+      req.body = normalizeInboundParseFields(req.body);
+      return next();
+    } catch { return res.status(400).json({ error: "Invalid inbound envelope" }); }
+  });
+  return express.json({ limit: "64kb", strict: true })(req, res, next);
+}, inboundSendgridRouter);
+app.use("/api/internal", internalRouter);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -30,5 +51,15 @@ app.use(
 );
 
 app.use("/api", router);
+
+const authUnavailableHandler: ErrorRequestHandler = async (error, _req, res, next) => {
+  if (!(error instanceof AuthServiceUnavailable)) { next(error); return; }
+  if (res.headersSent) { next(error); return; }
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Retry-After", "5");
+  const diagnosticId = await safeRecordServerDiagnostic("AUTH_SERVICE_UNAVAILABLE");
+  res.status(503).json({ error: "AUTH_SERVICE_UNAVAILABLE", diagnosticId });
+};
+app.use(authUnavailableHandler);
 
 export default app;

@@ -5,10 +5,10 @@
  * Marvol Facility Cleaning Management API
  * OpenAPI spec version: 0.1.0
  */
+import type { ApplicationUploadDocument } from "./applicationUploadDocument";
 import type { SubmitApplicationRequestApplication } from "./submitApplicationRequestApplication";
 import type { SubmitApplicationRequestI9Employee } from "./submitApplicationRequestI9Employee";
 import type { SubmitApplicationRequestW4Employee } from "./submitApplicationRequestW4Employee";
-import type { UploadedDocument } from "./uploadedDocument";
 
 export interface SubmitApplicationRequest {
   firstName: string;
@@ -19,5 +19,5 @@ export interface SubmitApplicationRequest {
   application?: SubmitApplicationRequestApplication;
   i9Employee?: SubmitApplicationRequestI9Employee;
   w4Employee?: SubmitApplicationRequestW4Employee;
-  documents?: UploadedDocument[];
+  documents?: ApplicationUploadDocument[];
 }

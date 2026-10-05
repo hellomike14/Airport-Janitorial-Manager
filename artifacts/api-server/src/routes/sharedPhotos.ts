@@ -1,8 +1,9 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db } from "@workspace/db";
-import { sharedPhotosTable, staffTable, areasTable, notificationsTable, schedulesTable } from "@workspace/db/schema";
+import { sharedPhotosTable, staffTable, areasTable, notificationsTable, schedulesTable, objectUploadsTable } from "@workspace/db/schema";
 import { eq, desc, ne, and, lte, gte, inArray } from "drizzle-orm";
 import { z } from "zod";
+import { actorStaffFromRequest } from "../lib/actorSession";
 
 const router: IRouter = Router();
 
@@ -54,6 +55,16 @@ router.post("/", async (req: Request, res: Response) => {
   }
 
   try {
+    const actor = await actorStaffFromRequest(req);
+    if (!actor || actor.id !== body.data.staffId) {
+      res.status(403).json({ error: "Cannot share a photo for another staff member" });
+      return;
+    }
+    const [upload] = await db.select().from(objectUploadsTable).where(and(eq(objectUploadsTable.objectPath, body.data.imagePath), eq(objectUploadsTable.ownerStaffId, actor.id)));
+    if (!upload || upload.purpose !== "shared_photo") {
+      res.status(403).json({ error: "Object is not authorized for photo sharing" });
+      return;
+    }
     const [photo] = await db
       .insert(sharedPhotosTable)
       .values({

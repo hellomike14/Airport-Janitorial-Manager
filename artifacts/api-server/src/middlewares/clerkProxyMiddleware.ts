@@ -66,12 +66,21 @@ export function clerkProxyMiddleware(): RequestHandler {
   return createProxyMiddleware({
     target: CLERK_FAPI,
     changeOrigin: true,
+    proxyTimeout: 15000,
+    timeout: 20000,
     // Take over the response so it can be re-sent with a Content-Length (see
     // proxyRes); the deployment edge rejects chunked proxied responses.
     selfHandleResponse: true,
     pathRewrite: (path: string) =>
       path.replace(new RegExp(`^${CLERK_PROXY_PATH}`), ''),
     on: {
+      error: (_error, _req, res) => {
+        if ('writeHead' in res && !res.headersSent) {
+          const body = JSON.stringify({ errors: [{ message: 'Sign-in is temporarily unavailable. Please try again.', code: 'authentication_unavailable' }] });
+          res.writeHead(503, { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body), 'cache-control': 'no-store', 'retry-after': '5' });
+          res.end(body);
+        } else { res.destroy(); }
+      },
       proxyReq: (proxyReq, req) => {
         const protocol = req.headers['x-forwarded-proto'] || 'https';
         const host = getClerkProxyHost(req) || '';

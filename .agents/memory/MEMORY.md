@@ -1,6 +1,9 @@
-- [Marvol typecheck quirks](marvol-typecheck.md) — repo typecheck is red on master; orval query-options need queryKey, so prefer plain fetch fns over disabled-query hooks.
-- [Marvol actor sessions](marvol-actor-session.md) — signed HttpOnly actor cookie identifies the logged-in staff member; identity-sensitive endpoints must derive the actor from it, never from client-sent ids.
+- [Marvol typecheck quirks](marvol-typecheck.md) — do not assume historical typecheck failures persist; orval query-options may require queryKey.
+- [Marvol actor sessions](marvol-actor-session.md) — verified Clerk sessions identify staff; identity-sensitive endpoints must derive the actor server-side, never from client-sent ids.
 - [Marvol artifact routing](marvol-routing.md) — web previews at "/", API at "/api" on the shared proxy; /marvol-cleaning/api/... returns SPA HTML, not the API.
 - [Marvol email-only sign-in](marvol-email-signin.md) — social login is hidden in the app; disabling its provider entirely requires Clerk tenant access per environment.
 - [Marvol orval codegen safety](marvol-orval-codegen.md) — never append helpers to generated/ files; put them in a stable *-extras.ts and re-export from index.ts.
 - [Marvol assignment freshness](marvol-assignment-freshness.md) — staff assignments are exact-area and cross-session; refetch them after identity resolves and whenever My Tasks mounts.
+- [Marvol sign-in latency](marvol-signin-latency.md) — delayed Clerk script loading reproduced the stuck login screen; it is not proof of Wi-Fi or account rejection.
+- [Staff access ownership](staff-access-ownership.md) — seed defaults must not undo administrator-managed login eligibility; former-worker restrictions remain authoritative.
+- [Access verification boundaries](access-verification.md) — distinguish local checks from production sign-in; preserve messaging data during interactive schema pushes.

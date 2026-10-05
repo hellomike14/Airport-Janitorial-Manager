@@ -4,21 +4,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { storePhotoBlob } from "@/lib/offlineStore";
 import { useOffline } from "@/contexts/OfflineContext";
 import { useTranslation } from "react-i18next";
+import { requestUploadUrl, type UploadUrlRequest } from "@workspace/api-client-react";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
-async function requestPresignedUrl(file: File): Promise<{ uploadURL: string; objectPath: string }> {
-  const res = await fetch(`${BASE_URL}/api/storage/uploads/request-url`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
-  });
-  if (!res.ok) throw new Error("Failed to get upload URL");
-  return res.json();
-}
-
-async function uploadFile(file: File): Promise<string> {
-  const { uploadURL, objectPath } = await requestPresignedUrl(file);
+async function uploadFile(file: File, request: UploadUrlRequest): Promise<string> {
+  const { uploadURL, objectPath } = await requestUploadUrl(request);
   const putRes = await fetch(uploadURL, {
     method: "PUT",
     headers: { "Content-Type": file.type },
@@ -38,6 +29,7 @@ function PhotoSlot({
   onUpload,
   onRemove,
   onFileCapture,
+  uploadRequest,
   accent = "blue",
   compact = false,
 }: {
@@ -46,6 +38,7 @@ function PhotoSlot({
   onUpload: (path: string) => void;
   onRemove: () => void;
   onFileCapture?: (file: File) => void;
+  uploadRequest: (file: File) => UploadUrlRequest;
   accent?: string;
   compact?: boolean;
 }) {
@@ -69,7 +62,7 @@ function PhotoSlot({
 
     setUploading(true);
     try {
-      const path = await uploadFile(file);
+      const path = await uploadFile(file, uploadRequest(file));
       onUpload(path);
     } catch (e) {
       console.error(e);
@@ -199,7 +192,16 @@ export function TaskPhotoPanel({
         "PATCH",
         `/api/tasks/${taskId}/images`,
         { [field]: null },
-        [blobKey]
+        [{
+          blobKey,
+          request: {
+            name: file.name,
+            size: file.size,
+            contentType: file.type,
+            purpose: field === "beforeImagePath" ? "task_before" : "task_after",
+            taskId,
+          },
+        }]
       );
     }
   };
@@ -212,6 +214,7 @@ export function TaskPhotoPanel({
         onUpload={(path) => { setBefore(path); updatePhoto("beforeImagePath", path); }}
         onRemove={() => { setBefore(null); updatePhoto("beforeImagePath", null); }}
         onFileCapture={(file) => handleFileCapture("beforeImagePath", file)}
+        uploadRequest={(file) => ({ name: file.name, size: file.size, contentType: file.type, purpose: "task_before", taskId })}
         accent="blue"
         compact={compact}
       />
@@ -226,6 +229,7 @@ export function TaskPhotoPanel({
         onUpload={(path) => { setAfter(path); updatePhoto("afterImagePath", path); }}
         onRemove={() => { setAfter(null); updatePhoto("afterImagePath", null); }}
         onFileCapture={(file) => handleFileCapture("afterImagePath", file)}
+        uploadRequest={(file) => ({ name: file.name, size: file.size, contentType: file.type, purpose: "task_after", taskId })}
         accent="emerald"
         compact={compact}
       />

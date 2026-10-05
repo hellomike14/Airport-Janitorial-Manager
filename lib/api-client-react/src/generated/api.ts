@@ -21,6 +21,11 @@ import type {
   AreaEffectiveTask,
   AssignIssueRequest,
   Assignment,
+  AuthDiagnosticEventInput,
+  AuthDiagnosticEventReceipt,
+  AuthDiagnosticRateLimitError,
+  AuthDiagnostics,
+  AuthServiceUnavailableError,
   BatchCompleteResponse,
   ChatMessage,
   ChatMessageInput,
@@ -39,9 +44,12 @@ import type {
   CreateTaskTypeRequest,
   DashboardStats,
   DeleteResponse,
+  DiagnosticStoreUnavailableError,
   ErrorEnvelope,
   GetDashboardParams,
+  GetInspectorWorkflow200,
   HealthStatus,
+  InvalidDiagnosticCodeError,
   Issue,
   JobApplication,
   ListApplicationsParams,
@@ -53,6 +61,7 @@ import type {
   ListSpecialTasksParams,
   ListTasksParams,
   MarkAllReadRequest,
+  NoStaffMatchError,
   Notification,
   OnboardingHire,
   OnboardingItem,
@@ -60,7 +69,12 @@ import type {
   QuickbooksStatus,
   RemoveAreaTaskExclusionRequest,
   ReorderTaskTypesRequest,
+  SendgridInboundReplyRequest,
+  SessionExpiredError,
+  SetConversationArchive200,
+  SetConversationArchiveRequest,
   SpecialTask,
+  StaffAccessDisabledError,
   StaffMember,
   SubmitApplicationRequest,
   Task,
@@ -310,6 +324,96 @@ export const useCreateStaffMember = <
 > => {
   return useMutation(getCreateStaffMemberMutationOptions(options));
 };
+
+/**
+ * @summary Resolve the authenticated session to a staff member
+ */
+export const getGetCurrentStaffMemberUrl = () => {
+  return `/api/staff/me`;
+};
+
+export const getCurrentStaffMember = async (
+  options?: RequestInit,
+): Promise<StaffMember> => {
+  return customFetch<StaffMember>(getGetCurrentStaffMemberUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetCurrentStaffMemberQueryKey = () => {
+  return [`/api/staff/me`] as const;
+};
+
+export const getGetCurrentStaffMemberQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCurrentStaffMember>>,
+  TError = ErrorType<
+    | SessionExpiredError
+    | StaffAccessDisabledError
+    | NoStaffMatchError
+    | AuthServiceUnavailableError
+  >,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getCurrentStaffMember>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetCurrentStaffMemberQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getCurrentStaffMember>>
+  > = ({ signal }) => getCurrentStaffMember({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getCurrentStaffMember>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetCurrentStaffMemberQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getCurrentStaffMember>>
+>;
+export type GetCurrentStaffMemberQueryError = ErrorType<
+  | SessionExpiredError
+  | StaffAccessDisabledError
+  | NoStaffMatchError
+  | AuthServiceUnavailableError
+>;
+
+/**
+ * @summary Resolve the authenticated session to a staff member
+ */
+
+export function useGetCurrentStaffMember<
+  TData = Awaited<ReturnType<typeof getCurrentStaffMember>>,
+  TError = ErrorType<
+    | SessionExpiredError
+    | StaffAccessDisabledError
+    | NoStaffMatchError
+    | AuthServiceUnavailableError
+  >,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getCurrentStaffMember>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetCurrentStaffMemberQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Update a staff member
@@ -4752,3 +4856,533 @@ export const useDisconnectQuickbooks = <
 > => {
   return useMutation(getDisconnectQuickbooksMutationOptions(options));
 };
+
+/**
+ * @summary Archive or restore a conversation for the authenticated participant
+ */
+export const getSetConversationArchiveUrl = (id: number) => {
+  return `/api/conversations/${id}/archive`;
+};
+
+export const setConversationArchive = async (
+  id: number,
+  setConversationArchiveRequest: SetConversationArchiveRequest,
+  options?: RequestInit,
+): Promise<SetConversationArchive200> => {
+  return customFetch<SetConversationArchive200>(
+    getSetConversationArchiveUrl(id),
+    {
+      ...options,
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(setConversationArchiveRequest),
+    },
+  );
+};
+
+export const getSetConversationArchiveMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setConversationArchive>>,
+    TError,
+    { id: number; data: BodyType<SetConversationArchiveRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setConversationArchive>>,
+  TError,
+  { id: number; data: BodyType<SetConversationArchiveRequest> },
+  TContext
+> => {
+  const mutationKey = ["setConversationArchive"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setConversationArchive>>,
+    { id: number; data: BodyType<SetConversationArchiveRequest> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return setConversationArchive(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetConversationArchiveMutationResult = NonNullable<
+  Awaited<ReturnType<typeof setConversationArchive>>
+>;
+export type SetConversationArchiveMutationBody =
+  BodyType<SetConversationArchiveRequest>;
+export type SetConversationArchiveMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Archive or restore a conversation for the authenticated participant
+ */
+export const useSetConversationArchive = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setConversationArchive>>,
+    TError,
+    { id: number; data: BodyType<SetConversationArchiveRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof setConversationArchive>>,
+  TError,
+  { id: number; data: BodyType<SetConversationArchiveRequest> },
+  TContext
+> => {
+  return useMutation(getSetConversationArchiveMutationOptions(options));
+};
+
+/**
+ * @summary Accept an authenticated inspector email reply
+ */
+export const getReceiveSendgridInspectorReplyUrl = () => {
+  return `/api/webhooks/sendgrid/inbound`;
+};
+
+export const receiveSendgridInspectorReply = async (
+  sendgridInboundReplyRequest: SendgridInboundReplyRequest,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getReceiveSendgridInspectorReplyUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(sendgridInboundReplyRequest),
+  });
+};
+
+export const getReceiveSendgridInspectorReplyMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof receiveSendgridInspectorReply>>,
+    TError,
+    { data: BodyType<SendgridInboundReplyRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof receiveSendgridInspectorReply>>,
+  TError,
+  { data: BodyType<SendgridInboundReplyRequest> },
+  TContext
+> => {
+  const mutationKey = ["receiveSendgridInspectorReply"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof receiveSendgridInspectorReply>>,
+    { data: BodyType<SendgridInboundReplyRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return receiveSendgridInspectorReply(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReceiveSendgridInspectorReplyMutationResult = NonNullable<
+  Awaited<ReturnType<typeof receiveSendgridInspectorReply>>
+>;
+export type ReceiveSendgridInspectorReplyMutationBody =
+  BodyType<SendgridInboundReplyRequest>;
+export type ReceiveSendgridInspectorReplyMutationError = ErrorType<void>;
+
+/**
+ * @summary Accept an authenticated inspector email reply
+ */
+export const useReceiveSendgridInspectorReply = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof receiveSendgridInspectorReply>>,
+    TError,
+    { data: BodyType<SendgridInboundReplyRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof receiveSendgridInspectorReply>>,
+  TError,
+  { data: BodyType<SendgridInboundReplyRequest> },
+  TContext
+> => {
+  return useMutation(getReceiveSendgridInspectorReplyMutationOptions(options));
+};
+
+/**
+ * @summary Get authorized inspector assignment workflow state and audit history
+ */
+export const getGetInspectorWorkflowUrl = (taskId: number) => {
+  return `/api/inspector-workflow/${taskId}`;
+};
+
+export const getInspectorWorkflow = async (
+  taskId: number,
+  options?: RequestInit,
+): Promise<GetInspectorWorkflow200> => {
+  return customFetch<GetInspectorWorkflow200>(
+    getGetInspectorWorkflowUrl(taskId),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetInspectorWorkflowQueryKey = (taskId: number) => {
+  return [`/api/inspector-workflow/${taskId}`] as const;
+};
+
+export const getGetInspectorWorkflowQueryOptions = <
+  TData = Awaited<ReturnType<typeof getInspectorWorkflow>>,
+  TError = ErrorType<void>,
+>(
+  taskId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getInspectorWorkflow>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetInspectorWorkflowQueryKey(taskId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getInspectorWorkflow>>
+  > = ({ signal }) =>
+    getInspectorWorkflow(taskId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!taskId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getInspectorWorkflow>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetInspectorWorkflowQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getInspectorWorkflow>>
+>;
+export type GetInspectorWorkflowQueryError = ErrorType<void>;
+
+/**
+ * @summary Get authorized inspector assignment workflow state and audit history
+ */
+
+export function useGetInspectorWorkflow<
+  TData = Awaited<ReturnType<typeof getInspectorWorkflow>>,
+  TError = ErrorType<void>,
+>(
+  taskId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getInspectorWorkflow>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetInspectorWorkflowQueryOptions(taskId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Internal scheduler trigger for overdue inspector assignments
+ */
+export const getRunInspectorSlaSweepUrl = () => {
+  return `/api/internal/inspector-sla-sweep`;
+};
+
+export const runInspectorSlaSweep = async (
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getRunInspectorSlaSweepUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getRunInspectorSlaSweepMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof runInspectorSlaSweep>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof runInspectorSlaSweep>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["runInspectorSlaSweep"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof runInspectorSlaSweep>>,
+    void
+  > = () => {
+    return runInspectorSlaSweep(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RunInspectorSlaSweepMutationResult = NonNullable<
+  Awaited<ReturnType<typeof runInspectorSlaSweep>>
+>;
+
+export type RunInspectorSlaSweepMutationError = ErrorType<void>;
+
+/**
+ * @summary Internal scheduler trigger for overdue inspector assignments
+ */
+export const useRunInspectorSlaSweep = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof runInspectorSlaSweep>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof runInspectorSlaSweep>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getRunInspectorSlaSweepMutationOptions(options));
+};
+
+/**
+ * Accepts a limited set of diagnostic codes without requiring an authenticated session.
+ * @summary Report a limited authentication availability diagnostic
+ */
+export const getReportAuthDiagnosticEventUrl = () => {
+  return `/api/auth-diagnostics/events`;
+};
+
+export const reportAuthDiagnosticEvent = async (
+  authDiagnosticEventInput: AuthDiagnosticEventInput,
+  options?: RequestInit,
+): Promise<AuthDiagnosticEventReceipt> => {
+  return customFetch<AuthDiagnosticEventReceipt>(
+    getReportAuthDiagnosticEventUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(authDiagnosticEventInput),
+    },
+  );
+};
+
+export const getReportAuthDiagnosticEventMutationOptions = <
+  TError = ErrorType<
+    | InvalidDiagnosticCodeError
+    | AuthDiagnosticRateLimitError
+    | DiagnosticStoreUnavailableError
+  >,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reportAuthDiagnosticEvent>>,
+    TError,
+    { data: BodyType<AuthDiagnosticEventInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof reportAuthDiagnosticEvent>>,
+  TError,
+  { data: BodyType<AuthDiagnosticEventInput> },
+  TContext
+> => {
+  const mutationKey = ["reportAuthDiagnosticEvent"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof reportAuthDiagnosticEvent>>,
+    { data: BodyType<AuthDiagnosticEventInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return reportAuthDiagnosticEvent(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReportAuthDiagnosticEventMutationResult = NonNullable<
+  Awaited<ReturnType<typeof reportAuthDiagnosticEvent>>
+>;
+export type ReportAuthDiagnosticEventMutationBody =
+  BodyType<AuthDiagnosticEventInput>;
+export type ReportAuthDiagnosticEventMutationError = ErrorType<
+  | InvalidDiagnosticCodeError
+  | AuthDiagnosticRateLimitError
+  | DiagnosticStoreUnavailableError
+>;
+
+/**
+ * @summary Report a limited authentication availability diagnostic
+ */
+export const useReportAuthDiagnosticEvent = <
+  TError = ErrorType<
+    | InvalidDiagnosticCodeError
+    | AuthDiagnosticRateLimitError
+    | DiagnosticStoreUnavailableError
+  >,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reportAuthDiagnosticEvent>>,
+    TError,
+    { data: BodyType<AuthDiagnosticEventInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof reportAuthDiagnosticEvent>>,
+  TError,
+  { data: BodyType<AuthDiagnosticEventInput> },
+  TContext
+> => {
+  return useMutation(getReportAuthDiagnosticEventMutationOptions(options));
+};
+
+/**
+ * Available only to authenticated administrators.
+ * @summary Get authentication diagnostics and staff access audit history
+ */
+export const getGetAuthDiagnosticsUrl = () => {
+  return `/api/auth-diagnostics`;
+};
+
+export const getAuthDiagnostics = async (
+  options?: RequestInit,
+): Promise<AuthDiagnostics> => {
+  return customFetch<AuthDiagnostics>(getGetAuthDiagnosticsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAuthDiagnosticsQueryKey = () => {
+  return [`/api/auth-diagnostics`] as const;
+};
+
+export const getGetAuthDiagnosticsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAuthDiagnostics>>,
+  TError = ErrorType<ErrorEnvelope>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAuthDiagnostics>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetAuthDiagnosticsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAuthDiagnostics>>
+  > = ({ signal }) => getAuthDiagnostics({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAuthDiagnostics>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAuthDiagnosticsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAuthDiagnostics>>
+>;
+export type GetAuthDiagnosticsQueryError = ErrorType<ErrorEnvelope>;
+
+/**
+ * @summary Get authentication diagnostics and staff access audit history
+ */
+
+export function useGetAuthDiagnostics<
+  TData = Awaited<ReturnType<typeof getAuthDiagnostics>>,
+  TError = ErrorType<ErrorEnvelope>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAuthDiagnostics>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAuthDiagnosticsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}

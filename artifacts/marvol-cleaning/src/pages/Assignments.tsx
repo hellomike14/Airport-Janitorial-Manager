@@ -10,7 +10,7 @@ import {
   useListAreas
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Calendar, Trash2, Plus, Star } from "lucide-react";
+import { AlertCircle, Calendar, Trash2, Plus, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -20,6 +20,8 @@ export default function Assignments() {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const queryClient = useQueryClient();
   const [isAdding, setIsAdding] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const { currentUser } = useAuth();
   
   const { data: assignments, isLoading } = useListAssignments({ date: selectedDate });
@@ -39,18 +41,25 @@ export default function Assignments() {
         queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
         setIsAdding(false);
         setFormData({ staffId: '', areaId: '', notes: '', isSpecial: false });
-      }
+        setCreateError(null);
+      },
+      onError: () => setCreateError(t("assignments.createFailed")),
     }
   });
 
   const deleteMutation = useDeleteAssignment({
     mutation: {
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/assignments"] })
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
+        setDeleteError(null);
+      },
+      onError: () => setDeleteError(t("assignments.deleteFailed")),
     }
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setCreateError(null);
     createMutation.mutate({
       data: {
         staffId: parseInt(formData.staffId),
@@ -61,6 +70,25 @@ export default function Assignments() {
         isSpecial: formData.isSpecial
       }
     });
+  };
+
+  const assignmentStaff = (staff ?? []).filter((person) => person.role === "staff");
+  const eligibleStaff = assignmentStaff.filter((person) => {
+    const access = person as typeof person & { loginEnabled?: boolean; formerEmployee?: boolean };
+    return access.active && access.loginEnabled === true && access.formerEmployee !== true;
+  });
+  const unavailableStaffCount = assignmentStaff.length - eligibleStaff.length;
+
+  const updateForm = (changes: Partial<typeof formData>) => {
+    setCreateError(null);
+    setFormData((current) => ({ ...current, ...changes }));
+  };
+
+  const removeAssignment = (id: number) => {
+    if (confirm(t("assignments.removeAssignment"))) {
+      setDeleteError(null);
+      deleteMutation.mutate({ id });
+    }
   };
 
   return (
@@ -77,13 +105,20 @@ export default function Assignments() {
             <input 
               type="date" 
               value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
+              onChange={(e) => {
+                setSelectedDate(e.target.value);
+                setCreateError(null);
+                setDeleteError(null);
+              }}
               className="font-bold text-slate-700 bg-transparent outline-none cursor-pointer"
             />
           </div>
           <div className="h-8 w-px bg-slate-200 mx-2" />
           <Button 
-            onClick={() => setIsAdding(!isAdding)}
+            onClick={() => {
+              setIsAdding(!isAdding);
+              setCreateError(null);
+            }}
             className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl"
           >
             <Plus className="w-4 h-4 mr-2" /> {t("assignments.assignStaff")}
@@ -95,19 +130,34 @@ export default function Assignments() {
         <div className="bg-indigo-50/50 rounded-3xl p-6 border border-indigo-100 shadow-sm animate-fade-in-up">
           <h3 className="text-lg font-bold text-indigo-900 mb-4">{t("assignments.createAssignment", { date: format(new Date(selectedDate), "MMM do", { locale: dateLocale }) })}</h3>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {createError && (
+              <div
+                role="alert"
+                data-testid="error-create-assignment"
+                className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700"
+              >
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{createError}</span>
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-semibold text-indigo-900 mb-1">{t("assignments.selectStaff")}</label>
-                <select required value={formData.staffId} onChange={e => setFormData({...formData, staffId: e.target.value})} className="w-full bg-white border border-indigo-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
+                <select required value={formData.staffId} onChange={e => updateForm({ staffId: e.target.value })} className="w-full bg-white border border-indigo-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
                   <option value="">{t("assignments.chooseStaffMember")}</option>
-                  {staff?.filter(s => s.role === 'staff').map(s => (
+                  {eligibleStaff.map(s => (
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
+                {unavailableStaffCount > 0 && (
+                  <p className="mt-2 text-xs leading-relaxed text-indigo-700" data-testid="text-unavailable-assignment-staff">
+                    {t("assignments.unavailableStaffHint")}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-semibold text-indigo-900 mb-1">{t("assignments.selectArea")}</label>
-                <select required value={formData.areaId} onChange={e => setFormData({...formData, areaId: e.target.value})} className="w-full bg-white border border-indigo-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
+                <select required value={formData.areaId} onChange={e => updateForm({ areaId: e.target.value })} className="w-full bg-white border border-indigo-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
                   <option value="">{t("assignments.chooseArea")}</option>
                   {areas?.map(a => (
                     <option key={a.id} value={a.id}>{a.name} ({a.terminal})</option>
@@ -118,25 +168,39 @@ export default function Assignments() {
             
             <div>
               <label className="block text-sm font-semibold text-indigo-900 mb-1">{t("assignments.specialInstructions")}</label>
-              <input value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} placeholder={t("assignments.specialInstructionsPlaceholder")} className="w-full bg-white border border-indigo-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
+              <input value={formData.notes} onChange={e => updateForm({ notes: e.target.value })} placeholder={t("assignments.specialInstructionsPlaceholder")} className="w-full bg-white border border-indigo-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
             </div>
 
             <div className="flex flex-col sm:flex-row sm:items-center gap-3">
               <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-indigo-800 bg-white px-4 py-2 rounded-xl border border-indigo-200">
-                <input type="checkbox" checked={formData.isSpecial} onChange={e => setFormData({...formData, isSpecial: e.target.checked})} className="w-4 h-4 text-indigo-600 rounded" />
+                <input type="checkbox" checked={formData.isSpecial} onChange={e => updateForm({ isSpecial: e.target.checked })} className="w-4 h-4 text-indigo-600 rounded" />
                 <Star className="w-4 h-4 text-amber-500" />
                 {t("assignments.markSpecial")}
               </label>
               
               <div className="sm:flex-1" />
               <div className="flex gap-3 justify-end">
-                <Button type="button" variant="ghost" onClick={() => setIsAdding(false)} className="rounded-xl text-indigo-700 hover:bg-indigo-100">{t("common.cancel")}</Button>
+                <Button type="button" variant="ghost" onClick={() => {
+                  setIsAdding(false);
+                  setCreateError(null);
+                }} className="rounded-xl text-indigo-700 hover:bg-indigo-100">{t("common.cancel")}</Button>
                 <Button type="submit" disabled={createMutation.isPending} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md shadow-indigo-600/20 px-6 font-bold">
                   {createMutation.isPending ? t("assignments.assigning") : t("assignments.confirmAssignment")}
                 </Button>
               </div>
             </div>
           </form>
+        </div>
+      )}
+
+      {deleteError && (
+        <div
+          role="alert"
+          data-testid="error-delete-assignment"
+          className="flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700"
+        >
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{deleteError}</span>
         </div>
       )}
 
@@ -190,11 +254,7 @@ export default function Assignments() {
                               )}
                             </div>
                             <button
-                              onClick={() => {
-                                if (confirm(t("assignments.removeAssignment"))) {
-                                  deleteMutation.mutate({ id: assignment.id });
-                                }
-                              }}
+                              onClick={() => removeAssignment(assignment.id)}
                               className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 active:bg-rose-100 rounded-lg transition-colors touch-manipulation"
                               title={t("assignments.removeAssignmentTitle")}
                             >
@@ -232,11 +292,7 @@ export default function Assignments() {
                               </td>
                               <td className="px-6 py-4 text-right">
                                 <button
-                                  onClick={() => {
-                                    if (confirm(t("assignments.removeAssignment"))) {
-                                      deleteMutation.mutate({ id: assignment.id });
-                                    }
-                                  }}
+                                  onClick={() => removeAssignment(assignment.id)}
                                   className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
                                   title={t("assignments.removeAssignmentTitle")}
                                 >

@@ -5,8 +5,190 @@
  * Marvol Facility Cleaning Management API
  * OpenAPI spec version: 0.1.0
  */
+export interface SetConversationArchiveRequest {
+  staffId: number;
+  archived: boolean;
+}
+
+export type SendgridInboundReplyRequestEnvelope = {
+  from: string;
+  to: string[];
+};
+
+export interface SendgridInboundReplyRequest {
+  envelope: SendgridInboundReplyRequestEnvelope;
+  from: string;
+  /** @maxLength 2000 */
+  text: string;
+  headers?: string;
+  SPF?: string;
+  dkim?: string;
+}
+
 export interface HealthStatus {
   status: string;
+}
+
+export type SessionExpiredErrorError =
+  (typeof SessionExpiredErrorError)[keyof typeof SessionExpiredErrorError];
+
+export const SessionExpiredErrorError = {
+  SESSION_EXPIRED: "SESSION_EXPIRED",
+} as const;
+
+export interface SessionExpiredError {
+  error: SessionExpiredErrorError;
+  diagnosticId: string;
+}
+
+export type StaffAccessDisabledErrorError =
+  (typeof StaffAccessDisabledErrorError)[keyof typeof StaffAccessDisabledErrorError];
+
+export const StaffAccessDisabledErrorError = {
+  STAFF_ACCESS_DISABLED: "STAFF_ACCESS_DISABLED",
+} as const;
+
+export interface StaffAccessDisabledError {
+  error: StaffAccessDisabledErrorError;
+  diagnosticId: string;
+}
+
+export type NoStaffMatchErrorError =
+  (typeof NoStaffMatchErrorError)[keyof typeof NoStaffMatchErrorError];
+
+export const NoStaffMatchErrorError = {
+  NO_STAFF_MATCH: "NO_STAFF_MATCH",
+} as const;
+
+export interface NoStaffMatchError {
+  error: NoStaffMatchErrorError;
+  diagnosticId: string;
+}
+
+export type AuthServiceUnavailableErrorError =
+  (typeof AuthServiceUnavailableErrorError)[keyof typeof AuthServiceUnavailableErrorError];
+
+export const AuthServiceUnavailableErrorError = {
+  AUTH_SERVICE_UNAVAILABLE: "AUTH_SERVICE_UNAVAILABLE",
+} as const;
+
+export interface AuthServiceUnavailableError {
+  error: AuthServiceUnavailableErrorError;
+  diagnosticId: string;
+}
+
+export type AuthDiagnosticCode =
+  (typeof AuthDiagnosticCode)[keyof typeof AuthDiagnosticCode];
+
+export const AuthDiagnosticCode = {
+  AUTH_SERVICE_UNAVAILABLE: "AUTH_SERVICE_UNAVAILABLE",
+  STAFF_LOOKUP_TIMEOUT: "STAFF_LOOKUP_TIMEOUT",
+} as const;
+
+export type AuthDiagnosticRecordedCode =
+  (typeof AuthDiagnosticRecordedCode)[keyof typeof AuthDiagnosticRecordedCode];
+
+export const AuthDiagnosticRecordedCode = {
+  SESSION_EXPIRED: "SESSION_EXPIRED",
+  NO_STAFF_MATCH: "NO_STAFF_MATCH",
+  STAFF_ACCESS_DISABLED: "STAFF_ACCESS_DISABLED",
+  AUTH_SERVICE_UNAVAILABLE: "AUTH_SERVICE_UNAVAILABLE",
+  STAFF_LOOKUP_TIMEOUT: "STAFF_LOOKUP_TIMEOUT",
+} as const;
+
+export interface AuthDiagnosticEventInput {
+  code: AuthDiagnosticCode;
+}
+
+export interface AuthDiagnosticEventReceipt {
+  diagnosticId: string;
+}
+
+export type InvalidDiagnosticCodeErrorError =
+  (typeof InvalidDiagnosticCodeErrorError)[keyof typeof InvalidDiagnosticCodeErrorError];
+
+export const InvalidDiagnosticCodeErrorError = {
+  INVALID_DIAGNOSTIC_CODE: "INVALID_DIAGNOSTIC_CODE",
+} as const;
+
+export interface InvalidDiagnosticCodeError {
+  error: InvalidDiagnosticCodeErrorError;
+}
+
+export type AuthDiagnosticRateLimitErrorError =
+  (typeof AuthDiagnosticRateLimitErrorError)[keyof typeof AuthDiagnosticRateLimitErrorError];
+
+export const AuthDiagnosticRateLimitErrorError = {
+  RATE_LIMITED: "RATE_LIMITED",
+} as const;
+
+export interface AuthDiagnosticRateLimitError {
+  error: AuthDiagnosticRateLimitErrorError;
+}
+
+export type DiagnosticStoreUnavailableErrorError =
+  (typeof DiagnosticStoreUnavailableErrorError)[keyof typeof DiagnosticStoreUnavailableErrorError];
+
+export const DiagnosticStoreUnavailableErrorError = {
+  DIAGNOSTIC_STORE_UNAVAILABLE: "DIAGNOSTIC_STORE_UNAVAILABLE",
+} as const;
+
+export interface DiagnosticStoreUnavailableError {
+  error: DiagnosticStoreUnavailableErrorError;
+  diagnosticId: string;
+}
+
+export type AuthDiagnosticEventSource =
+  (typeof AuthDiagnosticEventSource)[keyof typeof AuthDiagnosticEventSource];
+
+export const AuthDiagnosticEventSource = {
+  server: "server",
+  client: "client",
+} as const;
+
+export interface AuthDiagnosticEvent {
+  diagnosticId: string;
+  code: AuthDiagnosticRecordedCode;
+  source: AuthDiagnosticEventSource;
+  createdAt: string;
+}
+
+export interface AuthDiagnosticSummary {
+  code: AuthDiagnosticRecordedCode;
+  /** @minimum 0 */
+  count: number;
+}
+
+export interface StaffAccessState {
+  active: boolean;
+  loginEnabled: boolean;
+  formerEmployee: boolean;
+  hasEmail: boolean;
+}
+
+export type StaffAccessChangeAction =
+  (typeof StaffAccessChangeAction)[keyof typeof StaffAccessChangeAction];
+
+export const StaffAccessChangeAction = {
+  CREATE: "CREATE",
+  UPDATE: "UPDATE",
+  DELETE: "DELETE",
+} as const;
+
+export interface StaffAccessChange {
+  id: number;
+  actorName: string;
+  staffName: string;
+  action: StaffAccessChangeAction;
+  createdAt: string;
+  before: StaffAccessState;
+  after: StaffAccessState;
+}
+
+export interface AuthDiagnostics {
+  events: AuthDiagnosticEvent[];
+  summary: AuthDiagnosticSummary[];
+  accessChanges: StaffAccessChange[];
 }
 
 export type StaffMemberRole =
@@ -23,9 +205,23 @@ export interface StaffMember {
   id: number;
   name: string;
   role: StaffMemberRole;
-  /** Whether the staff member has a configured sign-in email. The email address itself is never returned. */
+  /** Whether the staff member has a configured sign-in email. */
   hasEmail: boolean;
+  /**
+   * Saved email, returned in the staff directory only to administrators and supervisors.
+   * @nullable
+   */
+  readonly email?: string | null;
+  /**
+   * Saved phone number, returned in the staff directory only to administrators and supervisors.
+   * @nullable
+   */
+  readonly phone?: string | null;
   active: boolean;
+  /** Whether this staff member is currently eligible to sign in. */
+  readonly loginEnabled: boolean;
+  /** Whether this retained historical record belongs to a former employee. */
+  readonly formerEmployee: boolean;
   createdAt: string;
 }
 
@@ -69,10 +265,16 @@ export interface CleaningArea {
   name: string;
   terminal: string;
   location: string;
+  coverage: string;
+  additionalCoverage: string | null;
   sortOrder: number;
 }
 
 export interface Task {
+  /** An after photo must be attached before this task can be completed. */
+  photoRequired?: boolean;
+  beforeImagePath?: string | null;
+  afterImagePath?: string | null;
   id: number;
   areaId: number;
   taskDate: string;
@@ -88,6 +290,8 @@ export interface Task {
   assignedToName?: string | null;
   /** Whether the assigned staff member is still active. Null when no one is assigned. */
   assignedToActive?: boolean | null;
+  /** Inspector workflow link when this task originated from an inspector reply. */
+  inspectorWorkflowTaskId: number | null;
   isSpecial: boolean;
   notes?: string | null;
 }
@@ -141,6 +345,7 @@ export interface Assignment {
   staffName: string;
   areaId: number;
   areaName: string;
+  terminal: string;
   assignmentDate: string;
   assignedById: number;
   assignedByName: string;
@@ -214,6 +419,7 @@ export interface AssignIssueRequest {
 export interface CompleteIssueRequest {
   completionNotes?: string | null;
   completedById: number;
+  afterImagePath?: string | null;
 }
 
 export interface UpdateIssueImagesRequest {
@@ -278,6 +484,20 @@ export interface UpdateChatMessageInput {
   body: string;
 }
 
+export type ChatMessageInspectorEmailDeliveryStatus =
+  (typeof ChatMessageInspectorEmailDeliveryStatus)[keyof typeof ChatMessageInspectorEmailDeliveryStatus];
+
+export const ChatMessageInspectorEmailDeliveryStatus = {
+  pending: "pending",
+  sending: "sending",
+  retrying: "retrying",
+  accepted: "accepted",
+  disabled: "disabled",
+  not_configured: "not_configured",
+  failed: "failed",
+  not_applicable: "not_applicable",
+} as const;
+
 export interface ChatMessage {
   id: number;
   conversationId: number;
@@ -285,6 +505,9 @@ export interface ChatMessage {
   senderName: string;
   body: string;
   isRead: boolean;
+  /** @nullable */
+  inspectorWorkflowTaskId: number | null;
+  inspectorEmailDeliveryStatus: ChatMessageInspectorEmailDeliveryStatus;
   createdAt: string;
 }
 
@@ -295,11 +518,25 @@ export interface ChatMessageInput {
    * @maxLength 2000
    */
   body: string;
+  clientRequestId: string;
 }
 
 export interface MarkAllReadRequest {
   staffId: number;
 }
+
+export type UploadUrlRequestPurpose =
+  (typeof UploadUrlRequestPurpose)[keyof typeof UploadUrlRequestPurpose];
+
+export const UploadUrlRequestPurpose = {
+  task_before: "task_before",
+  task_after: "task_after",
+  issue_before: "issue_before",
+  issue_after: "issue_after",
+  conversation_attachment: "conversation_attachment",
+  shared_photo: "shared_photo",
+  application_document: "application_document",
+} as const;
 
 export interface UploadUrlRequest {
   /** @minLength 1 */
@@ -308,11 +545,18 @@ export interface UploadUrlRequest {
   size: number;
   /** @minLength 1 */
   contentType: string;
+  purpose: UploadUrlRequestPurpose;
+  taskId?: number;
+  conversationId?: number;
+  issueId?: number;
+  areaId?: number;
 }
 
 export interface UploadUrlResponse {
   uploadURL: string;
   objectPath: string;
+  /** Applicant capability returned only for application_document uploads. */
+  uploadToken?: string;
 }
 
 export interface ErrorEnvelope {
@@ -434,6 +678,10 @@ export interface JobApplication {
   updatedAt: string;
 }
 
+export type ApplicationUploadDocument = UploadedDocument & {
+  uploadToken: string;
+};
+
 export type SubmitApplicationRequestApplication = { [key: string]: unknown };
 
 export type SubmitApplicationRequestI9Employee = { [key: string]: unknown };
@@ -449,7 +697,7 @@ export interface SubmitApplicationRequest {
   application?: SubmitApplicationRequestApplication;
   i9Employee?: SubmitApplicationRequestI9Employee;
   w4Employee?: SubmitApplicationRequestW4Employee;
-  documents?: UploadedDocument[];
+  documents?: ApplicationUploadDocument[];
 }
 
 export type UpdateApplicationRequestStatus =
@@ -594,4 +842,116 @@ export type GetDashboardParams = {
 
 export type ListApplicationsParams = {
   status?: string;
+};
+
+export type SetConversationArchive200 = {
+  archived: boolean;
+};
+
+export type GetInspectorWorkflow200Source = {
+  conversationId?: number;
+  messageId?: number;
+};
+
+export type GetInspectorWorkflow200Task = {
+  id: number;
+  name: string;
+  completed: boolean;
+  /** @nullable */
+  completedAt: string | null;
+};
+
+export type GetInspectorWorkflow200Area = {
+  id: number;
+  name: string;
+};
+
+/**
+ * @nullable
+ */
+export type GetInspectorWorkflow200AssignedStaff = {
+  id: number;
+  name: string;
+} | null;
+
+export type GetInspectorWorkflow200AssignmentMethod =
+  (typeof GetInspectorWorkflow200AssignmentMethod)[keyof typeof GetInspectorWorkflow200AssignmentMethod];
+
+export const GetInspectorWorkflow200AssignmentMethod = {
+  fresh_gps: "fresh_gps",
+  area_roster_workload: "area_roster_workload",
+} as const;
+
+export type GetInspectorWorkflow200Status =
+  (typeof GetInspectorWorkflow200Status)[keyof typeof GetInspectorWorkflow200Status];
+
+export const GetInspectorWorkflow200Status = {
+  assigned: "assigned",
+  overdue: "overdue",
+  escalated: "escalated",
+  completed: "completed",
+} as const;
+
+export type GetInspectorWorkflow200HistoryItemEvent =
+  (typeof GetInspectorWorkflow200HistoryItemEvent)[keyof typeof GetInspectorWorkflow200HistoryItemEvent];
+
+export const GetInspectorWorkflow200HistoryItemEvent = {
+  assigned: "assigned",
+  reassigned: "reassigned",
+} as const;
+
+export type GetInspectorWorkflow200HistoryItemMethod =
+  (typeof GetInspectorWorkflow200HistoryItemMethod)[keyof typeof GetInspectorWorkflow200HistoryItemMethod];
+
+export const GetInspectorWorkflow200HistoryItemMethod = {
+  fresh_gps: "fresh_gps",
+  area_roster_workload: "area_roster_workload",
+} as const;
+
+export type GetInspectorWorkflow200HistoryItem = {
+  assignedStaffId: number;
+  assignedById: number;
+  event: GetInspectorWorkflow200HistoryItemEvent;
+  method: GetInspectorWorkflow200HistoryItemMethod;
+  /** @nullable */
+  distanceMeters: number | null;
+  provenance: string;
+  createdAt: string;
+};
+
+/**
+ * @nullable
+ */
+export type GetInspectorWorkflow200CompletionEmailDeliveryStatus =
+  | (typeof GetInspectorWorkflow200CompletionEmailDeliveryStatus)[keyof typeof GetInspectorWorkflow200CompletionEmailDeliveryStatus]
+  | null;
+
+export const GetInspectorWorkflow200CompletionEmailDeliveryStatus = {
+  pending: "pending",
+  sending: "sending",
+  retrying: "retrying",
+  accepted: "accepted",
+  disabled: "disabled",
+  not_configured: "not_configured",
+  failed: "failed",
+} as const;
+
+export type GetInspectorWorkflow200 = {
+  source: GetInspectorWorkflow200Source;
+  task: GetInspectorWorkflow200Task;
+  area: GetInspectorWorkflow200Area;
+  /** @nullable */
+  assignedStaff?: GetInspectorWorkflow200AssignedStaff;
+  assignmentMethod?: GetInspectorWorkflow200AssignmentMethod;
+  /** @nullable */
+  assignmentDistanceMeters?: number | null;
+  dueAt: string;
+  /** @minimum 0 */
+  remainingSeconds: number;
+  status: GetInspectorWorkflow200Status;
+  /** @nullable */
+  escalatedAt?: string | null;
+  history: GetInspectorWorkflow200HistoryItem[];
+  /** @nullable */
+  completionEmailDeliveryStatus?: GetInspectorWorkflow200CompletionEmailDeliveryStatus;
 };

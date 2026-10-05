@@ -1,5 +1,7 @@
 import React from "react";
-import { SignIn, SignUp, useClerk, useUser } from "@clerk/react";
+import { SignIn, SignUp, useClerk, useUser, useAuth as useClerkAuth } from "@clerk/react";
+import { Redirect } from "wouter";
+import { LoginRecovery } from "../components/LoginRecovery";
 import { useTranslation } from "react-i18next";
 import { MailWarning, LogOut } from "lucide-react";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -47,6 +49,9 @@ function AuthShell({ children }: { children: React.ReactNode }) {
 }
 
 export function SignInPage() {
+  const { isLoaded, isSignedIn } = useClerkAuth();
+  if (!isLoaded) return <LoginRecovery />;
+  if (isSignedIn) return <Redirect to="/" />;
   return (
     <AuthShell>
       {/* path must be the full browser path — Clerk reads window.location.pathname directly */}
@@ -56,6 +61,9 @@ export function SignInPage() {
 }
 
 export function SignUpPage() {
+  const { isLoaded, isSignedIn } = useClerkAuth();
+  if (!isLoaded) return <LoginRecovery />;
+  if (isSignedIn) return <Redirect to="/" />;
   return (
     <AuthShell>
       <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} />
@@ -68,7 +76,7 @@ export function SignUpPage() {
  * email. The employee must ask an admin to add/fix their email on the Staff
  * page, then sign in again.
  */
-export function NoStaffMatch() {
+export function NoStaffMatch({ diagnosticId }: { diagnosticId?: string }) {
   const { t } = useTranslation();
   const { signOut } = useClerk();
   const { user } = useUser();
@@ -90,6 +98,7 @@ export function NoStaffMatch() {
             "You signed in successfully, but no staff record uses this email address. Ask an administrator to add this email to your staff profile, then sign in again."
           )}
         </p>
+        {diagnosticId && <p className="mt-3 rounded-lg bg-slate-100 px-3 py-2 font-mono text-xs text-slate-700" data-testid="text-diagnostic-id">{t("login.diagnosticId", { id: diagnosticId })}</p>}
         {email && (
           <p className="mt-3 text-sm font-semibold text-slate-700 bg-slate-100 rounded-xl py-2 px-3 break-all">
             {email}

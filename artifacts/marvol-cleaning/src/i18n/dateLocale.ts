@@ -1,4 +1,5 @@
 import { enUS, es, fr } from "date-fns/locale";
+import type { Locale } from "date-fns";
 
 const DATE_LOCALES: Record<string, Locale> = {
   en: enUS,
