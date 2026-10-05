@@ -49,7 +49,8 @@ const MessageParams = z.object({ id: z.coerce.number(), msgId: z.coerce.number()
 const InspectorWorkflowParams = z.object({ taskId: z.coerce.number().int().positive() });
 const InboundReplyBody = z.object({
   envelope: z.object({ from: z.string(), to: z.array(z.string()).min(1) }),
-  from: z.string(), text: z.string().trim().min(1).max(2000),
+  from: z.string(), text: z.string().trim().min(1).max(60000),
+  subject: z.string().max(1000).optional(),
   headers: z.string().optional(), SPF: z.string().optional(), dkim: z.string().optional(),
 }).strict();
 
@@ -340,7 +341,8 @@ inboundSendgridRouter.post("/", async (req: Request, res: Response) => {
     ]);
     if (!replyInspector || !replySupervisor || !replyConversation || replyConversation.isGroup ||
         replyInspector.role !== "inspector" || !isInspectorManager(replySupervisor.role) ||
-        !replyInspector.active || !replyInspector.loginEnabled || !replySupervisor.active || !replySupervisor.loginEnabled ||
+        !replyInspector.active || !replyInspector.loginEnabled || replyInspector.formerEmployee ||
+        !replySupervisor.active || !replySupervisor.loginEnabled || replySupervisor.formerEmployee ||
         normalizedEmail(replyInspector.email) !== INSPECTOR_EMAIL) {
       res.status(403).json({ error: "Inbound sender is not authorized" });
       return;
@@ -376,9 +378,11 @@ inboundSendgridRouter.post("/", async (req: Request, res: Response) => {
     const [message] = await tx.insert(messagesTable).values({
       conversationId: conversation.id,
       senderId: inspector.id,
-      body: `From inspector: ${inboundSenderEmail}\n\n${body.data.text}`,
+      body: `From inspector: ${inboundSenderEmail}\n${body.data.subject ? `Subject: ${body.data.subject}\n` : ""}\n${body.data.text}`,
     }).returning();
     await tx.update(inboundEmailMessagesTable).set({ messageId: message.id }).where(eq(inboundEmailMessagesTable.providerMessageId, providerMessageId));
+    // A fresh inspector email must be visible even if a manager archived the thread.
+    await tx.delete(conversationArchivesTable).where(eq(conversationArchivesTable.conversationId, conversation.id));
     const managers = await inspectorManagers();
     if (managers.length) await tx.insert(notificationsTable).values(managers.map(manager => ({ staffId: manager.id, type: "inspector_to_supervisor" as const, message: "URGENT: Inspector email message received", isRead: false })));
     const managerIds = new Set(managers.map(manager => manager.id));
@@ -719,6 +723,9 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
   }
   const { convo } = result;
   const shared = await inspectorForConversation(convo);
+  if (shared && isInspectorManager(sender.role) && body.data.inspectorRecipients === undefined) {
+    return res.status(400).json({ error: "Choose one inspector or explicitly select all inspectors before sending" });
+  }
   const selectedInspectorRecipients = body.data.inspectorRecipients === undefined
     ? undefined
     : resolveInspectorRecipients(body.data.inspectorRecipients);

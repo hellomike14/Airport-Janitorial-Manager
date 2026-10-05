@@ -11,9 +11,25 @@ import {
   outboundEmailStatus,
   resolveInspectorRecipients,
   verifyReplyToken,
+  senderMailbox,
 } from "./sendgridEmailBridge";
 
 const key = "a".repeat(32);
+test("display names and forwarded SRS messages preserve the approved original sender", () => {
+  const sender = "ashley.maynard@goaa.org";
+  const from = '"Maynard, Ashley" <Ashley.Maynard@GOAA.org>';
+  assert.equal(senderMailbox(from), sender);
+  assert.equal(isAuthorizedInspectorEmailSender(from, sender, "pass"), sender);
+  assert.equal(isAuthorizedInspectorEmailSender(from, "SRS0=fixture@marvolenterprises.com", "pass", "{@goaa.org : pass}"), sender);
+  assert.equal(isAuthorizedInspectorEmailSender(from, "SRS0=fixture@marvolenterprises.com", "pass"), null);
+  for (const dkim of ["{@notgoaa.org : pass}", "{@goaa.org.evil.test : pass}", "{@goaa.org : pass-fake}", "{@goaa.org : fail}", "{@marvolenterprises.com : pass}"]) {
+    assert.equal(isAuthorizedInspectorEmailSender(from, "forwarder@marvolenterprises.com", "pass", dkim), null, dkim);
+  }
+  for (const value of ["Ashley <ashley.maynard@goaa.org>, Intruder <bad@example.com>", "a@example.com, ashley.maynard@goaa.org", "Ashley\r\nFrom: <ashley.maynard@goaa.org>"]) {
+    assert.equal(isAuthorizedInspectorEmailSender(value, sender, "pass", "{@goaa.org : pass}"), null);
+  }
+  assert.equal(isAuthorizedInspectorEmailSender("Unknown <unknown@goaa.org>", "unknown@goaa.org", "pass", "{@goaa.org : pass}"), null);
+});
 test("reply tokens are signed, scoped, and expire", () => {
   const token = createReplyToken({ conversationId: 7, inspectorId: 8, supervisorId: 9, expiresAt: 200 }, key);
   assert.deepEqual(verifyReplyToken(token, key, 199), { conversationId: 7, inspectorId: 8, supervisorId: 9 });
@@ -27,7 +43,7 @@ test("missing SendGrid configuration never claims delivery", () => {
 
 test("only the ten configured external inspector addresses can be selected", () => {
   assert.equal(INSPECTOR_RECIPIENT_EMAILS.length, 10);
-  assert.deepEqual(resolveInspectorRecipients(undefined), [...INSPECTOR_RECIPIENT_EMAILS]);
+  assert.equal(resolveInspectorRecipients(undefined), null);
   assert.deepEqual(resolveInspectorRecipients([" AMBER.NORDICK@GOAA.ORG "]), ["amber.nordick@goaa.org"]);
   assert.deepEqual(resolveInspectorRecipients([...INSPECTOR_RECIPIENT_EMAILS]), [...INSPECTOR_RECIPIENT_EMAILS]);
   assert.equal(resolveInspectorRecipients(["amber.nordick@goaa.org", "arcolon@goaa.org"]), null);

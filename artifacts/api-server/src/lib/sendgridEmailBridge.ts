@@ -21,9 +21,9 @@ export function normalizedEmail(value: string | null | undefined): string | null
   return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) ? email : null;
 }
 
-/** A missing recipient choice preserves legacy broadcast behavior. */
+/** Sending to every inspector always requires an explicit recipient choice. */
 export function resolveInspectorRecipients(recipients: readonly string[] | undefined): string[] | null {
-  if (recipients === undefined) return [...INSPECTOR_RECIPIENT_EMAILS];
+  if (recipients === undefined) return null;
   if (recipients.length !== 1 && recipients.length !== INSPECTOR_RECIPIENT_EMAILS.length) return null;
   const normalized = recipients.map(normalizedEmail);
   if (normalized.some((email) => !email || !INSPECTOR_RECIPIENT_SET.has(email))) return null;
@@ -32,14 +32,32 @@ export function resolveInspectorRecipients(recipients: readonly string[] | undef
 }
 
 export function isAuthorizedInspectorEmailSender(from: string, envelopeFrom: string, spf?: string, dkim?: string): string | null {
-  const sender = normalizedEmail(from);
+  const sender = senderMailbox(from);
   if (
     !sender ||
     !INSPECTOR_RECIPIENT_SET.has(sender) ||
-    normalizedEmail(envelopeFrom) !== sender ||
-    !inboundAuthenticationPasses(spf, dkim, sender)
+    // Forwarding can rewrite the envelope sender (SRS). In that case require
+    // original-author DKIM; passing SPF for the forwarding server is not proof.
+    !(alignedDkimPass(dkim, sender) ||
+      (normalizedEmail(envelopeFrom) === sender && /^pass(?:\s|$)/i.test(spf?.trim() ?? "")))
   ) return null;
   return sender;
+}
+
+/** Accept a single display-name mailbox, never a list or injected header. */
+export function senderMailbox(value: string): string | null {
+  if (/[\r\n]/.test(value)) return null;
+  const plain = value.trim();
+  const match = plain.match(/^(?:[^<>]*?)<([^<>]+)>$/);
+  if (match && !/[,;]/.test(plain.slice(0, plain.indexOf("<")).replace(/"[^"\r\n]*"/g, ""))) {
+    return normalizedEmail(match[1]);
+  }
+  return /^[^\s<>(),;:]+@[^\s<>(),;:]+$/.test(plain) ? normalizedEmail(plain) : null;
+}
+
+export function alignedDkimPass(dkim: string | undefined, sender: string): boolean {
+  const domain = normalizedEmail(sender)?.split("@")[1]?.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return !!domain && new RegExp(`(?:^|[\\s{,])@?${domain}\\s*:\\s*pass(?=[\\s},]|$)`, "i").test(dkim ?? "");
 }
 
 export type InboundInspectorEmailTarget =
@@ -145,8 +163,7 @@ export function inboundProviderMessageId(headers: string | undefined, fallback: 
 
 export function inboundAuthenticationPasses(spf: string | undefined, dkim: string | undefined, sender: string): boolean {
   if (/^pass(?:\s|$)/i.test(spf?.trim() ?? "")) return true;
-  const domain = normalizedEmail(sender)?.split("@")[1]?.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return !!domain && new RegExp(`@?${domain}\\s*:\\s*pass`, "i").test(dkim ?? "");
+  return alignedDkimPass(dkim, sender);
 }
 
 export { INSPECTOR_EMAIL };

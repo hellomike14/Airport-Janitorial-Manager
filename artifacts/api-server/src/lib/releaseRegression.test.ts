@@ -103,7 +103,7 @@ test("webhook secret accepts identical query or header values only", () => {
 });
 test("multipart fields normalize and malformed/raw MIME inputs fail closed", () => {
   assert.deepEqual(normalizeInboundParseFields({ envelope: '{"from":"a@b.co","to":["x@y.co"]}', from: "a@b.co", text: "ok", spf: "pass" }), {
-    envelope: { from: "a@b.co", to: ["x@y.co"] }, from: "a@b.co", text: "ok", headers: undefined, SPF: "pass", dkim: undefined,
+    envelope: { from: "a@b.co", to: ["x@y.co"] }, from: "a@b.co", text: "ok", subject: undefined, headers: undefined, SPF: "pass", dkim: undefined,
   });
   assert.throws(() => normalizeInboundParseFields({ envelope: "{" }));
   assert.throws(() => normalizeInboundParseFields({ email: "raw", envelope: "{}" }));
