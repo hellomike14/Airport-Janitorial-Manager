@@ -1,3 +1,4 @@
+import { compactChecklist, type EffectiveTask } from "./compactChecklist";
 import { db } from "@workspace/db";
 import { tasksTable, areasTable, taskTypesTable, taskExclusionsTable, areaChecklistsTable } from "@workspace/db/schema";
 import { eq, and, asc, sql } from "drizzle-orm";
@@ -18,8 +19,8 @@ export const FALLBACK_TASKS = [
   "Final supervisor inspection walk-through and sign-off",
 ];
 
-export async function getActiveTaskTypes(): Promise<{ taskName: string; taskOrder: number }[]> {
-  const types = await db
+export async function getActiveTaskTypes(database: Pick<typeof db, "select"> = db): Promise<{ taskName: string; taskOrder: number }[]> {
+  const types = await database
     .select({ taskName: taskTypesTable.taskName, taskOrder: taskTypesTable.taskOrder })
     .from(taskTypesTable)
     .where(eq(taskTypesTable.active, true))
@@ -36,10 +37,10 @@ export async function getAreaSpecificTasks(area: { name: string; terminal: strin
   return AREA_SPECIFIC_TASKS[qualifiedKey] ?? AREA_SPECIFIC_TASKS[area.name] ?? [];
 }
 
-export async function getEffectiveTasksForArea(areaId: number): Promise<{ taskName: string; taskOrder: number; photoRequired?: boolean }[]> {
-  const [profile] = await db.select().from(areaChecklistsTable).where(eq(areaChecklistsTable.areaId, areaId));
+export async function getEffectiveTasksForArea(areaId: number, database: Pick<typeof db, "select"> = db): Promise<EffectiveTask[]> {
+  const [profile] = await database.select().from(areaChecklistsTable).where(eq(areaChecklistsTable.areaId, areaId));
   if (profile) return profile.items.map((item, i) => ({ ...item, taskOrder: i + 1 }));
-  const [area] = await db
+  const [area] = await database
     .select({ name: areasTable.name, terminal: areasTable.terminal })
     .from(areasTable)
     .where(eq(areasTable.id, areaId));
@@ -48,17 +49,17 @@ export async function getEffectiveTasksForArea(areaId: number): Promise<{ taskNa
   const qualifiedKey = `${area.terminal}::${area.name}`;
   const replacesDefaults = AREAS_REPLACING_DEFAULTS.has(qualifiedKey);
 
-  const activeTypes = replacesDefaults ? [] : await getActiveTaskTypes();
+  const activeTypes = replacesDefaults ? [] : await getActiveTaskTypes(database);
   const extraTasks = await getAreaSpecificTasks(area);
   const allTasks = [...new Map([...activeTypes, ...extraTasks].map(t => [t.taskName.trim().toLowerCase(), t])).values()];
 
-  const exclusions = await db
+  const exclusions = await database
     .select({ taskName: taskExclusionsTable.taskName })
     .from(taskExclusionsTable)
     .where(eq(taskExclusionsTable.areaId, areaId));
   const excluded = new Set(exclusions.map((e) => e.taskName));
 
-  return allTasks.filter((t) => !excluded.has(t.taskName));
+  return compactChecklist(allTasks.filter((t) => !excluded.has(t.taskName)));
 }
 
 export async function ensureTasksForDate(areaId: number, date: string) {
@@ -78,7 +79,7 @@ export async function ensureTasksForDate(areaId: number, date: string) {
 
     const [area] = await tx.select({ archived: areasTable.archived }).from(areasTable).where(eq(areasTable.id, areaId));
     if (!area || area.archived) return;
-    const allTasks = await getEffectiveTasksForArea(areaId);
+    const allTasks = await getEffectiveTasksForArea(areaId, tx);
     if (allTasks.length === 0) return;
 
     await tx.insert(tasksTable).values(
@@ -90,6 +91,7 @@ export async function ensureTasksForDate(areaId: number, date: string) {
         completed: false,
         isSpecial: false,
         photoRequired: t.photoRequired ?? false,
+        notes: t.notes ?? null,
       }))
     );
   });

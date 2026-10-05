@@ -62,6 +62,7 @@ async function buildAll() {
     outfile: path.resolve(distDir, "index.cjs"),
     define: {
       "process.env.NODE_ENV": '"production"',
+      OPERATIONS_MIGRATION_SQL: JSON.stringify(await readFile(path.resolve(__dirname, "../../lib/db/migrations/20261005_operations.sql"), "utf8")),
     },
     minify: true,
     external: externals,

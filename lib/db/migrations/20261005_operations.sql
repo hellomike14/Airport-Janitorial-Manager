@@ -1,5 +1,6 @@
 -- Additive migration. Does not delete or merge existing operational records.
 BEGIN;
+SELECT pg_advisory_xact_lock(8103, 1);
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS photo_required boolean NOT NULL DEFAULT false;
 CREATE TABLE IF NOT EXISTS time_entries (
   id serial PRIMARY KEY, staff_id integer NOT NULL REFERENCES staff(id), work_date date NOT NULL,
@@ -56,4 +57,8 @@ CREATE TABLE IF NOT EXISTS operations_settings (
   radius_meters integer NOT NULL DEFAULT 5000, max_accuracy_meters integer NOT NULL DEFAULT 200
 );
 INSERT INTO operations_settings(id) VALUES (1) ON CONFLICT DO NOTHING;
+CREATE TABLE IF NOT EXISTS operations_audit (
+  id serial PRIMARY KEY, actor_id integer NOT NULL REFERENCES staff(id), action text NOT NULL,
+  details jsonb NOT NULL, created_at timestamptz NOT NULL DEFAULT now()
+);
 COMMIT;

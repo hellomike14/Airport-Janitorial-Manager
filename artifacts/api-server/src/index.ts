@@ -1,4 +1,5 @@
 import app from "./app";
+import { applyOperationsMigration } from "./lib/operationsMigration";
 import { generatePreviousMonthlyReport } from "./lib/monthlyOperationsReport";
 import { db } from "@workspace/db";
 import { staffTable, areasTable, taskTypesTable, notificationsTable, staffLocationsTable, tasksTable, taskExclusionsTable, assignmentsTable, schedulesTable, issuesTable, sharedPhotosTable, objectUploadsTable, conversationsTable, messagesTable, conversationParticipantsTable } from "@workspace/db/schema";
@@ -818,7 +819,9 @@ async function seed() {
   }
 }
 
-app.listen(port, async () => {
+async function start() {
+  await applyOperationsMigration();
+  app.listen(port, async () => {
   console.log(`Server listening on port ${port}`);
   await seed().catch((err) => console.error("Seed error:", err));
   void generatePreviousMonthlyReport().catch(() => console.error("Monthly operations report could not be generated"));
@@ -834,4 +837,6 @@ app.listen(port, async () => {
     () => void drainOutbox().catch(() => undefined),
     inspectorConfig.outboxPollMs,
   ).unref();
-});
+  });
+}
+void start().catch(error => { console.error("Operations migration failed; server was not started", error); process.exitCode = 1; });

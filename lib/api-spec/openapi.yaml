@@ -1704,6 +1704,15 @@ components:
     Task:
       type: object
       properties:
+        photoRequired:
+          type: boolean
+          description: An after photo must be attached before this task can be completed.
+        beforeImagePath:
+          type: string
+          nullable: true
+        afterImagePath:
+          type: string
+          nullable: true
         id:
           type: integer
         areaId:

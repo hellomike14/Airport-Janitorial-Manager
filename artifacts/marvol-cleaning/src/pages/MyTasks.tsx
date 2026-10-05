@@ -90,7 +90,6 @@ export default function MyTasks() {
 
   const isLoading = loadingAssignments || loadingTasks;
 
-  if (!currentUser) return null;
 
   const getGreeting = (name: string) => {
     const h = getHours(new Date());
@@ -155,6 +154,7 @@ export default function MyTasks() {
 
   const [taskError, setTaskError] = useState("");
   const toggleTask = async (task: any) => {
+    if (!currentUser) return;
     setTaskError("");
     if (!task.completed && task.photoRequired && !task.afterImagePath) {
       setTaskError("Attach an after photo before completing this task. Required photos must finish uploading before completion.");
@@ -184,6 +184,7 @@ export default function MyTasks() {
     } catch (error) { setTaskError(error instanceof Error ? error.message : "Unable to save task completion"); }
   };
 
+  if (!currentUser) return null;
   if (isLoading) {
     return (
       <div className="space-y-4 max-w-2xl mx-auto">
@@ -339,6 +340,7 @@ export default function MyTasks() {
                       }`}>
                         {task.taskName}
                       </p>
+                      {task.notes && <details className="text-xs text-slate-600" onClick={e => e.stopPropagation()}><summary className="cursor-pointer">Cleaning duties</summary><p className="whitespace-pre-line mt-2">{task.notes}</p></details>}
                       {(task as any).photoRequired && <p className="text-xs text-amber-700">After photo required</p>}
                       {task.completed && task.completedAt && (
                         <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">

@@ -137,6 +137,7 @@ export default function AreaTasks() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-12">
+      {taskError && <p role="alert" className="p-3 rounded-lg bg-red-50 text-red-700">{taskError}</p>}
       <Link href="/areas" className="inline-flex items-center text-sm font-medium text-slate-500 hover:text-accent transition-colors">
         <ArrowLeft className="w-4 h-4 mr-1" /> {t("areaTasks.backToAreaList")}
       </Link>
@@ -220,7 +221,7 @@ export default function AreaTasks() {
                   </span>
                 )}
                 {task.notes && (
-                  <p className="text-sm text-slate-500 mt-1 italic">"{task.notes}"</p>
+                  <details className="text-sm text-slate-500 mt-1"><summary className="cursor-pointer">Cleaning duties</summary><p className="whitespace-pre-line mt-2">{task.notes}</p></details>
                 )}
               </div>
 
