@@ -2,13 +2,14 @@ import { Router, type IRouter, type NextFunction, type Request, type Response } 
 import { createHash } from "node:crypto";
 import { db } from "@workspace/db";
 import { schedulesTable, staffTable, areasTable } from "@workspace/db/schema";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { MoveTerminalGroupScheduleBody, PreviewTerminalGroupScheduleMoveQueryParams } from "@workspace/api-zod";
 import { actorStaffFromRequest } from "../lib/actorSession";
 import { isAssignmentTargetEligible } from "../lib/workflowPolicies";
 import { areaBelongsToGroup, TERMINAL_GROUP_KEYS, type TerminalGroupKey } from "../lib/assignmentGroups";
 import { lockScheduleWrites, scheduleGroupLock } from "../lib/scheduleLocks";
+import { overlaps } from "../lib/operationsPolicy";
 
 // The preview includes every schedule in active group areas, including rows
 // already owned by the target. This lets the save detect additions and edits
@@ -213,15 +214,37 @@ const ScheduleFields = z.object({
   staffId: z.number().int().positive(),
   areaId: z.number().int().positive().nullable().optional(),
   dayOfWeek: z.number().int().min(0).max(6),
-  startTime: z.string().regex(timeRegex, "Must be HH:mm format"),
-  endTime: z.string().regex(timeRegex, "Must be HH:mm format"),
-  notes: z.string().nullable().optional(),
+  startTime: z.string().regex(timeRegex),
+  endTime: z.string().regex(timeRegex),
+  notes: z.string().max(4000).nullable().optional(),
 });
-const CreateScheduleBody = ScheduleFields.refine((d) => d.startTime < d.endTime, { message: "startTime must be before endTime" });
-const UpdateScheduleBody = ScheduleFields.partial().refine(
-  (d) => !d.startTime || !d.endTime || d.startTime < d.endTime,
-  { message: "startTime must be before endTime" },
+const CreateScheduleBody = ScheduleFields.refine(
+  (d) => d.startTime < d.endTime,
+  "Start time must precede end time",
 );
+const UpdateScheduleBody = ScheduleFields.partial();
+class ShiftConflict extends Error {}
+async function validateShift(
+  tx: Parameters<Parameters<typeof database.transaction>[0]>[0],
+  input: z.infer<typeof ScheduleFields>,
+  updateId?: number,
+) {
+  const [person] = await tx.select().from(staffTable).where(eq(staffTable.id, input.staffId));
+  if (!person || !person.active || person.formerEmployee || person.role === "inspector") {
+    throw new ShiftConflict("Choose a current employee");
+  }
+  if (input.areaId) {
+    const [area] = await tx.select({ id: areasTable.id }).from(areasTable)
+      .where(and(eq(areasTable.id, input.areaId), eq(areasTable.archived, false)));
+    if (!area) throw new ShiftConflict("Choose an active area");
+  }
+  const existing = await tx.select().from(schedulesTable).where(and(
+    eq(schedulesTable.staffId, input.staffId), eq(schedulesTable.dayOfWeek, input.dayOfWeek),
+  ));
+  if (existing.some(row => row.id !== updateId && overlaps(row, input))) {
+    throw new ShiftConflict("This employee already has an overlapping shift. Assign additional areas under Assignments.");
+  }
+}
 
 router.post("/", requireScheduleEditor, async (req: Request, res: Response) => {
   const body = CreateScheduleBody.safeParse(req.body);
@@ -233,6 +256,7 @@ router.post("/", requireScheduleEditor, async (req: Request, res: Response) => {
   try {
     const [schedule] = await database.transaction(async (tx) => {
       await lockScheduleWrites(tx);
+      await validateShift(tx, body.data);
       return tx.insert(schedulesTable).values({
         staffId: body.data.staffId,
         areaId: body.data.areaId ?? null,
@@ -243,8 +267,9 @@ router.post("/", requireScheduleEditor, async (req: Request, res: Response) => {
       }).returning();
     });
 
-    res.json(schedule);
+    res.status(201).json(schedule);
   } catch (err: any) {
+    if (err instanceof ShiftConflict) { res.status(409).json({ error: err.message }); return; }
     res.status(500).json({ error: "Failed to create schedule" });
   }
 });
@@ -265,21 +290,22 @@ router.post("/bulk", requireScheduleEditor, async (req: Request, res: Response) 
     return;
   }
 
-  const results = await database.transaction(async (tx) => {
-    await lockScheduleWrites(tx);
-    return tx.insert(schedulesTable).values(
-      body.data.schedules.map((s) => ({
-        staffId: s.staffId,
-        areaId: s.areaId ?? null,
-        dayOfWeek: s.dayOfWeek,
-        startTime: s.startTime,
-        endTime: s.endTime,
-        notes: s.notes ?? null,
-      }))
-    ).returning();
-  });
-
-  res.json(results);
+  try {
+    const results = await database.transaction(async (tx) => {
+      await lockScheduleWrites(tx);
+      const saved = [];
+      for (const input of body.data.schedules) {
+        await validateShift(tx, input);
+        const [row] = await tx.insert(schedulesTable).values({ ...input, areaId: input.areaId ?? null, notes: input.notes ?? null }).returning();
+        saved.push(row);
+      }
+      return saved;
+    });
+    res.status(201).json(results);
+  } catch (error) {
+    if (error instanceof ShiftConflict) { res.status(409).json({ error: error.message }); return; }
+    throw error;
+  }
 });
 
 router.put("/:id", requireScheduleEditor, async (req: Request, res: Response) => {
@@ -295,19 +321,26 @@ router.put("/:id", requireScheduleEditor, async (req: Request, res: Response) =>
     return;
   }
 
-  const [updated] = await database.transaction(async (tx) => {
-    await lockScheduleWrites(tx);
-    return tx.update(schedulesTable)
-      .set({ ...body.data, updatedAt: new Date() })
-      .where(eq(schedulesTable.id, id)).returning();
-  });
-
-  if (!updated) {
-    res.status(404).json({ error: "Schedule not found" });
-    return;
+  try {
+    const result = await database.transaction(async (tx) => {
+      await lockScheduleWrites(tx);
+      const [current] = await tx.select().from(schedulesTable).where(eq(schedulesTable.id, id));
+      if (!current) return { status: "missing" as const };
+      const full = CreateScheduleBody.safeParse({ ...current, ...body.data });
+      if (!full.success) return { status: "invalid" as const };
+      await validateShift(tx, full.data, id);
+      const [updated] = await tx.update(schedulesTable)
+        .set({ ...full.data, updatedAt: new Date() })
+        .where(eq(schedulesTable.id, id)).returning();
+      return { status: "updated" as const, updated };
+    });
+    if (result.status === "missing") { res.status(404).json({ error: "Schedule not found" }); return; }
+    if (result.status === "invalid") { res.status(400).json({ error: "Invalid shift times" }); return; }
+    res.json(result.updated);
+  } catch (error) {
+    if (error instanceof ShiftConflict) { res.status(409).json({ error: error.message }); return; }
+    throw error;
   }
-
-  res.json(updated);
 });
 
 router.delete("/:id", requireScheduleEditor, async (req: Request, res: Response) => {

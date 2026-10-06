@@ -1,4 +1,6 @@
 import app from "./app";
+import { applyOperationsMigration } from "./lib/operationsMigration";
+import { generatePreviousMonthlyReport } from "./lib/monthlyOperationsReport";
 import { db } from "@workspace/db";
 import { staffTable, areasTable, taskTypesTable, notificationsTable, staffLocationsTable, tasksTable, taskExclusionsTable, assignmentsTable, schedulesTable, issuesTable, sharedPhotosTable, objectUploadsTable, conversationsTable, messagesTable, conversationParticipantsTable } from "@workspace/db/schema";
 import { eq, and, count, inArray, or, gte, like, ne, sql } from "drizzle-orm";
@@ -111,6 +113,9 @@ const LEGACY_STAFF_RENAMES = [
 
 
 async function seed() {
+  // Publish owns the managed production schema. Legacy startup guards are
+  // development-only, just like the additive Operations migration.
+  if (process.env.NODE_ENV !== "production") {
   // Startup-safe DDL guard: ensures the `archived` column exists in
   // environments where `drizzle-kit push` has not been run yet. Idempotent.
   await db.execute(
@@ -176,6 +181,7 @@ async function seed() {
   // Clerk migration: personal PINs are gone — drop the legacy hash column so
   // no PIN hashes linger in any environment (dev or production).
   await db.execute(sql`ALTER TABLE "staff" DROP COLUMN IF EXISTS "password"`);
+  }
 
   // Preserve existing staff history when a seeded management profile is
   // corrected after it has already been inserted in an environment.
@@ -875,9 +881,13 @@ async function seed() {
   }
 }
 
-app.listen(port, async () => {
+async function start() {
+  await applyOperationsMigration();
+  app.listen(port, async () => {
   console.log(`Server listening on port ${port}`);
   await seed().catch((err) => console.error("Seed error:", err));
+  void generatePreviousMonthlyReport().catch(() => console.error("Monthly operations report could not be generated"));
+  setInterval(() => void generatePreviousMonthlyReport().catch(() => console.error("Monthly operations report could not be generated")), 60 * 60 * 1000).unref();
   const inspectorConfig = inspectorRuntimeConfig();
   // A lock-protected sweep is safe to run on every instance; deployments
   // should additionally invoke it from their scheduler for sleep resilience.
@@ -889,4 +899,6 @@ app.listen(port, async () => {
     () => void drainOutbox().catch(() => undefined),
     inspectorConfig.outboxPollMs,
   ).unref();
-});
+  });
+}
+void start().catch(error => { console.error("Operations migration failed; server was not started", error); process.exitCode = 1; });

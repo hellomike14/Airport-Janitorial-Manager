@@ -11,6 +11,12 @@ A dated group reassignment changes only the roster for the selected date. Keep e
 
 **How to apply:** State the limited scope in the supervisor confirmation and keep recurring schedule changes deliberate and separate.
 
+Creating a dated individual or group area assignment must also stay separate from recurring shifts. Payroll uses actual clocked, approved time, not the number of area assignments.
+
+**Why:** One employee can cover several areas in a single shift. Turning those area assignments into recurring shifts duplicates scheduled coverage and can misrepresent payroll hours.
+
+**How to apply:** Keep dated assignment creation idempotent without generating weekly schedule rows; preserve explicit reviewed weekly moves as their own workflow.
+
 When explicitly transferring a recurring group schedule, treat the transfer as effective immediately, not as beginning on the date currently selected for a one-day roster.
 
 **Why:** The weekly schedule model has no effective date; implying a chosen start date would promise behavior the stored schedule cannot express.

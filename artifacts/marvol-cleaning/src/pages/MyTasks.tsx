@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect } from "react";
+import React, { useMemo, useEffect, useState } from "react";
 import { format, getHours } from "date-fns";
 import { useTranslation } from "react-i18next";
 import { getDateLocale } from "@/i18n/dateLocale";
@@ -28,6 +28,7 @@ import {
 import { TaskPhotoThumbnails, TaskPhotoToggle } from "@/components/TaskPhotos";
 import { StaffName } from "@/components/StaffName";
 import { InspectorWorkflowCard } from "@/components/InspectorWorkflowCard";
+import { TimeClock } from "./Operations";
 import { trackEvent } from "@/lib/analytics";
 
 const TERMINAL_STYLES: Record<string, { bg: string; text: string; dot: string; bar: string; border: string }> = {
@@ -89,7 +90,6 @@ export default function MyTasks() {
 
   const isLoading = loadingAssignments || loadingTasks;
 
-  if (!currentUser) return null;
 
   const getGreeting = (name: string) => {
     const h = getHours(new Date());
@@ -152,7 +152,15 @@ export default function MyTasks() {
   const totalCompleted = areaGroups.reduce((s, g) => s + g.completed, 0) + myExtraTasks.filter((t) => t.completed).length;
   const allDone = totalTasks > 0 && totalCompleted === totalTasks;
 
+  const [taskError, setTaskError] = useState("");
   const toggleTask = async (task: any) => {
+    if (!currentUser) return;
+    setTaskError("");
+    if (!task.completed && task.photoRequired && !task.afterImagePath) {
+      setTaskError("Attach an after photo before completing this task. Required photos must finish uploading before completion.");
+      return;
+    }
+    try {
     if (task.completed) {
       const handled = await offlineUncomplete.mutateOffline(task.id);
       if (!handled) {
@@ -173,8 +181,10 @@ export default function MyTasks() {
         offline: handled,
       });
     }
+    } catch (error) { setTaskError(error instanceof Error ? error.message : "Unable to save task completion"); }
   };
 
+  if (!currentUser) return null;
   if (isLoading) {
     return (
       <div className="space-y-4 max-w-2xl mx-auto">
@@ -187,6 +197,8 @@ export default function MyTasks() {
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto pb-16">
+      <TimeClock />
+      {taskError && <p role="alert" className="p-3 bg-red-50 text-red-700 rounded-lg">{taskError}</p>}
 
       <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-3xl p-6 text-white shadow-xl shadow-slate-900/20">
         <div className="flex items-start justify-between gap-3">
@@ -328,6 +340,8 @@ export default function MyTasks() {
                       }`}>
                         {task.taskName}
                       </p>
+                      {task.notes && <details className="text-xs text-slate-600" onClick={e => e.stopPropagation()}><summary className="cursor-pointer">Cleaning duties</summary><p className="whitespace-pre-line mt-2">{task.notes}</p></details>}
+                      {(task as any).photoRequired && <p className="text-xs text-amber-700">After photo required</p>}
                       {task.completed && task.completedAt && (
                         <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
                           <Clock className="w-3 h-3" />

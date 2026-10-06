@@ -291,6 +291,12 @@ export const ListTasksQueryParams = zod.object({
 });
 
 export const ListTasksResponseItem = zod.object({
+  photoRequired: zod
+    .boolean()
+    .optional()
+    .describe(
+      "An after photo must be attached before this task can be completed.",
+    ),
   id: zod.number(),
   areaId: zod.number(),
   taskDate: zod.string(),
@@ -388,6 +394,12 @@ export const CompleteTaskBody = zod.object({
 });
 
 export const CompleteTaskResponse = zod.object({
+  photoRequired: zod
+    .boolean()
+    .optional()
+    .describe(
+      "An after photo must be attached before this task can be completed.",
+    ),
   id: zod.number(),
   areaId: zod.number(),
   taskDate: zod.string(),
@@ -431,6 +443,12 @@ export const UncompleteTaskParams = zod.object({
 });
 
 export const UncompleteTaskResponse = zod.object({
+  photoRequired: zod
+    .boolean()
+    .optional()
+    .describe(
+      "An after photo must be attached before this task can be completed.",
+    ),
   id: zod.number(),
   areaId: zod.number(),
   taskDate: zod.string(),

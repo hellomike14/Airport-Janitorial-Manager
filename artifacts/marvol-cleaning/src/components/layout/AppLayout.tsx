@@ -100,6 +100,7 @@ function useNavConfig() {
       { href: "/issues", icon: AlertTriangle, label: t("nav.inspectorSpecialAssignments") },
       { href: "/report", icon: FileText, label: t("nav.inspectorReport") },
       { href: "/gps-tracking", icon: Navigation, label: t("nav.gpsTracking") },
+      { href: "/operations", icon: ClipboardList, label: "Operations" },
       { href: "/employee-portal", icon: Calendar, label: t("nav.employeePortal") },
       { href: "/photo-share", icon: Camera, label: t("nav.photoShare") },
       { href: "/weekly-report", icon: BarChart3, label: t("nav.weeklyReport") },
@@ -115,6 +116,7 @@ function useNavConfig() {
       { href: "/staff", icon: Users, label: t("nav.staffDirectory") },
       { href: "/issues", icon: AlertTriangle, label: t("nav.inspectorSpecialAssignments") },
       { href: "/report", icon: FileText, label: t("nav.inspectorReport") },
+      { href: "/operations", icon: ClipboardList, label: "Operations" },
       { href: "/employee-portal", icon: Calendar, label: t("nav.employeePortal") },
       { href: "/photo-share", icon: Camera, label: t("nav.photoShare") },
       { href: "/special-requests", icon: Star, label: t("nav.specialRequests") },
@@ -130,6 +132,7 @@ function useNavConfig() {
       { href: "/my-tasks", icon: CheckSquare, label: t("nav.myTasks") },
       { href: "/messages", icon: MessageSquare, label: t("nav.messages") },
       { href: "/issues", icon: AlertTriangle, label: t("nav.myIssues") },
+      { href: "/operations", icon: ClipboardList, label: "Operations" },
       { href: "/employee-portal", icon: Calendar, label: t("nav.mySchedule") },
       { href: "/photo-share", icon: Camera, label: t("nav.photoShare") },
       { href: "/special-requests", icon: Star, label: t("nav.specialRequests") },
@@ -623,7 +626,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Sidebar */}
-      <aside className={`
+      <aside className={`print:hidden
         fixed lg:static inset-y-0 left-0 z-50
         w-[280px] bg-sidebar text-sidebar-foreground flex flex-col
         transition-transform duration-300 ease-out shadow-2xl lg:shadow-none
@@ -706,7 +709,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
         {/* Top Header */}
-        <header className="h-16 bg-white/80 backdrop-blur-xl border-b border-border flex items-center justify-between px-4 sm:px-8 shrink-0 z-30 sticky top-0 shadow-sm shadow-slate-200/20">
+        <header className="print:hidden h-16 bg-white/80 backdrop-blur-xl border-b border-border flex items-center justify-between px-4 sm:px-8 shrink-0 z-30 sticky top-0 shadow-sm shadow-slate-200/20">
           <div className="flex items-center gap-4">
             <button
               className="lg:hidden min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 active:bg-slate-200 transition-colors touch-manipulation"

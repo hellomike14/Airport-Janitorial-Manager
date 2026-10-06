@@ -271,6 +271,8 @@ export interface CleaningArea {
 }
 
 export interface Task {
+  /** An after photo must be attached before this task can be completed. */
+  photoRequired?: boolean;
   id: number;
   areaId: number;
   taskDate: string;

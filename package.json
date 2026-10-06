@@ -7,10 +7,12 @@
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
+    "test:operations": "node --experimental-test-module-mocks --import ./artifacts/api-server/node_modules/tsx/dist/loader.mjs --test tests/operations/*.test.mts artifacts/api-server/src/lib/operationsPolicy.test.ts",
     "verify:access-flow": "bash scripts/verify-access-flow.sh"
   },
   "private": true,
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
     "prettier": "^3.8.1",
     "typescript": "~5.9.2"
   },

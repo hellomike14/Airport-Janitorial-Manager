@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { assignmentsTable, staffTable, areasTable, schedulesTable } from "@workspace/db/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { assignmentsTable, staffTable, areasTable } from "@workspace/db/schema";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import {
   ListAssignmentsQueryParams,
   CreateAssignmentBody,
@@ -12,7 +12,6 @@ import {
 import { actorStaffFromRequest } from "../lib/actorSession";
 import { isAssignmentTargetEligible } from "../lib/workflowPolicies";
 import { areaBelongsToGroup, groupAssignmentLock, groupForArea, planGroupAssignment, planGroupReassignment, TERMINAL_GROUP_KEYS } from "../lib/assignmentGroups";
-import { lockScheduleWrites } from "../lib/scheduleLocks";
 
 // Injectable dependencies keep assignment/schedule concurrency tests off the live database.
 export function createAssignmentsRouter(
@@ -47,7 +46,7 @@ router.get("/", async (req, res) => {
     .from(assignmentsTable)
     .innerJoin(
       staffTable,
-      and(eq(assignmentsTable.staffId, staffTable.id), eq(staffTable.active, true))
+      and(eq(assignmentsTable.staffId, staffTable.id), eq(staffTable.active, true), eq(staffTable.formerEmployee, false))
     )
     .innerJoin(areasTable, eq(assignmentsTable.areaId, areasTable.id))
     .where(
@@ -98,12 +97,17 @@ router.post("/", async (req, res) => {
       id: areasTable.id, name: areasTable.name, terminal: areasTable.terminal, location: areasTable.location,
     }).from(areasTable).where(eq(areasTable.archived, false));
     const areaIds = allAreas.filter((area) => areaBelongsToGroup(area, groupKey)).map((area) => area.id);
-    const existingGroup = await tx.select({ areaId: assignmentsTable.areaId, staffId: assignmentsTable.staffId })
+    const existingGroup = await tx.select({ id: assignmentsTable.id, areaId: assignmentsTable.areaId, staffId: assignmentsTable.staffId })
       .from(assignmentsTable).innerJoin(staffTable, and(
         eq(assignmentsTable.staffId, staffTable.id), eq(staffTable.active, true),
       )).where(and(eq(assignmentsTable.assignmentDate, body.assignmentDate), inArray(assignmentsTable.areaId, areaIds)));
-    if (existingGroup.some((row) => row.staffId !== body.staffId || row.areaId === body.areaId)) {
+    if (existingGroup.some((row) => row.staffId !== body.staffId)) {
       return { status: "conflict" as const };
+    }
+    const duplicate = existingGroup.find(row => row.areaId === body.areaId);
+    if (duplicate) {
+      const [created] = await tx.select().from(assignmentsTable).where(eq(assignmentsTable.id, duplicate.id));
+      return { status: "created" as const, created };
     }
     const [created] = await tx.insert(assignmentsTable).values({
       staffId: body.staffId,
@@ -113,20 +117,7 @@ router.post("/", async (req, res) => {
       notes: body.notes ?? null,
       isSpecial: body.isSpecial,
     }).returning();
-    await lockScheduleWrites(tx);
-    const dayOfWeek = new Date(body.assignmentDate + "T12:00:00").getDay();
-    const existing = await tx.select({ id: schedulesTable.id }).from(schedulesTable)
-      .where(and(eq(schedulesTable.staffId, body.staffId),
-        eq(schedulesTable.dayOfWeek, dayOfWeek), eq(schedulesTable.areaId, body.areaId))).limit(1);
-    if (!existing.length) {
-      const [shift] = await tx.select({ startTime: schedulesTable.startTime, endTime: schedulesTable.endTime })
-        .from(schedulesTable).where(eq(schedulesTable.staffId, body.staffId)).limit(1);
-      await tx.insert(schedulesTable).values({
-        staffId: body.staffId, areaId: body.areaId, dayOfWeek,
-        startTime: shift?.startTime ?? "14:00", endTime: shift?.endTime ?? "22:00",
-        notes: body.notes ?? null,
-      });
-    }
+    // A dated area assignment is not a recurring shift or payroll time.
     return { status: "created" as const, created };
   });
   if (result.status === "invalid") return res.status(400).json({ error: "Target staff or area is not eligible" });
@@ -203,27 +194,7 @@ router.post("/group", async (req, res) => {
       })));
     }
 
-    await lockScheduleWrites(tx);
-    const dayOfWeek = new Date(body.assignmentDate + "T12:00:00").getDay();
-    const scheduled = await tx.select({ areaId: schedulesTable.areaId })
-      .from(schedulesTable).where(and(
-        eq(schedulesTable.staffId, body.staffId),
-        eq(schedulesTable.dayOfWeek, dayOfWeek),
-        inArray(schedulesTable.areaId, areaIds),
-      ));
-    const scheduledIds = new Set(scheduled.map((row) => row.areaId));
-    const missingSchedules = areaIds.filter((id) => !scheduledIds.has(id));
-    if (missingSchedules.length) {
-      const [existingShift] = await tx.select({
-        startTime: schedulesTable.startTime, endTime: schedulesTable.endTime,
-      }).from(schedulesTable).where(eq(schedulesTable.staffId, body.staffId)).limit(1);
-      await tx.insert(schedulesTable).values(missingSchedules.map((areaId) => ({
-        staffId: body.staffId, areaId, dayOfWeek,
-        startTime: existingShift?.startTime ?? "14:00",
-        endTime: existingShift?.endTime ?? "22:00",
-        notes: body.notes ?? null,
-      })));
-    }
+    // Reviewed weekly moves remain separate from dated group assignments.
     return { status: "created" as const, createdCount: missingIds.length, existingCount };
   });
   if (result.status === "staff") return res.status(400).json({ error: "Target staff is not eligible" });

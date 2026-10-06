@@ -77,7 +77,7 @@ router.get("/dashboard", async (req, res) => {
   }
 
   const areaProgress = areas.map((area) => {
-    const stats = statsMap.get(area.id) ?? { total: 15, completed: 0 };
+    const stats = statsMap.get(area.id) ?? { total: 0, completed: 0 };
     return {
       areaId: area.id,
       areaName: area.name,
@@ -133,6 +133,7 @@ router.get("/", async (req, res) => {
       .select({ id: areasTable.id })
       .from(areasTable)
       .where(eq(areasTable.archived, false));
+    for (const area of allActive) await ensureTasksForDate(area.id, date);
     activeAreaIdFilter = allActive.map((a) => a.id);
   }
 
@@ -157,6 +158,7 @@ router.get("/", async (req, res) => {
       notes: tasksTable.notes,
       beforeImagePath: tasksTable.beforeImagePath,
       afterImagePath: tasksTable.afterImagePath,
+      photoRequired: tasksTable.photoRequired,
     })
     .from(tasksTable)
     .leftJoin(staffTable, eq(tasksTable.completedById, staffTable.id))
@@ -359,6 +361,7 @@ router.post("/complete-all", async (req, res) => {
         eq(tasksTable.areaId, body.areaId),
         eq(tasksTable.taskDate, body.date),
         eq(tasksTable.completed, false),
+        sql`(${tasksTable.photoRequired} = false OR ${tasksTable.afterImagePath} IS NOT NULL)`,
         sql`NOT EXISTS (SELECT 1 FROM inspector_task_links itl WHERE itl.task_id = ${tasksTable.id})`
       )
     );
@@ -389,6 +392,7 @@ router.post("/:id/complete", async (req, res) => {
       return { status: "forbidden" as const };
     }
     if (lockedTask.completed) return { status: "ok" as const, task: lockedTask, changed: false };
+    if (lockedTask.photoRequired && !lockedTask.afterImagePath) return { status: "photo_required" as const };
     const [task] = await tx.update(tasksTable).set({ completed: true, completedAt: new Date(), completedById: actor.id })
       .where(and(eq(tasksTable.id, id), eq(tasksTable.completed, false))).returning();
     if (!task) return { status: "conflict" as const };
@@ -413,6 +417,7 @@ router.post("/:id/complete", async (req, res) => {
   });
   if (completion.status === "not_found") return res.status(404).json({ error: "Task not found" });
   if (completion.status === "forbidden") return res.status(403).json({ error: "Inspector workflow completion requires the locked current assignee" });
+  if (completion.status === "photo_required") return res.status(400).json({ error: "Attach an after photo before completing this task" });
   if (completion.status === "conflict") return res.status(409).json({ error: "Task completion changed concurrently" });
   const updated = completion.task;
 
@@ -534,14 +539,11 @@ router.patch("/:id/images", async (req, res) => {
     return res.status(400).json({ error: "No image fields provided" });
   }
 
-  const [updated] = await db
-    .update(tasksTable)
-    .set(updates)
-    .where(eq(tasksTable.id, id))
-    .returning();
+  const [updated] = await db.update(tasksTable).set(updates)
+    .where(and(eq(tasksTable.id, id), afterImagePath === null ? sql`NOT (${tasksTable.completed} AND ${tasksTable.photoRequired})` : undefined)).returning();
 
   if (!updated) {
-    return res.status(404).json({ error: "Task not found" });
+    return res.status(409).json({ error: "Uncomplete this task before removing required evidence" });
   }
 
   return res.json({

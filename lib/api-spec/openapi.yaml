@@ -1860,6 +1860,9 @@ components:
     Task:
       type: object
       properties:
+        photoRequired:
+          type: boolean
+          description: An after photo must be attached before this task can be completed.
         id:
           type: integer
         areaId:

@@ -345,7 +345,7 @@ test("a simultaneous schedule edit or insert cannot slip past group confirmation
       await new Promise((resolve) => setTimeout(resolve, 20));
       assert.equal(confirmed, false, "confirmation waits for the schedule writer");
       releaseWrite();
-      assert.equal((await writer).status, 200);
+      assert.equal((await writer).status, change === "insert" ? 201 : 200);
       assert.equal((await confirmation).status, 409, `${change} invalidates the reviewed snapshot`);
       assert.equal(rows[0].staffId, 11, "confirmation must not move rows after a concurrent change");
       if (change === "insert") assert.equal(rows.length, 2, "the inserted row remains owned by its creator");
@@ -356,7 +356,7 @@ test("a simultaneous schedule edit or insert cannot slip past group confirmation
   }
 });
 
-test("assignment-created schedules serialize with a reviewed move in either lock order", async () => {
+test("dated assignments do not create recurring shifts or invalidate a reviewed weekly move", async () => {
   for (const [assignmentRoute, firstRequest] of [
     ["single", "assignment"], ["single", "confirmation"],
     ["group", "assignment"], ["group", "confirmation"],
@@ -370,23 +370,12 @@ test("assignment-created schedules serialize with a reviewed move in either lock
       updatedAt: new Date("2026-01-01"), staffName: "Original", areaName: area.name,
     };
     let rows = [original];
-    let releaseFirst!: () => void;
-    const firstGate = new Promise<void>((resolve) => { releaseFirst = resolve; });
-    let firstPaused!: () => void;
-    const paused = new Promise<void>((resolve) => { firstPaused = resolve; });
-    let secondWaiting!: () => void;
-    const waiting = new Promise<void>((resolve) => { secondWaiting = resolve; });
     const dialect = new PgDialect();
     const held = new Map<string, Promise<void>>();
-    let scheduleLockAttempts = 0;
     const database = {
       select: (fields: Record<string, unknown>) => ({
         from(table: unknown) {
-          const read = async (forUpdate: boolean) => {
-            if (forUpdate && firstRequest === "confirmation" && table === schedulesTable) {
-              firstPaused();
-              await firstGate;
-            }
+          const read = async () => {
             const data = table === staffTable
               ? [{ id: 99, name: "Target", active: true, formerEmployee: false }, { id: 12, name: "Assigned", active: true, formerEmployee: false }]
               : table === areasTable ? [area]
@@ -404,13 +393,12 @@ test("assignment-created schedules serialize with a reviewed move in either lock
               ]));
             });
           };
-          let lockedRead = false;
           const query = {
             where: () => query, innerJoin: () => query,
-            for: () => { lockedRead = true; return query; },
+            for: () => query,
             limit: () => query,
             then: (resolve: (value: unknown[]) => unknown, reject: (reason: unknown) => unknown) =>
-              read(lockedRead).then(resolve, reject),
+              read().then(resolve, reject),
           };
           return query;
         },
@@ -426,7 +414,6 @@ test("assignment-created schedules serialize with a reviewed move in either lock
             const previous = held.get(key);
             let release!: () => void;
             held.set(key, new Promise<void>((resolve) => { release = resolve; }));
-            if (key === "schedule:terminal-a-east" && ++scheduleLockAttempts === 2) secondWaiting();
             if (previous) await previous;
             releases.push(release);
           },
@@ -438,18 +425,7 @@ test("assignment-created schedules serialize with a reviewed move in either lock
                   then: (resolve: (value: unknown) => unknown) => resolve(undefined),
                 };
               }
-              assert.equal(table, schedulesTable);
-              return { then: async (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) => {
-                try {
-                  const schedule = Array.isArray(values) ? values[0] : values;
-                  if (firstRequest === "assignment") {
-                    firstPaused();
-                    await firstGate;
-                  }
-                  rows.push({ ...original, ...schedule, id: 1002, staffName: "Assigned" } as Row);
-                  return resolve(undefined);
-                } catch (error) { return reject(error); }
-              } };
+              assert.fail("Dated assignments must not insert recurring schedules");
             },
           }),
           update: (table: unknown) => {
@@ -497,22 +473,14 @@ test("assignment-created schedules serialize with a reviewed move in either lock
         method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({ staffId: 12, ...(assignmentRoute === "group" ? { groupKey: "terminal-a-east" } : { areaId: area.id, assignedById: 7 }), assignmentDate, isSpecial: false }),
       });
-      const first = firstRequest === "assignment" ? assign() : confirm();
-      await within(paused);
-      const second = firstRequest === "assignment" ? confirm() : assign();
-      await within(waiting);
-      let secondFinished = false;
-      void second.then(() => { secondFinished = true; });
-      await new Promise((resolve) => setTimeout(resolve, 20));
-      assert.equal(secondFinished, false, "the second request waits for the first transaction's schedule lock");
-      releaseFirst();
-      assert.equal((await within(first)).status, firstRequest === "assignment" ? 201 : 200);
-      assert.equal((await within(second)).status, firstRequest === "assignment" ? 409 : 201);
-      assert.equal(rows.length, 2);
-      assert.equal(rows[0].staffId, firstRequest === "assignment" ? 11 : 99);
-      assert.equal(rows[1].staffId, 12, "the assignment-created row is not silently moved");
+       const [first, second] = await within(Promise.all(firstRequest === "assignment"
+         ? [assign(), confirm()]
+         : [confirm(), assign()]));
+       assert.equal(first.status, firstRequest === "assignment" ? 201 : 200);
+       assert.equal(second.status, firstRequest === "assignment" ? 200 : 201);
+       assert.equal(rows.length, 1, "a dated assignment must not generate any recurring schedule rows");
+       assert.equal(rows[0].staffId, 99, "the independently reviewed weekly move still succeeds");
     } finally {
-      releaseFirst();
       await new Promise<void>((resolve, reject) => server.close((err) => err ? reject(err) : resolve()));
     }
   }
