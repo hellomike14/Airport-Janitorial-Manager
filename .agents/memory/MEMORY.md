@@ -13,3 +13,4 @@
 - [Schedule group locking](schedule-locking.md) — weekly schedule writes lock all terminal groups before touching rows so reviewed moves cannot miss concurrent changes.
 - [Marvol photo alert privacy](marvol-photo-alert-privacy.md) — bell previews must match object-read permissions; general message alerts cannot expose private chat images.
 - [Managed production migrations](managed-production-migrations.md) — reconcile additive startup SQL with Publish-owned production schema changes; never restore runtime production DDL.
+- [Git connection verification](git-auth-verification.md) — accepted authorization is not proof of a successful push; verify remote updates and avoid repeated reconnect loops.
