@@ -34,6 +34,7 @@ import {
 } from "../lib/operationsPolicy";
 import { getEffectiveTasksForArea } from "../lib/ensureTasksForDate";
 import { buildMonthlyReport } from "../lib/monthlyOperationsReport";
+import { lockScheduleWrites } from "../lib/scheduleLocks";
 
 const router: IRouter = Router();
 const manager = requireStaffRole("admin", "supervisor");
@@ -997,6 +998,7 @@ router.post("/schedules/consolidate", admin, async (req, res) => {
   // Exact staff/day/time matches only. Area coverage remains in assignments.
   // Ambiguous overlapping shifts require an administrator to resolve them individually.
   const result = await db.transaction(async (tx) => {
+    await lockScheduleWrites(tx);
     await tx.execute(sql`LOCK TABLE schedules IN SHARE ROW EXCLUSIVE MODE`);
     const rows = await tx.select().from(schedulesTable).for("update");
     const groups = new Map<string, typeof rows>();

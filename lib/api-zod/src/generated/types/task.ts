@@ -9,8 +9,6 @@
 export interface Task {
   /** An after photo must be attached before this task can be completed. */
   photoRequired?: boolean;
-  beforeImagePath?: string | null;
-  afterImagePath?: string | null;
   id: number;
   areaId: number;
   taskDate: string;
@@ -30,4 +28,8 @@ export interface Task {
   inspectorWorkflowTaskId: number | null;
   isSpecial: boolean;
   notes?: string | null;
+  /** @nullable */
+  beforeImagePath: string | null;
+  /** @nullable */
+  afterImagePath: string | null;
 }

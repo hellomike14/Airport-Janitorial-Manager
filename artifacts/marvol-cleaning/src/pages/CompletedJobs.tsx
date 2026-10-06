@@ -255,13 +255,15 @@ export default function CompletedJobs() {
                               </p>
                             )}
                           </div>
-                          <TaskPhotoToggle
-                            taskId={task.id}
-                            beforeImagePath={(task as any).beforeImagePath ?? null}
-                            afterImagePath={(task as any).afterImagePath ?? null}
-                            compact
-                          />
                         </div>
+                      </div>
+                      <div className="pl-9 mt-1">
+                        <TaskPhotoToggle
+                          taskId={task.id}
+                          beforeImagePath={(task as any).beforeImagePath ?? null}
+                          afterImagePath={(task as any).afterImagePath ?? null}
+                          compact
+                        />
                       </div>
                     </div>
                   ))}

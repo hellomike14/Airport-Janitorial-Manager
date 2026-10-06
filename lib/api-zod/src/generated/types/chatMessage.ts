@@ -13,9 +13,15 @@ export interface ChatMessage {
   senderId: number;
   senderName: string;
   body: string;
+  /** @nullable */
+  beforeImagePath: string | null;
+  /** @nullable */
+  afterImagePath: string | null;
   isRead: boolean;
   /** @nullable */
   inspectorWorkflowTaskId: number | null;
   inspectorEmailDeliveryStatus: ChatMessageInspectorEmailDeliveryStatus;
+  /** External inspector email addresses recorded for delivery; empty when this message has no email outbox. */
+  inspectorEmailRecipients: string[];
   createdAt: string;
 }

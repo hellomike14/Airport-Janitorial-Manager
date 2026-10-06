@@ -18,17 +18,18 @@ import { Check, Clock, User, AlertCircle, ArrowLeft, Camera, ToggleLeft, ToggleR
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { TaskPhotoToggle } from "@/components/TaskPhotos";
+import { TaskPhotoThumbnails, TaskPhotoToggle } from "@/components/TaskPhotos";
 import { StaffName } from "@/components/StaffName";
 import { useAuth } from "@/contexts/AuthContext";
 import { trackEvent } from "@/lib/analytics";
+import { calendarDate, facilityDateKey } from "@/lib/facilityDate";
 
 export default function AreaTasks() {
   const { t, i18n } = useTranslation();
   const dateLocale = getDateLocale(i18n.language);
   const [, params] = useRoute("/areas/:areaId");
   const areaId = params?.areaId ? parseInt(params.areaId) : 0;
-  const [selectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [selectedDate] = useState(facilityDateKey);
   const queryClient = useQueryClient();
 
   const { effectiveRole, currentUser } = useAuth();
@@ -149,7 +150,7 @@ export default function AreaTasks() {
           <div>
             <div className="flex items-center gap-3 mb-2">
               <StatusBadge status="info">{areaInfo?.terminal || t("areaTasks.terminal")}</StatusBadge>
-              <span className="text-sm font-semibold text-slate-400 uppercase tracking-wider">{format(new Date(selectedDate), "MMM do, yyyy", { locale: dateLocale })}</span>
+              <span className="text-sm font-semibold text-slate-400 uppercase tracking-wider">{format(calendarDate(selectedDate), "MMM do, yyyy", { locale: dateLocale })}</span>
             </div>
             <h1 className="text-4xl font-display font-bold text-slate-900">{areaInfo?.name || t("areaTasks.area", { id: areaId })}</h1>
             <p className="text-slate-500 mt-2 font-medium flex items-center gap-2">
@@ -195,8 +196,9 @@ export default function AreaTasks() {
           {tasks?.map((task) => (
             <li 
               key={task.id} 
-              className={`p-4 sm:p-5 transition-colors hover:bg-slate-50 flex items-start sm:items-center gap-4 ${task.completed ? 'bg-slate-50/50' : ''}`}
+              className={`p-4 sm:p-5 transition-colors hover:bg-slate-50 ${task.completed ? 'bg-slate-50/50' : ''}`}
             >
+              <div className="flex items-start sm:items-center gap-4">
               <button
                 onClick={() => toggleTask(task)}
                 disabled={completeMutation.isPending || uncompleteMutation.isPending}
@@ -241,6 +243,13 @@ export default function AreaTasks() {
                 ) : (
                   <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">{t("common.pending")}</span>
                 )}
+              </div>
+              </div>
+              <div className="pl-12 pt-2">
+                <TaskPhotoThumbnails
+                  beforeImagePath={(task as any).beforeImagePath ?? null}
+                  afterImagePath={(task as any).afterImagePath ?? null}
+                />
                 <TaskPhotoToggle
                   taskId={task.id}
                   beforeImagePath={(task as any).beforeImagePath ?? null}

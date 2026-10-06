@@ -1,11 +1,13 @@
 import { pgTable, text, serial, integer, boolean, timestamp } from "drizzle-orm/pg-core";
 import { staffTable } from "./staff";
 import { issuesTable } from "./issues";
+import { tasksTable } from "./tasks";
 
 export const notificationsTable = pgTable("notifications", {
   id: serial("id").primaryKey(),
   staffId: integer("staff_id").notNull().references(() => staffTable.id),
   issueId: integer("issue_id").references(() => issuesTable.id),
+  taskId: integer("task_id").references(() => tasksTable.id),
   type: text("type", { enum: ["new_issue", "issue_assigned", "issue_completed", "inspector_to_supervisor", "supervisor_to_inspector", "task_completed", "direct_alert", "photo_shared", "new_message"] }).notNull(),
   message: text("message").notNull(),
   isRead: boolean("is_read").notNull().default(false),

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { format } from "date-fns";
@@ -20,6 +20,8 @@ import {
   ArchiveRestore,
   AlertTriangle,
   Mail,
+  Camera,
+  Loader2,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { InspectorWorkflowCard } from "@/components/InspectorWorkflowCard";
@@ -33,14 +35,51 @@ import {
   sendConversationMessage,
   markConversationRead,
   deleteConversationMessage,
+  deleteOldConversationMessages,
   updateConversationMessage,
   setConversationArchive,
   listStaff,
   listArchivedConversations,
+  listInspectorEmailRecipients,
+  requestUploadUrl,
   type ConversationSummary,
 } from "@workspace/api-client-react";
 
 const CONVERSATIONS_KEY = "/api/conversations";
+const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+
+async function uploadConversationPhoto(
+  file: File,
+  conversationId: number,
+  onProgress: (progress: number) => void,
+): Promise<string> {
+  const { uploadURL, objectPath } = await requestUploadUrl({
+    name: file.name,
+    size: file.size,
+    contentType: file.type,
+    purpose: "conversation_attachment",
+    conversationId,
+  });
+  await new Promise<void>((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open("PUT", uploadURL);
+    request.setRequestHeader("Content-Type", file.type);
+    request.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100));
+    };
+    request.onerror = () => reject(new Error("Photo upload failed. Check your connection and try again."));
+    request.onload = () => {
+      if (request.status >= 200 && request.status < 300) resolve();
+      else reject(new Error(`Photo upload failed (HTTP ${request.status}).`));
+    };
+    request.send(file);
+  });
+  return objectPath;
+}
+
+function conversationPhotoUrl(objectPath: string) {
+  return `${BASE_URL}/api/storage${objectPath}`;
+}
 
 function roleIcon(role: string) {
   if (role === "admin") return <Shield className="w-3.5 h-3.5 text-violet-500" />;
@@ -86,17 +125,19 @@ type DialogMode = "individual" | "group";
 interface NewConvoDialogProps {
   senderRole: string;
   staffId: number;
+  inspectorId?: number;
   onClose: () => void;
   onStarted: (convo: ConversationSummary) => void;
 }
 
-function NewConvoDialog({ senderRole, staffId, onClose, onStarted }: NewConvoDialogProps) {
+function NewConvoDialog({ senderRole, staffId, inspectorId, onClose, onStarted }: NewConvoDialogProps) {
   const { t } = useTranslation();
   const canGroup = senderRole === "admin" || senderRole === "supervisor";
   // Admins/supervisors land straight on the group/checkbox view
   const [mode, setMode] = useState<DialogMode>(canGroup ? "group" : "individual");
   const [groupName, setGroupName] = useState("");
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [selectedStaffId, setSelectedStaffId] = useState<number | null>(null);
 
   const { data: staffList = [], isLoading } = useQuery({
     queryKey: ["/api/staff"],
@@ -117,6 +158,9 @@ function NewConvoDialog({ senderRole, staffId, onClose, onStarted }: NewConvoDia
     canGroup ? staffList.filter((s) => s.id !== staffId) : allowedRecipients;
 
   const staffGroup = groupRecipients.filter((s) => s.role === "staff");
+  const individualStaffRecipients = allowedRecipients
+    .filter((s) => s.role === "staff")
+    .sort((a, b) => a.name.localeCompare(b.name));
   const supervisorGroup = groupRecipients.filter((s) => s.role === "supervisor");
   const inspectorGroup = groupRecipients.filter((s) => s.role === "inspector");
   const adminGroup = groupRecipients.filter((s) => s.role === "admin");
@@ -124,7 +168,7 @@ function NewConvoDialog({ senderRole, staffId, onClose, onStarted }: NewConvoDia
   // configured address before it queues external delivery.
   const dedicatedInspector =
     (senderRole === "supervisor" || senderRole === "admin")
-      ? allowedRecipients.find((s) => s.role === "inspector" && s.hasEmail)
+      ? allowedRecipients.find((s) => s.id === inspectorId && s.role === "inspector" && s.hasEmail)
       : undefined;
 
   const individualMutation = useMutation({
@@ -234,8 +278,43 @@ function NewConvoDialog({ senderRole, staffId, onClose, onStarted }: NewConvoDia
                   </span>
                 </button>
               )}
+              {individualStaffRecipients.length > 0 && (
+                <div className="p-4 border-b border-slate-100">
+                  <label htmlFor="new-conversation-staff" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    {t("messages.chooseStaff")}
+                  </label>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <select
+                      id="new-conversation-staff"
+                      data-testid="new-conversation-staff"
+                      value={individualStaffRecipients.some((s) => s.id === selectedStaffId) ? selectedStaffId! : ""}
+                      onChange={(e) => setSelectedStaffId(e.target.value ? Number(e.target.value) : null)}
+                      disabled={individualMutation.isPending}
+                      className="min-w-0 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    >
+                      <option value="">{t("messages.selectStaffName")}</option>
+                      {individualStaffRecipients.map((s) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      data-testid="start-staff-conversation"
+                      disabled={individualMutation.isPending || !individualStaffRecipients.some((s) => s.id === selectedStaffId)}
+                      onClick={() => {
+                        if (selectedStaffId !== null && individualStaffRecipients.some((s) => s.id === selectedStaffId)) {
+                          individualMutation.mutate(selectedStaffId);
+                        }
+                      }}
+                      className="shrink-0 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-40"
+                    >
+                      {t("messages.startConversation")}
+                    </button>
+                  </div>
+                </div>
+              )}
               {allowedRecipients
-                .filter((s) => s.id !== dedicatedInspector?.id)
+                .filter((s) => s.role !== "staff" && s.id !== dedicatedInspector?.id)
                 .map((s) => (
                 <button
                   key={s.id}
@@ -256,6 +335,9 @@ function NewConvoDialog({ senderRole, staffId, onClose, onStarted }: NewConvoDia
                   <ChevronRight className="w-4 h-4 text-slate-300" />
                 </button>
               ))}
+              {individualMutation.isError && (
+                <p role="alert" className="p-4 text-sm text-rose-700">{t("messages.conversationOpenFailed")}</p>
+              )}
             </>
           )}
 
@@ -422,20 +504,49 @@ export default function Messages() {
   const qc = useQueryClient();
   const staffId = currentUser?.id ?? 0;
   const senderRole = currentUser?.role ?? "staff";
+  const canEmailInspector = senderRole === "admin" || senderRole === "supervisor";
+  const { data: inspectorContacts, isLoading: contactsLoading, isError: contactsError } = useQuery({
+    queryKey: ["/api/inspector-email/recipients", staffId],
+    queryFn: () => listInspectorEmailRecipients(),
+    enabled: canEmailInspector && staffId > 0,
+    staleTime: 60_000,
+  });
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showNewConvo, setShowNewConvo] = useState(false);
   const [showFlyer, setShowFlyer] = useState(false);
   const [draft, setDraft] = useState("");
+  const [beforePhoto, setBeforePhoto] = useState<File | null>(null);
+  const [afterPhoto, setAfterPhoto] = useState<File | null>(null);
+  const [beforeImagePath, setBeforeImagePath] = useState<string | null>(null);
+  const [afterImagePath, setAfterImagePath] = useState<string | null>(null);
+  const [photoProgress, setPhotoProgress] = useState<{ before: number | null; after: number | null }>({ before: null, after: null });
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [lightboxPath, setLightboxPath] = useState<string | null>(null);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  const [photoDraftConversationId, setPhotoDraftConversationId] = useState<number | null>(null);
+  const [inspectorRecipient, setInspectorRecipient] = useState("");
   const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  const [cleanupConversationId, setCleanupConversationId] = useState<number | null>(null);
+  const [cleanupDate, setCleanupDate] = useState("");
+  const [cleanupResult, setCleanupResult] = useState<{ id: number; deleted: number; retained: number } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const selectedConversationIdRef = useRef<number | null>(selectedId);
+  selectedConversationIdRef.current = selectedId;
+  const photoUploadIdRef = useRef(0);
+  const photoUploadActiveRef = useRef(false);
+  const beforePhotoInputRef = useRef<HTMLInputElement>(null);
+  const afterPhotoInputRef = useRef<HTMLInputElement>(null);
   const composeRequestRef = useRef<{
     conversationId: number;
     body: string;
     clientRequestId: string;
+    beforeImagePath?: string;
+    afterImagePath?: string;
+    inspectorRecipients?: string[];
   } | null>(null);
 
   const { data: conversations = [], isLoading: convosLoading, error: convosError } = useQuery({
@@ -467,6 +578,13 @@ export default function Messages() {
   });
 
   const selectedConvo = visibleConversations.find((c) => c.id === selectedId) ?? null;
+  const photoDraftMatchesConversation = photoDraftConversationId === selectedId;
+  const activeBeforePhoto = photoDraftMatchesConversation ? beforePhoto : null;
+  const activeAfterPhoto = photoDraftMatchesConversation ? afterPhoto : null;
+  const activeBeforeImagePath = photoDraftMatchesConversation ? beforeImagePath : null;
+  const activeAfterImagePath = photoDraftMatchesConversation ? afterImagePath : null;
+  const isSharedInspectorThread = canEmailInspector && !selectedConvo?.isGroup &&
+    selectedConvo?.otherStaffId === inspectorContacts?.inspectorId;
 
   const unreadInSelected = useMemo(
     () => messages.some((m) => m.senderId !== staffId && !m.isRead),
@@ -494,29 +612,56 @@ export default function Messages() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length, selectedId]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    photoUploadIdRef.current += 1;
+    photoUploadActiveRef.current = false;
     setEditingMessageId(null);
     setEditDraft("");
     setEditError(null);
+    setInspectorRecipient("");
+    setPhotoDraftConversationId(null);
+    setBeforePhoto(null);
+    setAfterPhoto(null);
+    setBeforeImagePath(null);
+    setAfterImagePath(null);
+    setPhotoProgress({ before: null, after: null });
+    setPhotoError(null);
+    setUploadingPhotos(false);
+    if (beforePhotoInputRef.current) beforePhotoInputRef.current.value = "";
+    if (afterPhotoInputRef.current) afterPhotoInputRef.current.value = "";
   }, [selectedId]);
 
   const sendMutation = useMutation({
-    mutationFn: (submission: { conversationId: number; body: string; clientRequestId: string }) =>
+    mutationFn: (submission: { conversationId: number; body: string; clientRequestId: string; beforeImagePath?: string; afterImagePath?: string; inspectorRecipients?: string[] }) =>
       sendConversationMessage(submission.conversationId, {
         senderId: staffId,
         body: submission.body,
         clientRequestId: submission.clientRequestId,
+        ...(submission.beforeImagePath ? { beforeImagePath: submission.beforeImagePath } : {}),
+        ...(submission.afterImagePath ? { afterImagePath: submission.afterImagePath } : {}),
+        ...(submission.inspectorRecipients ? { inspectorRecipients: submission.inspectorRecipients } : {}),
       }),
     onSuccess: (_message, submission) => {
       if (composeRequestRef.current?.clientRequestId === submission.clientRequestId) {
         composeRequestRef.current = null;
       }
-      if (selectedId === submission.conversationId) setDraft("");
+      if (selectedId === submission.conversationId) {
+        setDraft("");
+        setBeforePhoto(null);
+        setAfterPhoto(null);
+        setBeforeImagePath(null);
+        setAfterImagePath(null);
+        setPhotoDraftConversationId(null);
+        setPhotoProgress({ before: null, after: null });
+        setPhotoError(null);
+      }
+      if (submission.inspectorRecipients && selectedId === submission.conversationId) setInspectorRecipient("");
       trackEvent("message_sent", {
         conversation_type: selectedConvo?.otherStaffRole === "inspector" ? "inspector" : "standard",
         sender_role: senderRole,
       });
       qc.invalidateQueries({ queryKey: [CONVERSATIONS_KEY] });
+      qc.invalidateQueries({ queryKey: [CONVERSATIONS_KEY, submission.conversationId, "messages"] });
     },
   });
 
@@ -535,6 +680,18 @@ export default function Messages() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [CONVERSATIONS_KEY, selectedId, "messages"] });
       qc.invalidateQueries({ queryKey: [CONVERSATIONS_KEY] });
+    },
+  });
+
+  const cleanupMutation = useMutation({
+    mutationFn: ({ id, before }: { id: number; before: string }) =>
+      deleteOldConversationMessages(id, { before }),
+    onSuccess: (result, { id }) => {
+      setCleanupConversationId(null);
+      setCleanupDate("");
+      setCleanupResult({ id, ...result });
+      qc.invalidateQueries({ queryKey: [CONVERSATIONS_KEY] });
+      qc.invalidateQueries({ queryKey: [CONVERSATIONS_KEY, id, "messages"] });
     },
   });
 
@@ -559,23 +716,97 @@ export default function Messages() {
     deleteMutation.mutate({ convoId: selectedId, msgId });
   };
 
-  const handleSend = () => {
+  const handleDeleteOld = () => {
+    if (selectedId === null || cleanupConversationId !== selectedId || !cleanupDate || cleanupMutation.isPending) return;
+    const before = new Date(`${cleanupDate}T00:00:00`);
+    if (Number.isNaN(before.getTime()) || before.getTime() > Date.now()) return;
+    if (!window.confirm(t("messages.confirmDeleteOld", { date: cleanupDate }))) return;
+    cleanupMutation.mutate({ id: selectedId, before: before.toISOString() });
+  };
+
+  const handleSend = async () => {
     const body = draft.trim();
-    if (!body || selectedId === null || sendMutation.isPending) return;
+    const conversationId = selectedId;
+    if (!body || conversationId === null || selectedConversationIdRef.current !== conversationId ||
+        sendMutation.isPending || uploadingPhotos || photoUploadActiveRef.current) return;
+    if (selectedConvo?.otherStaffRole === "inspector" && canEmailInspector &&
+        (!inspectorContacts || contactsError || !isSharedInspectorThread)) return;
+    if (isSharedInspectorThread && !inspectorRecipient) return;
+    const inspectorRecipients = isSharedInspectorThread
+      ? inspectorRecipient === "all"
+        ? inspectorContacts!.emails
+        : [inspectorRecipient]
+      : undefined;
+    const attachmentContextMatches = photoDraftConversationId === conversationId;
+    const selectedBeforePhoto = attachmentContextMatches ? beforePhoto : null;
+    const selectedAfterPhoto = attachmentContextMatches ? afterPhoto : null;
+    let uploadedBeforePath = (attachmentContextMatches ? beforeImagePath : null) ?? undefined;
+    let uploadedAfterPath = (attachmentContextMatches ? afterImagePath : null) ?? undefined;
+    const uploadId = ++photoUploadIdRef.current;
+    const isCurrentUpload = () =>
+      photoUploadIdRef.current === uploadId && selectedConversationIdRef.current === conversationId;
+    photoUploadActiveRef.current = true;
+    setPhotoError(null);
+    setUploadingPhotos(true);
+    try {
+      if (selectedBeforePhoto && !uploadedBeforePath) {
+        if (selectedBeforePhoto.size > 10 * 1024 * 1024 || !["image/jpeg", "image/png", "image/webp"].includes(selectedBeforePhoto.type)) {
+          throw new Error("Before photo must be a JPEG, PNG, or WebP image no larger than 10 MB.");
+        }
+        setPhotoProgress((progress) => ({ ...progress, before: 0 }));
+        const path = await uploadConversationPhoto(selectedBeforePhoto, conversationId, (progress) => {
+          if (isCurrentUpload()) setPhotoProgress((current) => ({ ...current, before: progress }));
+        });
+        if (!isCurrentUpload()) return;
+        uploadedBeforePath = path;
+        setBeforeImagePath(uploadedBeforePath);
+      }
+      if (selectedAfterPhoto && !uploadedAfterPath) {
+        if (selectedAfterPhoto.size > 10 * 1024 * 1024 || !["image/jpeg", "image/png", "image/webp"].includes(selectedAfterPhoto.type)) {
+          throw new Error("After photo must be a JPEG, PNG, or WebP image no larger than 10 MB.");
+        }
+        setPhotoProgress((progress) => ({ ...progress, after: 0 }));
+        const path = await uploadConversationPhoto(selectedAfterPhoto, conversationId, (progress) => {
+          if (isCurrentUpload()) setPhotoProgress((current) => ({ ...current, after: progress }));
+        });
+        if (!isCurrentUpload()) return;
+        uploadedAfterPath = path;
+        setAfterImagePath(uploadedAfterPath);
+      }
+    } catch (error) {
+      if (isCurrentUpload()) setPhotoError(error instanceof Error ? error.message : "Photo upload failed. Please try again.");
+      return;
+    } finally {
+      if (photoUploadIdRef.current === uploadId) {
+        photoUploadActiveRef.current = false;
+        if (selectedConversationIdRef.current === conversationId) setUploadingPhotos(false);
+      }
+    }
+    if (!isCurrentUpload()) return;
+    setPhotoProgress({ before: null, after: null });
     const prior = composeRequestRef.current;
     const submission =
-      prior?.conversationId === selectedId && prior.body === body
+      prior?.conversationId === conversationId && prior.body === body &&
+      prior.beforeImagePath === uploadedBeforePath &&
+      prior.afterImagePath === uploadedAfterPath &&
+      JSON.stringify(prior.inspectorRecipients) === JSON.stringify(inspectorRecipients)
         ? prior
         : {
-            conversationId: selectedId,
+            conversationId,
             body,
             clientRequestId: crypto.randomUUID(),
+            beforeImagePath: uploadedBeforePath,
+            afterImagePath: uploadedAfterPath,
+            inspectorRecipients,
           };
     composeRequestRef.current = submission;
     sendMutation.mutate({
       conversationId: submission.conversationId,
       body: submission.body,
       clientRequestId: submission.clientRequestId,
+      beforeImagePath: submission.beforeImagePath,
+      afterImagePath: submission.afterImagePath,
+      inspectorRecipients: submission.inspectorRecipients,
     });
   };
 
@@ -614,11 +845,13 @@ export default function Messages() {
     setShowArchived((current) => !current);
   };
 
-  const canEmailInspector = senderRole === "admin" || senderRole === "supervisor";
+  const today = new Date();
+  const latestCleanupDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
   const inspectorMutation = useMutation({
     mutationFn: async () => {
-      const staff = await listStaff();
-      const inspector = staff.find((s) => s.active && s.role === "inspector" && s.hasEmail);
+      const [staff, contacts] = await Promise.all([listStaff(), listInspectorEmailRecipients()]);
+      const inspector = staff.find((s) => s.id === contacts.inspectorId && s.active && s.role === "inspector" && s.hasEmail);
       if (!inspector) throw new Error(t("messages.inspectorUnavailable"));
       const convo = await startConversation({ staffId, recipientId: inspector.id });
       await setConversationArchive(convo.id, { staffId, archived: false });
@@ -847,15 +1080,82 @@ export default function Messages() {
                   >
                     {showArchived ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
                   </button>
+                  {senderRole === "admin" && (
+                    <button
+                      type="button"
+                      data-testid="toggle-delete-old-messages"
+                      onClick={() => {
+                        if (cleanupConversationId === selectedConvo.id) {
+                          setCleanupConversationId(null);
+                        } else {
+                          setCleanupConversationId(selectedConvo.id);
+                          setCleanupDate("");
+                          setCleanupResult(null);
+                          cleanupMutation.reset();
+                        }
+                      }}
+                      disabled={cleanupMutation.isPending}
+                      className="rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-50"
+                      aria-label={t("messages.deleteOldMessages")}
+                      title={t("messages.deleteOldMessages")}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
               </div>
-                {selectedConvo.otherStaffRole === "inspector" && (
+                {senderRole === "admin" && cleanupConversationId === selectedConvo.id && (
+                  <div className="mx-4 mb-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-950">
+                    <label htmlFor="old-message-cutoff" className="block font-semibold mb-2">
+                      {t("messages.deleteBeforeDate")}
+                    </label>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        id="old-message-cutoff"
+                        data-testid="old-message-cutoff"
+                        type="date"
+                        max={latestCleanupDate}
+                        value={cleanupDate}
+                        onChange={(event) => setCleanupDate(event.target.value)}
+                        disabled={cleanupMutation.isPending}
+                        className="min-w-0 rounded-lg border border-rose-300 bg-white px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-rose-400"
+                      />
+                      <button
+                        type="button"
+                        data-testid="confirm-delete-old-messages"
+                        disabled={!cleanupDate || cleanupDate > latestCleanupDate || cleanupMutation.isPending}
+                        onClick={handleDeleteOld}
+                        className="rounded-lg bg-rose-700 px-3 py-2 font-semibold text-white hover:bg-rose-800 disabled:opacity-40"
+                      >
+                        {t("messages.deleteOldMessages")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCleanupConversationId(null)}
+                        disabled={cleanupMutation.isPending}
+                        className="rounded-lg px-3 py-2 font-medium text-slate-700 hover:bg-rose-100 disabled:opacity-40"
+                      >
+                        {t("messages.cancel")}
+                      </button>
+                    </div>
+                    <p className="mt-2 text-xs leading-relaxed">{t("messages.oldMessageCleanupHelp")}</p>
+                    {cleanupMutation.isError && (
+                      <p role="alert" className="mt-2 font-medium">{t("messages.oldMessageCleanupFailed")}</p>
+                    )}
+                  </div>
+                )}
+                {cleanupResult?.id === selectedConvo.id && (
+                  <p role="status" className="mx-4 mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+                    {t("messages.oldMessageCleanupDone", cleanupResult)}
+                  </p>
+                )}
+                {isSharedInspectorThread && (
                   <div className="mx-4 mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
                     <div className="flex items-center gap-1 font-semibold">
                       <Mail className="w-3.5 h-3.5" />
-                      Inspector email identity: inspector@marvolenterprises.com
+                      {t("messages.inspectorEmailIdentity")}
                     </div>
                     <p className="mt-0.5">
-                      Each applicable message shows its provider delivery state. “Accepted by provider” is not a read confirmation; pending, disabled, not configured, and failed are not sent.
+                      {t("messages.inspectorDeliveryNote")}
                     </p>
                   </div>
                 )}
@@ -979,6 +1279,37 @@ export default function Messages() {
                         ) : (
                           <p className="text-sm whitespace-pre-wrap break-words">{m.body}</p>
                         )}
+                        {(m.beforeImagePath || m.afterImagePath) && (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {([
+                              ["Before", m.beforeImagePath],
+                              ["After", m.afterImagePath],
+                            ] as const).map(([label, path]) => path && (
+                              <button key={label} type="button" onClick={() => setLightboxPath(path)}
+                                className="group/photo w-24 overflow-hidden rounded-lg border border-white/30 text-left"
+                                aria-label={`View ${label.toLowerCase()} photo`}>
+                                <span className={`block px-1.5 py-0.5 text-[10px] font-semibold ${mine ? "bg-emerald-700 text-white" : "bg-slate-100 text-slate-700"}`}>{label}</span>
+                                <img src={conversationPhotoUrl(path)} alt={`${label} photo`} loading="lazy"
+                                  className="h-20 w-full object-cover transition-transform group-hover/photo:scale-105" />
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {mine && m.inspectorEmailRecipients.length > 0 && (
+                          <div className="mt-2 text-[11px] text-emerald-100 break-all">
+                            {t("messages.emailRecipient")}: {m.inspectorEmailRecipients.length === 1
+                              ? m.inspectorEmailRecipients[0]
+                              : t("messages.allInspectorRecipients", { count: m.inspectorEmailRecipients.length })}
+                            {m.inspectorEmailRecipients.length > 1 && (
+                              <details className="mt-0.5">
+                                <summary className="cursor-pointer underline">{t("messages.viewEmailRecipients")}</summary>
+                                <ul className="mt-1 space-y-0.5">
+                                  {m.inspectorEmailRecipients.map((email) => <li key={email}>{email}</li>)}
+                                </ul>
+                              </details>
+                            )}
+                          </div>
+                        )}
                         <p className={`text-[10px] mt-1 ${mine ? "text-emerald-100" : "text-slate-400"}`}>
                           {format(new Date(m.createdAt), "MMM d, h:mm a")}
                         </p>
@@ -1000,28 +1331,102 @@ export default function Messages() {
 
               {/* Composer */}
               <div className="p-3 border-t border-slate-100 shrink-0">
+                {isSharedInspectorThread && (
+                  <div className="mb-2">
+                    <label htmlFor="inspector-email-recipient" className="block text-xs font-semibold text-slate-700 mb-1">
+                      {t("messages.emailRecipient")}
+                    </label>
+                    <select id="inspector-email-recipient" data-testid="inspector-email-recipient"
+                       value={inspectorRecipient} onChange={(e) => setInspectorRecipient(e.target.value)}
+                       disabled={uploadingPhotos}
+                      className="w-full rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                      <option value="">{t("messages.chooseEmailRecipient")}</option>
+                      <option value="all">{t("messages.allInspectorRecipients", { count: inspectorContacts?.emails.length ?? 0 })}</option>
+                      {inspectorContacts?.emails.map((email) => <option key={email} value={email}>{email}</option>)}
+                    </select>
+                  </div>
+                )}
+                {selectedConvo.otherStaffRole === "inspector" && canEmailInspector && (contactsLoading || contactsError) && (
+                  <p role={contactsError ? "alert" : "status"} className="mb-2 text-xs text-amber-800">
+                    {contactsError ? t("messages.inspectorRecipientsUnavailable") : t("common.loading")}
+                  </p>
+                )}
+                {sendMutation.isError && (
+                  <p role="alert" className="mb-2 text-xs text-rose-700">{t("messages.sendFailed")}</p>
+                )}
+                {photoDraftMatchesConversation && photoError && <p role="alert" className="mb-2 text-xs text-rose-700">{photoError}</p>}
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {([
+                    { label: "Before photo", key: "before" as const, file: activeBeforePhoto, path: activeBeforeImagePath, setFile: setBeforePhoto, setPath: setBeforeImagePath, progress: photoProgress.before },
+                    { label: "After photo", key: "after" as const, file: activeAfterPhoto, path: activeAfterImagePath, setFile: setAfterPhoto, setPath: setAfterImagePath, progress: photoProgress.after },
+                  ]).map((photo) => (
+                    <div key={photo.key} className="flex min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5">
+                      <label className={`flex cursor-pointer items-center gap-1.5 text-xs font-medium text-slate-700 ${uploadingPhotos || sendMutation.isPending ? "pointer-events-none opacity-50" : "hover:text-emerald-700"}`}>
+                        <Camera className="h-4 w-4 shrink-0" />
+                        <span>{photo.file?.name ?? (photo.path ? `${photo.label} attached` : photo.label)}</span>
+                        <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+                          ref={photo.key === "before" ? beforePhotoInputRef : afterPhotoInputRef}
+                          disabled={uploadingPhotos || sendMutation.isPending}
+                          aria-label={photo.label}
+                          onChange={(event) => {
+                            const selected = event.target.files?.[0] ?? null;
+                            event.currentTarget.value = "";
+                            const conversationId = selectedConversationIdRef.current;
+                            if (conversationId === null) return;
+                            if (photoDraftConversationId !== conversationId) {
+                              setBeforePhoto(null);
+                              setAfterPhoto(null);
+                              setBeforeImagePath(null);
+                              setAfterImagePath(null);
+                            }
+                            setPhotoDraftConversationId(conversationId);
+                            photo.setFile(selected);
+                            photo.setPath(null);
+                            setPhotoError(null);
+                            setPhotoProgress((progress) => ({ ...progress, [photo.key]: null }));
+                          }} />
+                      </label>
+                      {photoDraftMatchesConversation && photo.progress !== null && (
+                        <span role="status" className="text-[10px] text-slate-500">{photo.progress}%</span>
+                      )}
+                      {(photo.file || photo.path) && !uploadingPhotos && (
+                        <button type="button" onClick={() => { photo.setFile(null); photo.setPath(null); setPhotoError(null); }}
+                          className="rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                          aria-label={`Remove ${photo.label.toLowerCase()}`}>
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {uploadingPhotos && <p role="status" className="mb-2 flex items-center gap-1 text-xs text-slate-500"><Loader2 className="h-3 w-3 animate-spin" />Uploading photos…</p>}
                 <div className="flex items-end gap-2">
                   <textarea
                     value={draft}
+                    disabled={uploadingPhotos}
                     onChange={(e) => setDraft(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
-                        handleSend();
+                        void handleSend();
                       }
                     }}
-                    rows={1}
+                    rows={selectedConvo.otherStaffRole === "inspector" ? 4 : 1}
                     maxLength={2000}
                     placeholder={t("messages.typeMessage")}
-                    className="flex-1 resize-none rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 max-h-32"
+                    className={`flex-1 min-w-0 rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 ${
+                      selectedConvo.otherStaffRole === "inspector" ? "resize-y min-h-24 max-h-48" : "resize-none max-h-32"
+                    }`}
                   />
                   <button
                     onClick={handleSend}
-                    disabled={!draft.trim() || sendMutation.isPending}
+                    disabled={!draft.trim() || sendMutation.isPending || uploadingPhotos ||
+                      (isSharedInspectorThread && !inspectorRecipient) ||
+                      (selectedConvo.otherStaffRole === "inspector" && canEmailInspector && !isSharedInspectorThread)}
                     className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white rounded-xl p-2.5 transition-colors shrink-0"
                     aria-label={t("messages.send")}
                   >
-                    <Send className="w-5 h-5" />
+                    {uploadingPhotos ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
                   </button>
                 </div>
               </div>
@@ -1034,9 +1439,20 @@ export default function Messages() {
         <NewConvoDialog
           senderRole={senderRole}
           staffId={staffId}
+          inspectorId={inspectorContacts?.inspectorId}
           onClose={() => setShowNewConvo(false)}
           onStarted={handleStarted}
         />
+      )}
+      {lightboxPath && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4" onClick={() => setLightboxPath(null)}>
+          <button type="button" onClick={() => setLightboxPath(null)} aria-label="Close photo"
+            className="absolute right-4 top-4 rounded-full bg-black/50 p-2 text-white hover:bg-black/70">
+            <X className="h-6 w-6" />
+          </button>
+          <img src={conversationPhotoUrl(lightboxPath)} alt="Conversation attachment" onClick={(event) => event.stopPropagation()}
+            className="max-h-[90vh] max-w-[95vw] rounded-lg object-contain shadow-2xl" />
+        </div>
       )}
 
       {showFlyer && (

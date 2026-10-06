@@ -32,7 +32,7 @@ channel = "stable-25_05"
 
 [userenv.shared]
 SENDGRID_EMAIL_BRIDGE_ENABLED = "true"
-SENDGRID_FROM_EMAIL = "messages@marvolenterprises.com"
+SENDGRID_FROM_EMAIL = "inspector@marvolenterprises.com"
 SENDGRID_INBOUND_DOMAIN = "replies.marvolenterprises.com"
 PUBLIC_APP_URL = "https://airport-janitorial-manager.replit.app"
 SENDGRID_REPLY_TOKEN_TTL_DAYS = "30"

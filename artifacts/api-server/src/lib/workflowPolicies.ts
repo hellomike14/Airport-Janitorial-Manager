@@ -1,16 +1,17 @@
 export type ActorPolicy = { id: number; role: "staff" | "supervisor" | "admin" | "inspector" };
 
-export function canMutateTask(actor: ActorPolicy, assignedToId: number | null, inspectorLinked: boolean): boolean {
+export function canMutateTask(actor: ActorPolicy, assignedToId: number | null, inspectorLinked: boolean, assignedToArea = false): boolean {
   if (inspectorLinked) return assignedToId === actor.id;
-  return assignedToId === actor.id || actor.role === "supervisor" || actor.role === "admin";
+  return assignedToId === actor.id || actor.role === "supervisor" || actor.role === "admin" ||
+    (assignedToId === null && assignedToArea);
 }
 
 export function canManageAssignments(actor: ActorPolicy): boolean {
   return actor.role === "supervisor" || actor.role === "admin";
 }
 
-export function isAssignmentTargetEligible(target: { active: boolean; loginEnabled: boolean; formerEmployee: boolean }): boolean {
-  return target.active && target.loginEnabled && !target.formerEmployee;
+export function isAssignmentTargetEligible(target: { active: boolean; formerEmployee: boolean }): boolean {
+  return target.active && !target.formerEmployee;
 }
 
 export function canReadPrivateObject(input: {

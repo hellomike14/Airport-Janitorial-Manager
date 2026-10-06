@@ -1,11 +1,19 @@
 ---
 name: Marvol typecheck quirks
-description: Pre-existing typecheck breakage in the pnpm monorepo and the orval query-hook typing pitfall to avoid.
+description: Monorepo declaration freshness and Orval typing pitfalls.
 ---
 
 # Typecheck baseline
 
 Do not assume root typecheck is broken based on older notes. The root check passed on 2026-09-23; use the current command result rather than the historical error list.
+
+# Shared declarations after merges
+
+After an isolated task merge, generated API source can contain a new endpoint while the locally built declaration output is still stale. A leaf-package typecheck may then report a missing export even though the source defines it.
+
+**Why:** Merged source and local build output do not necessarily advance together.
+
+**How to apply:** Rebuild shared library declarations before changing imports or regenerating code when the missing symbol already exists in generated source; then rerun the leaf-package check.
 
 # Orval react-query typing pitfall
 
@@ -14,3 +22,11 @@ The generated `use*` query hooks type their options as `UseQueryOptions` which *
 # Orval TS2308 with path+query param operations
 
 An operation with BOTH a path param and query params makes Orval emit two same-named `<OpIdPascal>Params` exports (a zod object in `api-zod/generated/api.ts` and a query-params type in `generated/types/`), breaking the `export *` barrel with TS2308. Fix: add an explicit `export type { XParams } from "./generated/types";` line in `lib/api-zod/src/index.ts` (barrel is hand-maintained; orval only cleans `generated/`).
+
+# Date-time query validation
+
+For a date-time query parameter, Orval's generated Zod schema expects a `Date`, while Express supplies a string. The server's direct `zod` import is v3 and has no `z.iso` namespace.
+
+**Why:** Reusing the generated query schema directly or using a v4-only date helper causes either a runtime validation failure or a typecheck failure.
+
+**How to apply:** Parse ISO date-time query strings at the HTTP boundary with `z.string().datetime({ offset: true })`, then construct and validate the `Date` explicitly.

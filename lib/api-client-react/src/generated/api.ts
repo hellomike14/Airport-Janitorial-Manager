@@ -43,12 +43,15 @@ import type {
   CreateStaffMemberRequest,
   CreateTaskTypeRequest,
   DashboardStats,
+  DeleteOldConversationMessages200,
+  DeleteOldConversationMessagesParams,
   DeleteResponse,
   DiagnosticStoreUnavailableError,
   ErrorEnvelope,
   GetDashboardParams,
   GetInspectorWorkflow200,
   HealthStatus,
+  InspectorEmailRecipientsResponse,
   InvalidDiagnosticCodeError,
   Issue,
   JobApplication,
@@ -65,6 +68,7 @@ import type {
   Notification,
   OnboardingHire,
   OnboardingItem,
+  PreviewTerminalGroupScheduleMoveParams,
   QuickbooksConnectUrl,
   QuickbooksStatus,
   RemoveAreaTaskExclusionRequest,
@@ -79,6 +83,12 @@ import type {
   SubmitApplicationRequest,
   Task,
   TaskType,
+  TerminalGroupAssignmentInput,
+  TerminalGroupAssignmentResult,
+  TerminalGroupReassignmentInput,
+  TerminalGroupScheduleMoveInput,
+  TerminalGroupScheduleMoveResult,
+  TerminalGroupSchedulePreview,
   UpdateApplicationRequest,
   UpdateIssueImagesRequest,
   UpdateOnboardingItemRequest,
@@ -414,6 +424,165 @@ export function useGetCurrentStaffMember<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary List archived former staff for administrator rehire
+ */
+export const getListFormerStaffUrl = () => {
+  return `/api/staff/former`;
+};
+
+export const listFormerStaff = async (
+  options?: RequestInit,
+): Promise<StaffMember[]> => {
+  return customFetch<StaffMember[]>(getListFormerStaffUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListFormerStaffQueryKey = () => {
+  return [`/api/staff/former`] as const;
+};
+
+export const getListFormerStaffQueryOptions = <
+  TData = Awaited<ReturnType<typeof listFormerStaff>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listFormerStaff>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListFormerStaffQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listFormerStaff>>> = ({
+    signal,
+  }) => listFormerStaff({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listFormerStaff>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListFormerStaffQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listFormerStaff>>
+>;
+export type ListFormerStaffQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List archived former staff for administrator rehire
+ */
+
+export function useListFormerStaff<
+  TData = Awaited<ReturnType<typeof listFormerStaff>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listFormerStaff>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListFormerStaffQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Reactivate a former staff member without enabling sign-in
+ */
+export const getRehireStaffMemberUrl = (id: number) => {
+  return `/api/staff/${id}/rehire`;
+};
+
+export const rehireStaffMember = async (
+  id: number,
+  options?: RequestInit,
+): Promise<StaffMember> => {
+  return customFetch<StaffMember>(getRehireStaffMemberUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getRehireStaffMemberMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof rehireStaffMember>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof rehireStaffMember>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["rehireStaffMember"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof rehireStaffMember>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return rehireStaffMember(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RehireStaffMemberMutationResult = NonNullable<
+  Awaited<ReturnType<typeof rehireStaffMember>>
+>;
+
+export type RehireStaffMemberMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Reactivate a former staff member without enabling sign-in
+ */
+export const useRehireStaffMember = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof rehireStaffMember>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof rehireStaffMember>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getRehireStaffMemberMutationOptions(options));
+};
 
 /**
  * @summary Update a staff member
@@ -1633,6 +1802,383 @@ export const useCreateAssignment = <
   TContext
 > => {
   return useMutation(getCreateAssignmentMutationOptions(options));
+};
+
+/**
+ * @summary Assign one active staff member to every area in a terminal group for a date
+ */
+export const getAssignTerminalGroupUrl = () => {
+  return `/api/assignments/group`;
+};
+
+export const assignTerminalGroup = async (
+  terminalGroupAssignmentInput: TerminalGroupAssignmentInput,
+  options?: RequestInit,
+): Promise<TerminalGroupAssignmentResult> => {
+  return customFetch<TerminalGroupAssignmentResult>(
+    getAssignTerminalGroupUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(terminalGroupAssignmentInput),
+    },
+  );
+};
+
+export const getAssignTerminalGroupMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assignTerminalGroup>>,
+    TError,
+    { data: BodyType<TerminalGroupAssignmentInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assignTerminalGroup>>,
+  TError,
+  { data: BodyType<TerminalGroupAssignmentInput> },
+  TContext
+> => {
+  const mutationKey = ["assignTerminalGroup"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assignTerminalGroup>>,
+    { data: BodyType<TerminalGroupAssignmentInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return assignTerminalGroup(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssignTerminalGroupMutationResult = NonNullable<
+  Awaited<ReturnType<typeof assignTerminalGroup>>
+>;
+export type AssignTerminalGroupMutationBody =
+  BodyType<TerminalGroupAssignmentInput>;
+export type AssignTerminalGroupMutationError = ErrorType<void>;
+
+/**
+ * @summary Assign one active staff member to every area in a terminal group for a date
+ */
+export const useAssignTerminalGroup = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assignTerminalGroup>>,
+    TError,
+    { data: BodyType<TerminalGroupAssignmentInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof assignTerminalGroup>>,
+  TError,
+  { data: BodyType<TerminalGroupAssignmentInput> },
+  TContext
+> => {
+  return useMutation(getAssignTerminalGroupMutationOptions(options));
+};
+
+/**
+ * @summary Confirmed date-only reassignment of a terminal group; tasks and recurring schedules are unchanged
+ */
+export const getReassignTerminalGroupUrl = () => {
+  return `/api/assignments/group/reassign`;
+};
+
+export const reassignTerminalGroup = async (
+  terminalGroupReassignmentInput: TerminalGroupReassignmentInput,
+  options?: RequestInit,
+): Promise<TerminalGroupAssignmentResult> => {
+  return customFetch<TerminalGroupAssignmentResult>(
+    getReassignTerminalGroupUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(terminalGroupReassignmentInput),
+    },
+  );
+};
+
+export const getReassignTerminalGroupMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reassignTerminalGroup>>,
+    TError,
+    { data: BodyType<TerminalGroupReassignmentInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof reassignTerminalGroup>>,
+  TError,
+  { data: BodyType<TerminalGroupReassignmentInput> },
+  TContext
+> => {
+  const mutationKey = ["reassignTerminalGroup"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof reassignTerminalGroup>>,
+    { data: BodyType<TerminalGroupReassignmentInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return reassignTerminalGroup(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReassignTerminalGroupMutationResult = NonNullable<
+  Awaited<ReturnType<typeof reassignTerminalGroup>>
+>;
+export type ReassignTerminalGroupMutationBody =
+  BodyType<TerminalGroupReassignmentInput>;
+export type ReassignTerminalGroupMutationError = ErrorType<void>;
+
+/**
+ * @summary Confirmed date-only reassignment of a terminal group; tasks and recurring schedules are unchanged
+ */
+export const useReassignTerminalGroup = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reassignTerminalGroup>>,
+    TError,
+    { data: BodyType<TerminalGroupReassignmentInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof reassignTerminalGroup>>,
+  TError,
+  { data: BodyType<TerminalGroupReassignmentInput> },
+  TContext
+> => {
+  return useMutation(getReassignTerminalGroupMutationOptions(options));
+};
+
+/**
+ * @summary Review recurring schedule rows that would move to another staff member
+ */
+export const getPreviewTerminalGroupScheduleMoveUrl = (
+  params: PreviewTerminalGroupScheduleMoveParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/schedules/group/preview?${stringifiedParams}`
+    : `/api/schedules/group/preview`;
+};
+
+export const previewTerminalGroupScheduleMove = async (
+  params: PreviewTerminalGroupScheduleMoveParams,
+  options?: RequestInit,
+): Promise<TerminalGroupSchedulePreview> => {
+  return customFetch<TerminalGroupSchedulePreview>(
+    getPreviewTerminalGroupScheduleMoveUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getPreviewTerminalGroupScheduleMoveQueryKey = (
+  params?: PreviewTerminalGroupScheduleMoveParams,
+) => {
+  return [`/api/schedules/group/preview`, ...(params ? [params] : [])] as const;
+};
+
+export const getPreviewTerminalGroupScheduleMoveQueryOptions = <
+  TData = Awaited<ReturnType<typeof previewTerminalGroupScheduleMove>>,
+  TError = ErrorType<void>,
+>(
+  params: PreviewTerminalGroupScheduleMoveParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof previewTerminalGroupScheduleMove>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getPreviewTerminalGroupScheduleMoveQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof previewTerminalGroupScheduleMove>>
+  > = ({ signal }) =>
+    previewTerminalGroupScheduleMove(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof previewTerminalGroupScheduleMove>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type PreviewTerminalGroupScheduleMoveQueryResult = NonNullable<
+  Awaited<ReturnType<typeof previewTerminalGroupScheduleMove>>
+>;
+export type PreviewTerminalGroupScheduleMoveQueryError = ErrorType<void>;
+
+/**
+ * @summary Review recurring schedule rows that would move to another staff member
+ */
+
+export function usePreviewTerminalGroupScheduleMove<
+  TData = Awaited<ReturnType<typeof previewTerminalGroupScheduleMove>>,
+  TError = ErrorType<void>,
+>(
+  params: PreviewTerminalGroupScheduleMoveParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof previewTerminalGroupScheduleMove>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getPreviewTerminalGroupScheduleMoveQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Move reviewed recurring schedules only; dated assignments and tasks remain unchanged
+ */
+export const getMoveTerminalGroupScheduleUrl = () => {
+  return `/api/schedules/group/preview`;
+};
+
+export const moveTerminalGroupSchedule = async (
+  terminalGroupScheduleMoveInput: TerminalGroupScheduleMoveInput,
+  options?: RequestInit,
+): Promise<TerminalGroupScheduleMoveResult> => {
+  return customFetch<TerminalGroupScheduleMoveResult>(
+    getMoveTerminalGroupScheduleUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(terminalGroupScheduleMoveInput),
+    },
+  );
+};
+
+export const getMoveTerminalGroupScheduleMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof moveTerminalGroupSchedule>>,
+    TError,
+    { data: BodyType<TerminalGroupScheduleMoveInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof moveTerminalGroupSchedule>>,
+  TError,
+  { data: BodyType<TerminalGroupScheduleMoveInput> },
+  TContext
+> => {
+  const mutationKey = ["moveTerminalGroupSchedule"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof moveTerminalGroupSchedule>>,
+    { data: BodyType<TerminalGroupScheduleMoveInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return moveTerminalGroupSchedule(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type MoveTerminalGroupScheduleMutationResult = NonNullable<
+  Awaited<ReturnType<typeof moveTerminalGroupSchedule>>
+>;
+export type MoveTerminalGroupScheduleMutationBody =
+  BodyType<TerminalGroupScheduleMoveInput>;
+export type MoveTerminalGroupScheduleMutationError = ErrorType<void>;
+
+/**
+ * @summary Move reviewed recurring schedules only; dated assignments and tasks remain unchanged
+ */
+export const useMoveTerminalGroupSchedule = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof moveTerminalGroupSchedule>>,
+    TError,
+    { data: BodyType<TerminalGroupScheduleMoveInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof moveTerminalGroupSchedule>>,
+  TError,
+  { data: BodyType<TerminalGroupScheduleMoveInput> },
+  TContext
+> => {
+  return useMutation(getMoveTerminalGroupScheduleMutationOptions(options));
 };
 
 /**
@@ -3113,6 +3659,86 @@ export const useStartConversation = <
 };
 
 /**
+ * @summary List approved external inspector email recipients for management
+ */
+export const getListInspectorEmailRecipientsUrl = () => {
+  return `/api/inspector-email/recipients`;
+};
+
+export const listInspectorEmailRecipients = async (
+  options?: RequestInit,
+): Promise<InspectorEmailRecipientsResponse> => {
+  return customFetch<InspectorEmailRecipientsResponse>(
+    getListInspectorEmailRecipientsUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListInspectorEmailRecipientsQueryKey = () => {
+  return [`/api/inspector-email/recipients`] as const;
+};
+
+export const getListInspectorEmailRecipientsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listInspectorEmailRecipients>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listInspectorEmailRecipients>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListInspectorEmailRecipientsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listInspectorEmailRecipients>>
+  > = ({ signal }) =>
+    listInspectorEmailRecipients({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listInspectorEmailRecipients>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListInspectorEmailRecipientsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listInspectorEmailRecipients>>
+>;
+export type ListInspectorEmailRecipientsQueryError = ErrorType<void>;
+
+/**
+ * @summary List approved external inspector email recipients for management
+ */
+
+export function useListInspectorEmailRecipients<
+  TData = Awaited<ReturnType<typeof listInspectorEmailRecipients>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listInspectorEmailRecipients>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListInspectorEmailRecipientsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
  * @summary List messages in a conversation
  */
 export const getListConversationMessagesUrl = (
@@ -3317,6 +3943,110 @@ export const useSendConversationMessage = <
   TContext
 > => {
   return useMutation(getSendConversationMessageMutationOptions(options));
+};
+
+/**
+ * Admin only. Messages linked to inspector tasks or awaiting email delivery are retained.
+ * @summary Permanently remove messages before a date from one conversation
+ */
+export const getDeleteOldConversationMessagesUrl = (
+  id: number,
+  params: DeleteOldConversationMessagesParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/conversations/${id}/old-messages?${stringifiedParams}`
+    : `/api/conversations/${id}/old-messages`;
+};
+
+export const deleteOldConversationMessages = async (
+  id: number,
+  params: DeleteOldConversationMessagesParams,
+  options?: RequestInit,
+): Promise<DeleteOldConversationMessages200> => {
+  return customFetch<DeleteOldConversationMessages200>(
+    getDeleteOldConversationMessagesUrl(id, params),
+    {
+      ...options,
+      method: "DELETE",
+    },
+  );
+};
+
+export const getDeleteOldConversationMessagesMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteOldConversationMessages>>,
+    TError,
+    { id: number; params: DeleteOldConversationMessagesParams },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteOldConversationMessages>>,
+  TError,
+  { id: number; params: DeleteOldConversationMessagesParams },
+  TContext
+> => {
+  const mutationKey = ["deleteOldConversationMessages"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteOldConversationMessages>>,
+    { id: number; params: DeleteOldConversationMessagesParams }
+  > = (props) => {
+    const { id, params } = props ?? {};
+
+    return deleteOldConversationMessages(id, params, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteOldConversationMessagesMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteOldConversationMessages>>
+>;
+
+export type DeleteOldConversationMessagesMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Permanently remove messages before a date from one conversation
+ */
+export const useDeleteOldConversationMessages = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteOldConversationMessages>>,
+    TError,
+    { id: number; params: DeleteOldConversationMessagesParams },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteOldConversationMessages>>,
+  TError,
+  { id: number; params: DeleteOldConversationMessagesParams },
+  TContext
+> => {
+  return useMutation(getDeleteOldConversationMessagesMutationOptions(options));
 };
 
 /**

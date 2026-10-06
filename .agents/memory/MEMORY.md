@@ -1,4 +1,4 @@
-- [Marvol typecheck quirks](marvol-typecheck.md) — do not assume historical typecheck failures persist; orval query-options may require queryKey.
+- [Marvol typecheck quirks](marvol-typecheck.md) — rebuild stale shared declarations after merges; orval query-options may require queryKey.
 - [Marvol actor sessions](marvol-actor-session.md) — verified Clerk sessions identify staff; identity-sensitive endpoints must derive the actor server-side, never from client-sent ids.
 - [Marvol artifact routing](marvol-routing.md) — web previews at "/", API at "/api" on the shared proxy; /marvol-cleaning/api/... returns SPA HTML, not the API.
 - [Marvol email-only sign-in](marvol-email-signin.md) — social login is hidden in the app; disabling its provider entirely requires Clerk tenant access per environment.
@@ -7,3 +7,10 @@
 - [Marvol sign-in latency](marvol-signin-latency.md) — delayed Clerk script loading reproduced the stuck login screen; it is not proof of Wi-Fi or account rejection.
 - [Staff access ownership](staff-access-ownership.md) — seed defaults must not undo administrator-managed login eligibility; former-worker restrictions remain authoritative.
 - [Access verification boundaries](access-verification.md) — distinguish local checks from production sign-in; preserve messaging data during interactive schema pushes.
+- [Group reassignment scope](group-reassignment-scope.md) — one-day group moves leave task ownership and weekly schedules unchanged; avoid inferring recurring intent.
+- [Inspector email scope](inspector-email-scope.md) — managers explicitly choose one or all recipients; approved inspectors may also start new email, not just reply.
+- [Managed workflow port collisions](workflow-port-collisions.md) — a restart can leave an old Vite listener alive; verify the preview uses the managed port, not a fallback.
+- [Schedule group locking](schedule-locking.md) — weekly schedule writes lock all terminal groups before touching rows so reviewed moves cannot miss concurrent changes.
+- [Marvol photo alert privacy](marvol-photo-alert-privacy.md) — bell previews must match object-read permissions; general message alerts cannot expose private chat images.
+- [Managed production migrations](managed-production-migrations.md) — reconcile additive startup SQL with Publish-owned production schema changes; never restore runtime production DDL.
+- [Git connection verification](git-auth-verification.md) — accepted authorization is not proof of a successful push; verify remote updates and avoid repeated reconnect loops.

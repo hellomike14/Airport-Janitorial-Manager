@@ -30,7 +30,7 @@ const area = (
 // assignments, schedules, issues, photos, and task history while changing the
 // user-facing catalog.
 export const MCO_TERMINAL_AREAS: readonly McoTerminalArea[] = [
-  area("Terminal A - East", "Level 4", "Rows H, I, J, K, L", 1, [
+  area("Terminal A - East", "Level 4", "Rows H, J, K, L", 1, [
     "P4 - Row L-H",
     "Level 4 - Row L-H",
     "Terminal A — P4 Row H-L",
@@ -39,7 +39,7 @@ export const MCO_TERMINAL_AREAS: readonly McoTerminalArea[] = [
     "Terminal A — Level P4 East",
     "Level P4 - East",
   ]),
-  area("Terminal A - East", "Level 3", "Rows H, I, J, K, L, M, N, P", 2, [
+  area("Terminal A - East", "Level 3", "Rows H, J, K, L, M, N, P", 2, [
     "Terminal A — P3 Row H-P",
     "Terminal A — Level 3 Row H-P",
     "Level 3 - Row H-P",
@@ -47,7 +47,7 @@ export const MCO_TERMINAL_AREAS: readonly McoTerminalArea[] = [
     "Terminal A — Level P3 East",
     "Level P3 - East",
   ]),
-  area("Terminal A - East", "Level 2", "Rows H, I, J, K, L, M, N, P", 3, [
+  area("Terminal A - East", "Level 2", "Rows H, J, K, L, M, N, P", 3, [
     "Terminal A — P2 Row H-P",
     "Terminal A — Level 2 Row H-P",
     "Level 2 - Row H-P",
@@ -55,7 +55,7 @@ export const MCO_TERMINAL_AREAS: readonly McoTerminalArea[] = [
     "Terminal A — Level P2 East",
     "Level P2 - East",
   ]),
-  area("Terminal A - East", "Level 1", "Rows H, I, J, K, L, M, N, P", 4, [
+  area("Terminal A - East", "Level 1", "Rows H, J, K, L, M, N, P", 4, [
     "Terminal A — P1 Row H-P",
     "Terminal A — Level 1 Row H-P",
     "Level 1 - Row H-P",
@@ -192,7 +192,7 @@ export const MCO_TERMINAL_AREAS: readonly McoTerminalArea[] = [
     "Level R1 - East",
   ]),
 
-  area("Terminal B - West", "Level 4", "Rows H, I, J, K, L, M", 22, [
+  area("Terminal B - West", "Level 4", "Rows H, J, K, L, M", 22, [
     "P4 - Row H-M",
     "Level 4 - Row H-M",
     "Terminal B — P4 Row H-M",
@@ -200,7 +200,7 @@ export const MCO_TERMINAL_AREAS: readonly McoTerminalArea[] = [
     "Terminal B — Level P4 West",
     "Level P4 - West",
   ]),
-  area("Terminal B - West", "Level 3", "Rows H, I, J, K, L, M, N, P", 23, [
+  area("Terminal B - West", "Level 3", "Rows H, J, K, L, M, N, P", 23, [
     "Terminal B — P3 Row H-P",
     "Terminal B — Level 3 Row H-P",
     "Level 3 - Row H-P",
@@ -208,7 +208,7 @@ export const MCO_TERMINAL_AREAS: readonly McoTerminalArea[] = [
     "Terminal B — Level P3 West",
     "Level P3 - West",
   ]),
-  area("Terminal B - West", "Level 2", "Rows H, I, J, K, L, M, N, P", 24, [
+  area("Terminal B - West", "Level 2", "Rows H, J, K, L, M, N, P", 24, [
     "Terminal B — P2 Row H-P",
     "Terminal B — Level 2 Row H-P",
     "Level 2 - Row H-P",
@@ -216,7 +216,7 @@ export const MCO_TERMINAL_AREAS: readonly McoTerminalArea[] = [
     "Terminal B — Level P2 West",
     "Level P2 - West",
   ]),
-  area("Terminal B - West", "Level 1", "Rows H, I, J, K, L, M, N, P", 25, [
+  area("Terminal B - West", "Level 1", "Rows H, J, K, L, M, N, P", 25, [
     "Terminal B — P1 Row H-P",
     "Terminal B — Level 1 Row H-P",
     "Level 1 - Row H-P",

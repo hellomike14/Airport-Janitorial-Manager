@@ -47,10 +47,13 @@ previous month's report. For a deployment that sleeps, schedule a request to
 `POST /api/internal/monthly-operations-report` using the existing internal cron
 authentication configuration.
 
-The API applies the checked-in additive operations migration before accepting
-requests. The production bundle includes the migration, which is repeatable and
-does not remove existing operational history. Deployment requires the existing
-database and authentication configuration. Publish the merged `main` checkout
+Development startup applies the checked-in, repeatable additive operations
+migration before accepting requests, without removing operational history.
+Replit-managed production schema changes are applied by the Publish flow from
+the development schema. Production startup checks that the required schema is
+present and fails explicitly if it is missing; it does not execute schema DDL.
+Deployment requires the existing database and authentication configuration.
+Publish the merged `main` checkout
 through the existing Replit deployment and verify the Operations screen and API
 health after publication.
 

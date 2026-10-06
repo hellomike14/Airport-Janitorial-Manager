@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { tasksTable, staffTable, areasTable, issuesTable, notificationsTable, assignmentsTable, inspectorTaskLinksTable, messagesTable, messageEmailOutboxTable, objectUploadsTable } from "@workspace/db/schema";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { ensureTasksForDate } from "../lib/ensureTasksForDate";
+import { canMutateTask } from "../lib/workflowPolicies";
 import {
   ListTasksQueryParams,
   CompleteTaskParams,
@@ -14,7 +15,7 @@ import {
   CreateSpecialTaskBody,
 } from "@workspace/api-zod";
 import { actorStaffFromRequest } from "../lib/actorSession";
-import { INSPECTOR_EMAIL, normalizedEmail, outboundEmailStatus } from "../lib/sendgridEmailBridge";
+import { INSPECTOR_EMAIL, INSPECTOR_RECIPIENT_EMAILS, normalizedEmail, outboundEmailStatus } from "../lib/sendgridEmailBridge";
 
 const router: IRouter = Router();
 
@@ -380,10 +381,15 @@ router.post("/:id/complete", async (req, res) => {
     const [link] = await tx.select().from(inspectorTaskLinksTable).where(eq(inspectorTaskLinksTable.taskId, id)).for("update");
     // This decision is made only from locked rows, so a concurrent SLA
     // reassignment cannot leave a stale assignee authorized.
-    if (link && lockedTask.assignedToId !== actor.id) return { status: "forbidden" as const };
-    if (!link && actor.role !== "admin" && actor.role !== "supervisor" && lockedTask.assignedToId !== actor.id) {
-      const [assignment] = await tx.select({ id: assignmentsTable.id }).from(assignmentsTable).where(and(eq(assignmentsTable.staffId, actor.id), eq(assignmentsTable.areaId, lockedTask.areaId), eq(assignmentsTable.assignmentDate, lockedTask.taskDate)));
-      if (!assignment || lockedTask.isSpecial) return { status: "forbidden" as const };
+    const [areaAssignment] = !link && lockedTask.assignedToId === null
+      ? await tx.select({ id: assignmentsTable.id }).from(assignmentsTable).where(and(
+          eq(assignmentsTable.staffId, actor.id),
+          eq(assignmentsTable.areaId, lockedTask.areaId),
+          eq(assignmentsTable.assignmentDate, lockedTask.taskDate),
+        )).limit(1).for("share")
+      : [];
+    if (!canMutateTask(actor, lockedTask.assignedToId, Boolean(link), Boolean(areaAssignment))) {
+      return { status: "forbidden" as const };
     }
     if (lockedTask.completed) return { status: "ok" as const, task: lockedTask, changed: false };
     if (lockedTask.photoRequired && !lockedTask.afterImagePath) return { status: "photo_required" as const };
@@ -399,7 +405,11 @@ router.post("/:id/complete", async (req, res) => {
       if (inspector && supervisor && normalizedEmail(inspector.email) === INSPECTOR_EMAIL) {
         const completionBody = `COMPLETED — Inspector special assignment\nArea: ${area?.name ?? "Assigned area"}\nCompleted by: ${actor.name}`;
         const [message] = await tx.insert(messagesTable).values({ conversationId: link.conversationId, senderId: supervisor.id, body: completionBody }).returning();
-        await tx.insert(messageEmailOutboxTable).values({ messageId: message.id, conversationId: link.conversationId, inspectorId: inspector.id, supervisorId: supervisor.id, inspectorEmail: inspector.email!, inspectorName: inspector.name, supervisorName: supervisor.name, messageBody: completionBody, status: outboundEmailStatus() });
+        await tx.insert(messageEmailOutboxTable).values(INSPECTOR_RECIPIENT_EMAILS.map((inspectorEmail) => ({
+          messageId: message.id, conversationId: link.conversationId, inspectorId: inspector.id,
+          supervisorId: supervisor.id, inspectorEmail, inspectorName: inspector.name,
+          supervisorName: supervisor.name, messageBody: completionBody, status: outboundEmailStatus(),
+        })));
         await tx.update(inspectorTaskLinksTable).set({ completionMessageId: message.id }).where(and(eq(inspectorTaskLinksTable.taskId, task.id), sql`${inspectorTaskLinksTable.completionMessageId} IS NULL`));
       }
     }
@@ -433,6 +443,7 @@ router.post("/:id/complete", async (req, res) => {
     await db.insert(notificationsTable).values(
       recipients.map((r) => ({
         staffId: r.id,
+        taskId: updated.id,
         type: "task_completed" as const,
         message: `${completedBy} completed "${updated.taskName}" in ${area.name}`,
       }))
@@ -458,11 +469,14 @@ router.post("/:id/uncomplete", async (req, res) => {
     const [lockedTask] = await tx.select().from(tasksTable).where(eq(tasksTable.id, id)).for("update");
     if (!lockedTask) return { status: "not_found" as const };
     const [link] = await tx.select().from(inspectorTaskLinksTable).where(eq(inspectorTaskLinksTable.taskId, id)).for("update");
-    if (link && lockedTask.assignedToId !== actor.id) return { status: "forbidden" as const };
-    if (!link && actor.role !== "admin" && actor.role !== "supervisor" && lockedTask.assignedToId !== actor.id) {
-      const [assignment] = await tx.select({ id: assignmentsTable.id }).from(assignmentsTable).where(and(eq(assignmentsTable.staffId, actor.id), eq(assignmentsTable.areaId, lockedTask.areaId), eq(assignmentsTable.assignmentDate, lockedTask.taskDate)));
-      if (!assignment || lockedTask.isSpecial) return { status: "forbidden" as const };
-    }
+    const [areaAssignment] = !link && lockedTask.assignedToId === null
+      ? await tx.select({ id: assignmentsTable.id }).from(assignmentsTable).where(and(
+          eq(assignmentsTable.staffId, actor.id),
+          eq(assignmentsTable.areaId, lockedTask.areaId),
+          eq(assignmentsTable.assignmentDate, lockedTask.taskDate),
+        )).limit(1).for("share")
+      : [];
+    if (!canMutateTask(actor, lockedTask.assignedToId, Boolean(link), Boolean(areaAssignment))) return { status: "forbidden" as const };
     if (!lockedTask.completed) return { status: "ok" as const, task: lockedTask };
     const [task] = await tx.update(tasksTable).set({
       completed: false,
@@ -494,12 +508,21 @@ router.patch("/:id/images", async (req, res) => {
   }
   const actor = await actorStaffFromRequest(req);
   if (!actor) return res.status(401).json({ error: "Login session required" });
-  const [authorizationTask] = await db.select().from(tasksTable).where(eq(tasksTable.id, id));
+  const [authorizationTask] = await db.select({
+    assignedToId: tasksTable.assignedToId,
+    areaId: tasksTable.areaId,
+    taskDate: tasksTable.taskDate,
+  }).from(tasksTable).where(eq(tasksTable.id, id));
   if (!authorizationTask) return res.status(404).json({ error: "Task not found" });
-  if (actor.role !== "admin" && actor.role !== "supervisor" && authorizationTask.assignedToId !== actor.id) {
-    const [assignment] = await db.select({ id: assignmentsTable.id }).from(assignmentsTable).where(and(eq(assignmentsTable.staffId, actor.id), eq(assignmentsTable.areaId, authorizationTask.areaId), eq(assignmentsTable.assignmentDate, authorizationTask.taskDate)));
-    if (!assignment || authorizationTask.isSpecial) return res.status(403).json({ error: "Only the assignee or management may attach task images" });
-  }
+  const [[link], [areaAssignment]] = await Promise.all([
+    db.select({ taskId: inspectorTaskLinksTable.taskId }).from(inspectorTaskLinksTable).where(eq(inspectorTaskLinksTable.taskId, id)).limit(1),
+    db.select({ id: assignmentsTable.id }).from(assignmentsTable).where(and(
+      eq(assignmentsTable.staffId, actor.id),
+      eq(assignmentsTable.areaId, authorizationTask.areaId),
+      eq(assignmentsTable.assignmentDate, authorizationTask.taskDate),
+    )).limit(1),
+  ]);
+  if (!canMutateTask(actor, authorizationTask.assignedToId, Boolean(link), Boolean(areaAssignment))) return res.status(403).json({ error: "Only the assigned staff member may attach task images" });
 
   const { beforeImagePath, afterImagePath } = req.body;
   for (const [path, purpose] of [[beforeImagePath, "task_before"], [afterImagePath, "task_after"]] as const) {

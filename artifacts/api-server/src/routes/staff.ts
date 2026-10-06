@@ -70,6 +70,14 @@ router.get("/me", async (req, res) => {
   res.json(toPublicStaff(resolution.staff));
 });
 
+router.get("/former", requireStaffRole("admin"), async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const archived = await db.select().from(staffTable)
+    .where(and(eq(staffTable.formerEmployee, true), eq(staffTable.active, false), eq(staffTable.role, "staff")))
+    .orderBy(staffTable.name);
+  res.json(archived.map(toPublicStaff));
+});
+
 // Email is the Clerk↔staff join key: it must be unique (case-insensitive)
 // among active staff, or one account could resolve to the wrong person.
 async function emailTakenByOther(email: string, excludeId?: number): Promise<boolean> {
@@ -173,6 +181,29 @@ router.put("/:id", requireStaffRole("admin"), async (req, res) => {
   if (result.status === "former") return res.status(403).json({ error: "Former staff records cannot be renamed or reactivated" });
   if (result.status === "email_taken") return res.status(409).json({ error: "Another active staff member already uses this email" });
   return res.json(toPublicStaff(result.staff));
+});
+
+router.post("/:id/rehire", requireStaffRole("admin"), async (req, res) => {
+  const actor = await actorStaffFromRequest(req);
+  if (!actor) { res.status(401).json({ error: "Login session required" }); return; }
+  const { id } = UpdateStaffMemberParams.parse({ id: req.params.id });
+  const result = await db.transaction(async tx => {
+    const [before] = await tx.select().from(staffTable).where(eq(staffTable.id, id)).for("update");
+    if (!before) return { status: "not_found" as const };
+    if (!before.formerEmployee || before.active || before.role !== "staff") return { status: "not_former" as const };
+    const [staff] = await tx.update(staffTable)
+      .set({ active: true, formerEmployee: false, loginEnabled: false })
+      .where(eq(staffTable.id, id))
+      .returning();
+    await tx.insert(staffAccessChangesTable).values(accessChangeValues({
+      actor, staff, action: "UPDATE",
+      before: accessSnapshot(before), after: accessSnapshot(staff),
+    }));
+    return { status: "updated" as const, staff };
+  });
+  if (result.status === "not_found") { res.status(404).json({ error: "Staff member not found" }); return; }
+  if (result.status === "not_former") { res.status(409).json({ error: "Only archived former staff can be rehired" }); return; }
+  res.json(toPublicStaff(result.staff));
 });
 
 router.delete("/:id", requireStaffRole("admin"), async (req, res) => {

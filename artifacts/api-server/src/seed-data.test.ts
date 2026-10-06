@@ -19,6 +19,11 @@ test("Alexis remains removed and cannot be reseeded as active staff", () => {
   assert.equal(SEED_STAFF.some((staff) => staff.name === "Alexis Moron"), false);
 });
 
+test("Diego remains removed and cannot be reseeded as active staff", () => {
+  assert.equal(REMOVED_STAFF_NAMES.includes("Diego Moreno Velez"), true);
+  assert.equal(SEED_STAFF.some((staff) => staff.name === "Diego Moreno Velez"), false);
+});
+
 test("only explicitly seeded email identities have login enabled by default", () => {
   for (const staff of SEED_STAFF) {
     assert.equal(
