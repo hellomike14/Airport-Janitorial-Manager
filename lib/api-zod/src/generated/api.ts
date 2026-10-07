@@ -1387,6 +1387,18 @@ export const ListConversationMessagesResponseItem = zod.object({
     .describe(
       "External inspector email addresses recorded for delivery; empty when this message has no email outbox.",
     ),
+  inspectorEmailAcceptedAt: zod
+    .date()
+    .nullable()
+    .describe(
+      "Time the provider accepted all selected recipient deliveries; null otherwise. This is not confirmed delivery.",
+    ),
+  inboundEmailReceivedAt: zod
+    .date()
+    .nullable()
+    .describe(
+      "Recorded receipt time for a message saved from the authenticated inbound email path; null for other messages.",
+    ),
   createdAt: zod.string(),
 });
 export const ListConversationMessagesResponse = zod.array(

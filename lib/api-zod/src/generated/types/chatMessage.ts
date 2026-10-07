@@ -23,5 +23,15 @@ export interface ChatMessage {
   inspectorEmailDeliveryStatus: ChatMessageInspectorEmailDeliveryStatus;
   /** External inspector email addresses recorded for delivery; empty when this message has no email outbox. */
   inspectorEmailRecipients: string[];
+  /**
+   * Time the provider accepted all selected recipient deliveries; null otherwise. This is not confirmed delivery.
+   * @nullable
+   */
+  inspectorEmailAcceptedAt: Date | null;
+  /**
+   * Recorded receipt time for a message saved from the authenticated inbound email path; null for other messages.
+   * @nullable
+   */
+  inboundEmailReceivedAt: Date | null;
   createdAt: string;
 }

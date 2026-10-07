@@ -2855,6 +2855,14 @@ components:
           items:
             type: string
             format: email
+        inspectorEmailAcceptedAt:
+          type: ["string", "null"]
+          format: date-time
+          description: Time the provider accepted all selected recipient deliveries; null otherwise. This is not confirmed delivery.
+        inboundEmailReceivedAt:
+          type: ["string", "null"]
+          format: date-time
+          description: Recorded receipt time for a message saved from the authenticated inbound email path; null for other messages.
         createdAt:
           type: string
       required:
@@ -2869,6 +2877,8 @@ components:
         - inspectorWorkflowTaskId
         - inspectorEmailDeliveryStatus
         - inspectorEmailRecipients
+        - inspectorEmailAcceptedAt
+        - inboundEmailReceivedAt
         - createdAt
 
     ChatMessageInput:

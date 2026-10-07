@@ -5,13 +5,15 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 mapfile -t backend_tests < <(find "$ROOT/artifacts/api-server/src" -type f -name '*.test.ts' | sort)
+backend_tests+=("$ROOT/tests/inspector-history.http.test.ts")
 frontend_auth_tests=(
   "$ROOT/artifacts/marvol-cleaning/src/lib/authBootstrapRecovery.test.ts"
   "$ROOT/artifacts/marvol-cleaning/src/lib/resolveStaffSession.test.ts"
 )
 
 echo "== Backend Node tests =="
-pnpm --filter @workspace/api-server exec tsx --test "${backend_tests[@]}"
+pnpm --filter @workspace/api-server exec node \
+  --experimental-test-module-mocks --import tsx --test "${backend_tests[@]}"
 
 echo "== Frontend authentication Node tests =="
 pnpm --filter @workspace/api-server exec tsx --test "${frontend_auth_tests[@]}"
