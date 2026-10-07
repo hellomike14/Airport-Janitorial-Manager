@@ -12,6 +12,7 @@ import {
   type TrainingAcknowledgment,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { finalTrainingPosition, shouldReportTrainingPause } from "./trainingPlayback";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 const HEARTBEAT_MS = 5000;
@@ -40,7 +41,17 @@ function AckRecord({ ack, label }: { ack: TrainingAcknowledgment; label?: string
   );
 }
 
-function AttestationForm({ status, statusKey }: { status: EmployeeTrainingStatus; statusKey: readonly unknown[] }) {
+export function AttestationForm({
+  status,
+  statusKey,
+  onRefreshStatus,
+  refreshing,
+}: {
+  status: EmployeeTrainingStatus;
+  statusKey: readonly unknown[];
+  onRefreshStatus: () => void;
+  refreshing: boolean;
+}) {
   const qc = useQueryClient();
   const [watched, setWatched] = useState(false);
   const [understood, setUnderstood] = useState(false);
@@ -54,9 +65,39 @@ function AttestationForm({ status, statusKey }: { status: EmployeeTrainingStatus
       qc.setQueryData(statusKey, result);
       void qc.invalidateQueries({ queryKey: getGetEmployeeTrainingReviewQueryKey() });
     },
+    onError: () => {
+      void qc.invalidateQueries({ queryKey: statusKey });
+    },
   });
   const nameOk = name.trim() !== "" && normalizeName(name) === normalizeName(status.staff.name);
-  const canSubmit = status.eligible && watched && understood && nameOk && !sign.isPending;
+  const blockers: string[] = [];
+  if (!status.eligible) {
+    const remaining = Math.max(0, status.training.duration - status.watchedSeconds);
+    if (remaining > 0.75) {
+      blockers.push(
+        `The server has credited ${Math.floor(status.watchedSeconds)} of ${Math.round(status.training.duration)} seconds; ` +
+        `${Math.ceil(remaining)} more seconds of complete, non-skipped coverage are needed. ` +
+        "Your saved credit is preserved. Press Play to continue at the earliest uncredited section. " +
+        "If the video already ended, refresh saved progress and replay that section."
+      );
+    } else {
+      blockers.push(
+        "The server has not confirmed continuous coverage from the beginning through the end. " +
+        "A small uncredited gap may remain. Your saved credit is preserved; press Play to replay from the earliest gap without seeking."
+      );
+    }
+  }
+  if (!watched) blockers.push("Check “I watched the full training video” to confirm your own statement.");
+  if (!understood) blockers.push("Check “I understand the training” to confirm your own statement.");
+  if (!name.trim()) {
+    blockers.push(`Enter the full name on your staff account: ${status.staff.name}.`);
+  } else if (!nameOk) {
+    blockers.push(
+      `Your signature must match the full staff-account name: ${status.staff.name}. ` +
+      "Case and repeated spaces are ignored; spelling and name parts must match."
+    );
+  }
+  const canSubmit = blockers.length === 0 && !sign.isPending;
   return (
     <form className="space-y-3 rounded-xl border border-slate-200 p-4" data-testid="form-attestation"
       onSubmit={(e) => { e.preventDefault(); if (canSubmit) sign.mutate(); }}>
@@ -64,11 +105,20 @@ function AttestationForm({ status, statusKey }: { status: EmployeeTrainingStatus
       <p className="text-sm text-slate-500">
         This is your own statement. It is recorded as an employee attestation and is not proof of comprehension.
       </p>
-      {!status.eligible && (
-        <p className="text-sm text-amber-700" data-testid="text-not-eligible">
-          Signing unlocks after the server has recorded the full video as watched
-          ({Math.floor(status.watchedSeconds)} of {Math.round(status.training.duration)} seconds credited).
-        </p>
+      {blockers.length > 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
+          role="status" aria-live="polite" data-testid="attestation-requirements">
+          <p className="font-semibold">Complete these requirements before signing:</p>
+          <ul className="mt-1 list-disc space-y-1 pl-5">
+            {blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}
+          </ul>
+          {!status.eligible && (
+            <button type="button" onClick={onRefreshStatus} disabled={refreshing}
+              className="mt-2 underline font-medium disabled:opacity-60" data-testid="button-refresh-training-status">
+              {refreshing ? "Refreshing saved progress…" : "Refresh saved progress"}
+            </button>
+          )}
+        </div>
       )}
       <label className="flex items-start gap-2 text-sm text-slate-700">
         <input type="checkbox" className="mt-1 accent-emerald-600" checked={watched}
@@ -90,7 +140,7 @@ function AttestationForm({ status, statusKey }: { status: EmployeeTrainingStatus
       </div>
       {sign.isError && (
         <p role="alert" className="text-sm text-red-700" data-testid="text-sign-error">
-          Could not save your attestation{sign.error instanceof Error ? `: ${sign.error.message}` : ""}. Try again.
+          The server did not confirm this attestation. Your existing records are preserved. Refresh the saved progress and review the requirements before retrying.
         </p>
       )}
       <button type="submit" disabled={!canSubmit} data-testid="button-sign"
@@ -101,11 +151,17 @@ function AttestationForm({ status, statusKey }: { status: EmployeeTrainingStatus
   );
 }
 
-function Player({ status, statusKey }: { status: EmployeeTrainingStatus; statusKey: readonly unknown[] }) {
+export function Player({ status, statusKey }: { status: EmployeeTrainingStatus; statusKey: readonly unknown[] }) {
   const qc = useQueryClient();
   const videoRef = useRef<HTMLVideoElement>(null);
   const sessionRef = useRef<string | null>(null);
   const startingRef = useRef(false);
+  const allowNextPlayRef = useRef(false);
+  const suppressPauseRef = useRef(false);
+  const programmaticSeekRef = useRef(false);
+  const baselineReadyRef = useRef(false);
+  const waitingPositionRef = useRef<number | null>(null);
+  const reportedRateRef = useRef(1);
   const mountedRef = useRef(true);
   const queueRef = useRef<Promise<void>>(Promise.resolve());
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -119,11 +175,11 @@ function Player({ status, statusKey }: { status: EmployeeTrainingStatus; statusK
 
   const stopTimer = () => { if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; } };
 
-  const report = useCallback((playing: boolean, seeking: boolean, forcePosition?: number) => {
+  const report = useCallback((playing: boolean, seeking: boolean, forcePosition?: number, forceRate?: number) => {
     const v = videoRef.current;
     const sessionId = sessionRef.current;
     if (!v || !sessionId) return;
-    const r = v.playbackRate;
+    const r = forceRate ?? v.playbackRate;
     if (!(r >= 0.25 && r <= 2)) {
       v.pause();
       setProblem(`Playback speed ${r}x is not supported. Use a speed between 0.25x and 2x.`);
@@ -153,35 +209,239 @@ function Player({ status, statusKey }: { status: EmployeeTrainingStatus; statusK
     }, HEARTBEAT_MS);
   };
 
+  const seekToPosition = async (video: HTMLVideoElement, position: number) => {
+    if (!Number.isFinite(position) || position < 0) throw new Error("The saved resume position is invalid.");
+    if (position > 0 && video.readyState < 1) {
+      await new Promise<void>((resolve, reject) => {
+        const timeout = window.setTimeout(() => finish(new Error("The video metadata did not load in time.")), 15000);
+        const cleanup = () => {
+          window.clearTimeout(timeout);
+          video.removeEventListener("loadedmetadata", onMetadata);
+          video.removeEventListener("error", onError);
+        };
+        const finish = (error?: Error) => {
+          cleanup();
+          if (error) reject(error);
+          else resolve();
+        };
+        const onMetadata = () => finish();
+        const onError = () => finish(new Error("The training video could not be loaded."));
+        video.addEventListener("loadedmetadata", onMetadata, { once: true });
+        video.addEventListener("error", onError, { once: true });
+        if (video.readyState >= 1) onMetadata();
+      });
+    }
+    if (Number.isFinite(video.duration) && position > video.duration + 0.25) {
+      throw new Error("The saved progress does not match this video’s duration. Contact a manager; your saved progress is preserved.");
+    }
+    const target = Number.isFinite(video.duration) ? Math.min(position, video.duration) : position;
+    if (Math.abs(video.currentTime - target) <= 0.05) return video.currentTime;
+    await new Promise<void>((resolve, reject) => {
+      const timeout = window.setTimeout(() => finish(new Error("The video could not seek to the saved position.")), 15000);
+      const cleanup = () => {
+        window.clearTimeout(timeout);
+        video.removeEventListener("seeked", onSeeked);
+        video.removeEventListener("error", onError);
+      };
+      const finish = (error?: Error) => {
+        cleanup();
+        if (error) reject(error);
+        else resolve();
+      };
+      const onSeeked = () => finish();
+      const onError = () => finish(new Error("The training video could not be loaded."));
+      programmaticSeekRef.current = true;
+      video.addEventListener("seeked", onSeeked, { once: true });
+      video.addEventListener("error", onError, { once: true });
+      try {
+        video.currentTime = target;
+        if (!video.seeking && Math.abs(video.currentTime - target) <= 0.05) finish();
+      } catch (error) {
+        finish(error instanceof Error ? error : new Error("The saved position could not be selected."));
+      }
+    }).finally(() => { programmaticSeekRef.current = false; });
+    return video.currentTime;
+  };
+
+  const onPlay = async () => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (allowNextPlayRef.current) {
+      allowNextPlayRef.current = false;
+      return;
+    }
+    if (startingRef.current) {
+      suppressPauseRef.current = true;
+      v.pause();
+      return;
+    }
+    setProblem(null);
+    startingRef.current = true;
+    baselineReadyRef.current = false;
+    waitingPositionRef.current = null;
+    stopTimer();
+    suppressPauseRef.current = true;
+    v.pause();
+    try {
+      if (!sessionRef.current) {
+        const session = await startEmployeeTrainingSession();
+        if (!mountedRef.current) return;
+        sessionRef.current = session.sessionId;
+        await seekToPosition(v, session.resumePosition);
+      }
+      if (!mountedRef.current || !sessionRef.current) return;
+      const baseline = Number.isFinite(v.currentTime) ? v.currentTime : 0;
+      await report(false, true, baseline);
+      if (!sessionRef.current) return;
+      await report(true, false, baseline);
+      if (!sessionRef.current) return;
+      baselineReadyRef.current = true;
+      allowNextPlayRef.current = true;
+      await v.play();
+    } catch (err) {
+      allowNextPlayRef.current = false;
+      setProblem(`Could not resume the training video${err instanceof Error ? ` (${err.message})` : ""}. Your saved progress is preserved; press Play to retry.`);
+    } finally {
+      startingRef.current = false;
+    }
+  };
+
+  const onPlaying = () => {
+    const v = videoRef.current;
+    if (!v || !sessionRef.current) return;
+    const waitingPosition = waitingPositionRef.current;
+    if (baselineReadyRef.current && waitingPosition === null) {
+      baselineReadyRef.current = false;
+      startTimer();
+      return;
+    }
+    baselineReadyRef.current = false;
+    waitingPositionRef.current = null;
+    if (waitingPosition !== null) {
+      void report(true, false, waitingPosition)?.then(() => startTimer());
+      return;
+    }
+    const position = v.currentTime;
+    void report(false, true, position)?.then(() =>
+      report(true, false, position)?.then(() => startTimer()));
+  };
+
+  const onWaiting = () => {
+    const v = videoRef.current;
+    if (!v || !sessionRef.current) return;
+    stopTimer();
+    waitingPositionRef.current = v.currentTime;
+    void report(false, false, waitingPositionRef.current);
+  };
+
+  const onStalled = () => {
+    const v = videoRef.current;
+    if (!v || !sessionRef.current) return;
+    const position = v.currentTime;
+    stopTimer();
+    void report(false, false, position)?.then(async () => {
+      if (v.paused || v.seeking || v.ended || v.readyState <= 2) {
+        waitingPositionRef.current = position;
+        return;
+      }
+      await report(true, false, position);
+      startTimer();
+    });
+  };
+
+  const onEnded = () => {
+    stopTimer();
+    const v = videoRef.current;
+    if (!v || !sessionRef.current) return;
+    const position = finalTrainingPosition(v.currentTime, v.duration);
+    if (position === null) {
+      setProblem("The video ended without a usable playback position. Your saved progress is preserved; press Play to retry.");
+      return;
+    }
+    const finalReport = report(false, false, position);
+    if (!finalReport) return;
+    void finalReport.then(async () => {
+      const latest = qc.getQueryData<EmployeeTrainingStatus>(statusKeyRef.current);
+      if (!mountedRef.current || sessionRef.current === null || latest?.eligible) return;
+      try {
+        const session = await startEmployeeTrainingSession();
+        if (!mountedRef.current) return;
+        sessionRef.current = session.sessionId;
+        const resumePosition = await seekToPosition(v, session.resumePosition);
+        baselineReadyRef.current = false;
+        waitingPositionRef.current = null;
+        await report(false, true, resumePosition);
+        if (!sessionRef.current) return;
+        setProblem(
+          `Some sections were not fully credited. Your saved progress is preserved. ` +
+          `The video is positioned at ${Math.floor(resumePosition)} seconds, the earliest uncredited section. ` +
+          "Press Play and let it play without seeking."
+        );
+      } catch (err) {
+        setProblem(
+          `The server did not confirm full coverage. Your saved progress is preserved. ` +
+          `Refresh saved progress and press Play to resume${err instanceof Error ? ` (${err.message})` : ""}.`
+        );
+      }
+    });
+  };
+
+  const onSeeked = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (programmaticSeekRef.current) {
+      programmaticSeekRef.current = false;
+      return;
+    }
+    const position = v.currentTime;
+    const playing = !v.paused && !v.ended;
+    void report(playing, false, position)?.then(() => {
+      if (playing) startTimer();
+    });
+  };
+
+  const onRateChange = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    const nextRate = v.playbackRate;
+    setRate(nextRate);
+    if (nextRate === reportedRateRef.current) return;
+    const previousRate = reportedRateRef.current;
+    if (!sessionRef.current) {
+      if (nextRate < 0.25 || nextRate > 2 || !Number.isFinite(nextRate)) {
+        setProblem(`Playback speed ${nextRate}x is not supported. Use a speed between 0.25x and 2x.`);
+        suppressPauseRef.current = true;
+        v.pause();
+      } else {
+        reportedRateRef.current = nextRate;
+      }
+      return;
+    }
+    const position = v.currentTime;
+    stopTimer();
+    void report(false, false, position, previousRate)?.then(async () => {
+      if (nextRate < 0.25 || nextRate > 2) {
+        setProblem(`Playback speed ${nextRate}x is not supported. Use a speed between 0.25x and 2x.`);
+        suppressPauseRef.current = true;
+        v.pause();
+        return;
+      }
+      reportedRateRef.current = nextRate;
+      if (!v.paused && !v.seeking && !v.ended) {
+        await report(true, false, position, nextRate);
+        startTimer();
+      } else {
+        await report(false, true, position, nextRate);
+      }
+    });
+  };
+
   useEffect(() => {
     mountedRef.current = true;
     const onHide = () => { if (document.hidden) videoRef.current?.pause(); };
     document.addEventListener("visibilitychange", onHide);
     return () => { mountedRef.current = false; document.removeEventListener("visibilitychange", onHide); stopTimer(); };
   }, []);
-
-  const onPlay = async () => {
-    const v = videoRef.current;
-    if (!v) return;
-    setProblem(null);
-    if (sessionRef.current) return;
-    if (startingRef.current) { v.pause(); return; }
-    startingRef.current = true;
-    v.pause();
-    try {
-      const s = await startEmployeeTrainingSession();
-      if (!mountedRef.current) return;
-      sessionRef.current = s.sessionId;
-      v.currentTime = 0;
-      await report(true, false, 0);
-      if (!sessionRef.current) return;
-      await v.play();
-    } catch (err) {
-      setProblem(`Could not start a watch session${err instanceof Error ? ` (${err.message})` : ""}. Press play to retry.`);
-    } finally {
-      startingRef.current = false;
-    }
-  };
 
   const changeRate = (value: number) => {
     const v = videoRef.current;
@@ -206,15 +466,31 @@ function Player({ status, statusKey }: { status: EmployeeTrainingStatus; statusK
         onLoadedData={() => setFailed(false)}
         onVolumeChange={() => setVolume(videoRef.current?.muted ? 0 : videoRef.current?.volume ?? 1)}
         onPlay={onPlay}
-        onPlaying={() => { if (sessionRef.current) { report(true, false); startTimer(); } }}
-        onPause={() => { stopTimer(); const v = videoRef.current; if (v && !v.ended && !v.seeking) report(false, false); }}
-        onEnded={() => { stopTimer(); const v = videoRef.current; report(false, false, v?.duration ?? v?.currentTime); }}
-        onSeeking={() => report(false, true)}
-        onSeeked={() => { const v = videoRef.current; if (v) report(!v.paused && !v.ended, false); }}
-        onRateChange={() => {
+        onPlaying={onPlaying}
+        onPause={() => {
+          stopTimer();
+          if (suppressPauseRef.current) {
+            suppressPauseRef.current = false;
+            return;
+          }
           const v = videoRef.current;
-          if (v) { setRate(v.playbackRate); report(!v.paused, false); }
+          if (v && shouldReportTrainingPause({
+            currentTime: v.currentTime,
+            ended: v.ended,
+            seeking: v.seeking,
+          })) report(false, false);
         }}
+        onEnded={onEnded}
+        onSeeking={() => {
+          if (programmaticSeekRef.current) return;
+          stopTimer();
+          waitingPositionRef.current = null;
+          report(false, true);
+        }}
+        onSeeked={onSeeked}
+        onWaiting={onWaiting}
+        onStalled={onStalled}
+        onRateChange={onRateChange}
       >
         <source src={`${BASE_URL}${status.training.videoUrl}`} type='video/mp4; codecs="avc1.640032,mp4a.40.2"' />
         <source src={`${BASE_URL}${status.training.videoUrl}?format=webm`} type='video/webm; codecs="vp9,opus"' />
@@ -356,7 +632,13 @@ export default function EmployeeTraining() {
                   You signed an earlier version. Version {status.training.version} needs a new attestation.
                 </p>
               )}
-              <AttestationForm key={`${status.staff.id}:${status.training.version}`} status={status} statusKey={statusKey} />
+              <AttestationForm
+                key={`${status.staff.id}:${status.training.version}`}
+                status={status}
+                statusKey={statusKey}
+                onRefreshStatus={() => { void q.refetch(); }}
+                refreshing={q.isFetching}
+              />
             </>
           )}
           {status.history.filter((h) => h.id !== status.acknowledgment?.id).length > 0 && (

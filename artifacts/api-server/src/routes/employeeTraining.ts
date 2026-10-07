@@ -12,9 +12,9 @@ const router: IRouter = Router();
 const storage = new ObjectStorageService();
 router.use("/employee-training", acknowledgmentsRouter);
 
-// The parent API router requires a verified, active staff session for every request,
-// including HEAD and subsequent range requests. Inspectors do not have this portal.
-router.get("/employee-training/video", requireStaffRole("admin", "supervisor", "staff"), async (req, res) => {
+// Every active staff role may view the shared training media; personal progress
+// and attestations remain bound to the actor resolved from the verified session.
+router.get("/employee-training/video", requireStaffRole("admin", "supervisor", "staff", "inspector"), async (req, res) => {
   res.setHeader("Cache-Control", "private, no-store");
   res.setHeader("X-Content-Type-Options", "nosniff");
   if (req.query.format !== undefined && req.query.format !== "webm" && req.query.format !== "mp4") {

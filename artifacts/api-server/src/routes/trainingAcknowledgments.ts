@@ -1,16 +1,25 @@
 import { Router, type IRouter } from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { and, eq, desc, ne, sql } from "drizzle-orm";
+import { and, eq, desc, sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { staffTable, trainingProgressTable, trainingAcknowledgmentsTable } from "@workspace/db/schema";
 import { actorStaffFromRequest } from "../lib/actorSession";
 import { requireStaffRole } from "../middlewares/requireStaffRole";
 import { employeeTraining } from "../lib/employeeTrainingConfig";
-import { fullyWatched, mergeWatchRanges, normalizedSignature, watchedSeconds, watchInterval, watchCreditClock } from "../lib/trainingPolicy";
+import {
+  earliestUncreditedPosition,
+  fullyWatched,
+  heartbeatPosition,
+  mergeWatchRanges,
+  normalizedSignature,
+  watchedSeconds,
+  watchInterval,
+  watchCreditClock,
+} from "../lib/trainingPolicy";
 
 const router: IRouter = Router();
-router.use(requireStaffRole("admin", "supervisor", "staff"));
+router.use(requireStaffRole("admin", "supervisor", "staff", "inspector"));
 const target = (staffId: number) => and(eq(trainingProgressTable.staffId, staffId),
   eq(trainingProgressTable.version, employeeTraining.version));
 const publicTraining = {
@@ -40,14 +49,28 @@ router.get("/status", async (req, res) => {
 router.post("/session", async (req, res) => {
   const actor = (await actorStaffFromRequest(req))!;
   const sessionId = randomUUID();
-  await db.insert(trainingProgressTable).values({
+  const resumePosition = await db.transaction(async tx => {
+    const [progress] = await tx.insert(trainingProgressTable).values({
     staffId: actor.id, version: employeeTraining.version, sessionId,
-  }).onConflictDoUpdate({
-    target: [trainingProgressTable.staffId, trainingProgressTable.version],
-    set: { sessionId, lastPosition: 0, wasPlaying: false,
-      updatedAt: sql`greatest(${trainingProgressTable.updatedAt}, now())` },
+    }).onConflictDoUpdate({
+      target: [trainingProgressTable.staffId, trainingProgressTable.version],
+      set: {
+        sessionId,
+        wasPlaying: false,
+        updatedAt: sql`greatest(${trainingProgressTable.updatedAt}, now())`,
+      },
+    }).returning({
+      id: trainingProgressTable.id,
+      watchedRanges: trainingProgressTable.watchedRanges,
+    });
+    const position = earliestUncreditedPosition(progress?.watchedRanges ?? [], employeeTraining.duration);
+    if (progress) {
+      await tx.update(trainingProgressTable).set({ lastPosition: position })
+        .where(eq(trainingProgressTable.id, progress.id));
+    }
+    return position;
   });
-  res.json({ sessionId });
+  res.json({ sessionId, resumePosition });
 });
 
 const heartbeat = z.object({
@@ -63,12 +86,13 @@ router.post("/progress", async (req, res) => {
     const [progress] = await tx.select().from(trainingProgressTable).where(target(actor.id)).for("update");
     if (!progress || progress.sessionId !== parsed.data.sessionId) return null;
     const now = new Date();
-    const interval = watchInterval(progress, parsed.data, now);
+    const position = heartbeatPosition(progress.lastPosition, parsed.data.position, parsed.data.seeking);
+    const interval = watchInterval(progress, { ...parsed.data, position }, now);
     const ranges = mergeWatchRanges(
       interval ? [...progress.watchedRanges, interval] : progress.watchedRanges,
       employeeTraining.duration);
     await tx.update(trainingProgressTable).set({
-      watchedRanges: ranges, lastPosition: parsed.data.position,
+      watchedRanges: ranges, lastPosition: position,
       wasPlaying: parsed.data.playing && !parsed.data.seeking,
       updatedAt: watchCreditClock(progress.updatedAt, interval, parsed.data.rate, now),
     }).where(eq(trainingProgressTable.id, progress.id));
@@ -110,8 +134,8 @@ router.post("/acknowledgment", async (req, res) => {
 router.get("/review", requireStaffRole("admin", "supervisor"), async (_req, res) => {
   const [people, progress, history] = await Promise.all([
     db.select({ staffId: staffTable.id, name: staffTable.name, active: staffTable.active,
-      formerEmployee: staffTable.formerEmployee }).from(staffTable).where(and(
-        ne(staffTable.role, "inspector"), eq(staffTable.formerEmployee, false))),
+      formerEmployee: staffTable.formerEmployee }).from(staffTable).where(
+        eq(staffTable.formerEmployee, false)),
     db.select().from(trainingProgressTable).where(eq(trainingProgressTable.version, employeeTraining.version)),
     db.select().from(trainingAcknowledgmentsTable).orderBy(desc(trainingAcknowledgmentsTable.completedAt)),
   ]);

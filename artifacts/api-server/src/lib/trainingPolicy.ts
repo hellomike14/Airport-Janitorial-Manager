@@ -23,6 +23,10 @@ export function fullyWatched(ranges: WatchRange[], duration: number) {
     ranges[0][1] >= duration - 0.25;
 }
 
+export function heartbeatPosition(lastPosition: number, requestedPosition: number, seeking: boolean): number {
+  return seeking ? requestedPosition : Math.max(lastPosition, requestedPosition);
+}
+
 export function watchInterval(previous: { lastPosition: number; wasPlaying: boolean; updatedAt: Date },
   current: { position: number; seeking: boolean; rate: number }, now: Date): WatchRange | null {
   const elapsed = (now.getTime() - previous.updatedAt.getTime()) / 1000;
@@ -32,6 +36,17 @@ export function watchInterval(previous: { lastPosition: number; wasPlaying: bool
   if (!previous.wasPlaying || current.seeking || advance <= 0 ||
       advance > Math.min(12 * current.rate, elapsed * current.rate + 0.75)) return null;
   return [previous.lastPosition, current.position];
+}
+
+export function earliestUncreditedPosition(ranges: WatchRange[], duration: number): number {
+  const merged = mergeWatchRanges(ranges, duration);
+  if (fullyWatched(merged, duration)) return 0;
+  let coveredThrough = 0;
+  for (const [start, end] of merged) {
+    if (start > coveredThrough + 0.05) return Math.max(0, coveredThrough - 0.25);
+    coveredThrough = Math.max(coveredThrough, end);
+  }
+  return Math.max(0, coveredThrough - 0.25);
 }
 
 // Borrow timing tolerance once, rather than granting it anew on every request.

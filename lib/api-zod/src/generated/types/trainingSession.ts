@@ -8,4 +8,6 @@
 
 export interface TrainingSession {
   sessionId: string;
+  /** @minimum 0 */
+  resumePosition: number;
 }

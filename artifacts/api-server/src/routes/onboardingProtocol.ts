@@ -9,7 +9,7 @@ const options = z.object({ download: z.enum(["1"]).optional() });
 
 export function createOnboardingProtocolRouter(
   storage: Pick<ObjectStorageService, "getObjectEntityFile"> = new ObjectStorageService(),
-  authorize: RequestHandler = requireStaffRole("admin", "supervisor", "staff"),
+  authorize: RequestHandler = requireStaffRole("admin", "supervisor", "staff", "inspector"),
 ): IRouter {
   const router = Router();
   router.get("/onboarding-protocol", authorize, async (req, res) => {

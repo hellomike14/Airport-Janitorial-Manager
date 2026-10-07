@@ -127,6 +127,7 @@ function useNavConfig() {
       { href: "/completed-jobs", icon: CheckCircle2, label: t("nav.completedTasks") },
       { href: "/photo-share", icon: Camera, label: t("nav.photoShare") },
       { href: "/special-requests", icon: Star, label: t("nav.specialRequests") },
+      { href: "/employment", icon: Briefcase, label: t("nav.employment") },
     ],
     staff: [
       { href: "/my-tasks", icon: CheckSquare, label: t("nav.myTasks") },
