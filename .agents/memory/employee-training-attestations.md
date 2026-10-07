@@ -21,11 +21,11 @@ Do not assume every browser can decode an MP4 merely because it contains H.264/A
 
 **How to apply:** Verify actual decoding and playback, not just HTTP success. Keep compatibility encodings tied to the same approved content version and never overwrite their stored files.
 
-Training belongs under Employment → Onboarding, not Employee Portal. Signed-in employees need their own training there, without access to other hires, applications, or QuickBooks.
+Training belongs under Employment → Onboarding, not Employee Portal. Every active, login-enabled staff role, including inspectors, needs access to its own training there, without access to another employee's records, other hires, applications, or QuickBooks.
 
 **Why:** The user explicitly changed the destination and required existing Employment/Onboarding access controls and saved records to remain intact.
 
-**How to apply:** Keep training identity-bound to staff accounts rather than hire checklist rows. Manager completion review stays manager-only; moving the UI must never reset progress, signatures, timestamps, or version history.
+**How to apply:** Keep training identity-bound to the server-resolved staff account rather than hire checklist rows. Former, inactive, and login-disabled records remain blocked. Manager completion review stays admin/supervisor-only; moving the UI must never reset progress, signatures, timestamps, or version history.
 
 Exclude all former employees from the New Employee Training review list while retaining their saved training records.
 

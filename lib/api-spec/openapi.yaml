@@ -1925,9 +1925,10 @@ components:
           items: { $ref: "#/components/schemas/TrainingAcknowledgment" }
     TrainingSession:
       type: object
-      required: [sessionId]
+      required: [sessionId, resumePosition]
       properties:
         sessionId: { type: string, format: uuid }
+        resumePosition: { type: number, minimum: 0 }
     TrainingHeartbeat:
       type: object
       additionalProperties: false

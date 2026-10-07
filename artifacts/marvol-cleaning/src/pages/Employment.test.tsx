@@ -14,7 +14,7 @@ vi.mock("./employment/ApplicationsTab", () => ({
   ApplicationsTab: () => <div data-testid="applications-panel" />,
 }));
 vi.mock("./employment/OnboardingTab", () => ({
-  OnboardingTab: () => <div data-testid="onboarding-panel" />,
+  OnboardingTab: () => <div data-testid="onboarding-panel"><div data-testid="employee-training-panel" /></div>,
 }));
 vi.mock("./employment/QuickBooksTab", () => ({
   QuickBooksTab: () => <div data-testid="quickbooks-panel" />,
@@ -64,6 +64,19 @@ test("all signed-in roles can open blank Forms without seeing Admin submissions 
     expect(screen.queryByTestId("employment-tab-submitted-forms")).toBeNull();
     expect(screen.queryByTestId("submitted-forms-panel")).toBeNull();
     expect(screen.queryByTestId("identity-documents")).toBeNull();
+  }
+});
+
+test("all active staff roles, including inspectors, can open Onboarding and see their own training", () => {
+  for (const role of ["admin", "supervisor", "staff", "inspector"]) {
+    cleanup();
+    actor.effectiveRole = role;
+    window.history.replaceState(null, "", "/employment?tab=onboarding");
+    render(<Employment />);
+    expect(screen.getByTestId("employment-tab-onboarding")).toBeTruthy();
+    expect(screen.getByTestId("employment-tab-onboarding").getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByTestId("onboarding-panel")).toBeTruthy();
+    expect(screen.getByTestId("employee-training-panel")).toBeTruthy();
   }
 });
 

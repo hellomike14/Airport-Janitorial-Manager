@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fullyWatched, mergeWatchRanges, normalizedSignature, watchInterval, watchedSeconds, watchCreditClock } from "./trainingPolicy";
+import { earliestUncreditedPosition, fullyWatched, heartbeatPosition, mergeWatchRanges, normalizedSignature, watchInterval, watchedSeconds, watchCreditClock } from "./trainingPolicy";
 
 test("seeking to the end or sending a fabricated advance earns no watch coverage", () => {
   const previous = { lastPosition: 0, wasPlaying: true, updatedAt: new Date(0) };
@@ -19,6 +19,19 @@ test("browser rounding is tolerated only at the start/end, not substantial inter
   assert.equal(fullyWatched([[0.1, 99.9]], 100), true);
   assert.equal(fullyWatched([[2, 100]], 100), false);
   assert.equal(fullyWatched([[0, 90]], 100), false);
+});
+test("recovery starts just before the earliest uncredited segment without changing earned ranges", () => {
+  const ranges: [number, number][] = [[0, 10], [20, 40], [50, 178.629985]];
+  const before = structuredClone(ranges);
+  assert.equal(earliestUncreditedPosition(ranges, 190.122993), 9.75);
+  assert.deepEqual(ranges, before);
+  assert.equal(earliestUncreditedPosition([[0, 178.629985]], 190.122993), 178.379985);
+  assert.equal(earliestUncreditedPosition([[0.1, 190]], 190.122993), 0);
+});
+test("delayed non-seeking heartbeats cannot move the active watch position backward", () => {
+  assert.equal(heartbeatPosition(12, 9, false), 12);
+  assert.equal(heartbeatPosition(12, 9, true), 9);
+  assert.equal(heartbeatPosition(12, 15, false), 15);
 });
 test("signature normalization preserves identity without sensitivity to case and spaces", () => {
   assert.equal(normalizedSignature("  Maria  García "), normalizedSignature("maria garcía"));
@@ -52,4 +65,17 @@ test("continuous playback with network jitter repays borrowed tolerance", () => 
       updatedAt: watchCreditClock(previous.updatedAt, interval, 2, now) };
   }
   assert.equal(fullyWatched(mergeWatchRanges(ranges, 200), 200), true);
+});
+
+test("a serialized end report can credit the final segment after the last heartbeat", () => {
+  const duration = 190.122993;
+  const lastHeartbeat = 178.629985;
+  const elapsedMs = (duration - lastHeartbeat) * 1000;
+  const interval = watchInterval(
+    { lastPosition: lastHeartbeat, wasPlaying: true, updatedAt: new Date(0) },
+    { position: duration, seeking: false, rate: 1 },
+    new Date(elapsedMs),
+  );
+  assert.deepEqual(interval, [lastHeartbeat, duration]);
+  assert.equal(fullyWatched(mergeWatchRanges([[0, lastHeartbeat], interval!], duration), duration), true);
 });

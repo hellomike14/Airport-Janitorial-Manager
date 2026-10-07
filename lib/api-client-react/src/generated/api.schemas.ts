@@ -46,6 +46,8 @@ export interface EmployeeTrainingStatus {
 
 export interface TrainingSession {
   sessionId: string;
+  /** @minimum 0 */
+  resumePosition: number;
 }
 
 export interface TrainingHeartbeat {

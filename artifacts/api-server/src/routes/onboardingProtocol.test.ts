@@ -19,7 +19,7 @@ test("staff protocol delivery preserves PDF bytes, access control and explicit e
   };
   const app = express();
   app.use(createOnboardingProtocolRouter(storage, (req, res, next) => {
-    if (!["admin", "supervisor", "staff"].includes(String(req.headers["x-test-role"]))) {
+    if (!["admin", "supervisor", "staff", "inspector"].includes(String(req.headers["x-test-role"]))) {
       res.status(403).end();
       return;
     }
@@ -30,9 +30,7 @@ test("staff protocol delivery preserves PDF bytes, access control and explicit e
   const url = `http://127.0.0.1:${(server.address() as { port: number }).port}/onboarding-protocol`;
   try {
     assert.equal((await fetch(url)).status, 403);
-    assert.equal((await fetch(url, { headers: { "x-test-role": "inspector" } })).status, 403);
-    assert.equal(reads, 0);
-    for (const role of ["admin", "supervisor", "staff"]) {
+    for (const role of ["admin", "supervisor", "staff", "inspector"]) {
       for (const [query, disposition] of [["", "inline"], ["?download=1", "attachment"]]) {
         const response = await fetch(url + query, { headers: { "x-test-role": role } });
         assert.equal(response.status, 200);
@@ -43,9 +41,10 @@ test("staff protocol delivery preserves PDF bytes, access control and explicit e
       }
     }
     assert.equal((await fetch(url + "?download=invalid", { headers: { "x-test-role": "staff" } })).status, 400);
-    assert.equal(reads, 6);
+    assert.equal(reads, 8);
     unavailable = true;
     assert.equal((await fetch(url, { headers: { "x-test-role": "staff" } })).status, 503);
+    assert.equal(reads, 9);
   } finally {
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
   }

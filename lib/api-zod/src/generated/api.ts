@@ -2199,8 +2199,13 @@ export const GetEmployeeTrainingStatusResponse = zod.object({
 /**
  * @summary Start one watch session for the signed-in employee
  */
+export const startEmployeeTrainingSessionResponseResumePositionMin = 0;
+
 export const StartEmployeeTrainingSessionResponse = zod.object({
   sessionId: zod.string().uuid(),
+  resumePosition: zod
+    .number()
+    .min(startEmployeeTrainingSessionResponseResumePositionMin),
 });
 
 /**

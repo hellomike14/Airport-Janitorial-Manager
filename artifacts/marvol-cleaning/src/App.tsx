@@ -225,6 +225,7 @@ function ProtectedRoutes() {
             <Route path="/completed-jobs" component={CompletedJobs} />
             <Route path="/photo-share" component={PhotoShare} />
             <Route path="/special-requests" component={SpecialRequests} />
+            <Route path="/employment" component={Employment} />
             <Route path="/"><Redirect to="/issues" /></Route>
             <Route path="/staff"><Redirect to="/issues" /></Route>
             <Route path="/assignments"><Redirect to="/issues" /></Route>
