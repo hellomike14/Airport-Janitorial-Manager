@@ -134,6 +134,7 @@ function useNavConfig() {
       { href: "/issues", icon: AlertTriangle, label: t("nav.myIssues") },
       { href: "/operations", icon: ClipboardList, label: "Operations" },
       { href: "/employee-portal", icon: Calendar, label: t("nav.mySchedule") },
+      { href: "/employment", icon: Briefcase, label: t("nav.employment") },
       { href: "/photo-share", icon: Camera, label: t("nav.photoShare") },
       { href: "/special-requests", icon: Star, label: t("nav.specialRequests") },
     ],

@@ -1,28 +1,44 @@
 import React, { useState } from "react";
 import { useListStaff, useListFormerStaff, getListFormerStaffQueryKey, useRehireStaffMember, useCreateStaffMember, useDeleteStaffMember, useUpdateStaffMember } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { UserPlus, Shield, User, Trash2, Lock, ArrowUpDown, LogOut, MailWarning, CheckCircle2, Mail, Phone, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/AuthContext";
+import { getConfidentialStaffMembers } from "@workspace/api-client-react";
+import { ConfidentialBoundary } from "@/components/confidential/ConfidentialBoundary";
 import { AccessHealthSection } from "@/components/AccessHealthSection";
 
 export default function Staff() {
+  const { effectiveRole } = useAuth();
+  if (effectiveRole === "admin") return <ConfidentialBoundary><StaffPage confidential /></ConfidentialBoundary>;
+  return <StaffPage confidential={false} />;
+}
+
+function StaffPage({ confidential }: { confidential: boolean }) {
   const { t } = useTranslation();
   const { effectiveRole } = useAuth();
   const readOnly = effectiveRole === "supervisor";
-  const { data: staff, isLoading } = useListStaff();
+  const publicStaff = useListStaff({ query: { queryKey: ["/api/staff"], enabled: !confidential } });
+  const secureStaff = useQuery({
+    queryKey: ["/api/staff/confidential"],
+    enabled: confidential,
+    gcTime: 0,
+    queryFn: ({ signal }) => getConfidentialStaffMembers(signal),
+  });
+  const { data: staff, isLoading } = confidential ? secureStaff : publicStaff;
   const { data: formerStaff } = useListFormerStaff({ query: { queryKey: getListFormerStaffQueryKey(), enabled: effectiveRole === "admin" } });
   const { currentUser, logout } = useAuth();
   const queryClient = useQueryClient();
+  const refreshStaff = () => { void queryClient.invalidateQueries({ queryKey: ["/api/staff"] }); void queryClient.invalidateQueries({ queryKey: ["/api/staff/confidential"] }); };
   const [isAdding, setIsAdding] = useState(false);
   const [formData, setFormData] = useState({ name: "", role: "staff", phone: "", email: "" });
 
   const createMutation = useCreateStaffMember({
     mutation: {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
+        refreshStaff();
         setIsAdding(false);
         setFormData({ name: "", role: "staff", phone: "", email: "" });
       },
@@ -33,14 +49,14 @@ export default function Staff() {
 
   const deleteMutation = useDeleteStaffMember({
     mutation: {
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/staff"] }),
+      onSuccess: () => refreshStaff(),
       onError: () => alert(t("staff.removeFailed")),
     },
   });
 
   const updateMutation = useUpdateStaffMember({
     mutation: {
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/staff"] }),
+      onSuccess: () => refreshStaff(),
       onError: (err: any) =>
         alert(err?.data?.error ?? err?.message ?? t("staff.saveFailed", "Could not save the staff member.")),
     },
@@ -48,7 +64,7 @@ export default function Staff() {
   const rehireMutation = useRehireStaffMember({
     mutation: {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
+        refreshStaff();
         queryClient.invalidateQueries({ queryKey: ["/api/staff/former"] });
       },
       onError: (err: any) =>
@@ -95,6 +111,9 @@ export default function Staff() {
     }
   };
 
+  if (confidential && secureStaff.isError) return (
+    <div role="alert" className="p-8 text-rose-700">{t("confidential.loadFailedBody")} <button className="font-semibold underline" onClick={() => void secureStaff.refetch()}>{t("confidential.retry")}</button></div>
+  );
   if (isLoading) return <div className="p-8 animate-pulse text-slate-500">{t("staff.loadingDirectory")}</div>;
 
   const admins = staff?.filter((s) => s.role === "admin") || [];

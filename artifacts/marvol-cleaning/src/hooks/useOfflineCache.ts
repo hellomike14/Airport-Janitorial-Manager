@@ -29,7 +29,7 @@ export function useHydrateFromOfflineCache() {
         if (!mounted) return;
 
         for (const entry of cached) {
-          if (entry.data != null) {
+          if (entry.data != null && matchesCachePrefix(entry.url)) {
             try {
               const queryKey = JSON.parse(entry.url);
               const existing = queryClient.getQueryData(queryKey);

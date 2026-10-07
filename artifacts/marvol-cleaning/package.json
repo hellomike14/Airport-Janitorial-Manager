@@ -89,6 +89,7 @@
     "@clerk/react": "^6.15.1",
     "@clerk/themes": "^2.4.57",
     "leaflet": "^1.9.4",
+    "pdfjs-dist": "^6.4.299",
     "react-leaflet": "^5.0.0",
     "workbox-window": "^7.4.0"
   }

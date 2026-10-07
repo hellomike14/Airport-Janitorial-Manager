@@ -1,0 +1,18 @@
+/* PDF.js 6 can prefer cached appearance canvases until a scripting sandbox
+   updates them. We intentionally do not execute PDF scripts: editable widgets
+   show their real HTML controls instead, so live values match saved values. */
+.pdf-form-page .annotationLayer .marvol-editable-widget > canvas.annotationContent {
+  display: none !important;
+}
+
+.pdf-form-page .annotationLayer .marvol-editable-widget :is(input, textarea, select) {
+  display: block !important;
+  position: relative;
+  z-index: 1;
+}
+
+.pdf-form-page .annotationLayer .marvol-editable-widget input:is([type="checkbox"], [type="radio"]) {
+  appearance: auto !important;
+  background-image: none !important;
+  accent-color: #059669;
+}

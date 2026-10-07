@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Link2, CheckCircle2, AlertTriangle, Unlink } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { ConfidentialBoundary } from "@/components/confidential/ConfidentialBoundary";
 import {
   useGetQuickbooksStatus,
   getQuickbooksConnectUrl,
@@ -9,7 +11,7 @@ import {
   getGetQuickbooksStatusQueryKey,
 } from "@workspace/api-client-react";
 
-export function QuickBooksTab() {
+function QuickBooksContent() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { data: status, isLoading } = useGetQuickbooksStatus();
@@ -132,4 +134,10 @@ export function QuickBooksTab() {
       </div>
     </div>
   );
+}
+
+export function QuickBooksTab() {
+  const { effectiveRole } = useAuth();
+  if (effectiveRole !== "admin") return null;
+  return <ConfidentialBoundary><QuickBooksContent /></ConfidentialBoundary>;
 }

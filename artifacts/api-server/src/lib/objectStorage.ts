@@ -106,7 +106,7 @@ export class ObjectStorageService {
     return new Response(webStream, { headers });
   }
 
-  async getObjectEntityUploadURL(): Promise<string> {
+  async getObjectEntityUploadURL(namespace: "uploads" | "hr-identity/staging" = "uploads"): Promise<string> {
     const privateObjectDir = this.getPrivateObjectDir();
     if (!privateObjectDir) {
       throw new Error(
@@ -116,7 +116,7 @@ export class ObjectStorageService {
     }
 
     const objectId = randomUUID();
-    const fullPath = `${privateObjectDir}/uploads/${objectId}`;
+    const fullPath = `${privateObjectDir}/${namespace}/${objectId}`;
 
     const { bucketName, objectName } = parseObjectPath(fullPath);
 
@@ -152,6 +152,18 @@ export class ObjectStorageService {
       throw new ObjectNotFoundError();
     }
     return objectFile;
+  }
+
+  /** Snapshot an applicant's temporary signed-upload object to a fresh private key. */
+  async copyApplicantSubmissionObject(sourcePath: string): Promise<string> {
+    const source = await this.getObjectEntityFile(sourcePath);
+    const objectPath = `/objects/uploads/completed/${randomUUID()}`;
+    const privateObjectDir = this.getPrivateObjectDir().replace(/\/$/, "");
+    const { bucketName, objectName } = parseObjectPath(`${privateObjectDir}/uploads/completed/${objectPath.split("/").at(-1)}`);
+    const destination = objectStorageClient.bucket(bucketName).file(objectName);
+    await source.copy(destination, { preconditionOpts: { ifGenerationMatch: 0 } });
+    await setObjectAclPolicy(destination, { owner: "completed-employment-submission", visibility: "private" });
+    return objectPath;
   }
 
   normalizeObjectEntityPath(rawPath: string): string {

@@ -1,0 +1,16 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "ygwNRtzyye7BuK-u2lhat"
+uri = "file://documents/Marvol_Employee_Onboarding_Protocol_v1.pdf"
+type = "pdf"
+title = "Marvol Employee Onboarding Protocol"
+description = "18-page formatted PDF, Version 1.0. Preserves the full uploaded protocol, all 17 sections, templates and reference links."
+logical_id = "f245afc1-4911-4383-bf99-28241b470504"
+content_hash = "sha256:5a7e4c51dba12bcd28afd8870dccc96edbb118bbeb4365c85e7ec395a398df7e"
+size = 136449
+mtime_ms = 1791336287867
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:d901672a-2183-4a87-be90-bb9fa3418d6d/f245afc1-4911-4383-bf99-28241b470504/e9dae760-52b0-48c1-9f5d-acf389646499"
+storage_version_token = "1791336608710002"
+content_type = "application/pdf"

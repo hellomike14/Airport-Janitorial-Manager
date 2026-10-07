@@ -461,6 +461,7 @@ export default function EmployeePortal() {
         </div>
       )}
 
+
       {showAddModal && (
         <AddScheduleModal
           staffList={staffList}

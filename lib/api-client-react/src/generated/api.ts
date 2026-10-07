@@ -18,6 +18,7 @@ import type {
 
 import type {
   AddAreaTaskExclusionRequest,
+  ApplicationSubmissionReceipt,
   AreaEffectiveTask,
   AssignIssueRequest,
   Assignment,
@@ -27,12 +28,16 @@ import type {
   AuthDiagnostics,
   AuthServiceUnavailableError,
   BatchCompleteResponse,
+  CancelIdentityDocumentUpload200,
   ChatMessage,
   ChatMessageInput,
   CleaningArea,
   CompleteAllTasksRequest,
+  CompleteIdentityDocumentUpload200,
   CompleteIssueRequest,
   CompleteTaskRequest,
+  ConfigureAdminConfidentialCode200,
+  ConfigureAdminConfidentialCodeBody,
   ConversationStartInput,
   ConversationSummary,
   CreateAssignmentRequest,
@@ -47,22 +52,33 @@ import type {
   DeleteOldConversationMessagesParams,
   DeleteResponse,
   DiagnosticStoreUnavailableError,
+  EmployeeTrainingStatus,
   ErrorEnvelope,
+  GetAdminConfidentialAccessStatus200,
   GetDashboardParams,
+  GetEmploymentI9FormParams,
+  GetEmploymentJobApplicationParams,
+  GetEmploymentW4FormParams,
+  GetIdentityDocumentContext200,
   GetInspectorWorkflow200,
   HealthStatus,
   InspectorEmailRecipientsResponse,
   InvalidDiagnosticCodeError,
   Issue,
   JobApplication,
+  LinkIdentityDocumentEmployee200,
+  LinkIdentityDocumentEmployeeBody,
   ListApplicationsParams,
   ListAssignmentsParams,
   ListConversationMessagesParams,
   ListConversationsParams,
+  ListIdentityDocumentPhotos200,
+  ListIdentityDocumentPhotosParams,
   ListIssuesParams,
   ListNotificationsParams,
   ListSpecialTasksParams,
   ListTasksParams,
+  LockAdminConfidentialAccess200,
   MarkAllReadRequest,
   NoStaffMatchError,
   Notification,
@@ -73,6 +89,10 @@ import type {
   QuickbooksStatus,
   RemoveAreaTaskExclusionRequest,
   ReorderTaskTypesRequest,
+  ReserveIdentityDocumentUpload201,
+  ReserveIdentityDocumentUploadBody,
+  ReviewIdentityDocumentPhoto200,
+  ReviewIdentityDocumentPhotoBody,
   SendgridInboundReplyRequest,
   SessionExpiredError,
   SetConversationArchive200,
@@ -89,6 +109,13 @@ import type {
   TerminalGroupScheduleMoveInput,
   TerminalGroupScheduleMoveResult,
   TerminalGroupSchedulePreview,
+  TrainingAttestationInput,
+  TrainingHeartbeat,
+  TrainingReview,
+  TrainingSession,
+  TrainingWatchStatus,
+  UnlockAdminConfidentialAccess200,
+  UnlockAdminConfidentialAccessBody,
   UpdateApplicationRequest,
   UpdateIssueImagesRequest,
   UpdateOnboardingItemRequest,
@@ -106,6 +133,1138 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+/**
+ * @summary Verified Admin access-code status; no confidential data or secrets
+ */
+export const getGetAdminConfidentialAccessStatusUrl = () => {
+  return `/api/confidential-access/status`;
+};
+
+export const getAdminConfidentialAccessStatus = async (
+  options?: RequestInit,
+): Promise<GetAdminConfidentialAccessStatus200> => {
+  return customFetch<GetAdminConfidentialAccessStatus200>(
+    getGetAdminConfidentialAccessStatusUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetAdminConfidentialAccessStatusQueryKey = () => {
+  return [`/api/confidential-access/status`] as const;
+};
+
+export const getGetAdminConfidentialAccessStatusQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminConfidentialAccessStatus>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminConfidentialAccessStatus>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetAdminConfidentialAccessStatusQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAdminConfidentialAccessStatus>>
+  > = ({ signal }) =>
+    getAdminConfidentialAccessStatus({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminConfidentialAccessStatus>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAdminConfidentialAccessStatusQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminConfidentialAccessStatus>>
+>;
+export type GetAdminConfidentialAccessStatusQueryError = ErrorType<void>;
+
+/**
+ * @summary Verified Admin access-code status; no confidential data or secrets
+ */
+
+export function useGetAdminConfidentialAccessStatus<
+  TData = Awaited<ReturnType<typeof getAdminConfidentialAccessStatus>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminConfidentialAccessStatus>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAdminConfidentialAccessStatusQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Admin first setup or code change with current code and unlocked session
+ */
+export const getConfigureAdminConfidentialCodeUrl = () => {
+  return `/api/confidential-access/configure`;
+};
+
+export const configureAdminConfidentialCode = async (
+  configureAdminConfidentialCodeBody: ConfigureAdminConfidentialCodeBody,
+  options?: RequestInit,
+): Promise<ConfigureAdminConfidentialCode200> => {
+  return customFetch<ConfigureAdminConfidentialCode200>(
+    getConfigureAdminConfidentialCodeUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(configureAdminConfidentialCodeBody),
+    },
+  );
+};
+
+export const getConfigureAdminConfidentialCodeMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof configureAdminConfidentialCode>>,
+    TError,
+    { data: BodyType<ConfigureAdminConfidentialCodeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof configureAdminConfidentialCode>>,
+  TError,
+  { data: BodyType<ConfigureAdminConfidentialCodeBody> },
+  TContext
+> => {
+  const mutationKey = ["configureAdminConfidentialCode"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof configureAdminConfidentialCode>>,
+    { data: BodyType<ConfigureAdminConfidentialCodeBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return configureAdminConfidentialCode(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ConfigureAdminConfidentialCodeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof configureAdminConfidentialCode>>
+>;
+export type ConfigureAdminConfidentialCodeMutationBody =
+  BodyType<ConfigureAdminConfidentialCodeBody>;
+export type ConfigureAdminConfidentialCodeMutationError = ErrorType<void>;
+
+/**
+ * @summary Admin first setup or code change with current code and unlocked session
+ */
+export const useConfigureAdminConfidentialCode = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof configureAdminConfidentialCode>>,
+    TError,
+    { data: BodyType<ConfigureAdminConfidentialCodeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof configureAdminConfidentialCode>>,
+  TError,
+  { data: BodyType<ConfigureAdminConfidentialCodeBody> },
+  TContext
+> => {
+  return useMutation(getConfigureAdminConfidentialCodeMutationOptions(options));
+};
+
+/**
+ * @summary Admin code check; five failures block this administrator for 15 minutes
+ */
+export const getUnlockAdminConfidentialAccessUrl = () => {
+  return `/api/confidential-access/unlock`;
+};
+
+export const unlockAdminConfidentialAccess = async (
+  unlockAdminConfidentialAccessBody: UnlockAdminConfidentialAccessBody,
+  options?: RequestInit,
+): Promise<UnlockAdminConfidentialAccess200> => {
+  return customFetch<UnlockAdminConfidentialAccess200>(
+    getUnlockAdminConfidentialAccessUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(unlockAdminConfidentialAccessBody),
+    },
+  );
+};
+
+export const getUnlockAdminConfidentialAccessMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof unlockAdminConfidentialAccess>>,
+    TError,
+    { data: BodyType<UnlockAdminConfidentialAccessBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof unlockAdminConfidentialAccess>>,
+  TError,
+  { data: BodyType<UnlockAdminConfidentialAccessBody> },
+  TContext
+> => {
+  const mutationKey = ["unlockAdminConfidentialAccess"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof unlockAdminConfidentialAccess>>,
+    { data: BodyType<UnlockAdminConfidentialAccessBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return unlockAdminConfidentialAccess(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UnlockAdminConfidentialAccessMutationResult = NonNullable<
+  Awaited<ReturnType<typeof unlockAdminConfidentialAccess>>
+>;
+export type UnlockAdminConfidentialAccessMutationBody =
+  BodyType<UnlockAdminConfidentialAccessBody>;
+export type UnlockAdminConfidentialAccessMutationError = ErrorType<void>;
+
+/**
+ * @summary Admin code check; five failures block this administrator for 15 minutes
+ */
+export const useUnlockAdminConfidentialAccess = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof unlockAdminConfidentialAccess>>,
+    TError,
+    { data: BodyType<UnlockAdminConfidentialAccessBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof unlockAdminConfidentialAccess>>,
+  TError,
+  { data: BodyType<UnlockAdminConfidentialAccessBody> },
+  TContext
+> => {
+  return useMutation(getUnlockAdminConfidentialAccessMutationOptions(options));
+};
+
+/**
+ * @summary Revoke this browser unlock immediately
+ */
+export const getLockAdminConfidentialAccessUrl = () => {
+  return `/api/confidential-access/lock`;
+};
+
+export const lockAdminConfidentialAccess = async (
+  options?: RequestInit,
+): Promise<LockAdminConfidentialAccess200> => {
+  return customFetch<LockAdminConfidentialAccess200>(
+    getLockAdminConfidentialAccessUrl(),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getLockAdminConfidentialAccessMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof lockAdminConfidentialAccess>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof lockAdminConfidentialAccess>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["lockAdminConfidentialAccess"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof lockAdminConfidentialAccess>>,
+    void
+  > = () => {
+    return lockAdminConfidentialAccess(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type LockAdminConfidentialAccessMutationResult = NonNullable<
+  Awaited<ReturnType<typeof lockAdminConfidentialAccess>>
+>;
+
+export type LockAdminConfidentialAccessMutationError = ErrorType<void>;
+
+/**
+ * @summary Revoke this browser unlock immediately
+ */
+export const useLockAdminConfidentialAccess = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof lockAdminConfidentialAccess>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof lockAdminConfidentialAccess>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getLockAdminConfidentialAccessMutationOptions(options));
+};
+
+/**
+ * @summary Personal contact information for code-unlocked administrators only
+ */
+export const getListConfidentialStaffUrl = () => {
+  return `/api/staff/confidential`;
+};
+
+export const listConfidentialStaff = async (
+  options?: RequestInit,
+): Promise<StaffMember[]> => {
+  return customFetch<StaffMember[]>(getListConfidentialStaffUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListConfidentialStaffQueryKey = () => {
+  return [`/api/staff/confidential`] as const;
+};
+
+export const getListConfidentialStaffQueryOptions = <
+  TData = Awaited<ReturnType<typeof listConfidentialStaff>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listConfidentialStaff>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListConfidentialStaffQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listConfidentialStaff>>
+  > = ({ signal }) => listConfidentialStaff({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listConfidentialStaff>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListConfidentialStaffQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listConfidentialStaff>>
+>;
+export type ListConfidentialStaffQueryError = ErrorType<void>;
+
+/**
+ * @summary Personal contact information for code-unlocked administrators only
+ */
+
+export function useListConfidentialStaff<
+  TData = Awaited<ReturnType<typeof listConfidentialStaff>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listConfidentialStaff>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListConfidentialStaffQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Admin-only linked hire and employee selection
+ */
+export const getGetIdentityDocumentContextUrl = () => {
+  return `/api/identity-documents/context`;
+};
+
+export const getIdentityDocumentContext = async (
+  options?: RequestInit,
+): Promise<GetIdentityDocumentContext200> => {
+  return customFetch<GetIdentityDocumentContext200>(
+    getGetIdentityDocumentContextUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetIdentityDocumentContextQueryKey = () => {
+  return [`/api/identity-documents/context`] as const;
+};
+
+export const getGetIdentityDocumentContextQueryOptions = <
+  TData = Awaited<ReturnType<typeof getIdentityDocumentContext>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getIdentityDocumentContext>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetIdentityDocumentContextQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getIdentityDocumentContext>>
+  > = ({ signal }) => getIdentityDocumentContext({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getIdentityDocumentContext>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetIdentityDocumentContextQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getIdentityDocumentContext>>
+>;
+export type GetIdentityDocumentContextQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Admin-only linked hire and employee selection
+ */
+
+export function useGetIdentityDocumentContext<
+  TData = Awaited<ReturnType<typeof getIdentityDocumentContext>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getIdentityDocumentContext>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetIdentityDocumentContextQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getListIdentityDocumentPhotosUrl = (
+  params: ListIdentityDocumentPhotosParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/identity-documents?${stringifiedParams}`
+    : `/api/identity-documents`;
+};
+
+export const listIdentityDocumentPhotos = async (
+  params: ListIdentityDocumentPhotosParams,
+  options?: RequestInit,
+): Promise<ListIdentityDocumentPhotos200> => {
+  return customFetch<ListIdentityDocumentPhotos200>(
+    getListIdentityDocumentPhotosUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListIdentityDocumentPhotosQueryKey = (
+  params?: ListIdentityDocumentPhotosParams,
+) => {
+  return [`/api/identity-documents`, ...(params ? [params] : [])] as const;
+};
+
+export const getListIdentityDocumentPhotosQueryOptions = <
+  TData = Awaited<ReturnType<typeof listIdentityDocumentPhotos>>,
+  TError = ErrorType<unknown>,
+>(
+  params: ListIdentityDocumentPhotosParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listIdentityDocumentPhotos>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListIdentityDocumentPhotosQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listIdentityDocumentPhotos>>
+  > = ({ signal }) =>
+    listIdentityDocumentPhotos(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listIdentityDocumentPhotos>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListIdentityDocumentPhotosQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listIdentityDocumentPhotos>>
+>;
+export type ListIdentityDocumentPhotosQueryError = ErrorType<unknown>;
+
+export function useListIdentityDocumentPhotos<
+  TData = Awaited<ReturnType<typeof listIdentityDocumentPhotos>>,
+  TError = ErrorType<unknown>,
+>(
+  params: ListIdentityDocumentPhotosParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listIdentityDocumentPhotos>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListIdentityDocumentPhotosQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary HR only; immutable employee ownership once linked
+ */
+export const getLinkIdentityDocumentEmployeeUrl = (hireId: number) => {
+  return `/api/identity-documents/hires/${hireId}/employee`;
+};
+
+export const linkIdentityDocumentEmployee = async (
+  hireId: number,
+  linkIdentityDocumentEmployeeBody: LinkIdentityDocumentEmployeeBody,
+  options?: RequestInit,
+): Promise<LinkIdentityDocumentEmployee200> => {
+  return customFetch<LinkIdentityDocumentEmployee200>(
+    getLinkIdentityDocumentEmployeeUrl(hireId),
+    {
+      ...options,
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(linkIdentityDocumentEmployeeBody),
+    },
+  );
+};
+
+export const getLinkIdentityDocumentEmployeeMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof linkIdentityDocumentEmployee>>,
+    TError,
+    { hireId: number; data: BodyType<LinkIdentityDocumentEmployeeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof linkIdentityDocumentEmployee>>,
+  TError,
+  { hireId: number; data: BodyType<LinkIdentityDocumentEmployeeBody> },
+  TContext
+> => {
+  const mutationKey = ["linkIdentityDocumentEmployee"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof linkIdentityDocumentEmployee>>,
+    { hireId: number; data: BodyType<LinkIdentityDocumentEmployeeBody> }
+  > = (props) => {
+    const { hireId, data } = props ?? {};
+
+    return linkIdentityDocumentEmployee(hireId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type LinkIdentityDocumentEmployeeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof linkIdentityDocumentEmployee>>
+>;
+export type LinkIdentityDocumentEmployeeMutationBody =
+  BodyType<LinkIdentityDocumentEmployeeBody>;
+export type LinkIdentityDocumentEmployeeMutationError = ErrorType<unknown>;
+
+/**
+ * @summary HR only; immutable employee ownership once linked
+ */
+export const useLinkIdentityDocumentEmployee = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof linkIdentityDocumentEmployee>>,
+    TError,
+    { hireId: number; data: BodyType<LinkIdentityDocumentEmployeeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof linkIdentityDocumentEmployee>>,
+  TError,
+  { hireId: number; data: BodyType<LinkIdentityDocumentEmployeeBody> },
+  TContext
+> => {
+  return useMutation(getLinkIdentityDocumentEmployeeMutationOptions(options));
+};
+
+/**
+ * @summary Authorize one private photo before direct-to-storage transfer
+ */
+export const getReserveIdentityDocumentUploadUrl = () => {
+  return `/api/identity-documents/uploads`;
+};
+
+export const reserveIdentityDocumentUpload = async (
+  reserveIdentityDocumentUploadBody: ReserveIdentityDocumentUploadBody,
+  options?: RequestInit,
+): Promise<ReserveIdentityDocumentUpload201> => {
+  return customFetch<ReserveIdentityDocumentUpload201>(
+    getReserveIdentityDocumentUploadUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(reserveIdentityDocumentUploadBody),
+    },
+  );
+};
+
+export const getReserveIdentityDocumentUploadMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reserveIdentityDocumentUpload>>,
+    TError,
+    { data: BodyType<ReserveIdentityDocumentUploadBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof reserveIdentityDocumentUpload>>,
+  TError,
+  { data: BodyType<ReserveIdentityDocumentUploadBody> },
+  TContext
+> => {
+  const mutationKey = ["reserveIdentityDocumentUpload"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof reserveIdentityDocumentUpload>>,
+    { data: BodyType<ReserveIdentityDocumentUploadBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return reserveIdentityDocumentUpload(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReserveIdentityDocumentUploadMutationResult = NonNullable<
+  Awaited<ReturnType<typeof reserveIdentityDocumentUpload>>
+>;
+export type ReserveIdentityDocumentUploadMutationBody =
+  BodyType<ReserveIdentityDocumentUploadBody>;
+export type ReserveIdentityDocumentUploadMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Authorize one private photo before direct-to-storage transfer
+ */
+export const useReserveIdentityDocumentUpload = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reserveIdentityDocumentUpload>>,
+    TError,
+    { data: BodyType<ReserveIdentityDocumentUploadBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof reserveIdentityDocumentUpload>>,
+  TError,
+  { data: BodyType<ReserveIdentityDocumentUploadBody> },
+  TContext
+> => {
+  return useMutation(getReserveIdentityDocumentUploadMutationOptions(options));
+};
+
+/**
+ * @summary Validate bytes and atomically retain immutable photo version; idempotent
+ */
+export const getCompleteIdentityDocumentUploadUrl = (id: string) => {
+  return `/api/identity-documents/uploads/${id}/complete`;
+};
+
+export const completeIdentityDocumentUpload = async (
+  id: string,
+  options?: RequestInit,
+): Promise<CompleteIdentityDocumentUpload200> => {
+  return customFetch<CompleteIdentityDocumentUpload200>(
+    getCompleteIdentityDocumentUploadUrl(id),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getCompleteIdentityDocumentUploadMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof completeIdentityDocumentUpload>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof completeIdentityDocumentUpload>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ["completeIdentityDocumentUpload"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof completeIdentityDocumentUpload>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return completeIdentityDocumentUpload(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CompleteIdentityDocumentUploadMutationResult = NonNullable<
+  Awaited<ReturnType<typeof completeIdentityDocumentUpload>>
+>;
+
+export type CompleteIdentityDocumentUploadMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Validate bytes and atomically retain immutable photo version; idempotent
+ */
+export const useCompleteIdentityDocumentUpload = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof completeIdentityDocumentUpload>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof completeIdentityDocumentUpload>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(getCompleteIdentityDocumentUploadMutationOptions(options));
+};
+
+/**
+ * @summary Cancel uploader's pending transfer only; never delete submitted originals
+ */
+export const getCancelIdentityDocumentUploadUrl = (id: string) => {
+  return `/api/identity-documents/uploads/${id}`;
+};
+
+export const cancelIdentityDocumentUpload = async (
+  id: string,
+  options?: RequestInit,
+): Promise<CancelIdentityDocumentUpload200> => {
+  return customFetch<CancelIdentityDocumentUpload200>(
+    getCancelIdentityDocumentUploadUrl(id),
+    {
+      ...options,
+      method: "DELETE",
+    },
+  );
+};
+
+export const getCancelIdentityDocumentUploadMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof cancelIdentityDocumentUpload>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof cancelIdentityDocumentUpload>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ["cancelIdentityDocumentUpload"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof cancelIdentityDocumentUpload>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return cancelIdentityDocumentUpload(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CancelIdentityDocumentUploadMutationResult = NonNullable<
+  Awaited<ReturnType<typeof cancelIdentityDocumentUpload>>
+>;
+
+export type CancelIdentityDocumentUploadMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Cancel uploader's pending transfer only; never delete submitted originals
+ */
+export const useCancelIdentityDocumentUpload = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof cancelIdentityDocumentUpload>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof cancelIdentityDocumentUpload>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(getCancelIdentityDocumentUploadMutationOptions(options));
+};
+
+/**
+ * @summary Admin-only audited same-origin private preview; no-store
+ */
+export const getGetIdentityDocumentImageUrl = (id: string) => {
+  return `/api/identity-documents/${id}/image`;
+};
+
+export const getIdentityDocumentImage = async (
+  id: string,
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getGetIdentityDocumentImageUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetIdentityDocumentImageQueryKey = (id: string) => {
+  return [`/api/identity-documents/${id}/image`] as const;
+};
+
+export const getGetIdentityDocumentImageQueryOptions = <
+  TData = Awaited<ReturnType<typeof getIdentityDocumentImage>>,
+  TError = ErrorType<unknown>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getIdentityDocumentImage>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetIdentityDocumentImageQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getIdentityDocumentImage>>
+  > = ({ signal }) =>
+    getIdentityDocumentImage(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getIdentityDocumentImage>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetIdentityDocumentImageQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getIdentityDocumentImage>>
+>;
+export type GetIdentityDocumentImageQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Admin-only audited same-origin private preview; no-store
+ */
+
+export function useGetIdentityDocumentImage<
+  TData = Awaited<ReturnType<typeof getIdentityDocumentImage>>,
+  TError = ErrorType<unknown>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getIdentityDocumentImage>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetIdentityDocumentImageQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary HR photo-quality review only; never employment authorization
+ */
+export const getReviewIdentityDocumentPhotoUrl = (id: string) => {
+  return `/api/identity-documents/${id}/review`;
+};
+
+export const reviewIdentityDocumentPhoto = async (
+  id: string,
+  reviewIdentityDocumentPhotoBody: ReviewIdentityDocumentPhotoBody,
+  options?: RequestInit,
+): Promise<ReviewIdentityDocumentPhoto200> => {
+  return customFetch<ReviewIdentityDocumentPhoto200>(
+    getReviewIdentityDocumentPhotoUrl(id),
+    {
+      ...options,
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(reviewIdentityDocumentPhotoBody),
+    },
+  );
+};
+
+export const getReviewIdentityDocumentPhotoMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reviewIdentityDocumentPhoto>>,
+    TError,
+    { id: string; data: BodyType<ReviewIdentityDocumentPhotoBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof reviewIdentityDocumentPhoto>>,
+  TError,
+  { id: string; data: BodyType<ReviewIdentityDocumentPhotoBody> },
+  TContext
+> => {
+  const mutationKey = ["reviewIdentityDocumentPhoto"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof reviewIdentityDocumentPhoto>>,
+    { id: string; data: BodyType<ReviewIdentityDocumentPhotoBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return reviewIdentityDocumentPhoto(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReviewIdentityDocumentPhotoMutationResult = NonNullable<
+  Awaited<ReturnType<typeof reviewIdentityDocumentPhoto>>
+>;
+export type ReviewIdentityDocumentPhotoMutationBody =
+  BodyType<ReviewIdentityDocumentPhotoBody>;
+export type ReviewIdentityDocumentPhotoMutationError = ErrorType<unknown>;
+
+/**
+ * @summary HR photo-quality review only; never employment authorization
+ */
+export const useReviewIdentityDocumentPhoto = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reviewIdentityDocumentPhoto>>,
+    TError,
+    { id: string; data: BodyType<ReviewIdentityDocumentPhotoBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof reviewIdentityDocumentPhoto>>,
+  TError,
+  { id: string; data: BodyType<ReviewIdentityDocumentPhotoBody> },
+  TContext
+> => {
+  return useMutation(getReviewIdentityDocumentPhotoMutationOptions(options));
+};
 
 /**
  * @summary Health check
@@ -4406,7 +5565,8 @@ export function useGetDashboard<
 }
 
 /**
- * @summary List job applications (admin/supervisor)
+ * Completed answers and attachments are never available to supervisors or applicants.
+ * @summary List confidential submissions; requires verified Admin and confidential code
  */
 export const getListApplicationsUrl = (params?: ListApplicationsParams) => {
   const normalizedParams = new URLSearchParams();
@@ -4476,7 +5636,7 @@ export type ListApplicationsQueryResult = NonNullable<
 export type ListApplicationsQueryError = ErrorType<unknown>;
 
 /**
- * @summary List job applications (admin/supervisor)
+ * @summary List confidential submissions; requires verified Admin and confidential code
  */
 
 export function useListApplications<
@@ -4503,7 +5663,8 @@ export function useListApplications<
 }
 
 /**
- * @summary Submit a public job application (unauthenticated)
+ * Stores completed records privately. Returns only a success receipt, never form answers or file paths.
+ * @summary Publicly submit completed job application, employee I-9 and W-4
  */
 export const getSubmitApplicationUrl = () => {
   return `/api/applications`;
@@ -4512,8 +5673,8 @@ export const getSubmitApplicationUrl = () => {
 export const submitApplication = async (
   submitApplicationRequest: SubmitApplicationRequest,
   options?: RequestInit,
-): Promise<JobApplication> => {
-  return customFetch<JobApplication>(getSubmitApplicationUrl(), {
+): Promise<ApplicationSubmissionReceipt> => {
+  return customFetch<ApplicationSubmissionReceipt>(getSubmitApplicationUrl(), {
     ...options,
     method: "POST",
     headers: { "Content-Type": "application/json", ...options?.headers },
@@ -4522,7 +5683,7 @@ export const submitApplication = async (
 };
 
 export const getSubmitApplicationMutationOptions = <
-  TError = ErrorType<unknown>,
+  TError = ErrorType<void>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -4563,13 +5724,13 @@ export type SubmitApplicationMutationResult = NonNullable<
   Awaited<ReturnType<typeof submitApplication>>
 >;
 export type SubmitApplicationMutationBody = BodyType<SubmitApplicationRequest>;
-export type SubmitApplicationMutationError = ErrorType<unknown>;
+export type SubmitApplicationMutationError = ErrorType<void>;
 
 /**
- * @summary Submit a public job application (unauthenticated)
+ * @summary Publicly submit completed job application, employee I-9 and W-4
  */
 export const useSubmitApplication = <
-  TError = ErrorType<unknown>,
+  TError = ErrorType<void>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -4589,7 +5750,7 @@ export const useSubmitApplication = <
 };
 
 /**
- * @summary Get a single application
+ * @summary Get a confidential application (verified Admin plus access code only)
  */
 export const getGetApplicationUrl = (id: number) => {
   return `/api/applications/${id}`;
@@ -4649,7 +5810,7 @@ export type GetApplicationQueryResult = NonNullable<
 export type GetApplicationQueryError = ErrorType<unknown>;
 
 /**
- * @summary Get a single application
+ * @summary Get a confidential application (verified Admin plus access code only)
  */
 
 export function useGetApplication<
@@ -4676,7 +5837,7 @@ export function useGetApplication<
 }
 
 /**
- * @summary Update application status and employer-side fields
+ * @summary Update an application and employer-side fields (verified Admin plus access code only)
  */
 export const getUpdateApplicationUrl = (id: number) => {
   return `/api/applications/${id}`;
@@ -4740,7 +5901,7 @@ export type UpdateApplicationMutationBody = BodyType<UpdateApplicationRequest>;
 export type UpdateApplicationMutationError = ErrorType<unknown>;
 
 /**
- * @summary Update application status and employer-side fields
+ * @summary Update an application and employer-side fields (verified Admin plus access code only)
  */
 export const useUpdateApplication = <
   TError = ErrorType<unknown>,
@@ -6109,6 +7270,807 @@ export function useGetAuthDiagnostics<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetAuthDiagnosticsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Public blank fillable template; exposes no submitted application data.
+ * @summary Open or download the original fillable Marvol job application
+ */
+export const getGetEmploymentJobApplicationUrl = (
+  params?: GetEmploymentJobApplicationParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/employment-forms/job-application?${stringifiedParams}`
+    : `/api/employment-forms/job-application`;
+};
+
+export const getEmploymentJobApplication = async (
+  params?: GetEmploymentJobApplicationParams,
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getGetEmploymentJobApplicationUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetEmploymentJobApplicationQueryKey = (
+  params?: GetEmploymentJobApplicationParams,
+) => {
+  return [
+    `/api/employment-forms/job-application`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetEmploymentJobApplicationQueryOptions = <
+  TData = Awaited<ReturnType<typeof getEmploymentJobApplication>>,
+  TError = ErrorType<void>,
+>(
+  params?: GetEmploymentJobApplicationParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEmploymentJobApplication>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetEmploymentJobApplicationQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getEmploymentJobApplication>>
+  > = ({ signal }) =>
+    getEmploymentJobApplication(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getEmploymentJobApplication>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetEmploymentJobApplicationQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getEmploymentJobApplication>>
+>;
+export type GetEmploymentJobApplicationQueryError = ErrorType<void>;
+
+/**
+ * @summary Open or download the original fillable Marvol job application
+ */
+
+export function useGetEmploymentJobApplication<
+  TData = Awaited<ReturnType<typeof getEmploymentJobApplication>>,
+  TError = ErrorType<void>,
+>(
+  params?: GetEmploymentJobApplicationParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEmploymentJobApplication>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetEmploymentJobApplicationQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Public blank fillable template; exposes no submitted I-9 data.
+ * @summary Open or download the original fillable I-9 PDF
+ */
+export const getGetEmploymentI9FormUrl = (
+  params?: GetEmploymentI9FormParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/employment-forms/i-9?${stringifiedParams}`
+    : `/api/employment-forms/i-9`;
+};
+
+export const getEmploymentI9Form = async (
+  params?: GetEmploymentI9FormParams,
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getGetEmploymentI9FormUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetEmploymentI9FormQueryKey = (
+  params?: GetEmploymentI9FormParams,
+) => {
+  return [`/api/employment-forms/i-9`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetEmploymentI9FormQueryOptions = <
+  TData = Awaited<ReturnType<typeof getEmploymentI9Form>>,
+  TError = ErrorType<void>,
+>(
+  params?: GetEmploymentI9FormParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEmploymentI9Form>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetEmploymentI9FormQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getEmploymentI9Form>>
+  > = ({ signal }) =>
+    getEmploymentI9Form(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getEmploymentI9Form>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetEmploymentI9FormQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getEmploymentI9Form>>
+>;
+export type GetEmploymentI9FormQueryError = ErrorType<void>;
+
+/**
+ * @summary Open or download the original fillable I-9 PDF
+ */
+
+export function useGetEmploymentI9Form<
+  TData = Awaited<ReturnType<typeof getEmploymentI9Form>>,
+  TError = ErrorType<void>,
+>(
+  params?: GetEmploymentI9FormParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEmploymentI9Form>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetEmploymentI9FormQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Public blank fillable template; exposes no submitted W-4 data.
+ * @summary Open or download the original fillable 2026 W-4 PDF
+ */
+export const getGetEmploymentW4FormUrl = (
+  params?: GetEmploymentW4FormParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/employment-forms/w-4?${stringifiedParams}`
+    : `/api/employment-forms/w-4`;
+};
+
+export const getEmploymentW4Form = async (
+  params?: GetEmploymentW4FormParams,
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getGetEmploymentW4FormUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetEmploymentW4FormQueryKey = (
+  params?: GetEmploymentW4FormParams,
+) => {
+  return [`/api/employment-forms/w-4`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetEmploymentW4FormQueryOptions = <
+  TData = Awaited<ReturnType<typeof getEmploymentW4Form>>,
+  TError = ErrorType<void>,
+>(
+  params?: GetEmploymentW4FormParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEmploymentW4Form>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetEmploymentW4FormQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getEmploymentW4Form>>
+  > = ({ signal }) =>
+    getEmploymentW4Form(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getEmploymentW4Form>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetEmploymentW4FormQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getEmploymentW4Form>>
+>;
+export type GetEmploymentW4FormQueryError = ErrorType<void>;
+
+/**
+ * @summary Open or download the original fillable 2026 W-4 PDF
+ */
+
+export function useGetEmploymentW4Form<
+  TData = Awaited<ReturnType<typeof getEmploymentW4Form>>,
+  TError = ErrorType<void>,
+>(
+  params?: GetEmploymentW4FormParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEmploymentW4Form>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetEmploymentW4FormQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Private employee training video with HTTP byte ranges
+ */
+export const getGetEmployeeTrainingVideoUrl = () => {
+  return `/api/employee-training/video`;
+};
+
+export const getEmployeeTrainingVideo = async (
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getGetEmployeeTrainingVideoUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetEmployeeTrainingVideoQueryKey = () => {
+  return [`/api/employee-training/video`] as const;
+};
+
+export const getGetEmployeeTrainingVideoQueryOptions = <
+  TData = Awaited<ReturnType<typeof getEmployeeTrainingVideo>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getEmployeeTrainingVideo>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetEmployeeTrainingVideoQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getEmployeeTrainingVideo>>
+  > = ({ signal }) => getEmployeeTrainingVideo({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getEmployeeTrainingVideo>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetEmployeeTrainingVideoQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getEmployeeTrainingVideo>>
+>;
+export type GetEmployeeTrainingVideoQueryError = ErrorType<void>;
+
+/**
+ * @summary Private employee training video with HTTP byte ranges
+ */
+
+export function useGetEmployeeTrainingVideo<
+  TData = Awaited<ReturnType<typeof getEmployeeTrainingVideo>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getEmployeeTrainingVideo>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetEmployeeTrainingVideoQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Current employee's progress and retained attestations
+ */
+export const getGetEmployeeTrainingStatusUrl = () => {
+  return `/api/employee-training/status`;
+};
+
+export const getEmployeeTrainingStatus = async (
+  options?: RequestInit,
+): Promise<EmployeeTrainingStatus> => {
+  return customFetch<EmployeeTrainingStatus>(
+    getGetEmployeeTrainingStatusUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetEmployeeTrainingStatusQueryKey = () => {
+  return [`/api/employee-training/status`] as const;
+};
+
+export const getGetEmployeeTrainingStatusQueryOptions = <
+  TData = Awaited<ReturnType<typeof getEmployeeTrainingStatus>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getEmployeeTrainingStatus>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetEmployeeTrainingStatusQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getEmployeeTrainingStatus>>
+  > = ({ signal }) => getEmployeeTrainingStatus({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getEmployeeTrainingStatus>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetEmployeeTrainingStatusQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getEmployeeTrainingStatus>>
+>;
+export type GetEmployeeTrainingStatusQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Current employee's progress and retained attestations
+ */
+
+export function useGetEmployeeTrainingStatus<
+  TData = Awaited<ReturnType<typeof getEmployeeTrainingStatus>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getEmployeeTrainingStatus>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetEmployeeTrainingStatusQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Start one watch session for the signed-in employee
+ */
+export const getStartEmployeeTrainingSessionUrl = () => {
+  return `/api/employee-training/session`;
+};
+
+export const startEmployeeTrainingSession = async (
+  options?: RequestInit,
+): Promise<TrainingSession> => {
+  return customFetch<TrainingSession>(getStartEmployeeTrainingSessionUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getStartEmployeeTrainingSessionMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof startEmployeeTrainingSession>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof startEmployeeTrainingSession>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["startEmployeeTrainingSession"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof startEmployeeTrainingSession>>,
+    void
+  > = () => {
+    return startEmployeeTrainingSession(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type StartEmployeeTrainingSessionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof startEmployeeTrainingSession>>
+>;
+
+export type StartEmployeeTrainingSessionMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Start one watch session for the signed-in employee
+ */
+export const useStartEmployeeTrainingSession = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof startEmployeeTrainingSession>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof startEmployeeTrainingSession>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getStartEmployeeTrainingSessionMutationOptions(options));
+};
+
+/**
+ * @summary Record validated contiguous playback coverage
+ */
+export const getUpdateEmployeeTrainingProgressUrl = () => {
+  return `/api/employee-training/progress`;
+};
+
+export const updateEmployeeTrainingProgress = async (
+  trainingHeartbeat: TrainingHeartbeat,
+  options?: RequestInit,
+): Promise<TrainingWatchStatus> => {
+  return customFetch<TrainingWatchStatus>(
+    getUpdateEmployeeTrainingProgressUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(trainingHeartbeat),
+    },
+  );
+};
+
+export const getUpdateEmployeeTrainingProgressMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateEmployeeTrainingProgress>>,
+    TError,
+    { data: BodyType<TrainingHeartbeat> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateEmployeeTrainingProgress>>,
+  TError,
+  { data: BodyType<TrainingHeartbeat> },
+  TContext
+> => {
+  const mutationKey = ["updateEmployeeTrainingProgress"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateEmployeeTrainingProgress>>,
+    { data: BodyType<TrainingHeartbeat> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return updateEmployeeTrainingProgress(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateEmployeeTrainingProgressMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateEmployeeTrainingProgress>>
+>;
+export type UpdateEmployeeTrainingProgressMutationBody =
+  BodyType<TrainingHeartbeat>;
+export type UpdateEmployeeTrainingProgressMutationError = ErrorType<void>;
+
+/**
+ * @summary Record validated contiguous playback coverage
+ */
+export const useUpdateEmployeeTrainingProgress = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateEmployeeTrainingProgress>>,
+    TError,
+    { data: BodyType<TrainingHeartbeat> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateEmployeeTrainingProgress>>,
+  TError,
+  { data: BodyType<TrainingHeartbeat> },
+  TContext
+> => {
+  return useMutation(getUpdateEmployeeTrainingProgressMutationOptions(options));
+};
+
+/**
+ * @summary Save one immutable employee attestation per version
+ */
+export const getAcknowledgeEmployeeTrainingUrl = () => {
+  return `/api/employee-training/acknowledgment`;
+};
+
+export const acknowledgeEmployeeTraining = async (
+  trainingAttestationInput: TrainingAttestationInput,
+  options?: RequestInit,
+): Promise<EmployeeTrainingStatus> => {
+  return customFetch<EmployeeTrainingStatus>(
+    getAcknowledgeEmployeeTrainingUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(trainingAttestationInput),
+    },
+  );
+};
+
+export const getAcknowledgeEmployeeTrainingMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof acknowledgeEmployeeTraining>>,
+    TError,
+    { data: BodyType<TrainingAttestationInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof acknowledgeEmployeeTraining>>,
+  TError,
+  { data: BodyType<TrainingAttestationInput> },
+  TContext
+> => {
+  const mutationKey = ["acknowledgeEmployeeTraining"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof acknowledgeEmployeeTraining>>,
+    { data: BodyType<TrainingAttestationInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return acknowledgeEmployeeTraining(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AcknowledgeEmployeeTrainingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof acknowledgeEmployeeTraining>>
+>;
+export type AcknowledgeEmployeeTrainingMutationBody =
+  BodyType<TrainingAttestationInput>;
+export type AcknowledgeEmployeeTrainingMutationError = ErrorType<void>;
+
+/**
+ * @summary Save one immutable employee attestation per version
+ */
+export const useAcknowledgeEmployeeTraining = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof acknowledgeEmployeeTraining>>,
+    TError,
+    { data: BodyType<TrainingAttestationInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof acknowledgeEmployeeTraining>>,
+  TError,
+  { data: BodyType<TrainingAttestationInput> },
+  TContext
+> => {
+  return useMutation(getAcknowledgeEmployeeTrainingMutationOptions(options));
+};
+
+/**
+ * @summary Manager-only current completion and historical employee attestations
+ */
+export const getGetEmployeeTrainingReviewUrl = () => {
+  return `/api/employee-training/review`;
+};
+
+export const getEmployeeTrainingReview = async (
+  options?: RequestInit,
+): Promise<TrainingReview> => {
+  return customFetch<TrainingReview>(getGetEmployeeTrainingReviewUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetEmployeeTrainingReviewQueryKey = () => {
+  return [`/api/employee-training/review`] as const;
+};
+
+export const getGetEmployeeTrainingReviewQueryOptions = <
+  TData = Awaited<ReturnType<typeof getEmployeeTrainingReview>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getEmployeeTrainingReview>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetEmployeeTrainingReviewQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getEmployeeTrainingReview>>
+  > = ({ signal }) => getEmployeeTrainingReview({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getEmployeeTrainingReview>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetEmployeeTrainingReviewQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getEmployeeTrainingReview>>
+>;
+export type GetEmployeeTrainingReviewQueryError = ErrorType<void>;
+
+/**
+ * @summary Manager-only current completion and historical employee attestations
+ */
+
+export function useGetEmployeeTrainingReview<
+  TData = Awaited<ReturnType<typeof getEmployeeTrainingReview>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getEmployeeTrainingReview>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetEmployeeTrainingReviewQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

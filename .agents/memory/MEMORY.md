@@ -14,3 +14,8 @@
 - [Marvol photo alert privacy](marvol-photo-alert-privacy.md) — bell previews must match object-read permissions; general message alerts cannot expose private chat images.
 - [Managed production migrations](managed-production-migrations.md) — reconcile additive startup SQL with Publish-owned production schema changes; never restore runtime production DDL.
 - [Git connection verification](git-auth-verification.md) — accepted authorization is not proof of a successful push; verify remote updates and avoid repeated reconnect loops.
+- [Employee training attestations](employee-training-attestations.md) — separate employee statements, not comprehension proof; replacements require fresh acknowledgment and retain history.
+- [Temporary document tooling](temporary-document-tooling.md) — Python package setup for asset inspection can add unrelated project scaffolding and native dependencies.
+- [Online employment forms](online-employment-forms.md) — fill actual PDFs in-app and export/print entries; empty field-object metadata does not mean widgets are missing.
+- [Identity document privacy](identity-document-privacy.md) — all HR forms and photos are Admin-only; receipt/legibility review is never I-9 or E-Verify completion.
+- [Admin confidential lock scope](admin-confidential-lock.md) — extra code covers HR documents, staff personal information and finance; ordinary cleaning and training stay usable.

@@ -5,5 +5,10 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   resolve: { alias: { "@": path.resolve(import.meta.dirname, "src") } },
-  test: { environment: "jsdom", include: ["src/**/*.test.tsx"] },
+  test: {
+    environment: "jsdom",
+    include: ["src/**/*.test.{ts,tsx}"],
+    // These suites run with node:test in scripts/verify-access-flow.sh.
+    exclude: ["src/lib/authBootstrapRecovery.test.ts", "src/lib/resolveStaffSession.test.ts"],
+  },
 });

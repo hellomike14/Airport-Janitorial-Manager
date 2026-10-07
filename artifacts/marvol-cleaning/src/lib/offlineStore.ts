@@ -67,13 +67,22 @@ function getDB(): Promise<IDBPDatabase<OfflineDB>> {
   return dbPromise;
 }
 
+export function isConfidentialCacheUrl(url: string): boolean {
+  return /\/api\/(?:staff\b|applications(?:\/|["\\]|$)|confidential-access\b|auth-diagnostics\b|quickbooks\b|identity-documents\b|employment-forms\b)|\/(?:api\/)?storage\/objects\/(?:hr-identity|uploads)\/|\/objects\/(?:hr-identity|uploads)\//i.test(url);
+}
+
 export async function cacheApiResponse(url: string, data: unknown): Promise<void> {
+  if (isConfidentialCacheUrl(url)) return;
   const db = await getDB();
   await db.put("apiCache", { url, data, timestamp: Date.now() });
 }
 
 export async function getCachedApiResponse(url: string): Promise<unknown | null> {
   const db = await getDB();
+  if (isConfidentialCacheUrl(url)) {
+    await db.delete("apiCache", url);
+    return null;
+  }
   const entry = await db.get("apiCache", url);
   return entry?.data ?? null;
 }
@@ -82,7 +91,10 @@ export async function getAllCachedResponses(): Promise<
   Array<{ url: string; data: unknown; timestamp: number }>
 > {
   const db = await getDB();
-  return db.getAll("apiCache");
+  const entries = await db.getAll("apiCache");
+  const privateEntries = entries.filter(entry => isConfidentialCacheUrl(entry.url));
+  await Promise.all(privateEntries.map(entry => db.delete("apiCache", entry.url)));
+  return entries.filter(entry => !isConfidentialCacheUrl(entry.url));
 }
 
 export async function clearApiCache(): Promise<void> {

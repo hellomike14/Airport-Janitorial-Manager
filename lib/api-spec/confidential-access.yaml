@@ -1,0 +1,56 @@
+status:
+  get:
+    operationId: getAdminConfidentialAccessStatus
+    summary: Verified Admin access-code status; no confidential data or secrets
+    responses:
+      "200": { description: Access status, content: { application/json: { schema: { $ref: "#/schemas/ConfidentialAccessState" } } } }
+      default: { description: Access denied or service unavailable }
+configure:
+  post:
+    operationId: configureAdminConfidentialCode
+    summary: Admin first setup or code change with current code and unlocked session
+    requestBody:
+      required: true
+      content: { application/json: { schema: { $ref: "#/schemas/ConfidentialCodeInput" } } }
+    responses:
+      "200": { description: Configured and unlocked for 30 minutes; other grants revoked, content: { application/json: { schema: { $ref: "#/schemas/ConfidentialAccessState" } } } }
+      default: { description: "Access denied, invalid code, throttled or unavailable" }
+unlock:
+  post:
+    operationId: unlockAdminConfidentialAccess
+    summary: Admin code check; five failures block this administrator for 15 minutes
+    requestBody:
+      required: true
+      content: { application/json: { schema: { $ref: "#/schemas/ConfidentialUnlockInput" } } }
+    responses:
+      "200": { description: Session-bound 30-minute unlock, content: { application/json: { schema: { $ref: "#/schemas/ConfidentialAccessState" } } } }
+      default: { description: "Access denied, invalid code, throttled or unavailable" }
+lock:
+  post:
+    operationId: lockAdminConfidentialAccess
+    summary: Revoke this browser unlock immediately
+    responses:
+      "200": { description: Locked status, content: { application/json: { schema: { $ref: "#/schemas/ConfidentialAccessState" } } } }
+      default: { description: Access denied or unavailable }
+schemas:
+  ConfidentialAccessState:
+    type: object
+    required: [configured, unlocked, expiresAt, lockedUntil, serverTime]
+    properties:
+      configured: { type: boolean }
+      unlocked: { type: boolean }
+      expiresAt: { type: [string, "null"] }
+      lockedUntil: { type: [string, "null"] }
+      serverTime: { type: string }
+  ConfidentialCodeInput:
+    type: object
+    required: [code, confirmation]
+    properties:
+      code: { type: string, pattern: '^[0-9]{8,12}$' }
+      confirmation: { type: string }
+      currentCode: { type: string }
+  ConfidentialUnlockInput:
+    type: object
+    required: [code]
+    properties:
+      code: { type: string, pattern: '^[0-9]{8,12}$' }

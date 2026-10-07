@@ -1,10 +1,13 @@
 import { pgTable, text, serial, integer, boolean, timestamp } from "drizzle-orm/pg-core";
 import { jobApplicationsTable } from "./jobApplications";
+import { staffTable } from "./staff";
 
 export const onboardingHiresTable = pgTable("onboarding_hires", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   position: text("position"),
+  // Explicit HR linkage, never inferred from a name or client identity.
+  staffId: integer("staff_id").unique().references(() => staffTable.id, { onDelete: "restrict" }),
   applicationId: integer("application_id").references(() => jobApplicationsTable.id, {
     onDelete: "set null",
   }),

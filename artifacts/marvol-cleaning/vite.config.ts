@@ -41,6 +41,16 @@ export default defineConfig({
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
         runtimeCaching: [
           {
+            // Confidential data must never bypass the server's access-code check.
+            urlPattern: ({ url }) => {
+              try {
+                return /\/api\/(?:confidential-access(?:\/|$)|applications(?:\/|$)|staff(?:\/|$)|auth-diagnostics(?:\/|$)|quickbooks(?:\/|$)|identity-documents(?:\/|$)|employment-forms(?:\/|$)|storage\/objects\/(?:hr-identity|uploads)\/)/i.test(decodeURIComponent(url.pathname));
+              } catch { return true; }
+            },
+            handler: "NetworkOnly",
+            options: { fetchOptions: { cache: "no-store" } },
+          },
+          {
             urlPattern: /\/api\/(tasks|assignments|areas|issues)/,
             handler: "NetworkFirst",
             options: {

@@ -10,6 +10,9 @@ import {
   getListOnboardingHiresQueryKey,
 } from "@workspace/api-client-react";
 import type { OnboardingHire, OnboardingItem } from "@workspace/api-client-react";
+import EmployeeTraining from "@/components/EmployeeTraining";
+import { useAuth } from "@/contexts/AuthContext";
+import { OnboardingProtocolCard } from "./OnboardingProtocolCard";
 
 const CATEGORY_ORDER = ["step", "document", "training", "walkthrough"] as const;
 
@@ -106,6 +109,18 @@ function HireCard({ hire }: { hire: OnboardingHire }) {
 }
 
 export function OnboardingTab() {
+  const { effectiveRole } = useAuth();
+  const canManage = effectiveRole === "admin" || effectiveRole === "supervisor";
+  return (
+    <div className="space-y-6">
+      <OnboardingProtocolCard />
+      {canManage && <OnboardingManagement />}
+      <EmployeeTraining />
+    </div>
+  );
+}
+
+function OnboardingManagement() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { data: hires, isLoading } = useListOnboardingHires();

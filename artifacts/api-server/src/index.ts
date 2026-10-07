@@ -1,5 +1,7 @@
 import app from "./app";
+import { findSeedStaffIdentity } from "./lib/seedStaffIdentity";
 import { applyOperationsMigration } from "./lib/operationsMigration";
+import { applyTrainingMigration } from "./lib/trainingMigration";
 import { generatePreviousMonthlyReport } from "./lib/monthlyOperationsReport";
 import { db } from "@workspace/db";
 import { staffTable, areasTable, taskTypesTable, notificationsTable, staffLocationsTable, tasksTable, taskExclusionsTable, assignmentsTable, schedulesTable, issuesTable, sharedPhotosTable, objectUploadsTable, conversationsTable, messagesTable, conversationParticipantsTable } from "@workspace/db/schema";
@@ -411,10 +413,7 @@ async function seed() {
   const currentStaff = await db.select().from(staffTable);
 
   for (const existing of currentStaff) {
-    let seedEntry = SEED_STAFF.find((s) => s.name === existing.name);
-    if (!seedEntry && (existing.role === "admin" || existing.role === "inspector")) {
-      seedEntry = SEED_STAFF.find((s) => s.role === existing.role);
-    }
+    const seedEntry = findSeedStaffIdentity(existing, SEED_STAFF);
     if (seedEntry && seedEntry.name !== existing.name) {
       const targetExists = currentStaff.some(
         (s) => s.id !== existing.id && s.name === seedEntry!.name
@@ -883,6 +882,7 @@ async function seed() {
 
 async function start() {
   await applyOperationsMigration();
+  await applyTrainingMigration();
   app.listen(port, async () => {
   console.log(`Server listening on port ${port}`);
   await seed().catch((err) => console.error("Seed error:", err));

@@ -1,22 +1,29 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { FileText, ClipboardCheck, Link2 } from "lucide-react";
+import { FileText, ClipboardCheck, Link2, Files } from "lucide-react";
 import { ApplicationsTab } from "./employment/ApplicationsTab";
 import { OnboardingTab } from "./employment/OnboardingTab";
 import { QuickBooksTab } from "./employment/QuickBooksTab";
+import { FormsTab } from "./employment/FormsTab";
+import { useAuth } from "@/contexts/AuthContext";
+import { ConfidentialBoundary } from "@/components/confidential/ConfidentialBoundary";
 
-type Tab = "applications" | "onboarding" | "quickbooks";
+type Tab = "applications" | "onboarding" | "forms" | "quickbooks";
 
 function getInitialTab(): Tab {
   const params = new URLSearchParams(window.location.search);
   const tab = params.get("tab");
-  if (tab === "onboarding" || tab === "quickbooks") return tab;
+  if (tab === "onboarding" || tab === "forms" || tab === "quickbooks") return tab;
   return "applications";
 }
 
 export default function Employment() {
   const { t } = useTranslation();
-  const [tab, setTab] = useState<Tab>(getInitialTab);
+  const { effectiveRole } = useAuth();
+  const canManage = effectiveRole === "admin" || effectiveRole === "supervisor";
+  const allowedTabs: Tab[] = effectiveRole === "admin" ? ["applications", "onboarding", "forms", "quickbooks"] : effectiveRole === "supervisor" ? ["onboarding"] : ["onboarding"];
+  const [tab, setTab] = useState<Tab>(() => canManage ? getInitialTab() : "onboarding");
+  const activeTab = allowedTabs.includes(tab) ? tab : "onboarding";
 
   useEffect(() => {
     document.title = t("employment.title");
@@ -25,6 +32,7 @@ export default function Employment() {
   const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
     { id: "applications", label: t("employment.tabs.applications"), icon: FileText },
     { id: "onboarding", label: t("employment.tabs.onboarding"), icon: ClipboardCheck },
+    { id: "forms", label: t("employment.tabs.forms"), icon: Files },
     { id: "quickbooks", label: t("employment.tabs.quickbooks"), icon: Link2 },
   ];
 
@@ -35,13 +43,21 @@ export default function Employment() {
         <p className="text-sm text-slate-500 mt-0.5">{t("employment.subtitle")}</p>
       </div>
 
-      <div className="flex gap-1 border-b border-slate-200 mb-6">
-        {tabs.map(({ id, label, icon: Icon }) => (
+      <div className="flex gap-1 overflow-x-auto border-b border-slate-200 mb-6">
+        {tabs.filter(({ id }) => allowedTabs.includes(id)).map(({ id, label, icon: Icon }) => (
           <button
             key={id}
-            onClick={() => setTab(id)}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              tab === id
+            type="button"
+            data-testid={`employment-tab-${id}`}
+            aria-pressed={activeTab === id}
+            onClick={() => {
+              setTab(id);
+              const url = new URL(window.location.href);
+              url.searchParams.set("tab", id);
+              window.history.replaceState(null, "", url);
+            }}
+            className={`flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              activeTab === id
                 ? "border-emerald-600 text-emerald-700"
                 : "border-transparent text-slate-500 hover:text-slate-700"
             }`}
@@ -52,9 +68,12 @@ export default function Employment() {
         ))}
       </div>
 
-      {tab === "applications" && <ApplicationsTab />}
-      {tab === "onboarding" && <OnboardingTab />}
-      {tab === "quickbooks" && <QuickBooksTab />}
+      {effectiveRole === "admin" && activeTab === "applications" && (
+        <ConfidentialBoundary><ApplicationsTab /></ConfidentialBoundary>
+      )}
+      {activeTab === "onboarding" && <OnboardingTab />}
+      {activeTab === "forms" && <FormsTab />}
+      {effectiveRole === "admin" && activeTab === "quickbooks" && <QuickBooksTab />}
     </div>
   );
 }

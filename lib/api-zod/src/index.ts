@@ -4,3 +4,11 @@ export * from "./generated/types";
 // generated zod object (api) and the query-params type (types) share a name.
 export type { ListConversationMessagesParams } from "./generated/types";
 export type { DeleteOldConversationMessagesParams } from "./generated/types";
+// Orval emits both the Zod value and inline-body type under these names.
+export {
+  ConfigureAdminConfidentialCodeBody,
+  UnlockAdminConfidentialAccessBody,
+  LinkIdentityDocumentEmployeeBody,
+  ReserveIdentityDocumentUploadBody,
+  ReviewIdentityDocumentPhotoBody,
+} from "./generated/api";

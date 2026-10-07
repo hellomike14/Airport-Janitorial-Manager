@@ -10,3 +10,9 @@ Custom client functions must never be appended to orval-generated files (`genera
 **Why:** the group-conversation and per-message delete/edit helpers were lost during a codegen run triggered by an unrelated schema change, causing a runtime breakage visible only at build time.
 
 **How to apply:** whenever adding a new non-spec client helper, create or extend `lib/api-client-react/src/<feature>-extras.ts` and add it to `index.ts`. If the helper can be expressed in the OpenAPI spec, add it there instead so codegen covers it automatically.
+
+External OpenAPI fragments should expose simple named keys rather than slash-containing path keys with escaped JSON pointers. Quote descriptions containing commas inside YAML flow mappings.
+
+**Why:** The current Orval bundler could not resolve escaped external path pointers, and unquoted commas turned a description into unexpected response properties. Generation cleans its output before validation, so a failed run can also break the running preview.
+
+**How to apply:** Follow the existing named-fragment pattern, validate by completing codegen, and rebuild shared declarations before checking consumers. Explicitly resolve generated Zod-value/body-type export collisions in the stable package index.

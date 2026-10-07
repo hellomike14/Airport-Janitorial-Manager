@@ -1,0 +1,534 @@
+# Marvol Enterprise — Employee Onboarding Protocol
+
+**Version:** 1.0 • **Prepared:** October 6, 2026  
+**Scope:** Marvol Facility Services airport janitorial staff; supervisors and administrators receive additional role training.  
+**Status:** Proposed operating protocol for company adoption. The schedules, passing scores, escalation times and review intervals below are company standards proposed here, rather than statements of legal or airport requirements.  
+**Process owner:** Operations Manager • **Record owner:** HR/Administrator
+
+## 1. Purpose and release standard
+
+Every employee must understand the work, demonstrate safe cleaning, use the Marvol app, and know how to request help before working independently. Watching a video or signing a statement alone does not demonstrate competence.
+
+Independent assignment requires all applicable administrative and airport-access checks, required training, knowledge checks, practical demonstrations and supervisor approval. A pending item keeps the employee in an appropriate supervised assignment; it does not authorize access to restricted areas or unsafe work.
+
+The training home is **Employment → Onboarding**. The Forms tab contains approved employment and onboarding forms. Private HR documents must remain restricted to authorized HR staff. The Employee Portal continues to support ordinary employee operations.
+
+## 2. Roles and accountability
+
+| Role | Responsibility | Required evidence |
+|---|---|---|
+| HR/Administrator | Employment documents, contact details, payroll setup, employee record, language/accessibility needs, role permissions, badge coordination | Administrative checklist and verified document status |
+| Operations Manager | Assign supervisor and buddy, establish site procedures, resolve delays, authorize independent work | Release decision and exception log |
+| Supervisor | Orientation, safety instruction, practical assessment, shift oversight and follow-up | Observation checklist and signed assessments |
+| Training buddy | Demonstrate the assigned route and equipment; observe practice and report questions | Buddy-shift notes; no authority to waive release requirements |
+| Employee | Attend paid required training, ask questions, demonstrate procedures, record actual time and complete personal attestations | Own training and acknowledgment records |
+| Airport-authorized sponsor | Coordinate applicable airport credentials, training, approved access and badge return | Official clearance status and authorized access scope |
+| Payroll administrator | Record required training time and correct missing time promptly | Approved time records and correction history |
+
+One named person owns each item. Supervisors may observe their own direct reports, but employees cannot approve their own readiness or time.
+
+## 3. Onboarding stages and status rules
+
+| Stage | Target timing | Completion gate |
+|---|---|---|
+| Offered | After accepted offer | Role, reporting line, proposed start and work location confirmed |
+| Preparing | Before first shift | Administrative setup, orientation booking, buddy and access plan assigned |
+| Orientation | First paid day | Welcome, policies, emergency route and app access demonstrated |
+| Training | Days 1–3, adjusted to role | Required modules, video, knowledge check and practical demonstrations complete |
+| Supervised practice | First 3 working shifts | Buddy observations and coaching recorded |
+| Ready for independent work | When all applicable gates pass | Supervisor recommends and Operations Manager releases |
+| Follow-up | Days 7, 30, 60 and 90 | Documented check-ins, quality results and development actions |
+
+Each checklist item has **Not started / In progress / Completed / Needs correction / Not applicable**. “Not applicable” requires a manager reason and cannot waive a requirement that applies to the job. Overall statuses are **Preparing / In training / Needs support / Awaiting access / Ready / Closed**. Separating readiness from employment status prevents an incomplete course from silently changing someone's employment or account access.
+
+## 4. Before the first shift
+
+HR sends one welcome pack containing the start date, reporting location, supervisor contact, orientation agenda, uniform expectations, transport/parking instructions, document instructions and app sign-in guidance. Do not put passwords or sensitive documents in group messages.
+
+HR completes the following:
+
+- Confirm accepted offer, role, pay arrangements, schedule expectations and supervisor.
+- Create one employee record; check for duplicate or former-employee records before adding a new one.
+- Verify the employee's work email or designated sign-in identifier and a recovery route.
+- Ask which training language the employee understands: English, Spanish or Haitian Creole. Arrange interpretation or an accessible alternative where needed.
+- Collect emergency contact and payroll information through approved private channels.
+- Provide current approved tax and employment-verification forms; explain that the employee chooses acceptable I-9 documentation.
+- Schedule the applicable airport-access process through the authorized sponsor. Record its status without placing background-check details in ordinary supervisor views.
+- Assign a supervisor and buddy, reserve training time, and prepare uniform, appropriate PPE and equipment.
+- Confirm the current training-video version and available acknowledgment form.
+
+Form I-9 Section 1 is due no later than the first day of employment; employer Section 2 is generally due within three business days of the first day, with special rules for shorter employment and permitted alternatives. Follow current USCIS instructions rather than replacing this process with a company signature form. [USCIS Form I-9 instructions](https://www.uscis.gov/sites/default/files/document/forms/i-9instr.pdf)
+
+For first-time airport badge applicants, GOAA describes fingerprinting, a background check and required computer-based courses before badge issuance. The sponsor must verify current requirements and the access actually needed for this role. Company orientation does not replace airport-issued training. [GOAA Access Control](https://web.goaa.aero/airport-business/access-control/)
+
+## 5. First-day orientation
+
+Suggested paid orientation agenda; extend it when the employee needs more explanation or practice:
+
+| Session | Suggested time | Content |
+|---|---:|---|
+| Welcome and employment administration | 30 minutes | Role, reporting line, work expectations, document status, payroll and training time |
+| Workplace conduct | 20 minutes | Respect, harassment reporting, confidentiality, attendance and customer interactions |
+| Site walk | 30 minutes | Assigned area, storage, restrooms, exits, assembly point, emergency contact route and authorized access boundaries |
+| Safety instruction | 45 minutes | Hazards, PPE, chemicals, spills, sharps/bodily-fluid escalation and safe equipment use |
+| App orientation | 25 minutes | Sign-in, timekeeping, assigned tasks, photos, incident reporting and supplies |
+| Video and discussion | 20 minutes | Current MFS training video, pause for questions, explain the acknowledgment |
+| Practice and assessment | 45 minutes | Demonstrate critical procedures, knowledge check and coaching |
+
+Record actual attendance and time. Required job-related training must be recorded and paid as working time where applicable; employees should not be told to complete mandatory onboarding off the clock. [U.S. Department of Labor: Hours Worked](https://www.dol.gov/sites/dolgov/files/WHD/legacy/files/HoursWorked.pdf)
+
+Before the site walk, the supervisor records the actual local emergency number/contact, assembly point, incident-reporting route, SDS location and authorized areas in the site orientation form. Do not assume the app is the only emergency channel.
+
+## 6. Required training modules
+
+| Module | Employee must explain or demonstrate | Evidence |
+|---|---|---|
+| Company expectations | Reporting line, punctuality, respectful behavior, confidentiality and how to raise concerns | Orientation acknowledgment |
+| Airport security and access | Authorized areas, badge display/use, no badge sharing, escort restrictions, lost badge reporting | Sponsor-confirmed requirements and applicable official clearance |
+| Personal readiness | Black pants and yellow reflective shirt under the current training standard, company ID, suitable footwear and task-specific PPE | Supervisor inspection; verify any site-specific additions |
+| Hazard recognition | Inspect first; recognize spills, broken glass, traffic, obstructions and maintenance concerns | Site walk and verbal scenario |
+| Cleaning chemicals | Read labels, locate SDS, follow approved dilution/use instructions, use required protection and never mix products | Product-specific demonstration |
+| Trash handling | Empty bins, replace liners, collect litter and cigarette waste using approved tools; stop for unidentified hazardous waste or sharps | Observed work sample |
+| Sweeping and details | Walkways, curbs, corners, drains and high-traffic areas; protect pedestrians | Observed work sample |
+| Cobweb removal | Correct extension-pole use; safe reach; ceilings, signs, lights and pipes within authorized scope | Observed demonstration |
+| Elevator cleaning | Doors, buttons, glass and floor; protect passengers and avoid unapproved maintenance or electrical work | Observed demonstration |
+| Spill response | Secure area, place signs, use the approved response method and inspect before reopening | Controlled practice scenario |
+| Equipment and ergonomics | Inspect equipment, safe handling, lifting/cart use and reporting defects; operate only equipment covered by training | Equipment checklist |
+| App and timekeeping | Sign in as self; clock actual time, record breaks correctly, request a correction and avoid duplicate records | Employee demonstration |
+| Daily task evidence | Read detailed duties, complete only work actually done, attach required evidence and report unfinished work | Sample task demonstration without altering real records |
+| Incident and supply reporting | Report hazard/location/action taken; request stock; know when to call immediately | Scenario exercise |
+| Final inspection and handover | Check area, report problems, record completion and hand over unfinished or unsafe work | End-of-route demonstration |
+
+Chemical training must be specific to the products and hazards encountered. Explain labels, SDS access, safe use, protection and emergency measures before hazardous chemical work. PPE is selected for the task and product, rather than from a generic list. [OSHA/NIOSH: Cleaning Chemicals](https://www.osha.gov/sites/default/files/publications/OSHA3512.pdf)
+
+If respirators, powered machinery, bloodborne-pathogen exposure or other specialized work applies, the safety lead identifies and completes the separate applicable training/program requirements before authorizing that work. The general video is not authorization for specialized tasks.
+
+## 7. Video viewing and signed acknowledgment
+
+Use the approved **MFS New Employee Training** video in Employment → Onboarding. Maintain a stable training identifier and a new version whenever the content changes. Keep the exact video associated with each historical acknowledgment available under appropriate access controls.
+
+The employee workflow is:
+
+1. Sign in with the employee's own account.
+2. Watch the complete current video; allow pause, replay, volume, seeking and accessible alternatives.
+3. Save viewing progress. Seeking to the end alone must not mark the video complete.
+4. Ask the supervisor about anything unclear.
+5. Complete the knowledge check and any assigned correction.
+6. Select two separate, initially unchecked confirmations: **“I watched the full training video”** and **“I understand the training and know how to ask for help.”**
+7. Enter the employee's full-name signature and submit once.
+8. Show a saved confirmation with training title/version and completion time.
+
+Recommended attestation wording:
+
+> I confirm that I watched the identified training in a language or accessible format I understand. I had an opportunity to ask questions. I understand the procedures covered, know when to stop and request help, and will follow the approved site instructions. My acknowledgment records my attestation; my supervisor will separately verify practical competence.
+
+Retain employee ID, name at signing, typed signature, training ID/version, video identifier or hash, confirmations, server timestamp, knowledge-check result and any approved alternative evidence. Retain correction and superseding records without overwriting the original signature. A signed acknowledgment must persist after refresh and must not be duplicated by repeat submission.
+
+Viewing telemetry is supporting evidence, not proof of attention or comprehension. A signature is a training attestation, not a waiver of rights or a replacement for required statutory forms. A different person must never sign on an employee's behalf.
+
+For an accessible alternative, the supervisor records the training provided, version, language, date, reason, knowledge check and demonstration. Use a specific alternate-training completion route; do not manufacture video telemetry or impersonate the employee's signature.
+
+## 8. Knowledge check and correction
+
+**Proposed standard:** at least 9 of 10 correct, with every critical safety question correct. Provide an equivalent oral or translated assessment when appropriate. Explain incorrect answers, allow retraining and keep each attempt. Do not collect a signature implying understanding while material questions remain unresolved.
+
+| # | Ask the employee | Expected response | Critical? |
+|---|---|---|---|
+| 1 | What do you do before starting to clean an area? | Inspect it, identify hazards and confirm it is safe to proceed. | Yes |
+| 2 | What must you do before using a cleaning chemical? | Check the approved instructions/label and required PPE; know SDS access; never mix products. | Yes |
+| 3 | What is the correct spill-response order? | Secure area, place warning signs, use the approved method, inspect before reopening. | Yes |
+| 4 | What do you do with broken glass, sharps or unknown hazardous material? | Stop direct handling, secure/report the concern and follow the trained site procedure. | Yes |
+| 5 | Can you enter any airport area if a coworker opens the door? | No; access must be authorized for the employee and any escort must follow airport rules. | Yes |
+| 6 | What must be done when emptying a trashcan? | Empty it appropriately, replace its liner and leave the area clean. | No |
+| 7 | Which surfaces are covered in elevator cleaning? | Doors, buttons, glass and floor, within authorized cleaning scope. | No |
+| 8 | When can you mark a task complete? | Only after doing the work and providing required evidence. | No |
+| 9 | What if the time clock or GPS does not work? | Notify the supervisor, record actual time through the approved fallback and request an audited correction. | No |
+| 10 | What do you do when a hazard remains at the end of a shift? | Secure/report it, document unfinished work and hand it over to the supervisor. | Yes |
+
+A failed critical item results in **Needs support** for that task until retraining and reassessment. The supervisor records what was taught again and the observed result. The Operations Manager resolves repeated failures with HR through the normal company process; the app must not automatically make an employment decision from a quiz score.
+
+## 9. Practical assessment and independent-work release
+
+The supervisor observes these 15 points during a controlled exercise and supervised cleaning route:
+
+1. Uniform/ID and task-specific PPE are correct.
+2. Employee inspects the assigned area before work.
+3. Hazards are recognized and communicated.
+4. Pedestrian/vehicle exposure is controlled using site procedures.
+5. Chemical selection, instructions, labeling and SDS knowledge are correct.
+6. Equipment is inspected and used within the employee's authorization.
+7. Trash is removed safely and liners replaced.
+8. Walkways/curbs are swept without exposing others to hazards.
+9. Corners and drains receive the specified attention.
+10. Cobweb work uses approved safe reach and tools.
+11. Elevator surfaces are cleaned safely within scope.
+12. Spill isolation, warning signs and reopening check are correct.
+13. Actual time and applicable break records are accurate.
+14. Completed tasks, photos and reported issues reflect actual work.
+15. Final inspection, stock requests and handover are complete.
+
+Mark each **Pass / Retrain / Not applicable with reason**. Proposed release threshold: all applicable points pass after any correction. Independently of the score, unsafe chemical use, uncontrolled spills, unauthorized access, unsafe equipment use or falsified records block release until corrected and reassessed.
+
+For the first three working shifts, the buddy demonstrates, then observes, then steps back while the employee performs the route. At each shift end, the supervisor records strengths, corrections and whether further supervision is required. Extend the period when needed.
+
+The release record must contain administrative status, applicable airport-access clearance, required training/attestations, knowledge-check results, practical results, authorized areas/equipment, restrictions, supervisor recommendation, Operations Manager approval and release date. “Ready” means ready for the stated scope, not every task at every site.
+
+## 10. Follow-up and refresher training
+
+| Review | Focus | Output |
+|---|---|---|
+| Day 7 | App use, actual time records, safety habits, route confidence, remaining questions | Coaching plan and unresolved-item owners |
+| Day 30 | Cleaning quality, attendance discussions, documentation, stock handling and passenger interactions | Written review with employee comments |
+| Day 60 | Consistency, expanded duties and support needs | Targeted training plan |
+| Day 90 | Overall readiness, feedback and continuing development | Onboarding closed or extended with named actions |
+
+Use a 90% quality-inspection target for ordinary follow-up if adopted by Marvol; a critical safety failure requires correction regardless of the total score. Do not invent a fixed probation outcome or automatic disciplinary rule from these review dates.
+
+Retrain after a material video/procedure change, introduction of a new hazard/product/equipment, change in assigned scope, observed unsafe practice, relevant incident or extended absence where skills need refresh. Set refresher frequency through the safety program and current airport requirements. A new training version requires a new acknowledgment and any affected practical checks; retain earlier versions and records.
+
+## 11. Exceptions, escalation and records
+
+| Issue | Immediate action | Owner and follow-up |
+|---|---|---|
+| Immediate danger/injury | Stop affected work, secure as safe, use the local emergency route | Supervisor immediately; record incident after emergency response |
+| Badge pending, lost or expired | No unauthorized restricted-area access; notify sponsor | Sponsor and Operations Manager; approved assignment only |
+| Missing/late employment documentation | Alert HR promptly; follow current required process | HR; documented due date and resolution |
+| Sign-in, device or accessibility problem | Provide approved supervised alternative and actual-time recording | Administrator/supervisor; no shared account |
+| Failed training/assessment | Retrain; keep affected work supervised | Supervisor with a specific reassessment date |
+| Conflicting or obsolete procedure | Stop affected task and obtain current instruction | Operations Manager/safety lead |
+| Incomplete task or unsafe handover | Report and assign a responsible recipient | Supervisor before the shift ends |
+
+Proposed administrative escalation: reminder to the item owner one working day before due; overdue notice to the supervisor on the due date; unresolved administrative delay to Operations Manager/HR the next working day. Safety and security concerns use immediate escalation instead.
+
+Employees see their own training, progress, signatures and feedback. Supervisors see operational readiness and training evidence for the staff they are authorized to manage. HR/payroll documents, identity numbers, bank details, medical information and background-check contents remain separate with restricted access. Do not use task photos to collect personal documents or passenger information.
+
+HR maintains a documented retention schedule by record type using applicable law, airport/contract requirements and legal holds. Access, corrections, release decisions and version changes must be auditable. Do not purge records merely because a worker becomes inactive. On transfer, verify new-scope requirements; on separation, use the existing HR process to recover company property/badges and remove access appropriately.
+
+## 12. Reusable forms and checklist templates
+
+### A. Employee onboarding cover sheet
+
+- Employee name / employee ID:
+- Role / location / proposed start / actual first paid day:
+- Supervisor / training buddy / HR owner / badge sponsor:
+- Training language / accessibility arrangement:
+- Authorized areas and equipment:
+- Overall status / next due item / next review:
+
+### B. Administrative checklist
+
+| Item | Owner | Due date | Status | Verification reference |
+|---|---|---|---|---|
+| Accepted offer and role confirmed | HR | | | |
+| Employee record checked for duplicates | Administrator | | | |
+| Current employment/tax forms completed | HR | | | |
+| I-9 milestones verified | HR | | | |
+| Payroll and actual training-time route ready | Payroll | | | |
+| Emergency contact privately recorded | HR | | | |
+| Applicable badge/access requirements verified | Sponsor | | | |
+| Uniform/PPE/equipment issued and recorded | Supervisor | | | |
+| Own account/recovery route tested | Administrator | | | |
+| Language/accessibility needs arranged | HR | | | |
+| Orientation and buddy shifts scheduled | Supervisor | | | |
+
+### C. Training and assessment record
+
+- Module / training version / employee ID:
+- Trainer / date / actual training minutes / language:
+- Delivery: video / instructor-led / accessible alternative:
+- Employee questions and responses:
+- Knowledge-check attempt and critical-item results:
+- Practical points: Pass / Retrain / justified Not applicable:
+- Corrections / reassessment date / outcome:
+- Employee attestation reference / supervisor signature and timestamp:
+
+### D. Independent-work release
+
+- Employee ID / authorized scope:
+- Administrative requirements verified by / date:
+- Airport-access status verified by / date:
+- Required training and attestations complete:
+- Knowledge and practical checks complete:
+- Remaining restrictions or supervised tasks:
+- Supervisor recommendation and timestamp:
+- Operations Manager approval and timestamp:
+- Employee notified / first independent shift / Day 7 review date:
+
+### E. Follow-up review
+
+- Review milestone / date / reviewer / employee:
+- Safety observations / cleaning quality / record accuracy:
+- Employee feedback and unanswered questions:
+- Action / owner / due date / follow-up outcome:
+- Continue independent scope / narrow scope pending retraining / extend onboarding:
+- Reason and reviewer signature:
+
+## 13. App workflow blueprint and rollout
+
+This protocol is the operating specification; it does not claim these additional features have already been installed in the app.
+
+Recommended Onboarding sections: **My onboarding**, **Training video and acknowledgment**, **Knowledge check**, **Practical assessment**, **Access and readiness**, and manager-only **Staff completion review**. Show a clear next action and responsible contact on every pending item. Keep Forms separate for approved document templates and private submission routes.
+
+Build a reusable role template rather than manually duplicating requirements for each hire. Calculate due dates from the actual first paid day where applicable. Maintain versioned training requirements and immutable completed records. Never let staff approve their own readiness or sign for someone else. Handle interrupted video playback, duplicate submissions, failed saves, changed videos, accessible alternatives and unavailable devices explicitly.
+
+Before adoption, the Operations Manager and HR fill in the local contacts, exact site procedures, approved chemical/equipment list, official access requirements, pay/timekeeping process, document handling and retention schedule. Review the language editions with staff or qualified reviewers. Run a pilot with a small cohort and one supervisor; check understanding, usability and record accuracy, then correct gaps before general rollout.
+
+Track completion by stage, overdue critical items, first-pass practical results, time to authorized readiness, Day 30 quality, employee feedback and retraining frequency. Use these to improve the program rather than treating viewing time as a measure of employee value.
+
+## 14. Airport badging protocol
+
+**Owner:** Marvol's airport-authorized sponsor/signatory. **Approving authority:** Airport Access Control. Marvol records and coordinates the process; it does not issue airport authorization or promise approval.
+
+### A. Start the application
+
+After the candidate accepts the offer, HR confirms the role, assigned location and access genuinely required. The authorized sponsor verifies the current official application, accepted documentation, appointments, applicable fees and required training directly with GOAA. Explain the steps to the employee in a language they understand. Do not promise a badge date before clearance.
+
+Use these tracked milestones:
+
+**Not required → Sponsor review → Employee action needed → Application prepared → Appointment booked → Airport review pending → Required airport training pending → Ready for issuance → Issued/verified → Renewal due → Suspended/expired → Returned/closed.**
+
+“Not required” needs a sponsor-approved reason for the actual assignment. A company ID and an airport badge are separate records. An issued badge is not permission for every area or activity.
+
+### B. Appointments and official checks
+
+1. Sponsor checks the current application and confirms the employee's requested access scope.
+2. HR communicates the appointment location, time, documents and arrival instructions using a private channel.
+3. Employee attends required identity/document review and fingerprinting as directed by airport officials.
+4. Sponsor records the official processing status, without posting sensitive investigation details to a supervisor dashboard.
+5. Employee completes each required airport security/course requirement, and driver-related authorization only if needed for the role.
+6. Sponsor confirms official clearance and issuance status; incomplete or disputed results go through the airport's official review process.
+7. Supervisor assigns only work permitted by the employee's actual current clearance. No shared badges, borrowed credentials or informal escort arrangements.
+
+GOAA's published guidance requires first-time applicants to be fingerprinted, pass a background check and complete required computer-based training before issuance. Verify the current role-specific process before each application. [GOAA Access Control](https://web.goaa.aero/airport-business/access-control/)
+
+### C. Issuance and badge orientation
+
+The sponsor records badge type/approved scope, issue date, expiry date, required official training completion and verification source. Keep the badge number and any necessary scan restricted to authorized administrators; operational views show status, expiry and access scope instead of sensitive documents.
+
+The employee demonstrates understanding of:
+
+- Where their badge permits them to work, and where it does not.
+- Display/use requirements and protection against loss or misuse.
+- No credential sharing, unauthorized entry or tailgating.
+- Current official escort rules, if the employee has escort authorization.
+- Immediate reporting of a lost, stolen, damaged or suspected-compromised badge.
+- Who to contact for a blocked reader or disputed access; never bypass it.
+- Renewal and return obligations communicated by the sponsor.
+
+Record the employee's badge-rules acknowledgment separately from the airport's own required attestations. Airport-issued forms and courses remain authoritative.
+
+### D. Release gate
+
+The manager verifies that the badge is issued, current, applicable to the assignment and accompanied by required official training. Badge status alone does not complete company cleaning training. Company training alone does not authorize airport access. Confirm both before approving independent work in the relevant area.
+
+### E. Renewal, loss, suspension and return
+
+**Proposed company reminders:** sponsor reviews expirations weekly; create renewal tasks at 60, 30 and 7 days before expiry, adjusted to the airport's actual renewal window. Record appointment, training and issuance evidence. Never extend badge validity in the app without official confirmation.
+
+For a lost/stolen badge, the employee immediately contacts the supervisor and authorized sponsor using the established local route; the sponsor follows GOAA's current notification and replacement procedure. Prevent assignments requiring unavailable authorization. Do not use a coworker's badge while waiting.
+
+For suspension, expiry, transfer, extended leave or separation, the sponsor verifies official notification/deactivation and return requirements. HR coordinates company account changes through the normal approved process. Record the badge's return date, recipient and official confirmation; retain an unresolved return task if the badge has not been recovered. Do not label it “returned” solely because the employee record became inactive.
+
+### F. Badging checklist
+
+| Milestone | Owner | Due/appointment | Status | Evidence reference |
+|---|---|---|---|---|
+| Role and minimum access scope confirmed | Sponsor | | | |
+| Current official application/instructions verified | Sponsor | | | |
+| Employee privately given document instructions | HR | | | |
+| Required appointment scheduled | Sponsor/employee | | | |
+| Official application/identity steps completed | Sponsor | | | |
+| Fingerprinting/review status confirmed | Sponsor | | | |
+| Required official courses completed | Employee/sponsor | | | |
+| Role-specific additional authorization verified | Sponsor | | | |
+| Badge issued, scope and expiry verified | Sponsor | | | |
+| Badge-rules orientation and acknowledgment | Supervisor | | | |
+| Applicable work-access release approved | Manager | | | |
+| Renewal reminders assigned | Sponsor | | | |
+| Return/deactivation completed when applicable | Sponsor/HR | | | |
+
+## 15. Offer and acceptance workflow
+
+**Owner:** HR, with hiring-manager approval. Use the company's verified legal employing name on every letter; “Marvol Enterprise” here is a working name, not a determination of legal entity. Fill every bracket before sending. Terms in these templates are proposals to be completed, not promises about existing Marvol policies.
+
+1. Hiring manager approves the role, pay, schedule expectations, work location, reporting line and proposed start.
+2. HR checks the employing entity, current policy/benefit references and any lawful role-specific conditions.
+3. HR issues one dated, versioned offer with an acceptance deadline and a contact for questions.
+4. Candidate receives the offer in an understandable format and has an opportunity to ask questions.
+5. Candidate signs the acceptance tied to that exact offer version; HR records receipt and sends confirmation.
+6. HR starts preboarding and the applicable airport-badging process. Update start arrangements if clearance is pending; do not silently change the offer.
+7. Changes to pay, role, location, conditions or start terms require a revised written offer or written amendment, with fresh acceptance of the changed terms.
+8. Declined, expired or withdrawn offers retain a dated status and authorized reason under the HR retention schedule. Do not automatically create active employee access for an unaccepted offer.
+
+Keep offer/acceptance records private to the candidate and authorized HR/hiring management. A training signature does not count as offer acceptance. Typed signatures should be attributable to the signer with consent to the approved electronic process, offer-version linkage, timestamps and a downloadable copy. Do not send either letter on the candidate's behalf.
+
+### A. Offer letter template
+
+**[Verified legal employing name]**  
+[Company address]  
+[HR contact details]  
+[Date]
+
+**Private and confidential**  
+[Candidate full name]  
+[Candidate contact/address]
+
+**Subject: Offer of employment — [Job title]**
+
+Dear [Candidate first name],
+
+We are pleased to offer you the position of **[Job title]** with **[Verified legal employing name]**, reporting to **[Supervisor name/title]**. Your primary work location will be **[Location/site]**. Your proposed first day is **[Date]**, with arrival at **[Time and reporting location]**, subject to confirmation of the applicable start requirements described below.
+
+Your agreed employment terms are:
+
+- **Employment arrangement:** [Full-time/part-time/temporary and any verified applicable terms].
+- **Compensation:** [Hourly rate or salary amount, currency, pay period and verified classification].
+- **Schedule expectations:** [Expected days/hours, shift pattern and how changes will be communicated; do not imply guaranteed hours unless intended].
+- **Payroll frequency:** [Verified payroll schedule].
+- **Benefits/leave:** [Accurate summary or reference to the applicable current eligibility/policy documents].
+- **Required orientation and training:** [Reporting instructions and how paid training time will be recorded].
+
+Your duties will include [Brief role-specific cleaning/operational responsibilities]. We will provide orientation, task-specific safety instruction and supervision before independent assignment within your authorized scope.
+
+This offer is subject to [List only the actual lawful conditions approved by HR, such as employment-eligibility verification and applicable airport clearance]. Airport badge approval is determined by the airport authority. You may not perform work requiring restricted-area access until that authorization is confirmed. HR will explain any effect on your proposed start and available approved assignments.
+
+Please review the enclosed [Job description, applicable policy/benefit information and any approved documents]. You may ask questions before accepting. If you wish to accept, return the attached acceptance by **[Date/time/time zone]** to **[HR recipient or approved signing portal]**. HR will confirm receipt and your first-day arrangements.
+
+[Insert only company-approved language concerning the employment relationship, applicable agreements and other terms. Do not assume or add an at-will, arbitration, repayment or restrictive-covenant clause without company review.]
+
+We look forward to welcoming you to Marvol.
+
+Sincerely,
+
+[Authorized signatory name]  
+[Title]  
+[Signature]  
+[Date]
+
+**Offer reference/version:** [Reference]  
+**Attachments:** [List]
+
+### B. Candidate acceptance letter template
+
+[Candidate full name]  
+[Candidate contact details]  
+[Date]
+
+To: [HR/authorized recipient]  
+[Verified legal employing name]
+
+**Subject: Acceptance of offer — [Job title], offer [Reference/version]**
+
+Dear [Recipient name],
+
+I accept the offer of employment dated **[Offer date]**, reference **[Offer reference/version]**, for **[Job title]** with **[Verified legal employing name]**, on the terms set out in that offer and its listed attachments.
+
+I confirm the agreed [Hourly rate or salary], [Employment arrangement] and proposed start date of **[Date]** as stated in the offer. I understand that the start arrangements and any restricted-area work remain subject to the applicable requirements identified in the offer, including airport clearance where required.
+
+I have had an opportunity to review the offer and ask questions. I will complete the agreed preboarding steps and attend the scheduled orientation. This acceptance does not represent that I already hold an airport badge or have completed required job training.
+
+Please confirm receipt and provide my final first-day reporting instructions.
+
+Sincerely,
+
+**Candidate full name:** [Name]  
+**Candidate signature:** [Signature]  
+**Date:** [Date]  
+**Offer reference/version accepted:** [Reference]
+
+### C. HR acceptance receipt template
+
+**Subject: Welcome to Marvol — acceptance received**
+
+Dear [Employee first name],
+
+We received your signed acceptance on [Date] for [Job title], offer [Reference/version]. Your proposed start remains [Date], [subject to the specific outstanding condition, if any].
+
+Your supervisor is [Name/contact]. Report to [Location] at [Time] once HR confirms your first-day arrangements. Your next steps are [Specific document/orientation/badging actions and due dates]. Use [Approved private channel] for personal documents.
+
+Your required orientation and training will be scheduled and recorded through [Approved process]. Bring [Verified items] and contact [HR contact] if you need a language or accessibility arrangement or have any questions.
+
+Welcome to Marvol,
+
+[HR name/title/contact]
+
+### D. Offer tracking checklist
+
+| Record | Required information |
+|---|---|
+| Approval | Hiring approver, role, terms, date |
+| Issued offer | Candidate ID, legal entity, reference/version, issue date, deadline, delivery record |
+| Acceptance | Exact offer version, signer/name, date/time, approved signature evidence and copy |
+| Outstanding conditions | Requirement, authorized owner, due date, status and verified resolution |
+| HR confirmation | Receipt date, reporting instructions and confirmed/proposed start |
+| Amendment | Changed terms, reason, authorized approval and new acceptance |
+| Outcome | Accepted / Declined / Expired / Withdrawn; recorded date and authorized note |
+
+Adopt the letters only after HR verifies the company-specific terms and approved employment-language clauses. Do not treat this generic template as a completed contract or an actual offer to any individual.
+
+### Badging appointment control note
+
+GOAA's current page states that only Authorized Signatory Representatives may obtain official application forms; copies are not acceptable. The applicant and authorized employer representative sign the completed application, and it is valid for five business days after the authorized signatory signs. The signatory verifies matching identification and submits the completed application through the official portal before directing the employee to processing. Schedule the signing and appointment together so an application does not expire while waiting. Verify the current rule each time. This airport application procedure is distinct from the employee's I-9 document choices. [GOAA application guidance](https://web.goaa.aero/airport-business/access-control/)
+
+## 16. Combined application, I-9, W-4 and E-Verify packet
+
+**Owner-directed policy:** collect the application, I-9 and W-4 in one coordinated onboarding session, with the offer/acceptance gate enforced. The initial applicant may submit the job application before an offer; I-9 entry is unlocked only after an offer is accepted. For an accepted hire, any remaining application information, employee I-9 Section 1 and signed W-4 are completed together. Do not require a pre-offer applicant to complete an I-9 or use E-Verify to screen applicants.
+
+Use this sequence:
+
+1. Candidate submits the application. HR records the hiring decision through its authorized process.
+2. HR issues the approved conditional offer; candidate accepts the exact offer version.
+3. Open the combined new-hire packet. Candidate finishes any outstanding application information, completes and signs I-9 Section 1, and completes and signs the W-4 in the same session. Save each form separately with its own status and signature evidence.
+4. Employer/authorized representative completes the applicable document examination and I-9 Section 2 under current USCIS procedures. Employee submission alone does not complete the employer's I-9 responsibility.
+5. An authorized E-Verify user creates the case from the completed I-9, after offer acceptance. The ordinary case-creation deadline is within three business days after the employee's first day of employment. Track that deadline independently of optional packet completeness, and handle official exceptions under E-Verify guidance.
+6. Record case number, creation date, official status, next required action and authorized owner in a restricted HR record. Resolve and close cases using the official process; do not invent an automated authorization result.
+7. Track W-4 receipt separately for payroll. W-4 is a tax-withholding form, not an input or prerequisite for E-Verify. A missing W-4 must not delay a required E-Verify case; payroll handles any incomplete tax election under current IRS guidance.
+
+**Completion distinctions:** Application submitted; Offer accepted; Employee forms submitted; Employer I-9 verified; E-Verify case created; E-Verify follow-up pending or case completed; Payroll setup complete. Never combine these into a single “verified” checkbox.
+
+**Exceptions:** Allow lawful document receipts, pending Social Security number situations and other official exceptions to route to HR without false completion. Do not take adverse action solely because a case has a tentative mismatch or is awaiting resolution; follow official notices, employee rights and case deadlines. Preserve the first paid day, due dates and audited corrections. Do not automatically suspend an employee while a case is being resolved.
+
+Store identity numbers, documents and signed tax forms only in restricted HR storage. Employees access their own forms; ordinary managers see completion status and assigned actions, not full identity or tax details. The application/training signature is not a substitute for the individual statutory form signatures.
+
+Sources: [USCIS I-9 instructions](https://www.uscis.gov/sites/default/files/document/forms/i-9instr.pdf?download=1); [E-Verify case timing](https://everify.uscis.gov/ica-docs/cases/appendix/field-definitions/employees-first-day-of-employment); [E-Verify initial verification](https://www.e-verify.gov/node/2768).
+
+
+## 17. Adopted hiring sequence and final start confirmation
+
+**Approved sequence:** Application → conditional offer and acceptance → I-9 + W-4 → employer I-9 verification → E-Verify → final start-confirmation letter.
+
+This sequence supersedes any less-specific hiring sequence elsewhere in this protocol. I-9 and W-4 remain part of the same post-acceptance new-hire session. The employer completes its I-9 review separately before creating the E-Verify case. Record statutory deadlines from the first day of employment; packet delays or company letters must not delay a required case. W-4 remains a payroll requirement rather than an E-Verify input.
+
+The conditional offer and candidate acceptance use the templates in Section 15, with the actual approved conditions clearly listed. The HR acceptance receipt confirms receipt only; it is not the final notice that all start conditions are satisfied.
+
+Issue a final start-confirmation letter when the applicable offer conditions have been verified. E-Verify review must follow its official case process and employee rights; an unresolved tentative mismatch does not itself authorize delaying work, suspending the employee or withdrawing an offer. HR handles pending cases and lawful start arrangements through that process. Airport access remains a separate requirement for any assignment needing it.
+
+### Final start-confirmation letter template
+
+**[Verified legal employing name]**  
+[Company address and HR contact]  
+[Date]
+
+**Private and confidential**  
+[Employee full name]
+
+**Subject: Confirmation of employment start — [Job title]**
+
+Dear [Employee first name],
+
+Thank you for accepting our conditional offer dated [Offer date], reference [Offer reference/version]. We confirm your start arrangements for [Job title] with [Verified legal employing name]. [Describe the verified status of the applicable offer conditions accurately; do not state that a pending case or badge is approved.]
+
+Your first day is **[Confirmed date]**. Please report at **[Time]** to **[Reporting location]** and ask for **[Supervisor name/contact]**. Your role, compensation and other agreed terms remain those in your accepted offer [and any accepted amendment reference].
+
+Your orientation and required training will be scheduled and recorded through [Approved paid-time process]. Please bring [Verified items]. Your authorized work area is [Area/scope]. [State any lawful, approved assignment limitation while airport access is pending; do not imply that this letter grants airport clearance.]
+
+Complete your assigned onboarding steps in Employment → Onboarding, including the current training, employee acknowledgment and practical assessment. Independent work requires the separate supervisor and Operations Manager readiness approval.
+
+If you have questions or need a language or accessibility arrangement, contact [HR contact]. We look forward to welcoming you.
+
+Sincerely,
+
+[Authorized signatory name/title]  
+[Signature/date]
+
+**References:** [Accepted offer/version; accepted amendments; restricted HR verification reference]. Do not place identity numbers, E-Verify case details or sensitive documents in this letter.

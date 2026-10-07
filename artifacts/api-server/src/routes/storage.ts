@@ -1,4 +1,5 @@
 import { Router, type IRouter, type Request, type Response } from "express";
+import { isEmploymentFormObjectPath } from "./employmentForms";
 import { Readable } from "stream";
 import {
   RequestUploadUrlBody,
@@ -157,15 +158,38 @@ router.get("/storage/public-objects/*filePath", async (req: Request, res: Respon
 router.get("/storage/objects/*path", async (req: Request, res: Response) => {
   try {
     const actor = await actorStaffFromRequest(req);
-    if (!actor) {
-      res.status(401).json({ error: "Login session required" });
-      return;
-    }
     const raw = req.params.path;
     const wildcardPath = Array.isArray(raw) ? raw.join("/") : raw;
     const objectPath = `/objects/${wildcardPath}`;
+    const blankTemplate = isEmploymentFormObjectPath(objectPath);
+    if (!actor) {
+      if (!blankTemplate) {
+        res.status(401).json({ error: "Login session required" });
+        return;
+      }
+      const file = await objectStorageService.getObjectEntityFile(objectPath);
+      const response = await objectStorageService.downloadObject(file);
+      res.status(response.status);
+      response.headers.forEach((value, key) => res.setHeader(key, value));
+      res.setHeader("Cache-Control", "private, no-store");
+      if (response.body) {
+        Readable.fromWeb(response.body as ReadableStream<Uint8Array>).pipe(res);
+      } else {
+        res.end();
+      }
+      return;
+    }
+    // HR originals, staged bytes and previews must go through the dedicated
+    // Admin-only, audited endpoint, even for administrators.
+    if (objectPath.startsWith("/objects/hr-identity/")) {
+      res.status(403).json({ error: "Use the protected HR document endpoint" }); return;
+    }
     const [metadata] = await db.select().from(objectUploadsTable).where(eq(objectUploadsTable.objectPath, objectPath));
-    let allowed = actor.role === "admin";
+    if (metadata?.purpose === "application_document" && actor.role !== "admin") {
+      res.status(403).json({ error: "Only administrators may access completed applications" }); return;
+    }
+    if (metadata?.purpose === "application_document") res.setHeader("Cache-Control", "private, no-store");
+    let allowed = actor.role === "admin" || blankTemplate;
     if (metadata) {
       if (metadata.purpose === "conversation_attachment") {
         // Conversation photos are only readable by people authorized to read
@@ -211,7 +235,7 @@ router.get("/storage/objects/*path", async (req: Request, res: Response) => {
             const [assignmentNotification] = await db.select({ id: notificationsTable.id })
               .from(notificationsTable)
               .where(and(
-                eq(notificationsTable.staffId, actor.id),
+              eq(notificationsTable.staffId, actor!.id),
                 eq(notificationsTable.issueId, issue.id),
                 eq(notificationsTable.type, "issue_assigned"),
               ))
@@ -221,9 +245,6 @@ router.get("/storage/objects/*path", async (req: Request, res: Response) => {
         }
         if (!allowed && metadata.purpose === "shared_photo") {
           allowed = true;
-        }
-        if (!allowed && metadata.purpose === "application_document" && metadata.claimedAt) {
-          allowed = actor.role === "supervisor";
         }
       }
     }
@@ -249,6 +270,9 @@ router.get("/storage/objects/*path", async (req: Request, res: Response) => {
 
     res.status(response.status);
     response.headers.forEach((value, key) => res.setHeader(key, value));
+    if (isEmploymentFormObjectPath(objectPath) || metadata?.purpose === "application_document") {
+      res.setHeader("Cache-Control", "private, no-store");
+    }
 
     if (response.body) {
       const nodeStream = Readable.fromWeb(response.body as ReadableStream<Uint8Array>);
