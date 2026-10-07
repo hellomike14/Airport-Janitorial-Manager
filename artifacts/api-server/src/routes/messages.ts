@@ -1,4 +1,4 @@
-import { sharedInspector, canReadSharedInspector, sharedMessageIsRead } from "../lib/sharedInspectorConversation";
+import { sharedInspector, canReadSharedInspector, sharedMessageIsRead, groupSharedInspectorThreads, canonicalSharedInspectorThread, sharedInspectorGroupIsArchived } from "../lib/sharedInspectorConversation";
 import { isAllowedPair, canStart, isInspectorManager } from "../lib/conversationPolicy";
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db } from "@workspace/db";
@@ -22,6 +22,7 @@ import { z } from "zod";
 import { actorStaffFromRequest } from "../lib/actorSession";
 import { INSPECTOR_EMAIL, INSPECTOR_RECIPIENT_EMAILS, aggregateInspectorEmailStatus, classifyInboundInspectorEmailTarget, groupInspectorEmailRecipients, normalizedEmail, outboundEmailStatus, resolveInspectorRecipients, isAuthorizedInspectorEmailSender, verifyInboundWebhookSecret, verifyReplyToken, inboundProviderMessageId } from "../lib/sendgridEmailBridge";
 import { autoAssignInboundInspectorMessage } from "../lib/inspectorTaskWorkflow";
+import { groupInboundEmailReceivedAt, groupInspectorEmailAcceptedAt } from "../lib/messageEmailHistory";
 
 const router: IRouter = Router();
 /** Deliberately mounted before the staff-session router in app.ts. */
@@ -88,6 +89,23 @@ async function inspectorForConversation(convo: ConversationRow) {
   return sharedInspector(convo, people);
 }
 
+async function sharedInspectorThreads(inspectorId: number): Promise<ConversationRow[]> {
+  const candidates = await db.select().from(conversationsTable).where(and(
+    eq(conversationsTable.isGroup, false),
+    or(eq(conversationsTable.participantAId, inspectorId), eq(conversationsTable.participantBId, inspectorId)),
+  ));
+  if (!candidates.length) return [];
+  const participantIds = [...new Set(candidates.flatMap((conversation) => [
+    conversation.participantAId, conversation.participantBId,
+  ]).filter((id): id is number => id !== null))];
+  const people = await db.select({
+    id: staffTable.id,
+    role: staffTable.role,
+    email: staffTable.email,
+  }).from(staffTable).where(inArray(staffTable.id, participantIds));
+  return groupSharedInspectorThreads(candidates, people).get(inspectorId) ?? [];
+}
+
 async function directInboundInspectorThread() {
   return db.transaction(async (tx) => {
     // Lock active inspector rows so concurrent direct inbound deliveries make
@@ -135,12 +153,6 @@ async function directInboundInspectorThread() {
   });
 }
 
-async function readPosition(conversationId: number, staffId: number) {
-  const [position] = await db.select().from(conversationParticipantsTable).where(and(
-    eq(conversationParticipantsTable.conversationId, conversationId), eq(conversationParticipantsTable.staffId, staffId)));
-  return position?.lastReadAt ?? null;
-}
-
 async function inspectorManagers() {
   return db.select({ id: staffTable.id }).from(staffTable).where(and(
     inArray(staffTable.role, ["admin", "supervisor"]), eq(staffTable.active, true),
@@ -170,11 +182,12 @@ router.get("/inspector-email/recipients", async (req: Request, res: Response) =>
 //   supervisor ↔ inspector
 // ── Summary builder ───────────────────────────────────────────────────────────
 
-async function buildSummary(convo: ConversationRow, viewerId: number) {
+async function buildSummary(convo: ConversationRow, viewerId: number, sharedThreadIds?: number[]) {
+  const messageConversationIds = sharedThreadIds?.length ? sharedThreadIds : [convo.id];
   const [last] = await db
     .select()
     .from(messagesTable)
-    .where(eq(messagesTable.conversationId, convo.id))
+    .where(inArray(messagesTable.conversationId, messageConversationIds))
     .orderBy(desc(messagesTable.createdAt), desc(messagesTable.id))
     .limit(1);
 
@@ -237,18 +250,37 @@ async function buildSummary(convo: ConversationRow, viewerId: number) {
   const inspector = await inspectorForConversation(convo);
   const otherId = inspector && inspector.id !== viewerId ? inspector.id :
     convo.participantAId === viewerId ? convo.participantBId! : convo.participantAId!;
-  const lastReadAt = inspector ? await readPosition(convo.id, viewerId) : null;
   const other = await getStaff(otherId);
-  const [{ value: unread }] = await db
-    .select({ value: count() })
-    .from(messagesTable)
-    .where(
-      and(
-        eq(messagesTable.conversationId, convo.id),
-        inspector ? (lastReadAt ? gt(messagesTable.createdAt, lastReadAt) : undefined) : eq(messagesTable.isRead, false),
-        ne(messagesTable.senderId, viewerId)
-      )
-    );
+  let unread: number;
+  if (inspector) {
+    const positions = await db.select({
+      conversationId: conversationParticipantsTable.conversationId,
+      lastReadAt: conversationParticipantsTable.lastReadAt,
+    }).from(conversationParticipantsTable).where(and(
+      inArray(conversationParticipantsTable.conversationId, messageConversationIds),
+      eq(conversationParticipantsTable.staffId, viewerId),
+    ));
+    const lastReadByConversationId = new Map(positions.map((position) => [position.conversationId, position.lastReadAt]));
+    const unreadMessages = await db.select({
+      conversationId: messagesTable.conversationId,
+      senderId: messagesTable.senderId,
+      createdAt: messagesTable.createdAt,
+    }).from(messagesTable).where(and(
+      inArray(messagesTable.conversationId, messageConversationIds),
+      ne(messagesTable.senderId, viewerId),
+    ));
+    unread = unreadMessages.filter((message) => {
+      const lastReadAt = lastReadByConversationId.get(message.conversationId);
+      return !lastReadAt || message.createdAt > lastReadAt;
+    }).length;
+  } else {
+    const [{ value }] = await db.select({ value: count() }).from(messagesTable).where(and(
+      eq(messagesTable.conversationId, convo.id),
+      eq(messagesTable.isRead, false),
+      ne(messagesTable.senderId, viewerId),
+    ));
+    unread = value;
+  }
   return {
     id: convo.id,
     isGroup: false,
@@ -480,14 +512,21 @@ router.get("/conversations", async (req: Request, res: Response) => {
       )
     );
 
+  const sharedPeople = await db.select({
+    id: staffTable.id,
+    role: staffTable.role,
+    email: staffTable.email,
+    active: staffTable.active,
+    loginEnabled: staffTable.loginEnabled,
+    formerEmployee: staffTable.formerEmployee,
+  }).from(staffTable);
   if (isInspectorManager(actor.role)) {
-    const people = await db.select().from(staffTable);
-    const inspectorIds = people.filter(p => p.role === "inspector" && normalizedEmail(p.email) === INSPECTOR_EMAIL).map(p => p.id);
+    const inspectorIds = sharedPeople.filter(p => p.role === "inspector" && normalizedEmail(p.email) === INSPECTOR_EMAIL).map(p => p.id);
     if (inspectorIds.length) {
       const candidates = await db.select().from(conversationsTable).where(and(eq(conversationsTable.isGroup, false), or(
         inArray(conversationsTable.participantAId, inspectorIds), inArray(conversationsTable.participantBId, inspectorIds))));
       for (const convo of candidates) {
-        if (canReadSharedInspector(actor, convo, people) && !oneToOne.some(c => c.id === convo.id)) oneToOne.push(convo);
+        if (canReadSharedInspector(actor, convo, sharedPeople) && !oneToOne.some(c => c.id === convo.id)) oneToOne.push(convo);
       }
     }
   }
@@ -511,8 +550,19 @@ router.get("/conversations", async (req: Request, res: Response) => {
     .from(conversationArchivesTable).where(eq(conversationArchivesTable.staffId, staffId));
   const archivedIds = new Set(archived.map((row) => row.conversationId));
   const showArchived = query.data.archived === "true";
-  const convos = [...oneToOne, ...groupConvos].filter((convo) => archivedIds.has(convo.id) === showArchived);
-  const summaries = await Promise.all(convos.map((c) => buildSummary(c, staffId)));
+  const conversations = [...oneToOne, ...groupConvos];
+  const sharedGroups = groupSharedInspectorThreads(conversations, sharedPeople);
+  const groupedConversationIds = new Set([...sharedGroups.values()].flat().map((conversation) => conversation.id));
+  const summaries = await Promise.all(conversations
+    .filter((conversation) => !groupedConversationIds.has(conversation.id) && archivedIds.has(conversation.id) === showArchived)
+    .map((conversation) => buildSummary(conversation, staffId)));
+  for (const threads of sharedGroups.values()) {
+    const isArchivedForViewer = sharedInspectorGroupIsArchived(threads.map((thread) => thread.id), archivedIds);
+    if (isArchivedForViewer !== showArchived) continue;
+    const canonical = canonicalSharedInspectorThread(threads, sharedPeople);
+    if (!canonical) continue;
+    summaries.push(await buildSummary(canonical, staffId, threads.map((thread) => thread.id)));
+  }
   summaries.sort((a, b) => {
     const ta = a.lastMessageAt ?? a.createdAt;
     const tb = b.lastMessageAt ?? b.createdAt;
@@ -634,7 +684,18 @@ router.get("/conversations/:id/messages", async (req: Request, res: Response) =>
     return;
   }
   const shared = await inspectorForConversation(result.convo);
-  const lastReadAt = shared ? await readPosition(result.convo.id, actor.id) : null;
+  const historyThreads = shared ? await sharedInspectorThreads(shared.id) : [result.convo];
+  const historyThreadIds = historyThreads.length ? historyThreads.map((thread) => thread.id) : [result.convo.id];
+  const readPositions = shared
+    ? await db.select({
+        conversationId: conversationParticipantsTable.conversationId,
+        lastReadAt: conversationParticipantsTable.lastReadAt,
+      }).from(conversationParticipantsTable).where(and(
+        inArray(conversationParticipantsTable.conversationId, historyThreadIds),
+        eq(conversationParticipantsTable.staffId, actor.id),
+      ))
+    : [];
+  const lastReadByConversationId = new Map(readPositions.map((position) => [position.conversationId, position.lastReadAt]));
   const rows = await db
     .select({
       id: messagesTable.id,
@@ -649,21 +710,26 @@ router.get("/conversations/:id/messages", async (req: Request, res: Response) =>
     })
     .from(messagesTable)
     .innerJoin(staffTable, eq(messagesTable.senderId, staffTable.id))
-    .where(eq(messagesTable.conversationId, params.data.id))
+    .where(inArray(messagesTable.conversationId, historyThreadIds))
     .orderBy(asc(messagesTable.createdAt), asc(messagesTable.id));
-  const [workflowLinks, outboxRows] = await Promise.all([
+  const [workflowLinks, outboxRows, inboundRows] = await Promise.all([
     db.select({
       taskId: inspectorTaskLinksTable.taskId,
       sourceMessageId: inspectorTaskLinksTable.sourceMessageId,
       completionMessageId: inspectorTaskLinksTable.completionMessageId,
-    }).from(inspectorTaskLinksTable).where(eq(inspectorTaskLinksTable.conversationId, params.data.id)),
+    }).from(inspectorTaskLinksTable).where(inArray(inspectorTaskLinksTable.conversationId, historyThreadIds)),
     db.select({
       messageId: messageEmailOutboxTable.messageId,
       inspectorEmail: messageEmailOutboxTable.inspectorEmail,
       status: messageEmailOutboxTable.status,
+      acceptedAt: messageEmailOutboxTable.acceptedAt,
     }).from(messageEmailOutboxTable)
-      .where(eq(messageEmailOutboxTable.conversationId, params.data.id))
+      .where(inArray(messageEmailOutboxTable.conversationId, historyThreadIds))
       .orderBy(asc(messageEmailOutboxTable.id)),
+    db.select({
+      messageId: inboundEmailMessagesTable.messageId,
+      receivedAt: inboundEmailMessagesTable.receivedAt,
+    }).from(inboundEmailMessagesTable).where(inArray(inboundEmailMessagesTable.conversationId, historyThreadIds)),
   ]);
   const workflowTaskByMessageId = new Map<number, number>();
   workflowLinks.forEach((link) => {
@@ -681,6 +747,8 @@ router.get("/conversations/:id/messages", async (req: Request, res: Response) =>
   const workflowTaskPhotosById = new Map(workflowTaskPhotos.map((task) => [task.id, task]));
   const statusesByMessageId = new Map<number, string[]>();
   const inspectorEmailRecipientsByMessageId = groupInspectorEmailRecipients(outboxRows);
+  const inspectorEmailAcceptedAtByMessageId = groupInspectorEmailAcceptedAt(outboxRows);
+  const inboundEmailReceivedAtByMessageId = groupInboundEmailReceivedAt(inboundRows);
   for (const row of outboxRows) {
     const statuses = statusesByMessageId.get(row.messageId) ?? [];
     statuses.push(row.status);
@@ -694,11 +762,13 @@ router.get("/conversations/:id/messages", async (req: Request, res: Response) =>
       ...m,
       beforeImagePath: useWorkflowTaskPhotos ? taskPhotos?.beforeImagePath ?? null : m.beforeImagePath,
       afterImagePath: useWorkflowTaskPhotos ? taskPhotos?.afterImagePath ?? null : m.afterImagePath,
-      isRead: shared ? sharedMessageIsRead(m, actor.id, lastReadAt) : m.isRead,
+      isRead: shared ? sharedMessageIsRead(m, actor.id, lastReadByConversationId.get(m.conversationId) ?? null) : m.isRead,
       createdAt: m.createdAt.toISOString(),
       inspectorWorkflowTaskId,
       inspectorEmailDeliveryStatus: aggregateInspectorEmailStatus(statusesByMessageId.get(m.id) ?? []) ?? "not_applicable",
       inspectorEmailRecipients: inspectorEmailRecipientsByMessageId.get(m.id) ?? [],
+      inspectorEmailAcceptedAt: inspectorEmailAcceptedAtByMessageId.get(m.id) ?? null,
+      inboundEmailReceivedAt: inboundEmailReceivedAtByMessageId.get(m.id) ?? null,
     };
   }));
 });
@@ -774,6 +844,7 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
       const priorOutbox = await db.select({
         status: messageEmailOutboxTable.status,
         inspectorEmail: messageEmailOutboxTable.inspectorEmail,
+        acceptedAt: messageEmailOutboxTable.acceptedAt,
       }).from(messageEmailOutboxTable)
         .where(eq(messageEmailOutboxTable.messageId, prior.id))
         .orderBy(asc(messageEmailOutboxTable.id));
@@ -784,6 +855,10 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
         createdAt: prior.createdAt.toISOString(), inspectorWorkflowTaskId: null,
         inspectorEmailDeliveryStatus: aggregateInspectorEmailStatus(priorOutbox.map(({ status }) => status)) ?? "not_applicable",
         inspectorEmailRecipients: priorOutbox.map(({ inspectorEmail }) => inspectorEmail),
+        inspectorEmailAcceptedAt: groupInspectorEmailAcceptedAt(
+          priorOutbox.map((row) => ({ ...row, messageId: prior.id })),
+        ).get(prior.id) ?? null,
+        inboundEmailReceivedAt: null,
       });
     }
   }
@@ -881,6 +956,7 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
   const outbox = await db.select({
     status: messageEmailOutboxTable.status,
     inspectorEmail: messageEmailOutboxTable.inspectorEmail,
+    acceptedAt: messageEmailOutboxTable.acceptedAt,
   }).from(messageEmailOutboxTable)
     .where(eq(messageEmailOutboxTable.messageId, message.id))
     .orderBy(asc(messageEmailOutboxTable.id));
@@ -899,6 +975,8 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
     // the message.
     inspectorEmailDeliveryStatus: aggregateInspectorEmailStatus(outbox.map(({ status }) => status)) ?? "not_applicable",
     inspectorEmailRecipients: outbox.map(({ inspectorEmail }) => inspectorEmail),
+    inspectorEmailAcceptedAt: groupInspectorEmailAcceptedAt(outbox.map((row) => ({ ...row, messageId: message.id }))).get(message.id) ?? null,
+    inboundEmailReceivedAt: null,
     createdAt: message.createdAt.toISOString(),
   });
 });
@@ -956,6 +1034,18 @@ router.patch("/conversations/:id/messages/:msgId", async (req: Request, res: Res
     return;
   }
 
+  const [outboxRows, inboundRows] = await Promise.all([
+    db.select({
+      messageId: messageEmailOutboxTable.messageId,
+      inspectorEmail: messageEmailOutboxTable.inspectorEmail,
+      status: messageEmailOutboxTable.status,
+      acceptedAt: messageEmailOutboxTable.acceptedAt,
+    }).from(messageEmailOutboxTable).where(eq(messageEmailOutboxTable.messageId, updated.id)),
+    db.select({
+      messageId: inboundEmailMessagesTable.messageId,
+      receivedAt: inboundEmailMessagesTable.receivedAt,
+    }).from(inboundEmailMessagesTable).where(eq(inboundEmailMessagesTable.messageId, updated.id)),
+  ]);
   res.json({
     id: updated.id,
     conversationId: updated.conversationId,
@@ -965,6 +1055,11 @@ router.patch("/conversations/:id/messages/:msgId", async (req: Request, res: Res
     isRead: updated.isRead,
     beforeImagePath: updated.beforeImagePath,
     afterImagePath: updated.afterImagePath,
+    inspectorWorkflowTaskId: null,
+    inspectorEmailDeliveryStatus: aggregateInspectorEmailStatus(outboxRows.map(({ status }) => status)) ?? "not_applicable",
+    inspectorEmailRecipients: outboxRows.map(({ inspectorEmail }) => inspectorEmail),
+    inspectorEmailAcceptedAt: groupInspectorEmailAcceptedAt(outboxRows).get(updated.id) ?? null,
+    inboundEmailReceivedAt: groupInboundEmailReceivedAt(inboundRows).get(updated.id) ?? null,
     createdAt: updated.createdAt.toISOString(),
   });
 });
@@ -1064,9 +1159,18 @@ router.post("/conversations/:id/read", async (req: Request, res: Response) => {
     return;
   }
 
-  if (await inspectorForConversation(result.convo)) {
-    await db.insert(conversationParticipantsTable).values({ conversationId: params.data.id, staffId: actor.id, lastReadAt: new Date() })
-      .onConflictDoUpdate({ target: [conversationParticipantsTable.conversationId, conversationParticipantsTable.staffId], set: { lastReadAt: new Date() } });
+  const shared = await inspectorForConversation(result.convo);
+  if (shared) {
+    const historyThreads = await sharedInspectorThreads(shared.id);
+    const lastReadAt = new Date();
+    await db.insert(conversationParticipantsTable).values(
+      (historyThreads.length ? historyThreads : [result.convo]).map((thread) => ({
+        conversationId: thread.id, staffId: actor.id, lastReadAt,
+      }))
+    ).onConflictDoUpdate({
+      target: [conversationParticipantsTable.conversationId, conversationParticipantsTable.staffId],
+      set: { lastReadAt },
+    });
     res.json({ updated: 1 });
   } else if (result.convo.isGroup) {
     // Update last_read_at for this participant
@@ -1104,12 +1208,18 @@ router.patch("/conversations/:id/archive", async (req: Request, res: Response) =
   if (!actor) return;
   const access = await loadConversationForParticipant(params.data.id, actor.id);
   if (access.status !== undefined) { sendConvoError(res, access.status); return; }
+  const shared = await inspectorForConversation(access.convo);
+  const historyThreads = shared ? await sharedInspectorThreads(shared.id) : [];
+  const threadIds = shared && historyThreads.length
+    ? historyThreads.map((thread) => thread.id)
+    : [params.data.id];
   if (body.data.archived) {
-    await db.insert(conversationArchivesTable).values({ conversationId: params.data.id, staffId: actor.id })
-      .onConflictDoNothing();
+    await db.insert(conversationArchivesTable).values(threadIds.map((conversationId) => ({
+      conversationId, staffId: actor.id,
+    }))).onConflictDoNothing();
   } else {
     await db.delete(conversationArchivesTable).where(and(
-      eq(conversationArchivesTable.conversationId, params.data.id),
+      inArray(conversationArchivesTable.conversationId, threadIds),
       eq(conversationArchivesTable.staffId, actor.id),
     ));
   }

@@ -710,10 +710,9 @@ export default function Messages() {
     },
   });
 
-  const handleDelete = (msgId: number) => {
-    if (selectedId === null) return;
+  const handleDelete = (convoId: number, msgId: number) => {
     if (!window.confirm(t("messages.confirmDelete"))) return;
-    deleteMutation.mutate({ convoId: selectedId, msgId });
+    deleteMutation.mutate({ convoId, msgId });
   };
 
   const handleDeleteOld = () => {
@@ -829,9 +828,12 @@ export default function Messages() {
       setEditError(t("messages.editRequired"));
       return;
     }
-    if (selectedId === null || editingMessageId === null || editMutation.isPending) return;
+    const messageId = editingMessageId;
+    if (messageId === null || editMutation.isPending) return;
+    const editingMessage = messages.find((message) => message.id === messageId);
+    if (!editingMessage) return;
     setEditError(null);
-    editMutation.mutate({ convoId: selectedId, msgId: editingMessageId, body });
+    editMutation.mutate({ convoId: editingMessage.conversationId, msgId: messageId, body });
   };
 
   const handleStarted = (convo: ConversationSummary) => {
@@ -1080,7 +1082,7 @@ export default function Messages() {
                   >
                     {showArchived ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
                   </button>
-                  {senderRole === "admin" && (
+                  {senderRole === "admin" && !isSharedInspectorThread && (
                     <button
                       type="button"
                       data-testid="toggle-delete-old-messages"
@@ -1103,7 +1105,7 @@ export default function Messages() {
                     </button>
                   )}
               </div>
-                {senderRole === "admin" && cleanupConversationId === selectedConvo.id && (
+                {senderRole === "admin" && !isSharedInspectorThread && cleanupConversationId === selectedConvo.id && (
                   <div className="mx-4 mb-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-950">
                     <label htmlFor="old-message-cutoff" className="block font-semibold mb-2">
                       {t("messages.deleteBeforeDate")}
@@ -1197,7 +1199,7 @@ export default function Messages() {
                       {canDelete && (
                         <button
                           type="button"
-                          onClick={() => handleDelete(m.id)}
+                          onClick={() => handleDelete(m.conversationId, m.id)}
                           disabled={deleteMutation.isPending || editMutation.isPending}
                           className="p-1 text-slate-400 hover:text-red-500 disabled:opacity-50"
                           aria-label={t("messages.deleteMessage")}
@@ -1295,7 +1297,7 @@ export default function Messages() {
                             ))}
                           </div>
                         )}
-                        {mine && m.inspectorEmailRecipients.length > 0 && (
+                        {(mine || isSharedInspectorThread) && m.inspectorEmailRecipients.length > 0 && (
                           <div className="mt-2 text-[11px] text-emerald-100 break-all">
                             {t("messages.emailRecipient")}: {m.inspectorEmailRecipients.length === 1
                               ? m.inspectorEmailRecipients[0]
@@ -1314,8 +1316,16 @@ export default function Messages() {
                           {format(new Date(m.createdAt), "MMM d, h:mm a")}
                         </p>
                         {emailDeliveryText(m.inspectorEmailDeliveryStatus) && (
-                          <p className={`text-[10px] mt-1 font-semibold ${mine ? "text-emerald-100" : "text-slate-500"}`}>
+                          <p data-testid={`status-email-delivery-${m.id}`} className={`text-[10px] mt-1 font-semibold ${mine ? "text-emerald-100" : "text-slate-500"}`}>
                             {emailDeliveryText(m.inspectorEmailDeliveryStatus)}
+                            {m.inspectorEmailDeliveryStatus === "accepted" && m.inspectorEmailAcceptedAt
+                              ? ` · ${format(new Date(m.inspectorEmailAcceptedAt), "MMM d, h:mm a")}`
+                              : ""}
+                          </p>
+                        )}
+                        {m.inboundEmailReceivedAt && (
+                          <p data-testid={`status-email-received-${m.id}`} className={`text-[10px] mt-1 ${mine ? "text-emerald-100" : "text-slate-500"}`}>
+                            Inbound email received · {format(new Date(m.inboundEmailReceivedAt), "MMM d, h:mm a")}
                           </p>
                         )}
                         {m.inspectorWorkflowTaskId && (

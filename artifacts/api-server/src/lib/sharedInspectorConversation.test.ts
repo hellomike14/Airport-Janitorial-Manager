@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { sharedInspector, canReadSharedInspector, sharedMessageIsRead } from "./sharedInspectorConversation";
+import { sharedInspector, canReadSharedInspector, canonicalSharedInspectorThread, groupSharedInspectorThreads, sharedInspectorGroupIsArchived, sharedMessageIsRead } from "./sharedInspectorConversation";
 
 const inspector = { id: 10, role: "inspector", email: " Inspector@MarvolEnterprises.com " };
 const originalManager = { id: 20, role: "supervisor" };
-const thread = { isGroup: false, participantAId: 20, participantBId: 10 };
+const thread = { id: 1, isGroup: false, participantAId: 20, participantBId: 10 };
 const people = [inspector, originalManager];
 
 for (const role of ["admin", "supervisor"]) {
@@ -24,6 +24,23 @@ test("ordinary DMs, groups, and other inspector identities remain private", () =
   assert.equal(sharedInspector(thread, [{ ...inspector, role: "staff" }, originalManager]), undefined);
   assert.equal(sharedInspector(thread, [inspector, { ...originalManager, role: "staff" }]), undefined);
   assert.equal(sharedInspector(thread, []), undefined);
+});
+
+test("shared inspector threads group into one canonical view without absorbing ordinary DMs", () => {
+  const secondThread = { ...thread, id: 3, participantAId: 30, participantBId: 10 };
+  const ordinary = { ...thread, id: 4, participantAId: 40 };
+  const people = [
+    inspector,
+    originalManager,
+    { id: 30, role: "admin", email: "manager@example.com", active: true, loginEnabled: true, formerEmployee: false },
+    { id: 40, role: "staff" },
+  ];
+  const groups = groupSharedInspectorThreads([thread, secondThread, ordinary], people);
+  assert.deepEqual(groups.get(inspector.id)?.map(({ id }) => id), [1, 3]);
+  assert.equal(canonicalSharedInspectorThread([thread, secondThread], people)?.id, 3);
+  assert.equal(groups.size, 1);
+  assert.equal(sharedInspectorGroupIsArchived([1, 3], new Set([1])), false);
+  assert.equal(sharedInspectorGroupIsArchived([1, 3], new Set([1, 3])), true);
 });
 
 test("worker, inspector, and unknown roles cannot inherit management access", () => {
