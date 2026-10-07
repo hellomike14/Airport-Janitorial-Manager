@@ -1,21 +1,28 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronLeft, ChevronRight, Download, Loader2, Minus, Plus, Printer, RefreshCw, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Loader2, Minus, Plus, Printer, RefreshCw, Upload, X } from "lucide-react";
 import type { PDFDocumentLoadingTask, PDFDocumentProxy } from "pdfjs-dist";
+import { useSubmitEmploymentForm } from "@workspace/api-client-react";
 import { fetchFormBytes, type EmploymentFormId } from "./formSources";
 import { downloadBytes, openDocument, printDocument } from "./pdfRuntime";
+import { uploadEmploymentFormFile } from "./privateUpload";
 import { PdfPage } from "./PdfPage";
 
 interface Props {
   formId: EmploymentFormId;
   title: string;
   onClose: () => void;
+  onSubmitted: (emailSent: boolean) => void;
 }
 
 const BTN = "inline-flex min-h-[40px] items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-50";
+const MAX_PHOTO_FILES = 3;
+const MAX_TOTAL_UPLOAD_BYTES = 20 * 1024 * 1024;
+const MAX_UPLOAD_FILE_BYTES = 10 * 1024 * 1024;
 
-export default function EmploymentFormEditor({ formId, title, onClose }: Props) {
+export default function EmploymentFormEditor({ formId, title, onClose, onSubmitted }: Props) {
   const { t } = useTranslation();
+  const submitForm = useSubmitEmploymentForm();
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [renderError, setRenderError] = useState(false);
@@ -24,14 +31,20 @@ export default function EmploymentFormEditor({ formId, title, onClose }: Props) 
   const [dirty, setDirty] = useState(false);
   const editRevision = useRef(0);
   const [confirmClose, setConfirmClose] = useState(false);
-  const [busy, setBusy] = useState<"save" | "print" | null>(null);
+  const [busy, setBusy] = useState<"save" | "print" | "submit" | null>(null);
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [idPhotoFiles, setIdPhotoFiles] = useState<File[]>([]);
   const [current, setCurrent] = useState(1);
   const [zoom, setZoom] = useState(1);
   const [width, setWidth] = useState(0);
   const scroller = useRef<HTMLDivElement>(null);
+  const photoPicker = useRef<HTMLInputElement>(null);
   const dirtyRef = useRef(false);
-  dirtyRef.current = dirty;
+  dirtyRef.current = dirty || Boolean(firstName || lastName || email || phone || idPhotoFiles.length);
 
   // Load original template (never modified); destroy doc on unmount to drop all entries.
   useEffect(() => {
@@ -114,7 +127,62 @@ export default function EmploymentFormEditor({ formId, title, onClose }: Props) 
     catch { setNotice({ kind: "err", text: t("employment.forms.editor.printError") }); }
     finally { setBusy(null); }
   };
-  const requestClose = () => (dirty ? setConfirmClose(true) : onClose());
+  const onPhotoSelect = (files: FileList | null) => {
+    if (!files?.length) return;
+    const selected = Array.from(files);
+    const currentBytes = idPhotoFiles.reduce((sum, file) => sum + file.size, 0);
+    if (idPhotoFiles.length + selected.length > MAX_PHOTO_FILES ||
+        selected.some(file => !["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size <= 0 || file.size > MAX_UPLOAD_FILE_BYTES) ||
+        currentBytes + selected.reduce((sum, file) => sum + file.size, 0) > MAX_TOTAL_UPLOAD_BYTES) {
+      setNotice({ kind: "err", text: t("employment.forms.editor.photoLimit") });
+      if (photoPicker.current) photoPicker.current.value = "";
+      return;
+    }
+    setNotice(null);
+    setIdPhotoFiles(previous => [...previous, ...selected]);
+    if (photoPicker.current) photoPicker.current.value = "";
+  };
+  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setNotice(null);
+    if (!doc || !firstName.trim() || !lastName.trim() || !email.trim()) {
+      setNotice({ kind: "err", text: t("employment.forms.editor.contactRequired") });
+      return;
+    }
+    setBusy("submit");
+    try {
+      const pdfBytes = await exportBytes();
+      if (pdfBytes.byteLength + idPhotoFiles.reduce((sum, file) => sum + file.size, 0) > MAX_TOTAL_UPLOAD_BYTES) {
+        throw new Error("EMPLOYMENT_FORM_UPLOAD_TOO_LARGE");
+      }
+      const pdfFile = new File([pdfBytes], `marvol-${formId}-completed.pdf`, { type: "application/pdf" });
+      const completedPdf = await uploadEmploymentFormFile(pdfFile);
+      const photos = await Promise.all(idPhotoFiles.map(uploadEmploymentFormFile));
+      const receipt = await submitForm.mutateAsync({
+        data: {
+          formId,
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          email: email.trim(),
+          phone: phone.trim() || null,
+          completedPdf,
+          idPhotos: photos,
+        },
+      });
+      setDirty(false);
+      setFirstName("");
+      setLastName("");
+      setEmail("");
+      setPhone("");
+      setIdPhotoFiles([]);
+      onSubmitted(receipt.emailSent);
+    } catch {
+      setNotice({ kind: "err", text: t("employment.forms.editor.submitError") });
+    } finally {
+      setBusy(null);
+    }
+  };
+  const requestClose = () => (dirtyRef.current ? setConfirmClose(true) : onClose());
 
   useEffect(() => {
     const k = (e: KeyboardEvent) => { if (e.key === "Escape" && !confirmClose) requestClose(); };
@@ -231,6 +299,56 @@ export default function EmploymentFormEditor({ formId, title, onClose }: Props) 
           </div>
         )}
       </div>
+
+      <section aria-label={t("employment.forms.editor.submitHeading")} className="max-h-[42vh] shrink-0 overflow-y-auto border-t border-slate-300 bg-white px-4 py-3 sm:px-6">
+        <form onSubmit={onSubmit} className="mx-auto max-w-5xl space-y-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h3 className="text-sm font-semibold text-slate-900">{t("employment.forms.editor.submitHeading")}</h3>
+            <p className="text-xs text-slate-500">{t("employment.forms.editor.emailDestination", { address: "admin@marvolenterprises.com" })}</p>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <label className="text-xs font-medium text-slate-600">
+              {t("employment.fields.firstName")} *
+              <input value={firstName} onChange={event => setFirstName(event.target.value)} required maxLength={100}
+                autoComplete="given-name" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900" />
+            </label>
+            <label className="text-xs font-medium text-slate-600">
+              {t("employment.fields.lastName")} *
+              <input value={lastName} onChange={event => setLastName(event.target.value)} required maxLength={100}
+                autoComplete="family-name" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900" />
+            </label>
+            <label className="text-xs font-medium text-slate-600">
+              {t("employment.fields.email")} *
+              <input type="email" value={email} onChange={event => setEmail(event.target.value)} required maxLength={320}
+                autoComplete="email" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900" />
+            </label>
+            <label className="text-xs font-medium text-slate-600">
+              {t("employment.fields.phone")}
+              <input type="tel" value={phone} onChange={event => setPhone(event.target.value)} maxLength={50}
+                autoComplete="tel" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900" />
+            </label>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="inline-flex min-h-[40px] cursor-pointer items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+              <Upload className="h-4 w-4" aria-hidden="true" />
+              {t("employment.forms.editor.addIdPhotos")}
+              <input ref={photoPicker} type="file" accept="image/jpeg,image/png,image/webp" multiple
+                className="sr-only" onChange={event => onPhotoSelect(event.target.files)} />
+            </label>
+            {idPhotoFiles.length > 0 && (
+              <span className="min-w-0 truncate text-xs text-slate-500">
+                {t("employment.forms.editor.photosSelected", { count: idPhotoFiles.length, names: idPhotoFiles.map(file => file.name).join(", ") })}
+              </span>
+            )}
+            <button type="submit" disabled={!doc || busy !== null}
+              className="ml-auto inline-flex min-h-[40px] items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+              data-testid="form-editor-submit">
+              {busy === "submit" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Upload className="h-4 w-4" aria-hidden="true" />}
+              {t("employment.forms.editor.submitToMarvol")}
+            </button>
+          </div>
+        </form>
+      </section>
 
       {confirmClose && (
         <div role="alertdialog" aria-modal="true" aria-labelledby="form-discard-title" data-testid="form-editor-confirm"

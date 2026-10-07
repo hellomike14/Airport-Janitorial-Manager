@@ -18,3 +18,4 @@ export * from "./authDiagnostics";
 export * from "./operations";
 export * from "./employeeTraining";
 export * from "./identityDocuments";
+export * from "./employmentFormSubmissions";

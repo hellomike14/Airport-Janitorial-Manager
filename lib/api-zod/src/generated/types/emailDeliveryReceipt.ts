@@ -6,7 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface ApplicationSubmissionReceipt {
+export interface EmailDeliveryReceipt {
   success: true;
   emailSent: boolean;
 }

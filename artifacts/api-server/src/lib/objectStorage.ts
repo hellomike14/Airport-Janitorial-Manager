@@ -154,9 +154,42 @@ export class ObjectStorageService {
     return objectFile;
   }
 
+  async getObjectEntityMetadata(objectPath: string): Promise<{ sizeBytes: number; contentType: string }> {
+    const file = await this.getObjectEntityFile(objectPath);
+    const [metadata] = await file.getMetadata();
+    const sizeBytes = Number(metadata.size);
+    if (!Number.isSafeInteger(sizeBytes) || sizeBytes < 0) throw new Error("Invalid object metadata");
+    return { sizeBytes, contentType: typeof metadata.contentType === "string" ? metadata.contentType : "application/octet-stream" };
+  }
+
+  async readObjectEntityBytes(
+    objectPath: string,
+    maxBytes: number,
+  ): Promise<{ bytes: Buffer; sizeBytes: number; contentType: string }> {
+    const file = await this.getObjectEntityFile(objectPath);
+    const [metadata] = await file.getMetadata();
+    const declaredSize = Number(metadata.size);
+    if (!Number.isSafeInteger(declaredSize) || declaredSize < 0 || declaredSize > maxBytes) {
+      throw new Error("Stored document exceeds its allowed size");
+    }
+    const [downloaded] = await file.download();
+    const bytes = Buffer.from(downloaded);
+    if (bytes.byteLength > maxBytes) throw new Error("Stored document exceeds its allowed size");
+    return {
+      bytes,
+      sizeBytes: bytes.byteLength,
+      contentType: typeof metadata.contentType === "string" ? metadata.contentType : "application/octet-stream",
+    };
+  }
+
   /** Snapshot an applicant's temporary signed-upload object to a fresh private key. */
   async copyApplicantSubmissionObject(sourcePath: string): Promise<string> {
     const source = await this.getObjectEntityFile(sourcePath);
+    const [sourceMetadata] = await source.getMetadata();
+    const sourceSize = Number(sourceMetadata.size);
+    if (!Number.isSafeInteger(sourceSize) || sourceSize <= 0 || sourceSize > 10 * 1024 * 1024) {
+      throw new Error("Application upload exceeds its allowed size");
+    }
     const objectPath = `/objects/uploads/completed/${randomUUID()}`;
     const privateObjectDir = this.getPrivateObjectDir().replace(/\/$/, "");
     const { bucketName, objectName } = parseObjectPath(`${privateObjectDir}/uploads/completed/${objectPath.split("/").at(-1)}`);

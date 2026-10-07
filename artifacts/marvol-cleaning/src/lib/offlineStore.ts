@@ -68,7 +68,7 @@ function getDB(): Promise<IDBPDatabase<OfflineDB>> {
 }
 
 export function isConfidentialCacheUrl(url: string): boolean {
-  return /\/api\/(?:staff\b|applications(?:\/|["\\]|$)|confidential-access\b|auth-diagnostics\b|quickbooks\b|identity-documents\b|employment-forms\b)|\/(?:api\/)?storage\/objects\/(?:hr-identity|uploads)\/|\/objects\/(?:hr-identity|uploads)\//i.test(url);
+  return /\/api\/(?:staff\b|applications(?:\/|["\\]|$)|employment-form-submissions(?:\/|["\\]|$)|confidential-access\b|auth-diagnostics\b|quickbooks\b|identity-documents\b|employment-forms\b)|\/(?:api\/)?storage\/objects\/(?:hr-identity|uploads)\/|\/objects\/(?:hr-identity|uploads)\//i.test(url);
 }
 
 export async function cacheApiResponse(url: string, data: unknown): Promise<void> {

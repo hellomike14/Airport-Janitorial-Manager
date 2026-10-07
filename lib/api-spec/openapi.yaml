@@ -1166,6 +1166,28 @@ paths:
         "400":
           description: Invalid application or uploaded-file capability
 
+  /applications/{id}/resend-email:
+    post:
+      operationId: resendApplicationEmail
+      tags: [employment]
+      summary: Resend a completed application email to the configured administrator
+      description: Verified Admin plus confidential access code only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Email delivery result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailDeliveryReceipt"
+        "404":
+          description: Application not found
+
   /applications/{id}:
     get:
       operationId: getApplication
@@ -1207,6 +1229,93 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/JobApplication"
+
+  /employment-form-submissions:
+    get:
+      operationId: listEmploymentFormSubmissions
+      tags: [employment]
+      summary: List standalone employment form submissions (Admin plus confidential code only)
+      responses:
+        "200":
+          description: Private submission summaries without file paths
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EmploymentFormSubmissionSummary"
+    post:
+      operationId: submitEmploymentForm
+      tags: [employment]
+      summary: Submit one completed employment form and optional ID-card photos
+      description: Saves a private PDF snapshot and sends the PDF and ID photos to the configured administrator. Returns only a receipt.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmploymentFormSubmissionRequest"
+      responses:
+        "201":
+          description: Minimal receipt without personal information or object paths
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailDeliveryReceipt"
+        "400":
+          description: Invalid form or upload capability
+        "413":
+          description: Uploads exceed the supported email attachment limit
+
+  /employment-form-submissions/{id}:
+    get:
+      operationId: getEmploymentFormSubmission
+      tags: [employment]
+      summary: Get a standalone form and ID photos (Admin plus confidential code only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Confidential standalone form submission
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmploymentFormSubmission"
+        "404":
+          description: Submission not found
+
+  /employment-form-submissions/{id}/resend-email:
+    post:
+      operationId: resendEmploymentFormSubmissionEmail
+      tags: [employment]
+      summary: Retry email delivery for a standalone form (Admin plus confidential code only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Email delivery result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailDeliveryReceipt"
+        "404":
+          description: Submission not found
 
   /onboarding:
     get:
@@ -3013,11 +3122,24 @@ components:
     ApplicationSubmissionReceipt:
       type: object
       additionalProperties: false
-      required: [success]
+      required: [success, emailSent]
       properties:
         success:
           type: boolean
           const: true
+        emailSent:
+          type: boolean
+
+    EmailDeliveryReceipt:
+      type: object
+      additionalProperties: false
+      required: [success, emailSent]
+      properties:
+        success:
+          type: boolean
+          const: true
+        emailSent:
+          type: boolean
 
     JobApplication:
       type: object
@@ -3059,6 +3181,9 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/UploadedDocument"
+        emailStatus:
+          type: ["string", "null"]
+          enum: [sent, failed, null]
         createdAt:
           type: string
         updatedAt:
@@ -3074,8 +3199,79 @@ components:
         - w4Employee
         - w4Employer
         - documents
+        - emailStatus
         - createdAt
         - updatedAt
+
+    EmploymentFormId:
+      type: string
+      enum: [job-application, i-9, w-4]
+
+    EmploymentFormSubmissionRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        formId:
+          $ref: "#/components/schemas/EmploymentFormId"
+        firstName:
+          type: string
+          minLength: 1
+          maxLength: 100
+        lastName:
+          type: string
+          minLength: 1
+          maxLength: 100
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        phone:
+          type: ["string", "null"]
+          maxLength: 50
+        completedPdf:
+          $ref: "#/components/schemas/ApplicationUploadDocument"
+        idPhotos:
+          type: array
+          maxItems: 3
+          items:
+            $ref: "#/components/schemas/ApplicationUploadDocument"
+      required: [formId, firstName, lastName, email, completedPdf]
+
+    EmploymentFormSubmissionSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        formId:
+          $ref: "#/components/schemas/EmploymentFormId"
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+        phone:
+          type: ["string", "null"]
+        emailStatus:
+          type: string
+          enum: [pending, sent, failed]
+        submittedAt:
+          type: string
+          format: date-time
+      required: [id, formId, firstName, lastName, email, emailStatus, submittedAt]
+
+    EmploymentFormSubmission:
+      allOf:
+        - $ref: "#/components/schemas/EmploymentFormSubmissionSummary"
+        - type: object
+          properties:
+            completedPdfPath:
+              type: string
+            idPhotos:
+              type: array
+              items:
+                $ref: "#/components/schemas/UploadedDocument"
+          required: [completedPdfPath, idPhotos]
 
     UploadedDocument:
       type: object

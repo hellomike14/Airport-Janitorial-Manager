@@ -15,6 +15,7 @@ import schedulesRouter from "./schedules";
 import sharedPhotosRouter from "./sharedPhotos";
 import weeklyReportRouter from "./weeklyReport";
 import applicationsRouter from "./applications";
+import employmentFormSubmissionsRouter from "./employmentFormSubmissions";
 import onboardingRouter from "./onboarding";
 import quickbooksRouter from "./quickbooks";
 import authDiagnosticsRouter from "./authDiagnostics";
@@ -55,6 +56,7 @@ router.use(identityDocumentsRouter);
 router.use("/shared-photos", sharedPhotosRouter);
 router.use("/weekly-report", requireStaffRole("admin"), weeklyReportRouter);
 router.use("/applications", applicationsRouter);
+router.use("/employment-form-submissions", employmentFormSubmissionsRouter);
 router.use("/onboarding", requireStaffRole("admin", "supervisor"), onboardingRouter);
 router.use("/quickbooks", requireStaffRole("admin"), quickbooksRouter);
 

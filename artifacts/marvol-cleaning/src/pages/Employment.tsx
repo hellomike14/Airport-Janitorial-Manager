@@ -1,28 +1,31 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { FileText, ClipboardCheck, Link2, Files } from "lucide-react";
+import { FileText, ClipboardCheck, Link2, Files, ShieldCheck } from "lucide-react";
 import { ApplicationsTab } from "./employment/ApplicationsTab";
 import { OnboardingTab } from "./employment/OnboardingTab";
 import { QuickBooksTab } from "./employment/QuickBooksTab";
 import { FormsTab } from "./employment/FormsTab";
 import { useAuth } from "@/contexts/AuthContext";
 import { ConfidentialBoundary } from "@/components/confidential/ConfidentialBoundary";
+import { EmploymentFormSubmissionsTab } from "./employment/EmploymentFormSubmissionsTab";
+import IdentityDocuments from "./employment/IdentityDocuments";
 
-type Tab = "applications" | "onboarding" | "forms" | "quickbooks";
+type Tab = "applications" | "onboarding" | "forms" | "submitted-forms" | "quickbooks";
 
 function getInitialTab(): Tab {
   const params = new URLSearchParams(window.location.search);
   const tab = params.get("tab");
-  if (tab === "onboarding" || tab === "forms" || tab === "quickbooks") return tab;
+  if (tab === "onboarding" || tab === "forms" || tab === "submitted-forms" || tab === "quickbooks") return tab;
   return "applications";
 }
 
 export default function Employment() {
   const { t } = useTranslation();
   const { effectiveRole } = useAuth();
-  const canManage = effectiveRole === "admin" || effectiveRole === "supervisor";
-  const allowedTabs: Tab[] = effectiveRole === "admin" ? ["applications", "onboarding", "forms", "quickbooks"] : effectiveRole === "supervisor" ? ["onboarding"] : ["onboarding"];
-  const [tab, setTab] = useState<Tab>(() => canManage ? getInitialTab() : "onboarding");
+  const allowedTabs: Tab[] = effectiveRole === "admin"
+    ? ["applications", "onboarding", "forms", "submitted-forms", "quickbooks"]
+    : effectiveRole ? ["onboarding", "forms"] : ["onboarding"];
+  const [tab, setTab] = useState<Tab>(() => getInitialTab());
   const activeTab = allowedTabs.includes(tab) ? tab : "onboarding";
 
   useEffect(() => {
@@ -33,6 +36,7 @@ export default function Employment() {
     { id: "applications", label: t("employment.tabs.applications"), icon: FileText },
     { id: "onboarding", label: t("employment.tabs.onboarding"), icon: ClipboardCheck },
     { id: "forms", label: t("employment.tabs.forms"), icon: Files },
+    { id: "submitted-forms", label: t("employment.tabs.submittedForms"), icon: ShieldCheck },
     { id: "quickbooks", label: t("employment.tabs.quickbooks"), icon: Link2 },
   ];
 
@@ -73,6 +77,14 @@ export default function Employment() {
       )}
       {activeTab === "onboarding" && <OnboardingTab />}
       {activeTab === "forms" && <FormsTab />}
+      {effectiveRole === "admin" && activeTab === "submitted-forms" && (
+        <ConfidentialBoundary>
+          <div className="space-y-6">
+            <EmploymentFormSubmissionsTab />
+            <IdentityDocuments />
+          </div>
+        </ConfidentialBoundary>
+      )}
       {effectiveRole === "admin" && activeTab === "quickbooks" && <QuickBooksTab />}
     </div>
   );

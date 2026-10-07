@@ -854,11 +854,15 @@ export interface DeleteResponse {
   success: boolean;
 }
 
-export const ApplicationSubmissionReceiptValue = {
-  success: true,
-} as const;
-export type ApplicationSubmissionReceipt =
-  typeof ApplicationSubmissionReceiptValue;
+export interface ApplicationSubmissionReceipt {
+  success: true;
+  emailSent: boolean;
+}
+
+export interface EmailDeliveryReceipt {
+  success: true;
+  emailSent: boolean;
+}
 
 export type JobApplicationStatus =
   (typeof JobApplicationStatus)[keyof typeof JobApplicationStatus];
@@ -880,6 +884,18 @@ export type JobApplicationW4Employee = { [key: string]: unknown };
 
 export type JobApplicationW4Employer = { [key: string]: unknown };
 
+/**
+ * @nullable
+ */
+export type JobApplicationEmailStatus =
+  | (typeof JobApplicationEmailStatus)[keyof typeof JobApplicationEmailStatus]
+  | null;
+
+export const JobApplicationEmailStatus = {
+  sent: "sent",
+  failed: "failed",
+} as const;
+
 export interface UploadedDocument {
   name: string;
   path: string;
@@ -900,12 +916,73 @@ export interface JobApplication {
   w4Employee: JobApplicationW4Employee;
   w4Employer: JobApplicationW4Employer;
   documents: UploadedDocument[];
+  /** @nullable */
+  emailStatus: JobApplicationEmailStatus;
   createdAt: string;
   updatedAt: string;
 }
 
+export type EmploymentFormId =
+  (typeof EmploymentFormId)[keyof typeof EmploymentFormId];
+
+export const EmploymentFormId = {
+  "job-application": "job-application",
+  "i-9": "i-9",
+  "w-4": "w-4",
+} as const;
+
 export type ApplicationUploadDocument = UploadedDocument & {
   uploadToken: string;
+};
+
+export interface EmploymentFormSubmissionRequest {
+  formId: EmploymentFormId;
+  /**
+   * @minLength 1
+   * @maxLength 100
+   */
+  firstName: string;
+  /**
+   * @minLength 1
+   * @maxLength 100
+   */
+  lastName: string;
+  /** @maxLength 320 */
+  email: string;
+  /**
+   * @maxLength 50
+   * @nullable
+   */
+  phone?: string | null;
+  completedPdf: ApplicationUploadDocument;
+  /** @maxItems 3 */
+  idPhotos?: ApplicationUploadDocument[];
+}
+
+export type EmploymentFormSubmissionSummaryEmailStatus =
+  (typeof EmploymentFormSubmissionSummaryEmailStatus)[keyof typeof EmploymentFormSubmissionSummaryEmailStatus];
+
+export const EmploymentFormSubmissionSummaryEmailStatus = {
+  pending: "pending",
+  sent: "sent",
+  failed: "failed",
+} as const;
+
+export interface EmploymentFormSubmissionSummary {
+  id: number;
+  formId: EmploymentFormId;
+  firstName: string;
+  lastName: string;
+  email: string;
+  /** @nullable */
+  phone?: string | null;
+  emailStatus: EmploymentFormSubmissionSummaryEmailStatus;
+  submittedAt: string;
+}
+
+export type EmploymentFormSubmission = EmploymentFormSubmissionSummary & {
+  completedPdfPath: string;
+  idPhotos: UploadedDocument[];
 };
 
 export type SubmitApplicationRequestApplication = { [key: string]: unknown };

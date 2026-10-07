@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { JobApplicationApplication } from "./jobApplicationApplication";
+import type { JobApplicationEmailStatus } from "./jobApplicationEmailStatus";
 import type { JobApplicationI9Employee } from "./jobApplicationI9Employee";
 import type { JobApplicationI9Employer } from "./jobApplicationI9Employer";
 import type { JobApplicationStatus } from "./jobApplicationStatus";
@@ -27,6 +28,8 @@ export interface JobApplication {
   w4Employee: JobApplicationW4Employee;
   w4Employer: JobApplicationW4Employer;
   documents: UploadedDocument[];
+  /** @nullable */
+  emailStatus: JobApplicationEmailStatus;
   createdAt: string;
   updatedAt: string;
 }

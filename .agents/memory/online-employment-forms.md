@@ -7,7 +7,7 @@ Employment forms must be editable inside the app, not merely marked fillable or 
 
 **Why:** The user corrected the label-and-download approach and explicitly requested online completion plus administrator printing and saving.
 
-**How to apply:** Keep the in-app editor and device PDF export/print working when changing this feature. Do not silently add server retention or submission of completed tax/identity forms; that requires separate access and retention decisions.
+**How to apply:** Keep the in-app editor and device PDF export/print working. Completed standalone forms may be stored and emailed only with an explicit access boundary and recipient. Preserve submitted snapshots for Admin review; do not invent a retention period or automatically delete them until the user sets one.
 
 Do not infer that a PDF has no fillable fields from empty document-level field-object metadata.
 

@@ -747,7 +747,23 @@
       "applications": "Applications",
       "onboarding": "Onboarding",
       "forms": "Forms",
+      "submittedForms": "Submitted forms",
       "quickbooks": "QuickBooks"
+    },
+    "submittedForms": {
+      "title": "Submitted standalone forms",
+      "subtitle": "Completed PDFs and ID-card photos are private and available only to Admin with the confidential access code.",
+      "empty": "No standalone forms have been submitted yet.",
+      "loadError": "Submitted forms could not be loaded.",
+      "completedPdf": "Completed form PDF",
+      "retryEmail": "Retry email",
+      "retrySent": "Email sent to the administrator.",
+      "retryFailed": "Email could not be sent. The private record is still available here.",
+      "emailStatus": {
+        "pending": "Email pending",
+        "sent": "Emailed",
+        "failed": "Email failed"
+      }
     },
     "forms": {
       "i9": "I-9 Form",
@@ -755,7 +771,10 @@
       "w4": "W-4 Form",
       "w4Description": "2026 Employee’s Withholding Certificate · 5-page PDF.",
       "fillable": "Fillable PDF",
-      "fillableHelp": "Choose Fill Out Online to complete a form here, then Save PDF or Print. Entries stay in this browser only until you save; completed forms are not submitted or stored on the server.",
+      "fillableHelp": "Choose Fill Out Online to complete a form here, then download, print, or submit it privately to Marvol.",
+      "emailDestination": "Completed forms and ID-card photos are emailed to {{address}}.",
+      "submissionSent": "Your form was stored securely and emailed to the administrator.",
+      "submissionEmailFailed": "Your form was stored securely, but its email could not be delivered. An administrator can retry it.",
       "jobApplication": "Marvol Job Application",
       "jobApplicationDescription": "April 2026 · 4-page fillable PDF. Complete it online, save a copy, or print.",
       "open": "Open PDF",
@@ -763,10 +782,18 @@
       "empty": "No employment forms have been added yet.",
       "fillOnline": "Fill Out Online",
       "editor": {
-        "memoryNote": "Entries stay in this browser tab only. Save or print to keep them.",
-        "unexported": "Unsaved entries exist only in this tab. Save to device or print before leaving.",
+        "memoryNote": "Entries stay in this tab until you submit the completed form to Marvol.",
+        "unexported": "Unsubmitted entries exist only in this tab. Submit to Marvol or save a device copy before leaving.",
         "save": "Save PDF",
         "print": "Print",
+        "submitHeading": "Submit completed form",
+        "emailDestination": "Email destination: {{address}}",
+        "addIdPhotos": "Attach ID-card photos (optional)",
+        "photosSelected": "{{count}} ID photo(s) selected: {{names}}",
+        "submitToMarvol": "Submit to Marvol",
+        "contactRequired": "Enter your first name, last name, and email address.",
+        "photoLimit": "Attach up to 3 JPG, PNG, or WebP ID photos. Each file must be 10 MB or less, and all files together must be 20 MB or less.",
+        "submitError": "The form could not be submitted. Your entries are still in this window; please try again.",
         "close": "Close",
         "loading": "Loading the original form...",
         "loadError": "The form could not be loaded.",
@@ -784,7 +811,7 @@
         "saveError": "The PDF could not be created. Your entries are still on screen; try again.",
         "printError": "Printing could not start. Your entries are still on screen; try again.",
         "discardTitle": "Discard unsaved entries?",
-        "discardBody": "Entries are not stored anywhere else. Closing now permanently removes them.",
+        "discardBody": "Entries that have not been submitted or saved are not stored elsewhere. Closing now permanently removes them.",
         "keepEditing": "Keep editing",
         "discard": "Discard and close"
       }
@@ -904,11 +931,13 @@
       "blankTemplates": "Download blank forms",
       "uploadPrompt": "Click to upload documents",
       "uploadError": "Upload failed. Please try again.",
+      "attachmentLimit": "Upload up to 5 PDF or image files totaling 20 MB or less.",
       "nameRequired": "First and last name are required.",
       "submitError": "Could not submit your application. Please try again.",
       "submitButton": "Submit Application",
       "confirmTitle": "Application Received",
-      "confirmBody": "Thank you for applying to Marvol. Our team will review your application and contact you soon."
+      "confirmBody": "Thank you for applying to Marvol. Our team will review your application and contact you soon.",
+      "confirmEmailFailedBody": "Your application was saved securely, but the email notification could not be delivered. Marvol can still review it in the admin panel."
     },
     "detail": {
       "printPdf": "Print / PDF",
@@ -917,7 +946,13 @@
       "noPosition": "No position specified"
     },
     "applications": {
-      "empty": "No applications yet."
+      "empty": "No applications yet.",
+      "retryEmail": "Send / retry email",
+      "emailStatus": {
+        "sent": "Emailed",
+        "failed": "Email failed",
+        "notSent": "Not emailed"
+      }
     },
     "onboarding": {
       "subtitle": "Track onboarding checklists for each new hire.",
@@ -964,7 +999,7 @@
       "activity": "Document activity (latest 200 events)",
       "employeeLinked": "Employee account linked",
       "title": "Private identity photographs",
-      "intro": "HR forms and photographs are private and accessible only to administrators.",
+      "intro": "Submitted HR records and identity photographs are private and accessible only to administrators.",
       "notice": "I-9 choice: every category is optional. The employee chooses which acceptable documents to present. These photographs do not complete the employer I-9 examination or E-Verify.",
       "loading": "Loading",
       "loadError": "Could not load identity photographs.",
