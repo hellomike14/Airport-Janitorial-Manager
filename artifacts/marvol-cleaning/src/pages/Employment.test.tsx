@@ -19,6 +19,9 @@ vi.mock("./employment/OnboardingTab", () => ({
 vi.mock("./employment/QuickBooksTab", () => ({
   QuickBooksTab: () => <div data-testid="quickbooks-panel" />,
 }));
+vi.mock("./employment/EmploymentFormSubmissionsTab", () => ({
+  EmploymentFormSubmissionsTab: () => <div data-testid="submitted-forms-panel" />,
+}));
 
 beforeEach(() => {
   actor.effectiveRole = "admin";
@@ -45,43 +48,30 @@ test("admins can open Forms and its selection is retained on reload", () => {
   expect(screen.getByTestId("employment-forms")).toBeTruthy();
 });
 
-test("supervisors cannot open Forms directly", () => {
-  actor.effectiveRole = "supervisor";
-  window.history.replaceState(null, "", "/employment?tab=forms");
-  render(<Employment />);
-  expect(screen.queryByTestId("employment-forms")).toBeNull();
-  expect(screen.queryByTestId("employment-tab-forms")).toBeNull();
-  expect(screen.getByTestId("onboarding-panel")).toBeTruthy();
-});
-
 vi.mock("./employment/IdentityDocuments", () => ({
   default: () => <div data-testid="identity-documents" />,
 }));
 
-test("staff remain on onboarding without HR form or photograph access", () => {
-  actor.effectiveRole = "staff";
-  render(<Employment />);
-  expect(screen.getByTestId("onboarding-panel")).toBeTruthy();
-  expect(screen.queryByTestId("employment-tab-applications")).toBeNull();
-  expect(screen.queryByTestId("employment-tab-quickbooks")).toBeNull();
-  expect(screen.queryByTestId("employment-tab-forms")).toBeNull();
-  expect(screen.queryByTestId("identity-documents")).toBeNull();
-  expect(screen.queryByTestId("open-i-9")).toBeNull();
+test("all signed-in roles can open blank Forms without seeing Admin submissions or identity photos", () => {
+  for (const role of ["staff", "supervisor", "inspector"]) {
+    cleanup();
+    actor.effectiveRole = role;
+    window.history.replaceState(null, "", "/employment?tab=forms");
+    render(<Employment />);
+    expect(screen.getByTestId("employment-forms")).toBeTruthy();
+    expect(screen.getByTestId("fill-online-i-9")).toBeTruthy();
+    expect(screen.queryByTestId("employment-tab-applications")).toBeNull();
+    expect(screen.queryByTestId("employment-tab-submitted-forms")).toBeNull();
+    expect(screen.queryByTestId("submitted-forms-panel")).toBeNull();
+    expect(screen.queryByTestId("identity-documents")).toBeNull();
+  }
 });
 
-test("staff cannot reach Forms with explicit tab=forms", () => {
-  actor.effectiveRole = "staff";
-  window.history.replaceState(null, "", "/employment?tab=forms");
+test("admins keep completed-form review and identity photos in a separate confidential tab", () => {
+  actor.effectiveRole = "admin";
+  window.history.replaceState(null, "", "/employment?tab=submitted-forms");
   render(<Employment />);
-  expect(screen.queryByTestId("identity-documents")).toBeNull();
-  expect(screen.getByTestId("onboarding-panel")).toBeTruthy();
-});
-
-test("inspectors cannot open Forms", () => {
-  actor.effectiveRole = "inspector";
-  window.history.replaceState(null, "", "/employment?tab=forms");
-  render(<Employment />);
-  expect(screen.queryByTestId("employment-tab-forms")).toBeNull();
+  expect(screen.getByTestId("submitted-forms-panel")).toBeTruthy();
+  expect(screen.getByTestId("identity-documents")).toBeTruthy();
   expect(screen.queryByTestId("employment-forms")).toBeNull();
-  expect(screen.queryByTestId("identity-documents")).toBeNull();
 });

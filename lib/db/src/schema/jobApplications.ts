@@ -22,6 +22,7 @@ export const jobApplicationsTable = pgTable("job_applications", {
   w4Employee: jsonb("w4_employee").$type<Record<string, unknown>>().notNull(),
   w4Employer: jsonb("w4_employer").$type<Record<string, unknown>>().notNull(),
   documents: jsonb("documents").$type<UploadedDocument[]>().notNull(),
+  emailStatus: text("email_status", { enum: ["sent", "failed"] }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

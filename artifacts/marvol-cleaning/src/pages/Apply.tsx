@@ -1,31 +1,18 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CheckCircle2, Upload, X, Loader2, FileText } from "lucide-react";
-import { requestUploadUrl, useSubmitApplication } from "@workspace/api-client-react";
+import { useSubmitApplication } from "@workspace/api-client-react";
 import type { ApplicationUploadDocument } from "@workspace/api-client-react";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { PUBLIC_SECTIONS } from "./employment/formConfig";
 import { FieldGrid } from "./employment/FormField";
 import { trackEvent } from "@/lib/analytics";
+import { EmploymentFormsLibrary } from "./employment/EmploymentFormsLibrary";
+import { uploadEmploymentFormFile } from "./employment/formEditor/privateUpload";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
-async function uploadFile(file: File): Promise<ApplicationUploadDocument> {
-  const { uploadURL, objectPath, uploadToken } = await requestUploadUrl({
-    name: file.name,
-    size: file.size,
-    contentType: file.type,
-    purpose: "application_document",
-  });
-  if (!uploadToken) throw new Error("Application upload capability was not returned");
-  const putRes = await fetch(uploadURL, {
-    method: "PUT",
-    headers: { "Content-Type": file.type },
-    body: file,
-  });
-  if (!putRes.ok) throw new Error("Upload failed");
-  return { name: file.name, path: objectPath, contentType: file.type, uploadToken };
-}
+type LocalApplicationDocument = ApplicationUploadDocument & { byteSize: number };
 
 export default function Apply() {
   const { t } = useTranslation();
@@ -42,20 +29,31 @@ export default function Apply() {
     i9Employee: {},
     w4Employee: {},
   });
-  const [documents, setDocuments] = useState<ApplicationUploadDocument[]>([]);
+  const [documents, setDocuments] = useState<LocalApplicationDocument[]>([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
   const setField = (group: string) => (key: string, value: unknown) =>
     setGroups((prev) => ({ ...prev, [group]: { ...prev[group], [key]: value } }));
 
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
+    const incoming = Array.from(files);
+    const existingBytes = documents.reduce((sum, document) => sum + document.byteSize, 0);
+    if (documents.length + incoming.length > 5 ||
+        existingBytes + incoming.reduce((sum, file) => sum + file.size, 0) > 20 * 1024 * 1024) {
+      setError(t("employment.apply.attachmentLimit"));
+      return;
+    }
     setUploading(true);
     setError(null);
     try {
-      const uploaded = await Promise.all(Array.from(files).map(uploadFile));
+      const uploaded = await Promise.all(incoming.map(async file => ({
+        ...await uploadEmploymentFormFile(file),
+        byteSize: file.size,
+      })));
       setDocuments((prev) => [...prev, ...uploaded]);
     } catch {
       setError(t("employment.apply.uploadError"));
@@ -72,7 +70,7 @@ export default function Apply() {
       return;
     }
     try {
-      await submit.mutateAsync({
+      const receipt = await submit.mutateAsync({
         data: {
           firstName: firstName.trim(),
           lastName: lastName.trim(),
@@ -82,7 +80,7 @@ export default function Apply() {
           application: groups.application,
           i9Employee: groups.i9Employee,
           w4Employee: groups.w4Employee,
-          documents,
+          documents: documents.map(({ byteSize: _byteSize, ...document }) => document),
         },
       });
       trackEvent("application_submitted", {
@@ -91,6 +89,7 @@ export default function Apply() {
         has_position: Boolean(positionApplied.trim()),
         document_count: documents.length,
       });
+      setEmailSent(receipt.emailSent);
       setFirstName("");
       setLastName("");
       setEmail("");
@@ -116,7 +115,7 @@ export default function Apply() {
             {t("employment.apply.confirmTitle")}
           </h1>
           <p className="text-sm text-slate-600 leading-relaxed">
-            {t("employment.apply.confirmBody")}
+            {t(emailSent ? "employment.apply.confirmBody" : "employment.apply.confirmEmailFailedBody")}
           </p>
         </div>
       </div>
@@ -151,25 +150,9 @@ export default function Apply() {
         </div>
       </header>
 
-      <section aria-labelledby="blank-templates-title" className="max-w-3xl mx-auto px-4 pt-6">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5">
-          <h2 id="blank-templates-title" className="text-base font-semibold text-slate-900">
-            {t("employment.apply.blankTemplates")}
-          </h2>
-          <div className="mt-3 flex flex-wrap gap-3">
-            {[
-              ["job-application", t("employment.forms.jobApplication")],
-              ["i-9", t("employment.forms.i9")],
-              ["w-4", t("employment.forms.w4")],
-            ].map(([id, label]) => (
-              <a key={id} href={`${BASE_URL}/api/employment-forms/${id}?download=1`}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-                {label}
-              </a>
-            ))}
-          </div>
-        </div>
-      </section>
+      <div className="max-w-3xl mx-auto px-4 pt-6">
+        <EmploymentFormsLibrary variant="applicant" />
+      </div>
 
       <form onSubmit={handleSubmit} className="max-w-3xl mx-auto px-4 py-8 space-y-6">
         {/* Applicant identity */}

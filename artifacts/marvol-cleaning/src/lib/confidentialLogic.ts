@@ -19,5 +19,5 @@ export function mayRenderPrivate(role: string, s: ConfidentialAccessState | null
 }
 export function isSensitiveKey(key: readonly unknown[]): boolean {
   const flat = key.map(k => (typeof k === "string" ? k : "")).join("|").toLowerCase();
-  return /staff\/confidential|staff\/former|auth-diagnostics|quickbooks|applications|employment-forms|identity-documents|identity-photo|hr-form|hr-photo/.test(flat);
+  return /staff\/confidential|staff\/former|auth-diagnostics|quickbooks|applications|employment-form-submissions|employment-forms|identity-documents|identity-photo|hr-form|hr-photo/.test(flat);
 }

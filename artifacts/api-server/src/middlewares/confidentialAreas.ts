@@ -28,6 +28,9 @@ export function isConfidentialRequest(path: string, method: string) {
   try { path = decodeURIComponent(path); } catch { return true; }
   if (isPublicBlankEmploymentTemplate(path, method)) return false;
   if (/^\/applications(?:\/|$)/i.test(path)) return method !== "POST" || path.toLowerCase() !== "/applications";
+  if (/^\/employment-form-submissions(?:\/|$)/i.test(path)) {
+    return method !== "POST" || path.toLowerCase() !== "/employment-form-submissions";
+  }
   if (/^\/(?:identity-documents|quickbooks|auth-diagnostics)(?:\/|$)/i.test(path)) return true;
   if (/^\/employment-forms(?:\/|$)/i.test(path)) return true;
   if (/^\/staff\/(?:confidential|former)(?:\/|$)/i.test(path)) return true;

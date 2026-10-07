@@ -1557,6 +1557,9 @@ export const ListApplicationsResponseItem = zod.object({
       contentType: zod.string().optional(),
     }),
   ),
+  emailStatus: zod
+    .union([zod.literal("sent"), zod.literal("failed"), zod.literal(null)])
+    .nullable(),
   createdAt: zod.string(),
   updatedAt: zod.string(),
 });
@@ -1593,6 +1596,19 @@ export const SubmitApplicationBody = zod.object({
 });
 
 /**
+ * Verified Admin plus confidential access code only.
+ * @summary Resend a completed application email to the configured administrator
+ */
+export const ResendApplicationEmailParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ResendApplicationEmailResponse = zod.object({
+  success: zod.boolean(),
+  emailSent: zod.boolean(),
+});
+
+/**
  * @summary Get a confidential application (verified Admin plus access code only)
  */
 export const GetApplicationParams = zod.object({
@@ -1619,6 +1635,9 @@ export const GetApplicationResponse = zod.object({
       contentType: zod.string().optional(),
     }),
   ),
+  emailStatus: zod
+    .union([zod.literal("sent"), zod.literal("failed"), zod.literal(null)])
+    .nullable(),
   createdAt: zod.string(),
   updatedAt: zod.string(),
 });
@@ -1656,8 +1675,120 @@ export const UpdateApplicationResponse = zod.object({
       contentType: zod.string().optional(),
     }),
   ),
+  emailStatus: zod
+    .union([zod.literal("sent"), zod.literal("failed"), zod.literal(null)])
+    .nullable(),
   createdAt: zod.string(),
   updatedAt: zod.string(),
+});
+
+/**
+ * @summary List standalone employment form submissions (Admin plus confidential code only)
+ */
+export const ListEmploymentFormSubmissionsResponseItem = zod.object({
+  id: zod.number(),
+  formId: zod.enum(["job-application", "i-9", "w-4"]),
+  firstName: zod.string(),
+  lastName: zod.string(),
+  email: zod.string(),
+  phone: zod.string().nullish(),
+  emailStatus: zod.enum(["pending", "sent", "failed"]),
+  submittedAt: zod.date(),
+});
+export const ListEmploymentFormSubmissionsResponse = zod.array(
+  ListEmploymentFormSubmissionsResponseItem,
+);
+
+/**
+ * Saves a private PDF snapshot and sends the PDF and ID photos to the configured administrator. Returns only a receipt.
+ * @summary Submit one completed employment form and optional ID-card photos
+ */
+export const submitEmploymentFormBodyFirstNameMax = 100;
+
+export const submitEmploymentFormBodyLastNameMax = 100;
+
+export const submitEmploymentFormBodyEmailMax = 320;
+
+export const submitEmploymentFormBodyPhoneMax = 50;
+
+export const submitEmploymentFormBodyIdPhotosMax = 3;
+
+export const SubmitEmploymentFormBody = zod.object({
+  formId: zod.enum(["job-application", "i-9", "w-4"]),
+  firstName: zod.string().min(1).max(submitEmploymentFormBodyFirstNameMax),
+  lastName: zod.string().min(1).max(submitEmploymentFormBodyLastNameMax),
+  email: zod.string().email().max(submitEmploymentFormBodyEmailMax),
+  phone: zod.string().max(submitEmploymentFormBodyPhoneMax).nullish(),
+  completedPdf: zod
+    .object({
+      name: zod.string(),
+      path: zod.string(),
+      contentType: zod.string().optional(),
+    })
+    .and(
+      zod.object({
+        uploadToken: zod.string().uuid(),
+      }),
+    ),
+  idPhotos: zod
+    .array(
+      zod
+        .object({
+          name: zod.string(),
+          path: zod.string(),
+          contentType: zod.string().optional(),
+        })
+        .and(
+          zod.object({
+            uploadToken: zod.string().uuid(),
+          }),
+        ),
+    )
+    .max(submitEmploymentFormBodyIdPhotosMax)
+    .optional(),
+});
+
+/**
+ * @summary Get a standalone form and ID photos (Admin plus confidential code only)
+ */
+export const GetEmploymentFormSubmissionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetEmploymentFormSubmissionResponse = zod
+  .object({
+    id: zod.number(),
+    formId: zod.enum(["job-application", "i-9", "w-4"]),
+    firstName: zod.string(),
+    lastName: zod.string(),
+    email: zod.string(),
+    phone: zod.string().nullish(),
+    emailStatus: zod.enum(["pending", "sent", "failed"]),
+    submittedAt: zod.date(),
+  })
+  .and(
+    zod.object({
+      completedPdfPath: zod.string(),
+      idPhotos: zod.array(
+        zod.object({
+          name: zod.string(),
+          path: zod.string(),
+          contentType: zod.string().optional(),
+        }),
+      ),
+    }),
+  );
+
+/**
+ * @summary Retry email delivery for a standalone form (Admin plus confidential code only)
+ */
+export const ResendEmploymentFormSubmissionEmailParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ResendEmploymentFormSubmissionEmailResponse = zod.object({
+  success: zod.boolean(),
+  emailSent: zod.boolean(),
 });
 
 /**

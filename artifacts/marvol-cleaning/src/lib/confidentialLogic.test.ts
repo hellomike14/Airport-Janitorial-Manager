@@ -30,5 +30,6 @@ test("sensitive query keys are purged", () => {
   assert.equal(isSensitiveKey(["/api/staff"]), false);
   assert.equal(isSensitiveKey(["/api/staff/former"]), true);
   assert.equal(isSensitiveKey(["/api/applications", { status: "new" }]), true);
+  assert.equal(isSensitiveKey(["/api/employment-form-submissions"]), true);
   assert.equal(isSensitiveKey(["/api/photo-share/photos"]), false);
 });

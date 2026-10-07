@@ -52,7 +52,11 @@ import type {
   DeleteOldConversationMessagesParams,
   DeleteResponse,
   DiagnosticStoreUnavailableError,
+  EmailDeliveryReceipt,
   EmployeeTrainingStatus,
+  EmploymentFormSubmission,
+  EmploymentFormSubmissionRequest,
+  EmploymentFormSubmissionSummary,
   ErrorEnvelope,
   GetAdminConfidentialAccessStatus200,
   GetDashboardParams,
@@ -5750,6 +5754,91 @@ export const useSubmitApplication = <
 };
 
 /**
+ * Verified Admin plus confidential access code only.
+ * @summary Resend a completed application email to the configured administrator
+ */
+export const getResendApplicationEmailUrl = (id: number) => {
+  return `/api/applications/${id}/resend-email`;
+};
+
+export const resendApplicationEmail = async (
+  id: number,
+  options?: RequestInit,
+): Promise<EmailDeliveryReceipt> => {
+  return customFetch<EmailDeliveryReceipt>(getResendApplicationEmailUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getResendApplicationEmailMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof resendApplicationEmail>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof resendApplicationEmail>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["resendApplicationEmail"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof resendApplicationEmail>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return resendApplicationEmail(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ResendApplicationEmailMutationResult = NonNullable<
+  Awaited<ReturnType<typeof resendApplicationEmail>>
+>;
+
+export type ResendApplicationEmailMutationError = ErrorType<void>;
+
+/**
+ * @summary Resend a completed application email to the configured administrator
+ */
+export const useResendApplicationEmail = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof resendApplicationEmail>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof resendApplicationEmail>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getResendApplicationEmailMutationOptions(options));
+};
+
+/**
  * @summary Get a confidential application (verified Admin plus access code only)
  */
 export const getGetApplicationUrl = (id: number) => {
@@ -5921,6 +6010,355 @@ export const useUpdateApplication = <
   TContext
 > => {
   return useMutation(getUpdateApplicationMutationOptions(options));
+};
+
+/**
+ * @summary List standalone employment form submissions (Admin plus confidential code only)
+ */
+export const getListEmploymentFormSubmissionsUrl = () => {
+  return `/api/employment-form-submissions`;
+};
+
+export const listEmploymentFormSubmissions = async (
+  options?: RequestInit,
+): Promise<EmploymentFormSubmissionSummary[]> => {
+  return customFetch<EmploymentFormSubmissionSummary[]>(
+    getListEmploymentFormSubmissionsUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListEmploymentFormSubmissionsQueryKey = () => {
+  return [`/api/employment-form-submissions`] as const;
+};
+
+export const getListEmploymentFormSubmissionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listEmploymentFormSubmissions>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listEmploymentFormSubmissions>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListEmploymentFormSubmissionsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listEmploymentFormSubmissions>>
+  > = ({ signal }) =>
+    listEmploymentFormSubmissions({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listEmploymentFormSubmissions>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListEmploymentFormSubmissionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listEmploymentFormSubmissions>>
+>;
+export type ListEmploymentFormSubmissionsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List standalone employment form submissions (Admin plus confidential code only)
+ */
+
+export function useListEmploymentFormSubmissions<
+  TData = Awaited<ReturnType<typeof listEmploymentFormSubmissions>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listEmploymentFormSubmissions>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListEmploymentFormSubmissionsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Saves a private PDF snapshot and sends the PDF and ID photos to the configured administrator. Returns only a receipt.
+ * @summary Submit one completed employment form and optional ID-card photos
+ */
+export const getSubmitEmploymentFormUrl = () => {
+  return `/api/employment-form-submissions`;
+};
+
+export const submitEmploymentForm = async (
+  employmentFormSubmissionRequest: EmploymentFormSubmissionRequest,
+  options?: RequestInit,
+): Promise<EmailDeliveryReceipt> => {
+  return customFetch<EmailDeliveryReceipt>(getSubmitEmploymentFormUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(employmentFormSubmissionRequest),
+  });
+};
+
+export const getSubmitEmploymentFormMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitEmploymentForm>>,
+    TError,
+    { data: BodyType<EmploymentFormSubmissionRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof submitEmploymentForm>>,
+  TError,
+  { data: BodyType<EmploymentFormSubmissionRequest> },
+  TContext
+> => {
+  const mutationKey = ["submitEmploymentForm"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof submitEmploymentForm>>,
+    { data: BodyType<EmploymentFormSubmissionRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return submitEmploymentForm(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SubmitEmploymentFormMutationResult = NonNullable<
+  Awaited<ReturnType<typeof submitEmploymentForm>>
+>;
+export type SubmitEmploymentFormMutationBody =
+  BodyType<EmploymentFormSubmissionRequest>;
+export type SubmitEmploymentFormMutationError = ErrorType<void>;
+
+/**
+ * @summary Submit one completed employment form and optional ID-card photos
+ */
+export const useSubmitEmploymentForm = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitEmploymentForm>>,
+    TError,
+    { data: BodyType<EmploymentFormSubmissionRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof submitEmploymentForm>>,
+  TError,
+  { data: BodyType<EmploymentFormSubmissionRequest> },
+  TContext
+> => {
+  return useMutation(getSubmitEmploymentFormMutationOptions(options));
+};
+
+/**
+ * @summary Get a standalone form and ID photos (Admin plus confidential code only)
+ */
+export const getGetEmploymentFormSubmissionUrl = (id: number) => {
+  return `/api/employment-form-submissions/${id}`;
+};
+
+export const getEmploymentFormSubmission = async (
+  id: number,
+  options?: RequestInit,
+): Promise<EmploymentFormSubmission> => {
+  return customFetch<EmploymentFormSubmission>(
+    getGetEmploymentFormSubmissionUrl(id),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetEmploymentFormSubmissionQueryKey = (id: number) => {
+  return [`/api/employment-form-submissions/${id}`] as const;
+};
+
+export const getGetEmploymentFormSubmissionQueryOptions = <
+  TData = Awaited<ReturnType<typeof getEmploymentFormSubmission>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEmploymentFormSubmission>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetEmploymentFormSubmissionQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getEmploymentFormSubmission>>
+  > = ({ signal }) =>
+    getEmploymentFormSubmission(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getEmploymentFormSubmission>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetEmploymentFormSubmissionQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getEmploymentFormSubmission>>
+>;
+export type GetEmploymentFormSubmissionQueryError = ErrorType<void>;
+
+/**
+ * @summary Get a standalone form and ID photos (Admin plus confidential code only)
+ */
+
+export function useGetEmploymentFormSubmission<
+  TData = Awaited<ReturnType<typeof getEmploymentFormSubmission>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEmploymentFormSubmission>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetEmploymentFormSubmissionQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Retry email delivery for a standalone form (Admin plus confidential code only)
+ */
+export const getResendEmploymentFormSubmissionEmailUrl = (id: number) => {
+  return `/api/employment-form-submissions/${id}/resend-email`;
+};
+
+export const resendEmploymentFormSubmissionEmail = async (
+  id: number,
+  options?: RequestInit,
+): Promise<EmailDeliveryReceipt> => {
+  return customFetch<EmailDeliveryReceipt>(
+    getResendEmploymentFormSubmissionEmailUrl(id),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getResendEmploymentFormSubmissionEmailMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof resendEmploymentFormSubmissionEmail>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof resendEmploymentFormSubmissionEmail>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["resendEmploymentFormSubmissionEmail"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof resendEmploymentFormSubmissionEmail>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return resendEmploymentFormSubmissionEmail(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ResendEmploymentFormSubmissionEmailMutationResult = NonNullable<
+  Awaited<ReturnType<typeof resendEmploymentFormSubmissionEmail>>
+>;
+
+export type ResendEmploymentFormSubmissionEmailMutationError = ErrorType<void>;
+
+/**
+ * @summary Retry email delivery for a standalone form (Admin plus confidential code only)
+ */
+export const useResendEmploymentFormSubmissionEmail = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof resendEmploymentFormSubmissionEmail>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof resendEmploymentFormSubmissionEmail>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(
+    getResendEmploymentFormSubmissionEmailMutationOptions(options),
+  );
 };
 
 /**

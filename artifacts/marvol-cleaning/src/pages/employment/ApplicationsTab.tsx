@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, Loader2, Printer, Save, FileText } from "lucide-react";
+import { ChevronLeft, Loader2, Printer, Save, FileText, Mail, RefreshCw } from "lucide-react";
 import {
   useListApplications,
   useGetApplication,
   useUpdateApplication,
+  useResendApplicationEmail,
   getListApplicationsQueryKey,
   getGetApplicationQueryKey,
 } from "@workspace/api-client-react";
@@ -37,6 +38,7 @@ function ApplicationDetail({ id, onBack }: { id: number; onBack: () => void }) {
   const queryClient = useQueryClient();
   const { data: app, isLoading } = useGetApplication(id);
   const update = useUpdateApplication();
+  const resendEmail = useResendApplicationEmail();
   const printWindow = useRef<Window | null>(null);
 
   const [status, setStatus] = useState<UpdateApplicationRequestStatus>("new");
@@ -45,6 +47,7 @@ function ApplicationDetail({ id, onBack }: { id: number; onBack: () => void }) {
     w4Employer: {},
   });
   const [saved, setSaved] = useState(false);
+  const [emailNotice, setEmailNotice] = useState<"sent" | "failed" | null>(null);
   useEffect(() => () => { printWindow.current?.close(); }, []);
 
   useEffect(() => {
@@ -87,6 +90,20 @@ function ApplicationDetail({ id, onBack }: { id: number; onBack: () => void }) {
     win.document.close();
   };
 
+  const handleResendEmail = async () => {
+    setEmailNotice(null);
+    try {
+      const result = await resendEmail.mutateAsync({ id });
+      setEmailNotice(result.emailSent ? "sent" : "failed");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: getGetApplicationQueryKey(id) }),
+        queryClient.invalidateQueries({ queryKey: getListApplicationsQueryKey() }),
+      ]);
+    } catch {
+      setEmailNotice("failed");
+    }
+  };
+
   if (isLoading || !app) {
     return (
       <div className="flex justify-center py-16">
@@ -106,6 +123,13 @@ function ApplicationDetail({ id, onBack }: { id: number; onBack: () => void }) {
           {t("common.back")}
         </button>
         <div className="flex items-center gap-2">
+          {app.emailStatus !== "sent" && (
+            <button type="button" onClick={handleResendEmail} disabled={resendEmail.isPending}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+              {resendEmail.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              {t("employment.applications.retryEmail")}
+            </button>
+          )}
           <button
             onClick={handlePrint}
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
@@ -123,6 +147,12 @@ function ApplicationDetail({ id, onBack }: { id: number; onBack: () => void }) {
           </button>
         </div>
       </div>
+      {emailNotice && (
+        <p role={emailNotice === "sent" ? "status" : "alert"}
+          className={`rounded-lg px-3 py-2 text-sm ${emailNotice === "sent" ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-900"}`}>
+          {t(emailNotice === "sent" ? "employment.submittedForms.retrySent" : "employment.submittedForms.retryFailed")}
+        </p>
+      )}
 
       {/* Applicant header */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
@@ -289,7 +319,14 @@ export function ApplicationsTab() {
                   {app.email ? ` · ${app.email}` : ""}
                 </div>
               </div>
-              <StatusBadge status={app.status} />
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                <StatusBadge status={app.status} />
+                <span className={`text-[11px] font-medium ${
+                  app.emailStatus === "sent" ? "text-emerald-700" : "text-amber-700"
+                }`}>
+                  {t(`employment.applications.emailStatus.${app.emailStatus ?? "notSent"}`)}
+                </span>
+              </div>
             </button>
           ))}
         </div>

@@ -7,8 +7,9 @@ import { db, pool } from "@workspace/db";
 import { jobApplicationsTable, objectUploadsTable } from "@workspace/db/schema";
 import { and, eq } from "drizzle-orm";
 import { createApplicationsRouter } from "./applications";
+import type { EmploymentEmail } from "../lib/employmentFormEmail";
 
-test("public applicant submit stores private completed answers but returns only a receipt", async () => {
+test("public applicant submit stores private completed answers, attaches every document to Admin mail, and returns only a receipt", async () => {
   const nonce = randomUUID();
   const firstName = `Fixture${nonce.slice(0, 8)}`, lastName = "PrivacyRegression";
   const email = `${nonce}@example.invalid`;
@@ -16,10 +17,22 @@ test("public applicant submit stores private completed answers but returns only 
   const sourcePath = `/objects/uploads/fixture-${nonce}`;
   const completedPath = `/objects/uploads/completed/fixture-${nonce}`;
   let copyCalls = 0;
-  const router = createApplicationsRouter(async path => {
-    assert.equal(path, sourcePath);
-    copyCalls++;
-    return completedPath;
+  const sentEmails: EmploymentEmail[] = [];
+  const router = createApplicationsRouter({
+    copyApplicantSubmissionObject: async path => {
+      assert.equal(path, sourcePath);
+      copyCalls++;
+      return completedPath;
+    },
+    getObjectMetadata: async path => {
+      assert.equal(path, sourcePath);
+      return { sizeBytes: 37, contentType: "image/jpeg" };
+    },
+    readObjectBytes: async (path) => {
+      assert.equal(path, completedPath);
+      return { bytes: Buffer.from("synthetic identity photo"), sizeBytes: 37, contentType: "image/jpeg" };
+    },
+    sendEmail: async message => { sentEmails.push(message); },
   });
   const app = express();
   app.use(express.json());
@@ -44,7 +57,7 @@ test("public applicant submit stores private completed answers but returns only 
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(submittedAnswers),
     });
     assert.equal(response.status, 201);
-    assert.deepEqual(await response.json(), { success: true });
+    assert.deepEqual(await response.json(), { success: true, emailSent: true });
     assert.equal(response.headers.get("cache-control"), "no-store");
     assert.equal(copyCalls, 1);
 
@@ -53,10 +66,18 @@ test("public applicant submit stores private completed answers but returns only 
     ));
     assert.ok(stored, "the completed application is retained for Admin review");
     assert.equal(stored.email, email);
+    assert.equal(stored.emailStatus, "sent");
     assert.deepEqual(stored.application, submittedAnswers.application);
     assert.deepEqual(stored.i9Employee, submittedAnswers.i9Employee);
     assert.deepEqual(stored.w4Employee, submittedAnswers.w4Employee);
     assert.deepEqual(stored.documents.map(doc => doc.path), [completedPath]);
+    assert.equal(sentEmails.length, 1);
+    const sentEmail = sentEmails[0]!;
+    assert.match(sentEmail.text, /Job application:/);
+    assert.match(sentEmail.text, /Form I-9 \(employee section\):/);
+    assert.match(sentEmail.text, /Form W-4 \(employee section\):/);
+    assert.equal(sentEmail.attachments.length, 1);
+    assert.equal(sentEmail.attachments[0]?.filename, "synthetic-id.jpg");
 
     const [draft] = await db.select().from(objectUploadsTable).where(eq(objectUploadsTable.objectPath, sourcePath));
     const [snapshot] = await db.select().from(objectUploadsTable).where(eq(objectUploadsTable.objectPath, completedPath));

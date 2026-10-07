@@ -14,3 +14,17 @@ mtime_ms = 1791336287867
 storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:d901672a-2183-4a87-be90-bb9fa3418d6d/f245afc1-4911-4383-bf99-28241b470504/e9dae760-52b0-48c1-9f5d-acf389646499"
 storage_version_token = "1791336608710002"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "1AqijydbgKHmtG7Nf3hmT"
+uri = "file://.agents/outputs/marvol-employment-privacy-main-handoff.zip"
+type = "unspecified"
+title = "Marvol employment privacy handoff ZIP"
+description = "Verified Git tree diff from base 8951566fcbcf9de7dae9fd0dd4c96d9d4f87a49f to head 364dd27973dd8d5e7f82382a7658593ca004a0c8. Includes 182 changed tracked paths, a manifest, test results, SHA-256 and Git blob checks, and 19 tracked binary assets. No Git metadata, secrets, untracked files, database records, or applicant uploads."
+logical_id = "2d7d5038-de44-4ded-9378-5cbef85a19f0"
+content_hash = "sha256:60355ac944b4b8542f022102ce15b58325a1fd3a92860b0894068a43a4d6f268"
+size = 16652478
+mtime_ms = 1791387686146
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:d901672a-2183-4a87-be90-bb9fa3418d6d/2d7d5038-de44-4ded-9378-5cbef85a19f0/f4494a5f-174a-43c3-928a-8f8cf0a63866"
+storage_version_token = "1791387746158866"
+content_type = "application/octet-stream"

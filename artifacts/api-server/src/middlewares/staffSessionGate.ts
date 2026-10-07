@@ -3,8 +3,14 @@ import { isPublicBlankEmploymentTemplate } from "../routes/employmentForms";
 
 export function createStaffSessionGate(hasSession: (req: Request) => boolean, resolveActor: (req: Request) => Promise<unknown>) {
   return async (req: Request, res: Response, next: NextFunction) => {
+    const path = req.path.toLowerCase();
+    if (["GET", "HEAD"].includes(req.method) &&
+        (/^\/(?:applications|employment-form-submissions)(?:\/|$)/.test(path))) {
+      // Set before session resolution so even an anonymous 401 cannot be cached.
+      res.setHeader("Cache-Control", "private, no-store");
+    }
     const publicRequest = req.path === "/health" || req.path === "/healthz" ||
-      (req.method === "POST" && ["/applications", "/storage/uploads/request-url"].includes(req.path)) ||
+      (req.method === "POST" && ["/applications", "/employment-form-submissions", "/storage/uploads/request-url"].includes(req.path)) ||
       isPublicBlankEmploymentTemplate(req.path, req.method) ||
       (req.method === "GET" && req.path.startsWith("/storage/public-objects/"));
     if (publicRequest) { next(); return; }
