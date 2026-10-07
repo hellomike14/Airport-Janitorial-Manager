@@ -8,6 +8,295 @@
 import * as zod from "zod";
 
 /**
+ * @summary Verified Admin access-code status; no confidential data or secrets
+ */
+export const GetAdminConfidentialAccessStatusResponse = zod.object({
+  configured: zod.boolean(),
+  unlocked: zod.boolean(),
+  expiresAt: zod.string().nullable(),
+  lockedUntil: zod.string().nullable(),
+  serverTime: zod.string(),
+});
+
+/**
+ * @summary Admin first setup or code change with current code and unlocked session
+ */
+export const configureAdminConfidentialCodeBodyCodeRegExp = new RegExp(
+  "^[0-9]{8,12}$",
+);
+
+export const ConfigureAdminConfidentialCodeBody = zod.object({
+  code: zod.string().regex(configureAdminConfidentialCodeBodyCodeRegExp),
+  confirmation: zod.string(),
+  currentCode: zod.string().optional(),
+});
+
+export const ConfigureAdminConfidentialCodeResponse = zod.object({
+  configured: zod.boolean(),
+  unlocked: zod.boolean(),
+  expiresAt: zod.string().nullable(),
+  lockedUntil: zod.string().nullable(),
+  serverTime: zod.string(),
+});
+
+/**
+ * @summary Admin code check; five failures block this administrator for 15 minutes
+ */
+export const unlockAdminConfidentialAccessBodyCodeRegExp = new RegExp(
+  "^[0-9]{8,12}$",
+);
+
+export const UnlockAdminConfidentialAccessBody = zod.object({
+  code: zod.string().regex(unlockAdminConfidentialAccessBodyCodeRegExp),
+});
+
+export const UnlockAdminConfidentialAccessResponse = zod.object({
+  configured: zod.boolean(),
+  unlocked: zod.boolean(),
+  expiresAt: zod.string().nullable(),
+  lockedUntil: zod.string().nullable(),
+  serverTime: zod.string(),
+});
+
+/**
+ * @summary Revoke this browser unlock immediately
+ */
+export const LockAdminConfidentialAccessResponse = zod.object({
+  configured: zod.boolean(),
+  unlocked: zod.boolean(),
+  expiresAt: zod.string().nullable(),
+  lockedUntil: zod.string().nullable(),
+  serverTime: zod.string(),
+});
+
+/**
+ * @summary Personal contact information for code-unlocked administrators only
+ */
+export const ListConfidentialStaffResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  role: zod.enum(["staff", "supervisor", "admin", "inspector"]),
+  hasEmail: zod
+    .boolean()
+    .describe("Whether the staff member has a configured sign-in email."),
+  email: zod
+    .string()
+    .nullish()
+    .describe(
+      "Saved email, returned in the staff directory only to administrators and supervisors.",
+    ),
+  phone: zod
+    .string()
+    .nullish()
+    .describe(
+      "Saved phone number, returned in the staff directory only to administrators and supervisors.",
+    ),
+  active: zod.boolean(),
+  loginEnabled: zod
+    .boolean()
+    .describe("Whether this staff member is currently eligible to sign in."),
+  formerEmployee: zod
+    .boolean()
+    .describe(
+      "Whether this retained historical record belongs to a former employee.",
+    ),
+  createdAt: zod.string(),
+});
+export const ListConfidentialStaffResponse = zod.array(
+  ListConfidentialStaffResponseItem,
+);
+
+/**
+ * @summary Admin-only linked hire and employee selection
+ */
+export const GetIdentityDocumentContextResponse = zod.object({
+  canManage: zod.boolean(),
+  maxBytes: zod.number(),
+  acceptedTypes: zod.array(zod.string()),
+  employees: zod.array(
+    zod.object({
+      id: zod.number(),
+      name: zod.string(),
+    }),
+  ),
+  hires: zod.array(
+    zod.object({
+      id: zod.number(),
+      name: zod.string(),
+      staffId: zod.number().nullable(),
+      staffName: zod.string().nullable(),
+    }),
+  ),
+});
+
+export const ListIdentityDocumentPhotosQueryParams = zod.object({
+  hireId: zod.coerce.number().min(1),
+});
+
+export const ListIdentityDocumentPhotosResponse = zod.object({
+  photos: zod.array(
+    zod.object({
+      id: zod.string().uuid(),
+      hireId: zod.number(),
+      category: zod.enum(["identity", "work_authorization", "social_security"]),
+      side: zod.enum(["front", "back"]),
+      status: zod.enum(["uploaded", "needs_clearer_photo", "reviewed"]),
+      uploadedAt: zod.date(),
+      uploadedBy: zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+      reviewedAt: zod.date().nullable(),
+      reviewedBy: zod.union([
+        zod.object({
+          id: zod.number(),
+          name: zod.string(),
+        }),
+        zod.null(),
+      ]),
+      qualityReason: zod
+        .union([
+          zod.literal("blurry"),
+          zod.literal("glare"),
+          zod.literal("cropped"),
+          zod.literal("wrong_side"),
+          zod.literal("other"),
+          zod.literal(null),
+        ])
+        .nullable(),
+      replacesId: zod.string().uuid().nullable(),
+      supersededAt: zod.date().nullable(),
+    }),
+  ),
+  events: zod.array(
+    zod.object({
+      id: zod.string(),
+      photoId: zod.string().nullable(),
+      action: zod.string(),
+      details: zod.string().nullable(),
+      actor: zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+      createdAt: zod.date(),
+    }),
+  ),
+});
+
+/**
+ * @summary HR only; immutable employee ownership once linked
+ */
+
+export const LinkIdentityDocumentEmployeeParams = zod.object({
+  hireId: zod.coerce.number().min(1),
+});
+
+export const LinkIdentityDocumentEmployeeBody = zod.object({
+  staffId: zod.number().min(1),
+});
+
+export const LinkIdentityDocumentEmployeeResponse = zod.object({
+  success: zod.boolean(),
+});
+
+/**
+ * @summary Authorize one private photo before direct-to-storage transfer
+ */
+
+export const reserveIdentityDocumentUploadBodySizeMax = 8388608;
+
+export const ReserveIdentityDocumentUploadBody = zod.object({
+  hireId: zod.number().min(1),
+  category: zod.enum(["identity", "work_authorization", "social_security"]),
+  side: zod.enum(["front", "back"]),
+  size: zod.number().min(1).max(reserveIdentityDocumentUploadBodySizeMax),
+  contentType: zod.enum([
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/heic",
+    "image/heif",
+  ]),
+  replacesId: zod.string().uuid().nullable(),
+});
+
+/**
+ * @summary Validate bytes and atomically retain immutable photo version; idempotent
+ */
+export const CompleteIdentityDocumentUploadParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const CompleteIdentityDocumentUploadResponse = zod.object({
+  id: zod.string().uuid(),
+  hireId: zod.number(),
+  category: zod.enum(["identity", "work_authorization", "social_security"]),
+  side: zod.enum(["front", "back"]),
+  status: zod.enum(["uploaded", "needs_clearer_photo", "reviewed"]),
+  uploadedAt: zod.date(),
+  uploadedBy: zod.object({
+    id: zod.number(),
+    name: zod.string(),
+  }),
+  reviewedAt: zod.date().nullable(),
+  reviewedBy: zod.union([
+    zod.object({
+      id: zod.number(),
+      name: zod.string(),
+    }),
+    zod.null(),
+  ]),
+  qualityReason: zod
+    .union([
+      zod.literal("blurry"),
+      zod.literal("glare"),
+      zod.literal("cropped"),
+      zod.literal("wrong_side"),
+      zod.literal("other"),
+      zod.literal(null),
+    ])
+    .nullable(),
+  replacesId: zod.string().uuid().nullable(),
+  supersededAt: zod.date().nullable(),
+});
+
+/**
+ * @summary Cancel uploader's pending transfer only; never delete submitted originals
+ */
+export const CancelIdentityDocumentUploadParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const CancelIdentityDocumentUploadResponse = zod.object({
+  success: zod.boolean(),
+});
+
+/**
+ * @summary Admin-only audited same-origin private preview; no-store
+ */
+export const GetIdentityDocumentImageParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+/**
+ * @summary HR photo-quality review only; never employment authorization
+ */
+export const ReviewIdentityDocumentPhotoParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const ReviewIdentityDocumentPhotoBody = zod.object({
+  status: zod.enum(["reviewed", "needs_clearer_photo"]),
+  reason: zod
+    .enum(["blurry", "glare", "cropped", "wrong_side", "other"])
+    .optional(),
+});
+
+export const ReviewIdentityDocumentPhotoResponse = zod.object({
+  success: zod.boolean(),
+});
+
+/**
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
@@ -1241,7 +1530,8 @@ export const GetDashboardResponse = zod.object({
 });
 
 /**
- * @summary List job applications (admin/supervisor)
+ * Completed answers and attachments are never available to supervisors or applicants.
+ * @summary List confidential submissions; requires verified Admin and confidential code
  */
 export const ListApplicationsQueryParams = zod.object({
   status: zod.coerce.string().optional(),
@@ -1273,7 +1563,8 @@ export const ListApplicationsResponseItem = zod.object({
 export const ListApplicationsResponse = zod.array(ListApplicationsResponseItem);
 
 /**
- * @summary Submit a public job application (unauthenticated)
+ * Stores completed records privately. Returns only a success receipt, never form answers or file paths.
+ * @summary Publicly submit completed job application, employee I-9 and W-4
  */
 export const SubmitApplicationBody = zod.object({
   firstName: zod.string(),
@@ -1302,7 +1593,7 @@ export const SubmitApplicationBody = zod.object({
 });
 
 /**
- * @summary Get a single application
+ * @summary Get a confidential application (verified Admin plus access code only)
  */
 export const GetApplicationParams = zod.object({
   id: zod.coerce.number(),
@@ -1333,7 +1624,7 @@ export const GetApplicationResponse = zod.object({
 });
 
 /**
- * @summary Update application status and employer-side fields
+ * @summary Update an application and employer-side fields (verified Admin plus access code only)
  */
 export const UpdateApplicationParams = zod.object({
   id: zod.coerce.number(),
@@ -1689,6 +1980,227 @@ export const GetAuthDiagnosticsResponse = zod.object({
         formerEmployee: zod.boolean(),
         hasEmail: zod.boolean(),
       }),
+    }),
+  ),
+});
+
+/**
+ * Public blank fillable template; exposes no submitted application data.
+ * @summary Open or download the original fillable Marvol job application
+ */
+export const GetEmploymentJobApplicationQueryParams = zod.object({
+  download: zod
+    .enum(["1"])
+    .optional()
+    .describe("Set to 1 to download instead of opening inline."),
+});
+
+/**
+ * Public blank fillable template; exposes no submitted I-9 data.
+ * @summary Open or download the original fillable I-9 PDF
+ */
+export const GetEmploymentI9FormQueryParams = zod.object({
+  download: zod.enum(["1"]).optional(),
+});
+
+/**
+ * Public blank fillable template; exposes no submitted W-4 data.
+ * @summary Open or download the original fillable 2026 W-4 PDF
+ */
+export const GetEmploymentW4FormQueryParams = zod.object({
+  download: zod.enum(["1"]).optional(),
+});
+
+/**
+ * @summary Private employee training video with HTTP byte ranges
+ */
+export const GetEmployeeTrainingVideoHeader = zod.object({
+  Range: zod.string().optional(),
+});
+
+/**
+ * @summary Current employee's progress and retained attestations
+ */
+export const GetEmployeeTrainingStatusResponse = zod.object({
+  training: zod.object({
+    version: zod.string(),
+    title: zod.string(),
+    duration: zod.number(),
+    videoUrl: zod.string(),
+  }),
+  staff: zod.object({
+    id: zod.number(),
+    name: zod.string(),
+  }),
+  watchedSeconds: zod.number(),
+  eligible: zod.boolean(),
+  acknowledgment: zod.union([
+    zod.object({
+      id: zod.number(),
+      staffId: zod.number(),
+      version: zod.string(),
+      trainingTitle: zod.string(),
+      videoSha256: zod.string(),
+      signature: zod.string(),
+      staffName: zod.string(),
+      watchedConfirmation: zod.boolean(),
+      understoodConfirmation: zod.boolean(),
+      completedAt: zod.date(),
+    }),
+    zod.null(),
+  ]),
+  history: zod.array(
+    zod.object({
+      id: zod.number(),
+      staffId: zod.number(),
+      version: zod.string(),
+      trainingTitle: zod.string(),
+      videoSha256: zod.string(),
+      signature: zod.string(),
+      staffName: zod.string(),
+      watchedConfirmation: zod.boolean(),
+      understoodConfirmation: zod.boolean(),
+      completedAt: zod.date(),
+    }),
+  ),
+});
+
+/**
+ * @summary Start one watch session for the signed-in employee
+ */
+export const StartEmployeeTrainingSessionResponse = zod.object({
+  sessionId: zod.string().uuid(),
+});
+
+/**
+ * @summary Record validated contiguous playback coverage
+ */
+export const updateEmployeeTrainingProgressBodyPositionMin = 0;
+
+export const updateEmployeeTrainingProgressBodyRateMin = 0.25;
+export const updateEmployeeTrainingProgressBodyRateMax = 2;
+
+export const UpdateEmployeeTrainingProgressBody = zod.object({
+  sessionId: zod.string().uuid(),
+  version: zod.string(),
+  position: zod.number().min(updateEmployeeTrainingProgressBodyPositionMin),
+  playing: zod.boolean(),
+  seeking: zod.boolean(),
+  rate: zod
+    .number()
+    .min(updateEmployeeTrainingProgressBodyRateMin)
+    .max(updateEmployeeTrainingProgressBodyRateMax),
+});
+
+export const UpdateEmployeeTrainingProgressResponse = zod.object({
+  watchedSeconds: zod.number(),
+  eligible: zod.boolean(),
+});
+
+/**
+ * @summary Save one immutable employee attestation per version
+ */
+export const acknowledgeEmployeeTrainingBodyFullNameMax = 200;
+
+export const AcknowledgeEmployeeTrainingBody = zod.object({
+  version: zod.string(),
+  watched: zod.boolean(),
+  understood: zod.boolean(),
+  fullName: zod.string().min(1).max(acknowledgeEmployeeTrainingBodyFullNameMax),
+});
+
+export const AcknowledgeEmployeeTrainingResponse = zod.object({
+  training: zod.object({
+    version: zod.string(),
+    title: zod.string(),
+    duration: zod.number(),
+    videoUrl: zod.string(),
+  }),
+  staff: zod.object({
+    id: zod.number(),
+    name: zod.string(),
+  }),
+  watchedSeconds: zod.number(),
+  eligible: zod.boolean(),
+  acknowledgment: zod.union([
+    zod.object({
+      id: zod.number(),
+      staffId: zod.number(),
+      version: zod.string(),
+      trainingTitle: zod.string(),
+      videoSha256: zod.string(),
+      signature: zod.string(),
+      staffName: zod.string(),
+      watchedConfirmation: zod.boolean(),
+      understoodConfirmation: zod.boolean(),
+      completedAt: zod.date(),
+    }),
+    zod.null(),
+  ]),
+  history: zod.array(
+    zod.object({
+      id: zod.number(),
+      staffId: zod.number(),
+      version: zod.string(),
+      trainingTitle: zod.string(),
+      videoSha256: zod.string(),
+      signature: zod.string(),
+      staffName: zod.string(),
+      watchedConfirmation: zod.boolean(),
+      understoodConfirmation: zod.boolean(),
+      completedAt: zod.date(),
+    }),
+  ),
+});
+
+/**
+ * @summary Manager-only current completion and historical employee attestations
+ */
+export const GetEmployeeTrainingReviewResponse = zod.object({
+  training: zod.object({
+    version: zod.string(),
+    title: zod.string(),
+    duration: zod.number(),
+    videoUrl: zod.string(),
+  }),
+  employees: zod.array(
+    zod.object({
+      staffId: zod.number(),
+      name: zod.string(),
+      active: zod.boolean(),
+      formerEmployee: zod.boolean(),
+      status: zod.enum(["pending", "completed"]),
+      watchedSeconds: zod.number(),
+      eligible: zod.boolean(),
+      acknowledgment: zod.union([
+        zod.object({
+          id: zod.number(),
+          staffId: zod.number(),
+          version: zod.string(),
+          trainingTitle: zod.string(),
+          videoSha256: zod.string(),
+          signature: zod.string(),
+          staffName: zod.string(),
+          watchedConfirmation: zod.boolean(),
+          understoodConfirmation: zod.boolean(),
+          completedAt: zod.date(),
+        }),
+        zod.null(),
+      ]),
+      history: zod.array(
+        zod.object({
+          id: zod.number(),
+          staffId: zod.number(),
+          version: zod.string(),
+          trainingTitle: zod.string(),
+          videoSha256: zod.string(),
+          signature: zod.string(),
+          staffName: zod.string(),
+          watchedConfirmation: zod.boolean(),
+          understoodConfirmation: zod.boolean(),
+          completedAt: zod.date(),
+        }),
+      ),
     }),
   ),
 });

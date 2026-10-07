@@ -14,7 +14,6 @@ export const SEED_STAFF: SeedStaff[] = [
   { name: "Reynaldo Hernandez", role: "supervisor", email: "cnuevo986@gmail.com" },
 
   { name: "Jean Gardy Rigueur", role: "staff" },
-  { name: "Jose Camargo", role: "staff" },
   { name: "Juan Carlos Zurita Blacio", role: "staff" },
   { name: "Kevin Gonzalez Fernandez", role: "staff" },
   { name: "Steeve Alphonse", role: "staff", email: "steevealphonse86@gmail.com" },
@@ -24,6 +23,7 @@ export const SEED_STAFF: SeedStaff[] = [
 ];
 
 export const REMOVED_STAFF_NAMES = [
+  "Jose Camargo",
   "Diego Moreno Velez",
   "Alexis Moron",
   "Floraima Pinero Valdez",

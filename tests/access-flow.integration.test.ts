@@ -147,10 +147,13 @@ test("assignment management and target authorization reject unsafe combinations"
   const worker = currentWorker();
   const disabled = { ...currentWorker(), id: 8, loginEnabled: false };
   const former = { ...currentWorker(), id: 9, formerEmployee: true };
-  const service = new ControlledAccessService([worker, disabled, former]);
+  const inactive = { ...currentWorker(), id: 10, active: false };
+  const service = new ControlledAccessService([worker, disabled, former, inactive]);
 
   assert.equal(service.assign(worker, worker.id), false);
-  assert.equal(service.assign({ id: 2, name: "Supervisor", role: "supervisor" }, disabled.id), false);
+  // Login eligibility does not prevent management from assigning active staff.
+  assert.equal(service.assign({ id: 2, name: "Supervisor", role: "supervisor" }, disabled.id), true);
+  assert.equal(service.assign({ id: 2, name: "Supervisor", role: "supervisor" }, inactive.id), false);
   assert.equal(service.assign({ id: 1, name: "Admin", role: "admin" }, former.id), false);
   assert.equal(service.assign({ id: 1, name: "Admin", role: "admin" }, worker.id), true);
 });

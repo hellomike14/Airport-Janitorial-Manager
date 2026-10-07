@@ -9,6 +9,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import { AppLayout } from "./components/layout/AppLayout";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { ConfidentialAccessProvider } from "./contexts/ConfidentialAccessContext";
 import { OfflineProvider } from "./contexts/OfflineContext";
 import { OfflineBanner } from "./components/OfflineBanner";
 import "./i18n";
@@ -236,6 +237,7 @@ function ProtectedRoutes() {
             <Route path="/my-tasks" component={MyTasks} />
             <Route path="/issues" component={Issues} />
             <Route path="/employee-portal" component={EmployeePortal} />
+            <Route path="/employment" component={Employment} />
             <Route path="/photo-share" component={PhotoShare} />
             <Route path="/special-requests" component={SpecialRequests} />
             <Route path="/messages" component={Messages} />
@@ -288,6 +290,7 @@ function ClerkProviderWithRoutes() {
         <TooltipProvider>
           <OfflineProvider>
             <AuthProvider>
+              <ConfidentialAccessProvider>
               <Suspense fallback={<LoginRecovery />}>
               <Switch>
                 <Route path="/apply" component={Apply} />
@@ -296,6 +299,7 @@ function ClerkProviderWithRoutes() {
                 </Route>
               </Switch>
               </Suspense>
+              </ConfidentialAccessProvider>
             </AuthProvider>
           </OfflineProvider>
           <Toaster />

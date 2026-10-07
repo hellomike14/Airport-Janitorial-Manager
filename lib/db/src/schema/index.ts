@@ -1,3 +1,4 @@
+export * from "./confidentialAccess";
 export * from "./staff";
 export * from "./areas";
 export * from "./tasks";
@@ -15,3 +16,5 @@ export * from "./onboarding";
 export * from "./quickbooks";
 export * from "./authDiagnostics";
 export * from "./operations";
+export * from "./employeeTraining";
+export * from "./identityDocuments";

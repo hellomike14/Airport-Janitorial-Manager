@@ -2,6 +2,8 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { db } from "@workspace/db";
 import { quickbooksConnectionsTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
+import { confidentialCookie, confidentialIdentity, confidentialService, assertAdmin } from "../lib/confidentialAccess";
+import { confidentialFailure } from "./confidentialAccess";
 
 const router: IRouter = Router();
 
@@ -74,7 +76,8 @@ router.get("/connect", async (req: Request, res: Response) => {
     });
     return;
   }
-  const state = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  const identity = await confidentialIdentity(req); assertAdmin(identity);
+  const state = await confidentialService.startQuickbooks(identity, confidentialCookie(req));
   const params = new URLSearchParams({
     client_id: getClientId(),
     response_type: "code",
@@ -90,6 +93,11 @@ router.get("/connect", async (req: Request, res: Response) => {
  * and redirect the browser back to the Employment page.
  */
 router.get("/callback", async (req: Request, res: Response) => {
+  try {
+    const identity = await confidentialIdentity(req); assertAdmin(identity);
+    const state = typeof req.query.state === "string" ? req.query.state : "";
+    await confidentialService.consumeQuickbooks(identity, confidentialCookie(req), state);
+  } catch (error) { confidentialFailure(error, res); return; }
   const code = typeof req.query.code === "string" ? req.query.code : "";
   const realmId = typeof req.query.realmId === "string" ? req.query.realmId : "";
   const error = typeof req.query.error === "string" ? req.query.error : "";

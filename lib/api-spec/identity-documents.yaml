@@ -1,0 +1,189 @@
+# Private HR photo contract. No object paths, source filenames, document
+# numbers, authorization conclusions or public image URLs are returned.
+context:
+  get:
+    operationId: getIdentityDocumentContext
+    summary: Admin-only linked hire and employee selection
+    responses:
+      "200":
+        description: Server-authorized context
+        content:
+          application/json:
+            schema:
+              $ref: "#/schemas/IdentityContext"
+list:
+  get:
+    operationId: listIdentityDocumentPhotos
+    parameters:
+      - in: query
+        name: hireId
+        required: true
+        schema: { type: integer, minimum: 1 }
+    responses:
+      "200":
+        description: Admin-only submitted versions and audit history for the selected employee
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [photos, events]
+              properties:
+                photos: { type: array, items: { $ref: "#/schemas/IdentityPhoto" } }
+                events: { type: array, items: { $ref: "#/schemas/IdentityEvent" } }
+link:
+  parameters:
+    - in: path
+      name: hireId
+      required: true
+      schema: { type: integer, minimum: 1 }
+  put:
+    operationId: linkIdentityDocumentEmployee
+    summary: HR only; immutable employee ownership once linked
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [staffId]
+            properties: { staffId: { type: integer, minimum: 1 } }
+    responses:
+      "200": { $ref: "#/responses/Success" }
+reserve:
+  post:
+    operationId: reserveIdentityDocumentUpload
+    summary: Authorize one private photo before direct-to-storage transfer
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [hireId, category, side, size, contentType, replacesId]
+            properties:
+              hireId: { type: integer, minimum: 1 }
+              category: { type: string, enum: [identity, work_authorization, social_security] }
+              side: { type: string, enum: [front, back] }
+              size: { type: integer, minimum: 1, maximum: 8388608 }
+              contentType: { type: string, enum: [image/jpeg, image/png, image/webp, image/heic, image/heif] }
+              replacesId: { type: [string, "null"], format: uuid }
+    responses:
+      "201":
+        description: Short-lived PUT capability, not a public read link
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, uploadURL]
+              properties:
+                id: { type: string, format: uuid }
+                uploadURL: { type: string }
+complete:
+  parameters: [{ $ref: "#/parameters/PhotoId" }]
+  post:
+    operationId: completeIdentityDocumentUpload
+    summary: Validate bytes and atomically retain immutable photo version; idempotent
+    responses:
+      "200":
+        description: Uploaded photograph, never an I-9 or E-Verify conclusion
+        content: { application/json: { schema: { $ref: "#/schemas/IdentityPhoto" } } }
+cancel:
+  parameters: [{ $ref: "#/parameters/PhotoId" }]
+  delete:
+    operationId: cancelIdentityDocumentUpload
+    summary: Cancel uploader's pending transfer only; never delete submitted originals
+    responses:
+      "200": { $ref: "#/responses/Success" }
+image:
+  parameters: [{ $ref: "#/parameters/PhotoId" }]
+  get:
+    operationId: getIdentityDocumentImage
+    summary: Admin-only audited same-origin private preview; no-store
+    responses:
+      "200":
+        description: JPEG preview with location and other image metadata removed
+        content: { image/jpeg: { schema: { type: string, format: binary } } }
+review:
+  parameters: [{ $ref: "#/parameters/PhotoId" }]
+  patch:
+    operationId: reviewIdentityDocumentPhoto
+    summary: HR photo-quality review only; never employment authorization
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [status]
+            properties:
+              status: { type: string, enum: [reviewed, needs_clearer_photo] }
+              reason: { type: string, enum: [blurry, glare, cropped, wrong_side, other] }
+    responses:
+      "200": { $ref: "#/responses/Success" }
+parameters:
+  PhotoId:
+    in: path
+    name: id
+    required: true
+    schema: { type: string, format: uuid }
+responses:
+  Success:
+    description: Saved
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [success]
+          properties: { success: { type: boolean } }
+schemas:
+  IdentityActor:
+    type: object
+    required: [id, name]
+    properties: { id: { type: integer }, name: { type: string } }
+  IdentityContext:
+    type: object
+    required: [canManage, hires, employees, maxBytes, acceptedTypes]
+    properties:
+      canManage: { type: boolean }
+      maxBytes: { type: integer }
+      acceptedTypes: { type: array, items: { type: string } }
+      employees: { type: array, items: { $ref: "#/schemas/IdentityActor" } }
+      hires:
+        type: array
+        items:
+          type: object
+          required: [id, name, staffId, staffName]
+          properties:
+            id: { type: integer }
+            name: { type: string }
+            staffId: { type: [integer, "null"] }
+            staffName: { type: [string, "null"] }
+  IdentityPhoto:
+    type: object
+    required: [id, hireId, category, side, status, uploadedAt, uploadedBy, reviewedAt, reviewedBy, qualityReason, replacesId, supersededAt]
+    properties:
+      id: { type: string, format: uuid }
+      hireId: { type: integer }
+      category: { type: string, enum: [identity, work_authorization, social_security] }
+      side: { type: string, enum: [front, back] }
+      status: { type: string, enum: [uploaded, needs_clearer_photo, reviewed] }
+      uploadedAt: { type: string, format: date-time }
+      uploadedBy: { $ref: "#/schemas/IdentityActor" }
+      reviewedAt: { type: [string, "null"], format: date-time }
+      reviewedBy: { anyOf: [{ $ref: "#/schemas/IdentityActor" }, { type: "null" }] }
+      qualityReason: { type: [string, "null"], enum: [blurry, glare, cropped, wrong_side, other, null] }
+      replacesId: { type: [string, "null"], format: uuid }
+      supersededAt: { type: [string, "null"], format: date-time }
+  IdentityEvent:
+    type: object
+    required: [id, photoId, action, details, actor, createdAt]
+    properties:
+      id: { type: string }
+      photoId: { type: [string, "null"] }
+      action: { type: string }
+      details: { type: [string, "null"] }
+      actor: { $ref: "#/schemas/IdentityActor" }
+      createdAt: { type: string, format: date-time }

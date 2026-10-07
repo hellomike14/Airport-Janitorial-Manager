@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, Loader2, Printer, Save, FileText } from "lucide-react";
@@ -37,6 +37,7 @@ function ApplicationDetail({ id, onBack }: { id: number; onBack: () => void }) {
   const queryClient = useQueryClient();
   const { data: app, isLoading } = useGetApplication(id);
   const update = useUpdateApplication();
+  const printWindow = useRef<Window | null>(null);
 
   const [status, setStatus] = useState<UpdateApplicationRequestStatus>("new");
   const [groups, setGroups] = useState<Record<string, Record<string, unknown>>>({
@@ -44,6 +45,7 @@ function ApplicationDetail({ id, onBack }: { id: number; onBack: () => void }) {
     w4Employer: {},
   });
   const [saved, setSaved] = useState(false);
+  useEffect(() => () => { printWindow.current?.close(); }, []);
 
   useEffect(() => {
     if (app) {
@@ -80,6 +82,7 @@ function ApplicationDetail({ id, onBack }: { id: number; onBack: () => void }) {
     const html = buildApplicationPDF(merged, t);
     const win = window.open("", "_blank");
     if (!win) return;
+    printWindow.current = win;
     win.document.write(html);
     win.document.close();
   };

@@ -31,6 +31,48 @@ tags:
     description: Object storage upload and serving endpoints.
 
 paths:
+  /confidential-access/status:
+    $ref: "./confidential-access.yaml#/status"
+  /confidential-access/configure:
+    $ref: "./confidential-access.yaml#/configure"
+  /confidential-access/unlock:
+    $ref: "./confidential-access.yaml#/unlock"
+  /confidential-access/lock:
+    $ref: "./confidential-access.yaml#/lock"
+  /staff/confidential:
+    get:
+      operationId: listConfidentialStaff
+      tags: [Staff]
+      summary: Personal contact information for code-unlocked administrators only
+      responses:
+        "200":
+          description: Active staff including email and phone; never cached
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StaffMember"
+        "423":
+          description: Administrator access code required
+        "403":
+          description: Administrator role required
+  /identity-documents/context:
+    $ref: "./identity-documents.yaml#/context"
+  /identity-documents:
+    $ref: "./identity-documents.yaml#/list"
+  /identity-documents/hires/{hireId}/employee:
+    $ref: "./identity-documents.yaml#/link"
+  /identity-documents/uploads:
+    $ref: "./identity-documents.yaml#/reserve"
+  /identity-documents/uploads/{id}/complete:
+    $ref: "./identity-documents.yaml#/complete"
+  /identity-documents/uploads/{id}:
+    $ref: "./identity-documents.yaml#/cancel"
+  /identity-documents/{id}/image:
+    $ref: "./identity-documents.yaml#/image"
+  /identity-documents/{id}/review:
+    $ref: "./identity-documents.yaml#/review"
   /healthz:
     get:
       operationId: healthCheck
@@ -1087,7 +1129,8 @@ paths:
     get:
       operationId: listApplications
       tags: [employment]
-      summary: List job applications (admin/supervisor)
+      summary: List confidential submissions; requires verified Admin and confidential code
+      description: Completed answers and attachments are never available to supervisors or applicants.
       parameters:
         - name: status
           in: query
@@ -1105,7 +1148,8 @@ paths:
     post:
       operationId: submitApplication
       tags: [employment]
-      summary: Submit a public job application (unauthenticated)
+      summary: Publicly submit completed job application, employee I-9 and W-4
+      description: Stores completed records privately. Returns only a success receipt, never form answers or file paths.
       requestBody:
         required: true
         content:
@@ -1114,17 +1158,19 @@ paths:
               $ref: "#/components/schemas/SubmitApplicationRequest"
       responses:
         "201":
-          description: Created
+          description: Minimal receipt; completed answers, signatures and attachment paths are withheld
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/JobApplication"
+                $ref: "#/components/schemas/ApplicationSubmissionReceipt"
+        "400":
+          description: Invalid application or uploaded-file capability
 
   /applications/{id}:
     get:
       operationId: getApplication
       tags: [employment]
-      summary: Get a single application
+      summary: Get a confidential application (verified Admin plus access code only)
       parameters:
         - name: id
           in: path
@@ -1141,7 +1187,7 @@ paths:
     patch:
       operationId: updateApplication
       tags: [employment]
-      summary: Update application status and employer-side fields
+      summary: Update an application and employer-side fields (verified Admin plus access code only)
       parameters:
         - name: id
           in: path
@@ -1539,6 +1585,172 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
 
+  /employment-forms/job-application:
+    get:
+      operationId: getEmploymentJobApplication
+      tags: [Employment]
+      summary: Open or download the original fillable Marvol job application
+      description: Public blank fillable template; exposes no submitted application data.
+      parameters:
+        - name: download
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: ["1"]
+          description: Set to 1 to download instead of opening inline.
+      responses:
+        "200":
+          description: Original fillable application PDF
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Invalid download option
+        "404":
+          description: Application PDF not found
+        "503":
+          description: Application PDF temporarily unavailable
+  /employment-forms/i-9:
+    get:
+      operationId: getEmploymentI9Form
+      tags: [Employment]
+      summary: Open or download the original fillable I-9 PDF
+      description: Public blank fillable template; exposes no submitted I-9 data.
+      parameters:
+        - name: download
+          in: query
+          schema:
+            type: string
+            enum: ["1"]
+      responses:
+        "200":
+          description: Original fillable I-9 PDF
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Invalid download option
+        "404":
+          description: Form not found
+        "503":
+          description: Form temporarily unavailable
+  /employment-forms/w-4:
+    get:
+      operationId: getEmploymentW4Form
+      tags: [Employment]
+      summary: Open or download the original fillable 2026 W-4 PDF
+      description: Public blank fillable template; exposes no submitted W-4 data.
+      parameters:
+        - name: download
+          in: query
+          schema:
+            type: string
+            enum: ["1"]
+      responses:
+        "200":
+          description: Original fillable W-4 PDF
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Invalid download option
+        "404":
+          description: Form not found
+        "503":
+          description: Form temporarily unavailable
+  /employee-training/video:
+    get:
+      operationId: getEmployeeTrainingVideo
+      summary: Private employee training video with HTTP byte ranges
+      parameters:
+        - in: header
+          name: Range
+          schema: { type: string }
+      responses:
+        "200":
+          description: Full video
+          content:
+            video/mp4:
+              schema: { type: string, format: binary }
+        "206":
+          description: Requested video byte range
+          content:
+            video/mp4:
+              schema: { type: string, format: binary }
+        "401": { description: Verified staff session required }
+        "403": { description: Employee Portal access required }
+        "416": { description: Invalid or unsatisfiable byte range }
+  /employee-training/status:
+    get:
+      operationId: getEmployeeTrainingStatus
+      summary: Current employee's progress and retained attestations
+      responses:
+        "200":
+          description: Own training status
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmployeeTrainingStatus" }
+  /employee-training/session:
+    post:
+      operationId: startEmployeeTrainingSession
+      summary: Start one watch session for the signed-in employee
+      responses:
+        "200":
+          description: Watch session
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TrainingSession" }
+  /employee-training/progress:
+    post:
+      operationId: updateEmployeeTrainingProgress
+      summary: Record validated contiguous playback coverage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TrainingHeartbeat" }
+      responses:
+        "200":
+          description: Persisted watch coverage
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TrainingWatchStatus" }
+        "409": { description: Superseded watch session }
+  /employee-training/acknowledgment:
+    post:
+      operationId: acknowledgeEmployeeTraining
+      summary: Save one immutable employee attestation per version
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TrainingAttestationInput" }
+      responses:
+        "200":
+          description: Saved employee attestation and history
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmployeeTrainingStatus" }
+        "400": { description: "Invalid confirmation, signature or version" }
+        "409": { description: Full video not watched }
+  /employee-training/review:
+    get:
+      operationId: getEmployeeTrainingReview
+      summary: Manager-only current completion and historical employee attestations
+      responses:
+        "200":
+          description: Manager review
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TrainingReview" }
+        "403": { description: Manager access required }
 components:
   securitySchemes:
     BearerAuth:
@@ -1554,6 +1766,105 @@ components:
       in: header
       name: X-SendGrid-Inbound-Secret
   schemas:
+    TrainingVersion:
+      type: object
+      required: [version, title, duration, videoUrl]
+      properties:
+        version: { type: string }
+        title: { type: string }
+        duration: { type: number }
+        videoUrl: { type: string }
+    TrainingWatchStatus:
+      type: object
+      required: [watchedSeconds, eligible]
+      properties:
+        watchedSeconds: { type: number }
+        eligible: { type: boolean }
+    TrainingAcknowledgment:
+      type: object
+      required: [id, staffId, version, trainingTitle, videoSha256, signature, staffName, watchedConfirmation, understoodConfirmation, completedAt]
+      properties:
+        id: { type: integer }
+        staffId: { type: integer }
+        version: { type: string }
+        trainingTitle: { type: string }
+        videoSha256: { type: string }
+        signature: { type: string }
+        staffName: { type: string }
+        watchedConfirmation: { type: boolean }
+        understoodConfirmation: { type: boolean }
+        completedAt: { type: string, format: date-time }
+    EmployeeTrainingStatus:
+      type: object
+      required: [training, staff, watchedSeconds, eligible, acknowledgment, history]
+      properties:
+        training: { $ref: "#/components/schemas/TrainingVersion" }
+        staff:
+          type: object
+          required: [id, name]
+          properties:
+            id: { type: integer }
+            name: { type: string }
+        watchedSeconds: { type: number }
+        eligible: { type: boolean }
+        acknowledgment:
+          anyOf:
+            - $ref: "#/components/schemas/TrainingAcknowledgment"
+            - type: "null"
+        history:
+          type: array
+          items: { $ref: "#/components/schemas/TrainingAcknowledgment" }
+    TrainingSession:
+      type: object
+      required: [sessionId]
+      properties:
+        sessionId: { type: string, format: uuid }
+    TrainingHeartbeat:
+      type: object
+      additionalProperties: false
+      required: [sessionId, version, position, playing, seeking, rate]
+      properties:
+        sessionId: { type: string, format: uuid }
+        version: { type: string }
+        position: { type: number, minimum: 0 }
+        playing: { type: boolean }
+        seeking: { type: boolean }
+        rate: { type: number, minimum: 0.25, maximum: 2 }
+    TrainingAttestationInput:
+      type: object
+      additionalProperties: false
+      required: [version, watched, understood, fullName]
+      properties:
+        version: { type: string }
+        watched: { type: boolean, const: true }
+        understood: { type: boolean, const: true }
+        fullName: { type: string, minLength: 1, maxLength: 200 }
+    TrainingEmployeeReview:
+      type: object
+      required: [staffId, name, active, formerEmployee, status, watchedSeconds, eligible, acknowledgment, history]
+      properties:
+        staffId: { type: integer }
+        name: { type: string }
+        active: { type: boolean }
+        formerEmployee: { type: boolean }
+        status: { type: string, enum: [pending, completed] }
+        watchedSeconds: { type: number }
+        eligible: { type: boolean }
+        acknowledgment:
+          anyOf:
+            - $ref: "#/components/schemas/TrainingAcknowledgment"
+            - type: "null"
+        history:
+          type: array
+          items: { $ref: "#/components/schemas/TrainingAcknowledgment" }
+    TrainingReview:
+      type: object
+      required: [training, employees]
+      properties:
+        training: { $ref: "#/components/schemas/TrainingVersion" }
+        employees:
+          type: array
+          items: { $ref: "#/components/schemas/TrainingEmployeeReview" }
     SetConversationArchiveRequest:
       type: object
       required: [staffId, archived]
@@ -2698,6 +3009,15 @@ components:
           type: boolean
       required:
         - success
+
+    ApplicationSubmissionReceipt:
+      type: object
+      additionalProperties: false
+      required: [success]
+      properties:
+        success:
+          type: boolean
+          const: true
 
     JobApplication:
       type: object

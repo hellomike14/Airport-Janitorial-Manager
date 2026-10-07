@@ -36,17 +36,21 @@ function toPublicStaff(staff: typeof staffTable.$inferSelect) {
 
 router.get("/", async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
-  const actor = await actorStaffFromRequest(req);
-  const showContacts = actor?.role === "admin" || actor?.role === "supervisor";
   const staff = await db
     .select()
     .from(staffTable)
     .where(eq(staffTable.active, true))
     .orderBy(staffTable.role, staffTable.name);
-  res.json(staff.map(person => ({
-    ...toPublicStaff(person),
-    ...(showContacts ? { email: person.email, phone: person.phone } : {}),
-  })));
+  // Operational selectors never need private contact details, even when an
+  // administrator happens to be unlocked in another part of the app.
+  res.json(staff.map(toPublicStaff));
+});
+
+router.get("/confidential", requireStaffRole("admin"), async (_req, res) => {
+  // The mounted confidential-area middleware verifies the session-bound code.
+  res.setHeader("Cache-Control", "private, no-store");
+  const people = await db.select().from(staffTable).where(eq(staffTable.active, true)).orderBy(staffTable.role, staffTable.name);
+  res.json(people.map(person => ({ ...toPublicStaff(person), email: person.email, phone: person.phone })));
 });
 
 // Resolves the acting staff member from the verified Clerk session (matched

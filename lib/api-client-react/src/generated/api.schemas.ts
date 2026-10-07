@@ -5,6 +5,99 @@
  * Marvol Facility Cleaning Management API
  * OpenAPI spec version: 0.1.0
  */
+export interface TrainingVersion {
+  version: string;
+  title: string;
+  duration: number;
+  videoUrl: string;
+}
+
+export interface TrainingWatchStatus {
+  watchedSeconds: number;
+  eligible: boolean;
+}
+
+export interface TrainingAcknowledgment {
+  id: number;
+  staffId: number;
+  version: string;
+  trainingTitle: string;
+  videoSha256: string;
+  signature: string;
+  staffName: string;
+  watchedConfirmation: boolean;
+  understoodConfirmation: boolean;
+  completedAt: string;
+}
+
+export type EmployeeTrainingStatusStaff = {
+  id: number;
+  name: string;
+};
+
+export interface EmployeeTrainingStatus {
+  training: TrainingVersion;
+  staff: EmployeeTrainingStatusStaff;
+  watchedSeconds: number;
+  eligible: boolean;
+  acknowledgment: TrainingAcknowledgment | null;
+  history: TrainingAcknowledgment[];
+}
+
+export interface TrainingSession {
+  sessionId: string;
+}
+
+export interface TrainingHeartbeat {
+  sessionId: string;
+  version: string;
+  /** @minimum 0 */
+  position: number;
+  playing: boolean;
+  seeking: boolean;
+  /**
+   * @minimum 0.25
+   * @maximum 2
+   */
+  rate: number;
+}
+
+export interface TrainingAttestationInput {
+  version: string;
+  watched: true;
+  understood: true;
+  /**
+   * @minLength 1
+   * @maxLength 200
+   */
+  fullName: string;
+}
+
+export type TrainingEmployeeReviewStatus =
+  (typeof TrainingEmployeeReviewStatus)[keyof typeof TrainingEmployeeReviewStatus];
+
+export const TrainingEmployeeReviewStatus = {
+  pending: "pending",
+  completed: "completed",
+} as const;
+
+export interface TrainingEmployeeReview {
+  staffId: number;
+  name: string;
+  active: boolean;
+  formerEmployee: boolean;
+  status: TrainingEmployeeReviewStatus;
+  watchedSeconds: number;
+  eligible: boolean;
+  acknowledgment: TrainingAcknowledgment | null;
+  history: TrainingAcknowledgment[];
+}
+
+export interface TrainingReview {
+  training: TrainingVersion;
+  employees: TrainingEmployeeReview[];
+}
+
 export interface SetConversationArchiveRequest {
   staffId: number;
   archived: boolean;
@@ -761,6 +854,12 @@ export interface DeleteResponse {
   success: boolean;
 }
 
+export const ApplicationSubmissionReceiptValue = {
+  success: true,
+} as const;
+export type ApplicationSubmissionReceipt =
+  typeof ApplicationSubmissionReceiptValue;
+
 export type JobApplicationStatus =
   (typeof JobApplicationStatus)[keyof typeof JobApplicationStatus];
 
@@ -920,6 +1019,337 @@ export interface QuickbooksStatus {
 export interface QuickbooksConnectUrl {
   authorizeUrl: string;
 }
+
+export type GetAdminConfidentialAccessStatus200 = {
+  configured: boolean;
+  unlocked: boolean;
+  /** @nullable */
+  expiresAt: string | null;
+  /** @nullable */
+  lockedUntil: string | null;
+  serverTime: string;
+};
+
+export type ConfigureAdminConfidentialCodeBody = {
+  /** @pattern ^[0-9]{8,12}$ */
+  code: string;
+  confirmation: string;
+  currentCode?: string;
+};
+
+export type ConfigureAdminConfidentialCode200 = {
+  configured: boolean;
+  unlocked: boolean;
+  /** @nullable */
+  expiresAt: string | null;
+  /** @nullable */
+  lockedUntil: string | null;
+  serverTime: string;
+};
+
+export type UnlockAdminConfidentialAccessBody = {
+  /** @pattern ^[0-9]{8,12}$ */
+  code: string;
+};
+
+export type UnlockAdminConfidentialAccess200 = {
+  configured: boolean;
+  unlocked: boolean;
+  /** @nullable */
+  expiresAt: string | null;
+  /** @nullable */
+  lockedUntil: string | null;
+  serverTime: string;
+};
+
+export type LockAdminConfidentialAccess200 = {
+  configured: boolean;
+  unlocked: boolean;
+  /** @nullable */
+  expiresAt: string | null;
+  /** @nullable */
+  lockedUntil: string | null;
+  serverTime: string;
+};
+
+export type GetIdentityDocumentContext200EmployeesItem = {
+  id: number;
+  name: string;
+};
+
+export type GetIdentityDocumentContext200HiresItem = {
+  id: number;
+  name: string;
+  /** @nullable */
+  staffId: number | null;
+  /** @nullable */
+  staffName: string | null;
+};
+
+export type GetIdentityDocumentContext200 = {
+  canManage: boolean;
+  maxBytes: number;
+  acceptedTypes: string[];
+  employees: GetIdentityDocumentContext200EmployeesItem[];
+  hires: GetIdentityDocumentContext200HiresItem[];
+};
+
+export type ListIdentityDocumentPhotosParams = {
+  /**
+   * @minimum 1
+   */
+  hireId: number;
+};
+
+export type ListIdentityDocumentPhotos200PhotosItemCategory =
+  (typeof ListIdentityDocumentPhotos200PhotosItemCategory)[keyof typeof ListIdentityDocumentPhotos200PhotosItemCategory];
+
+export const ListIdentityDocumentPhotos200PhotosItemCategory = {
+  identity: "identity",
+  work_authorization: "work_authorization",
+  social_security: "social_security",
+} as const;
+
+export type ListIdentityDocumentPhotos200PhotosItemSide =
+  (typeof ListIdentityDocumentPhotos200PhotosItemSide)[keyof typeof ListIdentityDocumentPhotos200PhotosItemSide];
+
+export const ListIdentityDocumentPhotos200PhotosItemSide = {
+  front: "front",
+  back: "back",
+} as const;
+
+export type ListIdentityDocumentPhotos200PhotosItemStatus =
+  (typeof ListIdentityDocumentPhotos200PhotosItemStatus)[keyof typeof ListIdentityDocumentPhotos200PhotosItemStatus];
+
+export const ListIdentityDocumentPhotos200PhotosItemStatus = {
+  uploaded: "uploaded",
+  needs_clearer_photo: "needs_clearer_photo",
+  reviewed: "reviewed",
+} as const;
+
+export type ListIdentityDocumentPhotos200PhotosItemUploadedBy = {
+  id: number;
+  name: string;
+};
+
+export type ListIdentityDocumentPhotos200PhotosItemReviewedBy = {
+  id: number;
+  name: string;
+} | null;
+
+/**
+ * @nullable
+ */
+export type ListIdentityDocumentPhotos200PhotosItemQualityReason =
+  | (typeof ListIdentityDocumentPhotos200PhotosItemQualityReason)[keyof typeof ListIdentityDocumentPhotos200PhotosItemQualityReason]
+  | null;
+
+export const ListIdentityDocumentPhotos200PhotosItemQualityReason = {
+  blurry: "blurry",
+  glare: "glare",
+  cropped: "cropped",
+  wrong_side: "wrong_side",
+  other: "other",
+} as const;
+
+export type ListIdentityDocumentPhotos200PhotosItem = {
+  id: string;
+  hireId: number;
+  category: ListIdentityDocumentPhotos200PhotosItemCategory;
+  side: ListIdentityDocumentPhotos200PhotosItemSide;
+  status: ListIdentityDocumentPhotos200PhotosItemStatus;
+  uploadedAt: string;
+  uploadedBy: ListIdentityDocumentPhotos200PhotosItemUploadedBy;
+  /** @nullable */
+  reviewedAt: string | null;
+  reviewedBy: ListIdentityDocumentPhotos200PhotosItemReviewedBy;
+  /** @nullable */
+  qualityReason: ListIdentityDocumentPhotos200PhotosItemQualityReason;
+  /** @nullable */
+  replacesId: string | null;
+  /** @nullable */
+  supersededAt: string | null;
+};
+
+export type ListIdentityDocumentPhotos200EventsItemActor = {
+  id: number;
+  name: string;
+};
+
+export type ListIdentityDocumentPhotos200EventsItem = {
+  id: string;
+  /** @nullable */
+  photoId: string | null;
+  action: string;
+  /** @nullable */
+  details: string | null;
+  actor: ListIdentityDocumentPhotos200EventsItemActor;
+  createdAt: string;
+};
+
+export type ListIdentityDocumentPhotos200 = {
+  photos: ListIdentityDocumentPhotos200PhotosItem[];
+  events: ListIdentityDocumentPhotos200EventsItem[];
+};
+
+export type LinkIdentityDocumentEmployeeBody = {
+  /** @minimum 1 */
+  staffId: number;
+};
+
+export type LinkIdentityDocumentEmployee200 = {
+  success: boolean;
+};
+
+export type ReserveIdentityDocumentUploadBodyCategory =
+  (typeof ReserveIdentityDocumentUploadBodyCategory)[keyof typeof ReserveIdentityDocumentUploadBodyCategory];
+
+export const ReserveIdentityDocumentUploadBodyCategory = {
+  identity: "identity",
+  work_authorization: "work_authorization",
+  social_security: "social_security",
+} as const;
+
+export type ReserveIdentityDocumentUploadBodySide =
+  (typeof ReserveIdentityDocumentUploadBodySide)[keyof typeof ReserveIdentityDocumentUploadBodySide];
+
+export const ReserveIdentityDocumentUploadBodySide = {
+  front: "front",
+  back: "back",
+} as const;
+
+export type ReserveIdentityDocumentUploadBodyContentType =
+  (typeof ReserveIdentityDocumentUploadBodyContentType)[keyof typeof ReserveIdentityDocumentUploadBodyContentType];
+
+export const ReserveIdentityDocumentUploadBodyContentType = {
+  "image/jpeg": "image/jpeg",
+  "image/png": "image/png",
+  "image/webp": "image/webp",
+  "image/heic": "image/heic",
+  "image/heif": "image/heif",
+} as const;
+
+export type ReserveIdentityDocumentUploadBody = {
+  /** @minimum 1 */
+  hireId: number;
+  category: ReserveIdentityDocumentUploadBodyCategory;
+  side: ReserveIdentityDocumentUploadBodySide;
+  /**
+   * @minimum 1
+   * @maximum 8388608
+   */
+  size: number;
+  contentType: ReserveIdentityDocumentUploadBodyContentType;
+  /** @nullable */
+  replacesId: string | null;
+};
+
+export type ReserveIdentityDocumentUpload201 = {
+  id: string;
+  uploadURL: string;
+};
+
+export type CompleteIdentityDocumentUpload200Category =
+  (typeof CompleteIdentityDocumentUpload200Category)[keyof typeof CompleteIdentityDocumentUpload200Category];
+
+export const CompleteIdentityDocumentUpload200Category = {
+  identity: "identity",
+  work_authorization: "work_authorization",
+  social_security: "social_security",
+} as const;
+
+export type CompleteIdentityDocumentUpload200Side =
+  (typeof CompleteIdentityDocumentUpload200Side)[keyof typeof CompleteIdentityDocumentUpload200Side];
+
+export const CompleteIdentityDocumentUpload200Side = {
+  front: "front",
+  back: "back",
+} as const;
+
+export type CompleteIdentityDocumentUpload200Status =
+  (typeof CompleteIdentityDocumentUpload200Status)[keyof typeof CompleteIdentityDocumentUpload200Status];
+
+export const CompleteIdentityDocumentUpload200Status = {
+  uploaded: "uploaded",
+  needs_clearer_photo: "needs_clearer_photo",
+  reviewed: "reviewed",
+} as const;
+
+export type CompleteIdentityDocumentUpload200UploadedBy = {
+  id: number;
+  name: string;
+};
+
+export type CompleteIdentityDocumentUpload200ReviewedBy = {
+  id: number;
+  name: string;
+} | null;
+
+/**
+ * @nullable
+ */
+export type CompleteIdentityDocumentUpload200QualityReason =
+  | (typeof CompleteIdentityDocumentUpload200QualityReason)[keyof typeof CompleteIdentityDocumentUpload200QualityReason]
+  | null;
+
+export const CompleteIdentityDocumentUpload200QualityReason = {
+  blurry: "blurry",
+  glare: "glare",
+  cropped: "cropped",
+  wrong_side: "wrong_side",
+  other: "other",
+} as const;
+
+export type CompleteIdentityDocumentUpload200 = {
+  id: string;
+  hireId: number;
+  category: CompleteIdentityDocumentUpload200Category;
+  side: CompleteIdentityDocumentUpload200Side;
+  status: CompleteIdentityDocumentUpload200Status;
+  uploadedAt: string;
+  uploadedBy: CompleteIdentityDocumentUpload200UploadedBy;
+  /** @nullable */
+  reviewedAt: string | null;
+  reviewedBy: CompleteIdentityDocumentUpload200ReviewedBy;
+  /** @nullable */
+  qualityReason: CompleteIdentityDocumentUpload200QualityReason;
+  /** @nullable */
+  replacesId: string | null;
+  /** @nullable */
+  supersededAt: string | null;
+};
+
+export type CancelIdentityDocumentUpload200 = {
+  success: boolean;
+};
+
+export type ReviewIdentityDocumentPhotoBodyStatus =
+  (typeof ReviewIdentityDocumentPhotoBodyStatus)[keyof typeof ReviewIdentityDocumentPhotoBodyStatus];
+
+export const ReviewIdentityDocumentPhotoBodyStatus = {
+  reviewed: "reviewed",
+  needs_clearer_photo: "needs_clearer_photo",
+} as const;
+
+export type ReviewIdentityDocumentPhotoBodyReason =
+  (typeof ReviewIdentityDocumentPhotoBodyReason)[keyof typeof ReviewIdentityDocumentPhotoBodyReason];
+
+export const ReviewIdentityDocumentPhotoBodyReason = {
+  blurry: "blurry",
+  glare: "glare",
+  cropped: "cropped",
+  wrong_side: "wrong_side",
+  other: "other",
+} as const;
+
+export type ReviewIdentityDocumentPhotoBody = {
+  status: ReviewIdentityDocumentPhotoBodyStatus;
+  reason?: ReviewIdentityDocumentPhotoBodyReason;
+};
+
+export type ReviewIdentityDocumentPhoto200 = {
+  success: boolean;
+};
 
 export type ListTasksParams = {
   areaId?: number;
@@ -1099,3 +1529,39 @@ export type GetInspectorWorkflow200 = {
   /** @nullable */
   completionEmailDeliveryStatus?: GetInspectorWorkflow200CompletionEmailDeliveryStatus;
 };
+
+export type GetEmploymentJobApplicationParams = {
+  /**
+   * Set to 1 to download instead of opening inline.
+   */
+  download?: GetEmploymentJobApplicationDownload;
+};
+
+export type GetEmploymentJobApplicationDownload =
+  (typeof GetEmploymentJobApplicationDownload)[keyof typeof GetEmploymentJobApplicationDownload];
+
+export const GetEmploymentJobApplicationDownload = {
+  NUMBER_1: "1",
+} as const;
+
+export type GetEmploymentI9FormParams = {
+  download?: GetEmploymentI9FormDownload;
+};
+
+export type GetEmploymentI9FormDownload =
+  (typeof GetEmploymentI9FormDownload)[keyof typeof GetEmploymentI9FormDownload];
+
+export const GetEmploymentI9FormDownload = {
+  NUMBER_1: "1",
+} as const;
+
+export type GetEmploymentW4FormParams = {
+  download?: GetEmploymentW4FormDownload;
+};
+
+export type GetEmploymentW4FormDownload =
+  (typeof GetEmploymentW4FormDownload)[keyof typeof GetEmploymentW4FormDownload];
+
+export const GetEmploymentW4FormDownload = {
+  NUMBER_1: "1",
+} as const;

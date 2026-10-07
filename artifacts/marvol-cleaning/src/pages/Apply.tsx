@@ -91,6 +91,13 @@ export default function Apply() {
         has_position: Boolean(positionApplied.trim()),
         document_count: documents.length,
       });
+      setFirstName("");
+      setLastName("");
+      setEmail("");
+      setPhone("");
+      setPositionApplied("");
+      setGroups({ application: {}, i9Employee: {}, w4Employee: {} });
+      setDocuments([]);
       setSubmitted(true);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch {
@@ -143,6 +150,26 @@ export default function Apply() {
           <LanguageSwitcher />
         </div>
       </header>
+
+      <section aria-labelledby="blank-templates-title" className="max-w-3xl mx-auto px-4 pt-6">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <h2 id="blank-templates-title" className="text-base font-semibold text-slate-900">
+            {t("employment.apply.blankTemplates")}
+          </h2>
+          <div className="mt-3 flex flex-wrap gap-3">
+            {[
+              ["job-application", t("employment.forms.jobApplication")],
+              ["i-9", t("employment.forms.i9")],
+              ["w-4", t("employment.forms.w4")],
+            ].map(([id, label]) => (
+              <a key={id} href={`${BASE_URL}/api/employment-forms/${id}?download=1`}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                {label}
+              </a>
+            ))}
+          </div>
+        </div>
+      </section>
 
       <form onSubmit={handleSubmit} className="max-w-3xl mx-auto px-4 py-8 space-y-6">
         {/* Applicant identity */}
@@ -233,6 +260,7 @@ export default function Apply() {
             <span className="text-sm text-slate-500">{t("employment.apply.uploadPrompt")}</span>
             <input
               type="file"
+              accept="application/pdf,image/jpeg,image/png,image/webp"
               multiple
               className="hidden"
               onChange={(e) => handleFiles(e.target.files)}
