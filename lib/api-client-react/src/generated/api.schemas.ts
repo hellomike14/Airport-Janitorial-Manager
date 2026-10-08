@@ -971,6 +971,18 @@ export interface EmploymentFormSubmissionRequest {
   idPhotos?: ApplicationUploadDocument[];
 }
 
+export interface OnboardingProtocolEmailInput {
+  /**
+   * @minLength 3
+   * @maxLength 254
+   */
+  recipientEmail: string;
+}
+
+export interface OnboardingProtocolEmailResponse {
+  accepted: boolean;
+}
+
 export type EmploymentFormSubmissionSummaryEmailStatus =
   (typeof EmploymentFormSubmissionSummaryEmailStatus)[keyof typeof EmploymentFormSubmissionSummaryEmailStatus];
 

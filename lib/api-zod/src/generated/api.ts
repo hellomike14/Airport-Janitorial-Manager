@@ -1804,6 +1804,21 @@ export const ResendEmploymentFormSubmissionEmailResponse = zod.object({
 });
 
 /**
+ * Requires an authenticated administrator session. The PDF is read from protected storage by the server and is never accepted from the client.
+ * @summary Send the current onboarding protocol PDF to an administrator-selected recipient
+ */
+export const emailOnboardingProtocolBodyRecipientEmailMin = 3;
+export const emailOnboardingProtocolBodyRecipientEmailMax = 254;
+
+export const EmailOnboardingProtocolBody = zod.object({
+  recipientEmail: zod
+    .string()
+    .email()
+    .min(emailOnboardingProtocolBodyRecipientEmailMin)
+    .max(emailOnboardingProtocolBodyRecipientEmailMax),
+});
+
+/**
  * @summary List onboarding hires with progress
  */
 export const ListOnboardingHiresResponseItem = zod.object({

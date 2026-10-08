@@ -88,6 +88,8 @@ import type {
   Notification,
   OnboardingHire,
   OnboardingItem,
+  OnboardingProtocolEmailInput,
+  OnboardingProtocolEmailResponse,
   PreviewTerminalGroupScheduleMoveParams,
   QuickbooksConnectUrl,
   QuickbooksStatus,
@@ -6359,6 +6361,97 @@ export const useResendEmploymentFormSubmissionEmail = <
   return useMutation(
     getResendEmploymentFormSubmissionEmailMutationOptions(options),
   );
+};
+
+/**
+ * Requires an authenticated administrator session. The PDF is read from protected storage by the server and is never accepted from the client.
+ * @summary Send the current onboarding protocol PDF to an administrator-selected recipient
+ */
+export const getEmailOnboardingProtocolUrl = () => {
+  return `/api/onboarding-protocol/email`;
+};
+
+export const emailOnboardingProtocol = async (
+  onboardingProtocolEmailInput: OnboardingProtocolEmailInput,
+  options?: RequestInit,
+): Promise<OnboardingProtocolEmailResponse> => {
+  return customFetch<OnboardingProtocolEmailResponse>(
+    getEmailOnboardingProtocolUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(onboardingProtocolEmailInput),
+    },
+  );
+};
+
+export const getEmailOnboardingProtocolMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof emailOnboardingProtocol>>,
+    TError,
+    { data: BodyType<OnboardingProtocolEmailInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof emailOnboardingProtocol>>,
+  TError,
+  { data: BodyType<OnboardingProtocolEmailInput> },
+  TContext
+> => {
+  const mutationKey = ["emailOnboardingProtocol"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof emailOnboardingProtocol>>,
+    { data: BodyType<OnboardingProtocolEmailInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return emailOnboardingProtocol(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type EmailOnboardingProtocolMutationResult = NonNullable<
+  Awaited<ReturnType<typeof emailOnboardingProtocol>>
+>;
+export type EmailOnboardingProtocolMutationBody =
+  BodyType<OnboardingProtocolEmailInput>;
+export type EmailOnboardingProtocolMutationError = ErrorType<void>;
+
+/**
+ * @summary Send the current onboarding protocol PDF to an administrator-selected recipient
+ */
+export const useEmailOnboardingProtocol = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof emailOnboardingProtocol>>,
+    TError,
+    { data: BodyType<OnboardingProtocolEmailInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof emailOnboardingProtocol>>,
+  TError,
+  { data: BodyType<OnboardingProtocolEmailInput> },
+  TContext
+> => {
+  return useMutation(getEmailOnboardingProtocolMutationOptions(options));
 };
 
 /**

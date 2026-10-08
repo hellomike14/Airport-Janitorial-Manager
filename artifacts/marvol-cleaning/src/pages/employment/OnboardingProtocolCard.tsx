@@ -4,7 +4,7 @@ import { OnboardingProtocolActions } from "./OnboardingProtocolActions";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
-export function OnboardingProtocolCard() {
+export function OnboardingProtocolCard({ canEmailProtocol = false }: { canEmailProtocol?: boolean }) {
   const { t } = useTranslation();
   const url = `${BASE_URL}/api/onboarding-protocol`;
   return (
@@ -43,7 +43,7 @@ export function OnboardingProtocolCard() {
           {t("employment.onboarding.protocol.download")}
         </a>
       </div>
-      <OnboardingProtocolActions protectedUrl={url} />
+      <OnboardingProtocolActions protectedUrl={url} canEmailProtocol={canEmailProtocol} />
     </section>
   );
 }

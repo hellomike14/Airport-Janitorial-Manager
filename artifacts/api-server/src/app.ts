@@ -13,9 +13,11 @@ import { inboundSendgridRouter } from "./routes/messages";
 import internalRouter from "./routes/internal";
 import { inboundParseMiddleware } from "./lib/inboundParseMiddleware";
 import { safeRecordServerDiagnostic } from "./lib/authDiagnostics";
+import { requestLogger } from "./lib/logger";
 
 const app: Express = express();
 
+app.use(requestLogger);
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 
 app.use(cors({ credentials: true, origin: true }));

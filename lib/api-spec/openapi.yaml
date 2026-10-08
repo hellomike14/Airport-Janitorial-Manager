@@ -1317,6 +1317,32 @@ paths:
         "404":
           description: Submission not found
 
+  /onboarding-protocol/email:
+    post:
+      operationId: emailOnboardingProtocol
+      tags: [employment]
+      summary: Send the current onboarding protocol PDF to an administrator-selected recipient
+      description: Requires an authenticated administrator session. The PDF is read from protected storage by the server and is never accepted from the client.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OnboardingProtocolEmailInput"
+      responses:
+        "202":
+          description: The configured email provider accepted the message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingProtocolEmailResponse"
+        "400": { description: Invalid recipient address }
+        "401": { description: Authenticated staff session required }
+        "403": { description: Administrator role required }
+        "413": { description: The onboarding protocol exceeds the email attachment limit }
+        "502": { description: Email provider rejected the message }
+        "503": { description: Email delivery is not configured or the protected PDF is unavailable }
+
   /onboarding:
     get:
       operationId: listOnboardingHires
@@ -3247,6 +3273,24 @@ components:
           items:
             $ref: "#/components/schemas/ApplicationUploadDocument"
       required: [formId, firstName, lastName, email, completedPdf]
+
+    OnboardingProtocolEmailInput:
+      type: object
+      additionalProperties: false
+      properties:
+        recipientEmail:
+          type: string
+          format: email
+          minLength: 3
+          maxLength: 254
+      required: [recipientEmail]
+
+    OnboardingProtocolEmailResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        accepted: { type: boolean }
+      required: [accepted]
 
     EmploymentFormSubmissionSummary:
       type: object
