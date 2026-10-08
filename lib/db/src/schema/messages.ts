@@ -32,8 +32,38 @@ export const messagesTable = pgTable("messages", {
   beforeImagePath: text("before_image_path"),
   afterImagePath: text("after_image_path"),
   isRead: boolean("is_read").notNull().default(false),
+  // Body edits advance this version so acknowledgments never carry forward
+  // from an earlier message body. Existing rows start at version 1.
+  receiptVersion: integer("receipt_version").notNull().default(1),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => [unique("messages_sender_client_request_unique").on(t.senderId, t.clientRequestId)]);
+
+export type MessageReceiptDirection = "to_inspector" | "from_inspector";
+
+/**
+ * Append-only receipt evidence. Deliberately no foreign keys: message cleanup
+ * and staff archival must not cascade-delete previously recorded evidence.
+ */
+export const messageReceiptAcknowledgementsTable = pgTable(
+  "message_receipt_acknowledgements",
+  {
+    id: serial("id").primaryKey(),
+    conversationId: integer("conversation_id").notNull(),
+    messageId: integer("message_id").notNull(),
+    messageVersion: integer("message_version").notNull(),
+    bodySha256: text("body_sha256").notNull(),
+    direction: text("direction").$type<MessageReceiptDirection>().notNull(),
+    confirmedByStaffId: integer("confirmed_by_staff_id").notNull(),
+    confirmedByName: text("confirmed_by_name").notNull(),
+    confirmedByRole: text("confirmed_by_role").notNull(),
+    confirmedAt: timestamp("confirmed_at").notNull().defaultNow(),
+  },
+  (t) => [
+    unique("message_receipt_acknowledgements_message_version_unique").on(t.messageId, t.messageVersion),
+    index("message_receipt_acknowledgements_conversation_idx").on(t.conversationId, t.messageId),
+    check("message_receipt_acknowledgements_version_positive", sql`${t.messageVersion} > 0`),
+  ],
+);
 
 export type MessageEmailDeliveryStatus = "pending" | "sending" | "retrying" | "accepted" | "disabled" | "not_configured" | "failed";
 

@@ -10,6 +10,7 @@ export const INSPECTOR_RECIPIENT_EMAILS = [
   "clarence.randle@goaa.org",
   "jcampbell@goaa.org",
   "madaline.miralles@goaa.org",
+  "moussa.barmaki@goaa.org",
   "raquel.santana@goaa.org",
   "wendy.garrastegui@goaa.org",
   "yrene.ruizsanchez@goaa.org",

@@ -997,12 +997,49 @@ paths:
               schema:
                 $ref: "#/components/schemas/ChatMessage"
 
+  /conversations/{id}/messages/{msgId}/receipt:
+    post:
+      operationId: confirmConversationMessageReceipt
+      tags: [messages]
+      summary: Record an authenticated in-app receipt acknowledgment for an inspector email message
+      description: Actor identity comes from the verified session. The request accepts no staff identifier and never sends email.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: msgId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: This message version already has a receipt acknowledgment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageReceiptConfirmationResponse"
+        "201":
+          description: Receipt acknowledgment recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageReceiptConfirmationResponse"
+        "401":
+          description: Login session required
+        "403":
+          description: Caller is not authorized to acknowledge this message
+        "404":
+          description: Conversation or message not found
+        "409":
+          description: Message is not an inspector email receipt eligible for acknowledgment
+
   /conversations/{id}/old-messages:
     delete:
       operationId: deleteOldConversationMessages
       tags: [messages]
       summary: Permanently remove messages before a date from one conversation
-      description: Admin only. Messages linked to inspector tasks or awaiting email delivery are retained.
+      description: Admin only. Messages linked to inspector tasks, receipt acknowledgments, or awaiting email delivery are retained.
       parameters:
         - name: id
           in: path
@@ -3044,6 +3081,70 @@ components:
         - senderId
         - body
 
+    MessageReceiptConfirmer:
+      type: object
+      required: [name, role]
+      properties:
+        name:
+          type: string
+        role:
+          type: string
+
+    MessageReceiptPreviousVersion:
+      type: object
+      required: [version, confirmedBy, confirmedAt]
+      properties:
+        version:
+          type: integer
+        confirmedBy:
+          $ref: "#/components/schemas/MessageReceiptConfirmer"
+        confirmedAt:
+          type: string
+          format: date-time
+
+    ChatMessageReceipt:
+      type: object
+      required: [applicable, direction, status, version, canConfirm, confirmedBy, confirmedAt, previousVersions]
+      properties:
+        applicable:
+          type: boolean
+        direction:
+          type: ["string", "null"]
+          enum: [to_inspector, from_inspector, null]
+        status:
+          type: string
+          enum: [not_applicable, unconfirmed, confirmed]
+        version:
+          type: integer
+        canConfirm:
+          type: boolean
+        confirmedBy:
+          type: ["object", "null"]
+          properties:
+            name:
+              type: string
+            role:
+              type: string
+          required: [name, role]
+        confirmedAt:
+          type: ["string", "null"]
+          format: date-time
+        previousVersions:
+          type: array
+          items:
+            $ref: "#/components/schemas/MessageReceiptPreviousVersion"
+
+    MessageReceiptConfirmationResponse:
+      type: object
+      required: [messageId, alreadyConfirmed, receipt]
+      properties:
+        messageId:
+          type: integer
+        alreadyConfirmed:
+          type: boolean
+        receipt:
+          $ref: "#/components/schemas/ChatMessageReceipt"
+
     ChatMessage:
       type: object
       properties:
@@ -3063,6 +3164,10 @@ components:
           type: ["string", "null"]
         isRead:
           type: boolean
+        receiptVersion:
+          type: integer
+        receipt:
+          $ref: "#/components/schemas/ChatMessageReceipt"
         inspectorWorkflowTaskId:
           type: [integer, 'null']
         inspectorEmailDeliveryStatus:
@@ -3093,6 +3198,8 @@ components:
         - beforeImagePath
         - afterImagePath
         - isRead
+        - receiptVersion
+        - receipt
         - inspectorWorkflowTaskId
         - inspectorEmailDeliveryStatus
         - inspectorEmailRecipients

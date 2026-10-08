@@ -1371,6 +1371,37 @@ export const ListConversationMessagesResponseItem = zod.object({
   beforeImagePath: zod.string().nullable(),
   afterImagePath: zod.string().nullable(),
   isRead: zod.boolean(),
+  receiptVersion: zod.number(),
+  receipt: zod.object({
+    applicable: zod.boolean(),
+    direction: zod
+      .union([
+        zod.literal("to_inspector"),
+        zod.literal("from_inspector"),
+        zod.literal(null),
+      ])
+      .nullable(),
+    status: zod.enum(["not_applicable", "unconfirmed", "confirmed"]),
+    version: zod.number(),
+    canConfirm: zod.boolean(),
+    confirmedBy: zod
+      .object({
+        name: zod.string(),
+        role: zod.string(),
+      })
+      .nullable(),
+    confirmedAt: zod.date().nullable(),
+    previousVersions: zod.array(
+      zod.object({
+        version: zod.number(),
+        confirmedBy: zod.object({
+          name: zod.string(),
+          role: zod.string(),
+        }),
+        confirmedAt: zod.date(),
+      }),
+    ),
+  }),
   inspectorWorkflowTaskId: zod.number().nullable(),
   inspectorEmailDeliveryStatus: zod.enum([
     "pending",
@@ -1439,7 +1470,51 @@ export const SendConversationMessageBody = zod.object({
 });
 
 /**
- * Admin only. Messages linked to inspector tasks or awaiting email delivery are retained.
+ * Actor identity comes from the verified session. The request accepts no staff identifier and never sends email.
+ * @summary Record an authenticated in-app receipt acknowledgment for an inspector email message
+ */
+export const ConfirmConversationMessageReceiptParams = zod.object({
+  id: zod.coerce.number(),
+  msgId: zod.coerce.number(),
+});
+
+export const ConfirmConversationMessageReceiptResponse = zod.object({
+  messageId: zod.number(),
+  alreadyConfirmed: zod.boolean(),
+  receipt: zod.object({
+    applicable: zod.boolean(),
+    direction: zod
+      .union([
+        zod.literal("to_inspector"),
+        zod.literal("from_inspector"),
+        zod.literal(null),
+      ])
+      .nullable(),
+    status: zod.enum(["not_applicable", "unconfirmed", "confirmed"]),
+    version: zod.number(),
+    canConfirm: zod.boolean(),
+    confirmedBy: zod
+      .object({
+        name: zod.string(),
+        role: zod.string(),
+      })
+      .nullable(),
+    confirmedAt: zod.date().nullable(),
+    previousVersions: zod.array(
+      zod.object({
+        version: zod.number(),
+        confirmedBy: zod.object({
+          name: zod.string(),
+          role: zod.string(),
+        }),
+        confirmedAt: zod.date(),
+      }),
+    ),
+  }),
+});
+
+/**
+ * Admin only. Messages linked to inspector tasks, receipt acknowledgments, or awaiting email delivery are retained.
  * @summary Permanently remove messages before a date from one conversation
  */
 export const DeleteOldConversationMessagesParams = zod.object({
