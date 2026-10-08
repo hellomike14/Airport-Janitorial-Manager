@@ -12,7 +12,7 @@ test("staff protocol delivery preserves PDF bytes, access control and explicit e
   const storage: Pick<ObjectStorageService, "getObjectEntityFile"> = {
     async getObjectEntityFile(path) {
       reads++;
-      assert.equal(path, "/objects/uploads/717d414a-0c8c-4fed-9e44-4f72c57298a1");
+      assert.equal(path, "/objects/uploads/61d217bf-00af-4626-bd97-a84405b38a63");
       if (unavailable) throw new Error("Unavailable");
       return { download: async () => [pdf] } as unknown as Awaited<ReturnType<ObjectStorageService["getObjectEntityFile"]>>;
     },
