@@ -32,6 +32,13 @@ export default function Employment() {
     document.title = t("employment.title");
   }, [t]);
 
+  const navigateToTab = (nextTab: Tab) => {
+    setTab(nextTab);
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", nextTab);
+    window.history.replaceState(null, "", url);
+  };
+
   const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
     { id: "applications", label: t("employment.tabs.applications"), icon: FileText },
     { id: "onboarding", label: t("employment.tabs.onboarding"), icon: ClipboardCheck },
@@ -54,12 +61,7 @@ export default function Employment() {
             type="button"
             data-testid={`employment-tab-${id}`}
             aria-pressed={activeTab === id}
-            onClick={() => {
-              setTab(id);
-              const url = new URL(window.location.href);
-              url.searchParams.set("tab", id);
-              window.history.replaceState(null, "", url);
-            }}
+            onClick={() => navigateToTab(id)}
             className={`flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
               activeTab === id
                 ? "border-emerald-600 text-emerald-700"
@@ -75,7 +77,7 @@ export default function Employment() {
       {effectiveRole === "admin" && activeTab === "applications" && (
         <ConfidentialBoundary><ApplicationsTab /></ConfidentialBoundary>
       )}
-      {activeTab === "onboarding" && <OnboardingTab />}
+      {activeTab === "onboarding" && <OnboardingTab onOpenForms={() => navigateToTab("forms")} />}
       {activeTab === "forms" && <FormsTab />}
       {effectiveRole === "admin" && activeTab === "submitted-forms" && (
         <ConfidentialBoundary>

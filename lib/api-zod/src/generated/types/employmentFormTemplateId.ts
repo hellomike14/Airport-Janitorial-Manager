@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type EmploymentFormId =
-  (typeof EmploymentFormId)[keyof typeof EmploymentFormId];
+export type EmploymentFormTemplateId =
+  (typeof EmploymentFormTemplateId)[keyof typeof EmploymentFormTemplateId];
 
-export const EmploymentFormId = {
+export const EmploymentFormTemplateId = {
   "job-application": "job-application",
   "i-9": "i-9",
   "w-4": "w-4",
@@ -43,4 +43,5 @@ export const EmploymentFormId = {
   "badge-control": "badge-control",
   "i9-everify-tracker": "i9-everify-tracker",
   "training-matrix": "training-matrix",
+  "onboarding-index": "onboarding-index",
 } as const;

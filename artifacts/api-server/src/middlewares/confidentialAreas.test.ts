@@ -45,6 +45,25 @@ test("blank templates and applicant submission stay public; all completed submis
       assert.equal(response.status, 200, path);
       assert.match(response.headers.get("content-type")!, /application\/pdf/);
     }
+    for (const formId of [
+      "offer-tracking",
+      "knowledge-check-guide",
+      "independent-work-release",
+      "exception-correction",
+      "badging-checklist",
+      "badge-control",
+      "i9-everify-tracker",
+    ]) {
+      const path = `/employment-forms/${formId}`;
+      const anonymous = await get(path);
+      assert.equal(anonymous.status, 401, `${formId} blocks anonymous access`);
+      assert.equal(anonymous.headers.get("cache-control"), "private, no-store");
+      assert.equal((await get(path, "staff")).status, 403, `${formId} blocks non-Admin access`);
+      assert.equal((await get(path, "admin")).status, 423, `${formId} requires the confidential access code`);
+      const unlocked = await get(path, "admin", true);
+      assert.equal(unlocked.status, 200, `${formId} opens for an unlocked Admin`);
+      assert.match(unlocked.headers.get("content-type")!, /application\/pdf/);
+    }
     assert.deepEqual(await (await fetch(`${base}/applications`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ firstName: "Public applicant" }) })).json(), { success: true });
     assert.deepEqual(await (await fetch(`${base}/employment-form-submissions`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ firstName: "Public applicant" }) })).json(), { success: true, emailSent: true });
     for (const role of [undefined, "applicant", "staff", "supervisor"]) {

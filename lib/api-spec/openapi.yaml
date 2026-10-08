@@ -1846,6 +1846,42 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
 
+  /employment-forms/{formId}:
+    get:
+      operationId: getEmploymentFormTemplate
+      tags: [Employment]
+      summary: Open or download an allowlisted blank employment template PDF
+      description: Non-restricted blank templates are public. Seven onboarding templates require a verified Admin session and confidential access code. Completed records are never served from this route.
+      parameters:
+        - name: formId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/EmploymentFormTemplateId"
+        - name: download
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: ["1"]
+          description: Set to 1 to download instead of opening inline.
+      responses:
+        "200":
+          description: Allowlisted blank PDF template
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Invalid download option
+        "403":
+          description: Administrator and confidential access required for restricted templates
+        "404":
+          description: Template not found
+        "503":
+          description: Template temporarily unavailable
+
   /employment-forms/job-application:
     get:
       operationId: getEmploymentJobApplication
@@ -1930,14 +1966,14 @@ paths:
     post:
       operationId: emailEmploymentBlankForm
       tags: [Employment]
-      summary: Send a fixed blank Employment template PDF to a validated recipient
-      description: Public endpoint with per-IP rate limiting. Only one of the three server-allowlisted blank templates can be attached; client file and URL inputs are rejected.
+      summary: Send a fixed blank employment template PDF to a validated recipient
+      description: Per-IP rate-limited. Only a server-allowlisted template is attached; client file and URL inputs are rejected. Restricted onboarding templates require a verified Admin session and confidential access code.
       parameters:
         - name: formId
           in: path
           required: true
           schema:
-            $ref: "#/components/schemas/EmploymentFormId"
+            $ref: "#/components/schemas/EmploymentFormTemplateId"
       requestBody:
         required: true
         content:
@@ -3399,7 +3435,78 @@ components:
 
     EmploymentFormId:
       type: string
-      enum: [job-application, i-9, w-4]
+      enum:
+        - job-application
+        - i-9
+        - w-4
+        - onboarding-cover
+        - administrative-checklist
+        - conditional-offer
+        - offer-acceptance
+        - acceptance-receipt
+        - start-confirmation
+        - offer-tracking
+        - emergency-contact
+        - payroll-setup
+        - language-accessibility
+        - uniform-equipment-issue
+        - site-orientation
+        - orientation-acknowledgment
+        - training-attendance
+        - video-attestation
+        - knowledge-check
+        - knowledge-check-guide
+        - practical-assessment
+        - buddy-shift
+        - independent-work-release
+        - day-7-review
+        - day-30-review
+        - day-60-review
+        - day-90-review
+        - exception-correction
+        - badging-checklist
+        - badge-rules-acknowledgment
+        - badge-control
+        - i9-everify-tracker
+        - training-matrix
+
+    EmploymentFormTemplateId:
+      type: string
+      enum:
+        - job-application
+        - i-9
+        - w-4
+        - onboarding-cover
+        - administrative-checklist
+        - conditional-offer
+        - offer-acceptance
+        - acceptance-receipt
+        - start-confirmation
+        - offer-tracking
+        - emergency-contact
+        - payroll-setup
+        - language-accessibility
+        - uniform-equipment-issue
+        - site-orientation
+        - orientation-acknowledgment
+        - training-attendance
+        - video-attestation
+        - knowledge-check
+        - knowledge-check-guide
+        - practical-assessment
+        - buddy-shift
+        - independent-work-release
+        - day-7-review
+        - day-30-review
+        - day-60-review
+        - day-90-review
+        - exception-correction
+        - badging-checklist
+        - badge-rules-acknowledgment
+        - badge-control
+        - i9-everify-tracker
+        - training-matrix
+        - onboarding-index
 
     EmploymentFormSubmissionRequest:
       type: object

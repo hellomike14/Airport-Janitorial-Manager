@@ -2,7 +2,17 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import express from "express";
 import { once } from "node:events";
-import { createEmploymentFormsRouter } from "./employmentForms";
+import {
+  createEmploymentFormsRouter,
+  isPublicBlankEmploymentEmail,
+  isPublicBlankEmploymentTemplate,
+} from "./employmentForms";
+import {
+  getOnboardingCompanyForms,
+  getOnboardingFormTemplate,
+  ONBOARDING_INDEX_ID,
+  readOnboardingFormTemplate,
+} from "../lib/onboardingFormAssets";
 import type { ObjectStorageService } from "../lib/objectStorage";
 import type { EmploymentEmail } from "../lib/employmentFormEmail";
 
@@ -206,6 +216,70 @@ test("public blank form email endpoint limits requests per router and IP", async
     assert.equal(limited.status, 429);
     assert.ok(Number(limited.headers.get("retry-after")) > 0);
     assert.equal(sends, 5);
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+  }
+});
+
+test("all unrestricted onboarding templates and the three-page index can be downloaded and emailed", async () => {
+  const companyForms = getOnboardingCompanyForms();
+  const restrictedForms = companyForms.filter(form => form.restricted);
+  assert.equal(companyForms.length, 30);
+  assert.equal(restrictedForms.length, 7);
+
+  for (const form of companyForms) {
+    assert.equal(
+      isPublicBlankEmploymentTemplate(`/employment-forms/${form.id}`, "GET"),
+      !form.restricted,
+      `${form.id} GET privacy`,
+    );
+    assert.equal(
+      isPublicBlankEmploymentEmail(`/employment-forms/${form.id}/email`, "POST"),
+      !form.restricted,
+      `${form.id} email privacy`,
+    );
+  }
+  assert.equal(isPublicBlankEmploymentTemplate(`/employment-forms/${ONBOARDING_INDEX_ID}`, "GET"), true);
+  assert.equal(isPublicBlankEmploymentEmail(`/employment-forms/${ONBOARDING_INDEX_ID}/email`, "POST"), true);
+
+  const publicTemplates = [
+    ...companyForms.filter(form => !form.restricted),
+    getOnboardingFormTemplate(ONBOARDING_INDEX_ID)!,
+  ];
+  const sentEmails: EmploymentEmail[] = [];
+  const app = express();
+  app.use(express.json());
+  app.use(createEmploymentFormsRouter(undefined, undefined, async message => { sentEmails.push(message); }));
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const base = `http://127.0.0.1:${(server.address() as { port: number }).port}/employment-forms`;
+  try {
+    for (const template of publicTemplates) {
+      const expected = await readOnboardingFormTemplate(template.id);
+      const opened = await fetch(`${base}/${template.id}`);
+      assert.equal(opened.status, 200, `${template.id} opens`);
+      assert.equal(opened.headers.get("content-type"), "application/pdf");
+      assert.equal(opened.headers.get("content-disposition"), `inline; filename="${template.filename}"`);
+      assert.deepEqual(Buffer.from(await opened.arrayBuffer()), expected);
+
+      const downloaded = await fetch(`${base}/${template.id}?download=1`);
+      assert.equal(downloaded.status, 200, `${template.id} downloads`);
+      assert.equal(downloaded.headers.get("content-disposition"), `attachment; filename="${template.filename}"`);
+    }
+
+    const email = await fetch(`${base}/conditional-offer/email`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ recipientEmail: "onboarding@example.invalid" }),
+    });
+    assert.equal(email.status, 202);
+    assert.deepEqual(await email.json(), { accepted: true });
+    assert.equal(sentEmails.length, 1);
+    assert.equal(sentEmails[0]?.attachments[0]?.filename, "conditional-offer.pdf");
+    assert.deepEqual(
+      sentEmails[0]?.attachments[0]?.bytes,
+      await readOnboardingFormTemplate("conditional-offer"),
+    );
   } finally {
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
   }

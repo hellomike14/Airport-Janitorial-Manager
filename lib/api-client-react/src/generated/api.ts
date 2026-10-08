@@ -55,14 +55,15 @@ import type {
   DiagnosticStoreUnavailableError,
   EmailDeliveryReceipt,
   EmployeeTrainingStatus,
-  EmploymentFormId,
   EmploymentFormSubmission,
   EmploymentFormSubmissionRequest,
   EmploymentFormSubmissionSummary,
+  EmploymentFormTemplateId,
   EmploymentPdfEmailInput,
   ErrorEnvelope,
   GetAdminConfidentialAccessStatus200,
   GetDashboardParams,
+  GetEmploymentFormTemplateParams,
   GetEmploymentI9FormParams,
   GetEmploymentJobApplicationParams,
   GetEmploymentW4FormParams,
@@ -8198,6 +8199,125 @@ export function useGetAuthDiagnostics<
 }
 
 /**
+ * Non-restricted blank templates are public. Seven onboarding templates require a verified Admin session and confidential access code. Completed records are never served from this route.
+ * @summary Open or download an allowlisted blank employment template PDF
+ */
+export const getGetEmploymentFormTemplateUrl = (
+  formId: EmploymentFormTemplateId,
+  params?: GetEmploymentFormTemplateParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/employment-forms/${formId}?${stringifiedParams}`
+    : `/api/employment-forms/${formId}`;
+};
+
+export const getEmploymentFormTemplate = async (
+  formId: EmploymentFormTemplateId,
+  params?: GetEmploymentFormTemplateParams,
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getGetEmploymentFormTemplateUrl(formId, params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetEmploymentFormTemplateQueryKey = (
+  formId: EmploymentFormTemplateId,
+  params?: GetEmploymentFormTemplateParams,
+) => {
+  return [
+    `/api/employment-forms/${formId}`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetEmploymentFormTemplateQueryOptions = <
+  TData = Awaited<ReturnType<typeof getEmploymentFormTemplate>>,
+  TError = ErrorType<void>,
+>(
+  formId: EmploymentFormTemplateId,
+  params?: GetEmploymentFormTemplateParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEmploymentFormTemplate>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetEmploymentFormTemplateQueryKey(formId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getEmploymentFormTemplate>>
+  > = ({ signal }) =>
+    getEmploymentFormTemplate(formId, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!formId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getEmploymentFormTemplate>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetEmploymentFormTemplateQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getEmploymentFormTemplate>>
+>;
+export type GetEmploymentFormTemplateQueryError = ErrorType<void>;
+
+/**
+ * @summary Open or download an allowlisted blank employment template PDF
+ */
+
+export function useGetEmploymentFormTemplate<
+  TData = Awaited<ReturnType<typeof getEmploymentFormTemplate>>,
+  TError = ErrorType<void>,
+>(
+  formId: EmploymentFormTemplateId,
+  params?: GetEmploymentFormTemplateParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEmploymentFormTemplate>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetEmploymentFormTemplateQueryOptions(
+    formId,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
  * Public blank fillable template; exposes no submitted application data.
  * @summary Open or download the original fillable Marvol job application
  */
@@ -8507,15 +8627,17 @@ export function useGetEmploymentW4Form<
 }
 
 /**
- * Public endpoint with per-IP rate limiting. Only one of the three server-allowlisted blank templates can be attached; client file and URL inputs are rejected.
- * @summary Send a fixed blank Employment template PDF to a validated recipient
+ * Per-IP rate-limited. Only a server-allowlisted template is attached; client file and URL inputs are rejected. Restricted onboarding templates require a verified Admin session and confidential access code.
+ * @summary Send a fixed blank employment template PDF to a validated recipient
  */
-export const getEmailEmploymentBlankFormUrl = (formId: EmploymentFormId) => {
+export const getEmailEmploymentBlankFormUrl = (
+  formId: EmploymentFormTemplateId,
+) => {
   return `/api/employment-forms/${formId}/email`;
 };
 
 export const emailEmploymentBlankForm = async (
-  formId: EmploymentFormId,
+  formId: EmploymentFormTemplateId,
   employmentPdfEmailInput: EmploymentPdfEmailInput,
   options?: RequestInit,
 ): Promise<AcceptedEmailResponse> => {
@@ -8537,14 +8659,17 @@ export const getEmailEmploymentBlankFormMutationOptions = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof emailEmploymentBlankForm>>,
     TError,
-    { formId: EmploymentFormId; data: BodyType<EmploymentPdfEmailInput> },
+    {
+      formId: EmploymentFormTemplateId;
+      data: BodyType<EmploymentPdfEmailInput>;
+    },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof emailEmploymentBlankForm>>,
   TError,
-  { formId: EmploymentFormId; data: BodyType<EmploymentPdfEmailInput> },
+  { formId: EmploymentFormTemplateId; data: BodyType<EmploymentPdfEmailInput> },
   TContext
 > => {
   const mutationKey = ["emailEmploymentBlankForm"];
@@ -8558,7 +8683,10 @@ export const getEmailEmploymentBlankFormMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof emailEmploymentBlankForm>>,
-    { formId: EmploymentFormId; data: BodyType<EmploymentPdfEmailInput> }
+    {
+      formId: EmploymentFormTemplateId;
+      data: BodyType<EmploymentPdfEmailInput>;
+    }
   > = (props) => {
     const { formId, data } = props ?? {};
 
@@ -8576,7 +8704,7 @@ export type EmailEmploymentBlankFormMutationBody =
 export type EmailEmploymentBlankFormMutationError = ErrorType<void>;
 
 /**
- * @summary Send a fixed blank Employment template PDF to a validated recipient
+ * @summary Send a fixed blank employment template PDF to a validated recipient
  */
 export const useEmailEmploymentBlankForm = <
   TError = ErrorType<void>,
@@ -8585,14 +8713,17 @@ export const useEmailEmploymentBlankForm = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof emailEmploymentBlankForm>>,
     TError,
-    { formId: EmploymentFormId; data: BodyType<EmploymentPdfEmailInput> },
+    {
+      formId: EmploymentFormTemplateId;
+      data: BodyType<EmploymentPdfEmailInput>;
+    },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationResult<
   Awaited<ReturnType<typeof emailEmploymentBlankForm>>,
   TError,
-  { formId: EmploymentFormId; data: BodyType<EmploymentPdfEmailInput> },
+  { formId: EmploymentFormTemplateId; data: BodyType<EmploymentPdfEmailInput> },
   TContext
 > => {
   return useMutation(getEmailEmploymentBlankFormMutationOptions(options));

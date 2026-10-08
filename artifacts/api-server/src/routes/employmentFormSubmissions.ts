@@ -12,10 +12,12 @@ import { db } from "@workspace/db";
 import {
   employmentFormSubmissionsTable,
   objectUploadsTable,
+  type EmploymentFormId,
   type EmploymentFormAttachment,
 } from "@workspace/db/schema";
 import { requireStaffRole } from "../middlewares/requireStaffRole";
 import { ObjectStorageService } from "../lib/objectStorage";
+import { getOnboardingFormTemplate } from "../lib/onboardingFormAssets";
 import {
   EMPLOYMENT_FORMS_RECIPIENT,
   MAX_EMPLOYMENT_EMAIL_ATTACHMENT_BYTES,
@@ -46,10 +48,11 @@ const defaultDependencies: RouterDependencies = {
   authorizeAdmin: requireStaffRole("admin"),
 };
 
-function formLabel(formId: "job-application" | "i-9" | "w-4"): string {
+function formLabel(formId: EmploymentFormId): string {
   if (formId === "i-9") return "Form I-9";
   if (formId === "w-4") return "Form W-4";
-  return "Job application";
+  if (formId === "job-application") return "Job application";
+  return getOnboardingFormTemplate(formId)?.title ?? "Marvol onboarding form";
 }
 
 function emailFailure(error: unknown) {
@@ -96,18 +99,19 @@ async function getAttachments(
 }
 
 function emailText(submission: {
-  formId: "job-application" | "i-9" | "w-4";
+  formId: EmploymentFormId;
   firstName: string;
   lastName: string;
   email: string;
   phone: string | null;
+  idPhotos: EmploymentFormAttachment[];
 }): string {
   return [
-    `New completed ${formLabel(submission.formId)} and ID-card photos`,
+    `New completed ${formLabel(submission.formId)}${submission.idPhotos.length ? " and ID-card photos" : ""}`,
     `Applicant: ${submission.firstName} ${submission.lastName}`,
     `Contact email: ${submission.email}`,
     `Phone: ${submission.phone ?? "(not provided)"}`,
-    `The completed ${formLabel(submission.formId)} PDF and any ID-card photos are attached.`,
+    `The completed ${formLabel(submission.formId)} PDF${submission.idPhotos.length ? " and optional ID-card photos" : ""} are attached.`,
     `Recipient: ${EMPLOYMENT_FORMS_RECIPIENT}`,
   ].join("\n");
 }
@@ -119,7 +123,7 @@ export function createEmploymentFormSubmissionsRouter(
   const router: IRouter = Router();
 
   async function deliverSubmissionEmail(submission: {
-    formId: "job-application" | "i-9" | "w-4";
+    formId: EmploymentFormId;
     firstName: string;
     lastName: string;
     email: string;

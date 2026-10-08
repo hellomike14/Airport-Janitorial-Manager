@@ -1749,7 +1749,41 @@ export const UpdateApplicationResponse = zod.object({
  */
 export const ListEmploymentFormSubmissionsResponseItem = zod.object({
   id: zod.number(),
-  formId: zod.enum(["job-application", "i-9", "w-4"]),
+  formId: zod.enum([
+    "job-application",
+    "i-9",
+    "w-4",
+    "onboarding-cover",
+    "administrative-checklist",
+    "conditional-offer",
+    "offer-acceptance",
+    "acceptance-receipt",
+    "start-confirmation",
+    "offer-tracking",
+    "emergency-contact",
+    "payroll-setup",
+    "language-accessibility",
+    "uniform-equipment-issue",
+    "site-orientation",
+    "orientation-acknowledgment",
+    "training-attendance",
+    "video-attestation",
+    "knowledge-check",
+    "knowledge-check-guide",
+    "practical-assessment",
+    "buddy-shift",
+    "independent-work-release",
+    "day-7-review",
+    "day-30-review",
+    "day-60-review",
+    "day-90-review",
+    "exception-correction",
+    "badging-checklist",
+    "badge-rules-acknowledgment",
+    "badge-control",
+    "i9-everify-tracker",
+    "training-matrix",
+  ]),
   firstName: zod.string(),
   lastName: zod.string(),
   email: zod.string(),
@@ -1776,7 +1810,41 @@ export const submitEmploymentFormBodyPhoneMax = 50;
 export const submitEmploymentFormBodyIdPhotosMax = 3;
 
 export const SubmitEmploymentFormBody = zod.object({
-  formId: zod.enum(["job-application", "i-9", "w-4"]),
+  formId: zod.enum([
+    "job-application",
+    "i-9",
+    "w-4",
+    "onboarding-cover",
+    "administrative-checklist",
+    "conditional-offer",
+    "offer-acceptance",
+    "acceptance-receipt",
+    "start-confirmation",
+    "offer-tracking",
+    "emergency-contact",
+    "payroll-setup",
+    "language-accessibility",
+    "uniform-equipment-issue",
+    "site-orientation",
+    "orientation-acknowledgment",
+    "training-attendance",
+    "video-attestation",
+    "knowledge-check",
+    "knowledge-check-guide",
+    "practical-assessment",
+    "buddy-shift",
+    "independent-work-release",
+    "day-7-review",
+    "day-30-review",
+    "day-60-review",
+    "day-90-review",
+    "exception-correction",
+    "badging-checklist",
+    "badge-rules-acknowledgment",
+    "badge-control",
+    "i9-everify-tracker",
+    "training-matrix",
+  ]),
   firstName: zod.string().min(1).max(submitEmploymentFormBodyFirstNameMax),
   lastName: zod.string().min(1).max(submitEmploymentFormBodyLastNameMax),
   email: zod.string().email().max(submitEmploymentFormBodyEmailMax),
@@ -1820,7 +1888,41 @@ export const GetEmploymentFormSubmissionParams = zod.object({
 export const GetEmploymentFormSubmissionResponse = zod
   .object({
     id: zod.number(),
-    formId: zod.enum(["job-application", "i-9", "w-4"]),
+    formId: zod.enum([
+      "job-application",
+      "i-9",
+      "w-4",
+      "onboarding-cover",
+      "administrative-checklist",
+      "conditional-offer",
+      "offer-acceptance",
+      "acceptance-receipt",
+      "start-confirmation",
+      "offer-tracking",
+      "emergency-contact",
+      "payroll-setup",
+      "language-accessibility",
+      "uniform-equipment-issue",
+      "site-orientation",
+      "orientation-acknowledgment",
+      "training-attendance",
+      "video-attestation",
+      "knowledge-check",
+      "knowledge-check-guide",
+      "practical-assessment",
+      "buddy-shift",
+      "independent-work-release",
+      "day-7-review",
+      "day-30-review",
+      "day-60-review",
+      "day-90-review",
+      "exception-correction",
+      "badging-checklist",
+      "badge-rules-acknowledgment",
+      "badge-control",
+      "i9-everify-tracker",
+      "training-matrix",
+    ]),
     firstName: zod.string(),
     lastName: zod.string(),
     email: zod.string(),
@@ -2212,6 +2314,56 @@ export const GetAuthDiagnosticsResponse = zod.object({
 });
 
 /**
+ * Non-restricted blank templates are public. Seven onboarding templates require a verified Admin session and confidential access code. Completed records are never served from this route.
+ * @summary Open or download an allowlisted blank employment template PDF
+ */
+export const GetEmploymentFormTemplateParams = zod.object({
+  formId: zod.enum([
+    "job-application",
+    "i-9",
+    "w-4",
+    "onboarding-cover",
+    "administrative-checklist",
+    "conditional-offer",
+    "offer-acceptance",
+    "acceptance-receipt",
+    "start-confirmation",
+    "offer-tracking",
+    "emergency-contact",
+    "payroll-setup",
+    "language-accessibility",
+    "uniform-equipment-issue",
+    "site-orientation",
+    "orientation-acknowledgment",
+    "training-attendance",
+    "video-attestation",
+    "knowledge-check",
+    "knowledge-check-guide",
+    "practical-assessment",
+    "buddy-shift",
+    "independent-work-release",
+    "day-7-review",
+    "day-30-review",
+    "day-60-review",
+    "day-90-review",
+    "exception-correction",
+    "badging-checklist",
+    "badge-rules-acknowledgment",
+    "badge-control",
+    "i9-everify-tracker",
+    "training-matrix",
+    "onboarding-index",
+  ]),
+});
+
+export const GetEmploymentFormTemplateQueryParams = zod.object({
+  download: zod
+    .enum(["1"])
+    .optional()
+    .describe("Set to 1 to download instead of opening inline."),
+});
+
+/**
  * Public blank fillable template; exposes no submitted application data.
  * @summary Open or download the original fillable Marvol job application
  */
@@ -2239,11 +2391,46 @@ export const GetEmploymentW4FormQueryParams = zod.object({
 });
 
 /**
- * Public endpoint with per-IP rate limiting. Only one of the three server-allowlisted blank templates can be attached; client file and URL inputs are rejected.
- * @summary Send a fixed blank Employment template PDF to a validated recipient
+ * Per-IP rate-limited. Only a server-allowlisted template is attached; client file and URL inputs are rejected. Restricted onboarding templates require a verified Admin session and confidential access code.
+ * @summary Send a fixed blank employment template PDF to a validated recipient
  */
 export const EmailEmploymentBlankFormParams = zod.object({
-  formId: zod.enum(["job-application", "i-9", "w-4"]),
+  formId: zod.enum([
+    "job-application",
+    "i-9",
+    "w-4",
+    "onboarding-cover",
+    "administrative-checklist",
+    "conditional-offer",
+    "offer-acceptance",
+    "acceptance-receipt",
+    "start-confirmation",
+    "offer-tracking",
+    "emergency-contact",
+    "payroll-setup",
+    "language-accessibility",
+    "uniform-equipment-issue",
+    "site-orientation",
+    "orientation-acknowledgment",
+    "training-attendance",
+    "video-attestation",
+    "knowledge-check",
+    "knowledge-check-guide",
+    "practical-assessment",
+    "buddy-shift",
+    "independent-work-release",
+    "day-7-review",
+    "day-30-review",
+    "day-60-review",
+    "day-90-review",
+    "exception-correction",
+    "badging-checklist",
+    "badge-rules-acknowledgment",
+    "badge-control",
+    "i9-everify-tracker",
+    "training-matrix",
+    "onboarding-index",
+  ]),
 });
 
 export const emailEmploymentBlankFormBodyRecipientEmailMin = 3;
