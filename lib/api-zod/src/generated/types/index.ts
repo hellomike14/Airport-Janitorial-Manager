@@ -138,6 +138,8 @@ export * from "./notificationType";
 export * from "./onboardingHire";
 export * from "./onboardingItem";
 export * from "./onboardingItemCategory";
+export * from "./onboardingProtocolEmailInput";
+export * from "./onboardingProtocolEmailResponse";
 export * from "./previewTerminalGroupScheduleMoveParams";
 export * from "./quickbooksConnectUrl";
 export * from "./quickbooksStatus";

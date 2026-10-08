@@ -8,12 +8,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { openDocument, preparePdfPrintDocument, type PreparedPdfPrintDocument } from "./formEditor/pdfRuntime";
 
 const PDF_FILENAME = "Marvol_Employee_Onboarding_Protocol_v1.pdf";
 const PDF_FETCH_TIMEOUT_MS = 30_000;
-const PREVIEW_TIMEOUT_MS = 20_000;
+const PDF_PRINT_TIMEOUT_MS = 60_000;
+const EMAIL_SEND_TIMEOUT_MS = 35_000;
 
-type PreparedPdf = { file: File | null; url: string };
+type PreparedPdf = { bytes: Uint8Array; file: File | null; url: string };
 type Feedback = { key: string; error?: boolean };
 type PdfFailure = "sessionExpired" | "invalidPdf" | "fetchTimeout" | "fetchFailed";
 
@@ -43,7 +45,13 @@ function isShareCancellation(error: unknown) {
     : typeof error === "object" && error !== null && "name" in error && error.name === "AbortError";
 }
 
-export function OnboardingProtocolActions({ protectedUrl }: { protectedUrl: string }) {
+export function OnboardingProtocolActions({
+  protectedUrl,
+  canEmailProtocol = false,
+}: {
+  protectedUrl: string;
+  canEmailProtocol?: boolean;
+}) {
   const { t } = useTranslation();
   const [preparedUrl, setPreparedUrl] = useState<string | null>(null);
   const [nativeShareAvailable, setNativeShareAvailable] = useState(false);
@@ -51,13 +59,21 @@ export function OnboardingProtocolActions({ protectedUrl }: { protectedUrl: stri
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [copyFailed, setCopyFailed] = useState(false);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [emailRecipient, setEmailRecipient] = useState("");
+  const [emailFeedback, setEmailFeedback] = useState<Feedback | null>(null);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [emailAccepted, setEmailAccepted] = useState(false);
   const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
   const [previewState, setPreviewState] = useState<"idle" | "loading" | "ready" | "failed">("idle");
+  const [previewPageCount, setPreviewPageCount] = useState(0);
   const [previewVersion, setPreviewVersion] = useState(0);
 
   const preparedPdfRef = useRef<PreparedPdf | null>(null);
   const pendingPreparationRef = useRef<Promise<PreparedPdf | null> | null>(null);
   const preparationControllerRef = useRef<AbortController | null>(null);
+  const emailControllerRef = useRef<AbortController | null>(null);
+  const preparedPrintRef = useRef<PreparedPdfPrintDocument | null>(null);
   const objectUrlRef = useRef<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const mountedRef = useRef(true);
@@ -67,18 +83,72 @@ export function OnboardingProtocolActions({ protectedUrl }: { protectedUrl: stri
     return () => {
       mountedRef.current = false;
       preparationControllerRef.current?.abort();
+      emailControllerRef.current?.abort();
+      preparedPrintRef.current = null;
       if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
     };
   }, []);
 
   useEffect(() => {
-    if (!printPreviewOpen || !preparedUrl || previewState !== "loading") return;
-    const timer = window.setTimeout(() => {
-      setPreviewState("failed");
-      setFeedback({ key: "employment.onboarding.protocol.actions.previewFailed", error: true });
-    }, PREVIEW_TIMEOUT_MS);
-    return () => window.clearTimeout(timer);
-  }, [printPreviewOpen, preparedUrl, previewState]);
+    if (!printPreviewOpen || !preparedUrl || !preparedPdfRef.current) return;
+    const frame = iframeRef.current;
+    if (!frame) return;
+
+    let cancelled = false;
+    let loadingTask: Awaited<ReturnType<typeof openDocument>>["task"] | null = null;
+    let timedOut = false;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, PDF_PRINT_TIMEOUT_MS);
+
+    const renderAllPages = async () => {
+      try {
+        const preparedPdf = preparedPdfRef.current;
+        if (!preparedPdf) throw new Error("Prepared protocol PDF is unavailable");
+        const opened = await openDocument(preparedPdf.bytes);
+        loadingTask = opened.task;
+        if (cancelled) return;
+        if (controller.signal.aborted) throw new Error("Print preparation timed out");
+        const printDocument = await preparePdfPrintDocument(opened.doc, frame, {
+          signal: controller.signal,
+        });
+        if (cancelled) return;
+        if (controller.signal.aborted) throw new Error("Print preparation timed out");
+        preparedPrintRef.current = printDocument;
+        setPreviewPageCount(printDocument.pageCount);
+        setPreviewState("ready");
+      } catch {
+        if (cancelled) return;
+        preparedPrintRef.current = null;
+        setPreviewState("failed");
+        setFeedback({
+          key: timedOut
+            ? "employment.onboarding.protocol.actions.printPreparationTimeout"
+            : "employment.onboarding.protocol.actions.previewFailed",
+          error: true,
+        });
+      } finally {
+        window.clearTimeout(timeout);
+        if (loadingTask) {
+          try {
+            await loadingTask.destroy();
+          } catch {
+            // The print preview already has independent page images.
+          }
+        }
+      }
+    };
+
+    void renderAllPages();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeout);
+      controller.abort();
+      preparedPrintRef.current = null;
+    };
+  }, [printPreviewOpen, preparedUrl, previewVersion]);
 
   const preparePdf = () => {
     if (preparedPdfRef.current) return Promise.resolve(preparedPdfRef.current);
@@ -129,7 +199,7 @@ export function OnboardingProtocolActions({ protectedUrl }: { protectedUrl: stri
           return null;
         }
 
-        const prepared = { file, url };
+        const prepared = { bytes, file, url };
         preparedPdfRef.current = prepared;
         objectUrlRef.current = url;
         setPreparedUrl(url);
@@ -195,7 +265,6 @@ export function OnboardingProtocolActions({ protectedUrl }: { protectedUrl: stri
       return;
     }
 
-    setFeedback({ key: "employment.onboarding.protocol.actions.shareReady" });
     try {
       void Promise.resolve(shareApi.share({
         files: [prepared.file],
@@ -215,32 +284,103 @@ export function OnboardingProtocolActions({ protectedUrl }: { protectedUrl: stri
     }
   };
 
+  const openEmailDialog = () => {
+    setEmailRecipient("");
+    setEmailFeedback(null);
+    setEmailAccepted(false);
+    setEmailDialogOpen(true);
+  };
+
+  const handleEmailSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (isSendingEmail || emailControllerRef.current) return;
+    const input = event.currentTarget.elements.namedItem("recipientEmail") as HTMLInputElement | null;
+    if (!input?.checkValidity()) {
+      setEmailFeedback({ key: "employment.onboarding.protocol.actions.emailInvalidRecipient", error: true });
+      input?.focus();
+      return;
+    }
+
+    const endpoint = new URL(protectedUrl, window.location.origin);
+    endpoint.pathname = `${endpoint.pathname.replace(/\/+$/, "")}/email`;
+    endpoint.search = "";
+    const controller = new AbortController();
+    emailControllerRef.current = controller;
+    let timedOut = false;
+    setIsSendingEmail(true);
+    setEmailFeedback(null);
+    const timeout = window.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, EMAIL_SEND_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(endpoint.toString(), {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify({ recipientEmail: emailRecipient.trim() }),
+        signal: controller.signal,
+      });
+      if (response.status === 202) {
+        const result = await response.json().catch(() => null) as { accepted?: unknown } | null;
+        if (result?.accepted === true) {
+          setEmailAccepted(true);
+          setEmailFeedback({ key: "employment.onboarding.protocol.actions.emailAccepted" });
+          return;
+        }
+      }
+      const key = response.status === 401
+        ? "sessionExpired"
+        : response.status === 403
+          ? "emailForbidden"
+          : response.status === 400
+            ? "emailInvalidRecipient"
+            : response.status === 413
+              ? "emailAttachmentTooLarge"
+              : response.status === 503
+                ? "emailNotConfigured"
+                : "emailFailed";
+      setEmailFeedback({
+        key: `employment.onboarding.protocol.actions.${key}`,
+        error: true,
+      });
+    } catch {
+      if (!mountedRef.current) return;
+      setEmailFeedback({
+        key: `employment.onboarding.protocol.actions.${timedOut ? "emailTimeout" : "emailFailed"}`,
+        error: true,
+      });
+    } finally {
+      window.clearTimeout(timeout);
+      if (emailControllerRef.current === controller) emailControllerRef.current = null;
+      if (mountedRef.current) setIsSendingEmail(false);
+    }
+  };
+
   const handlePrint = () => {
     setPrintPreviewOpen(true);
+    setPreviewState("loading");
     const prepared = preparedPdfRef.current;
     if (!prepared) {
-      setPreviewState("loading");
       void preparePdf().then((result) => {
         if (!result && mountedRef.current) setPreviewState("failed");
       });
       return;
     }
-    setPreviewState("loading");
     setFeedback({ key: "employment.onboarding.protocol.actions.previewLoading" });
     setPreviewVersion((version) => version + 1);
   };
 
   const handlePrintPreparedPdf = () => {
-    if (previewState !== "ready" || !iframeRef.current) {
+    if (previewState !== "ready" || !preparedPrintRef.current) {
       setFeedback({ key: "employment.onboarding.protocol.actions.printNotReady", error: true });
       return;
     }
-    const frameWindow = iframeRef.current.contentWindow;
     try {
-      if (!frameWindow || typeof frameWindow.print !== "function") throw new Error("PDF printing is unsupported");
-      frameWindow.focus();
-      frameWindow.print();
-      setFeedback({ key: "employment.onboarding.protocol.actions.printDialogOpened" });
+      // Keep print() synchronous with this trusted click; preparation already finished.
+      preparedPrintRef.current.print();
     } catch {
       setPreviewState("failed");
       setFeedback({ key: "employment.onboarding.protocol.actions.printFallback", error: true });
@@ -285,17 +425,12 @@ export function OnboardingProtocolActions({ protectedUrl }: { protectedUrl: stri
   };
 
   const protectedLink = new URL(protectedUrl, window.location.origin).toString();
-  const emailBody = [
-    t("employment.onboarding.protocol.actions.emailIntro"),
-    protectedLink,
-    "",
-    t("employment.onboarding.protocol.actions.signInRequired"),
-  ].join("\n");
-  const emailHref = `mailto:?subject=${encodeURIComponent(t("employment.onboarding.protocol.actions.emailSubject"))}&body=${encodeURIComponent(emailBody)}`;
+  const protectedDownloadUrl = new URL(protectedLink);
+  protectedDownloadUrl.searchParams.set("download", "1");
 
   return (
     <div className="mt-4 space-y-3" aria-busy={isPreparing}>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <div className={`grid grid-cols-1 gap-2 ${canEmailProtocol ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
         <button
           type="button"
           data-testid="share-onboarding-protocol"
@@ -316,9 +451,20 @@ export function OnboardingProtocolActions({ protectedUrl }: { protectedUrl: stri
           {isPreparing ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Printer className="h-4 w-4" aria-hidden="true" />}
           {t(isPreparing ? "employment.onboarding.protocol.actions.preparing" : "employment.onboarding.protocol.actions.print")}
         </button>
+        {canEmailProtocol && (
+          <button
+            type="button"
+            data-testid="email-onboarding-protocol"
+            onClick={openEmailDialog}
+            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            <Mail className="h-4 w-4" aria-hidden="true" />
+            {t("employment.onboarding.protocol.actions.emailPdf")}
+          </button>
+        )}
       </div>
 
-      {feedback && !shareDialogOpen && (
+      {feedback && !shareDialogOpen && !emailDialogOpen && (
         <p
           role={feedback.error ? "alert" : "status"}
           aria-live={feedback.error ? "assertive" : "polite"}
@@ -361,14 +507,6 @@ export function OnboardingProtocolActions({ protectedUrl }: { protectedUrl: stri
                 aria-label={t("employment.onboarding.protocol.actions.fallbackOptions")}
                 className="grid grid-cols-1 gap-2"
               >
-                <a
-                  href={emailHref}
-                  data-testid="email-onboarding-protocol-link"
-                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  <Mail className="h-4 w-4 shrink-0" aria-hidden="true" />
-                  {t("employment.onboarding.protocol.actions.emailLink")}
-                </a>
                 <button
                   type="button"
                   data-testid="copy-onboarding-protocol-link"
@@ -413,26 +551,115 @@ export function OnboardingProtocolActions({ protectedUrl }: { protectedUrl: stri
         </DialogContent>
       </Dialog>
 
+      <Dialog
+        open={emailDialogOpen}
+        onOpenChange={(open) => {
+          if (!open && isSendingEmail) return;
+          setEmailDialogOpen(open);
+        }}
+      >
+        <DialogContent className="max-h-[85dvh] w-[calc(100%-1rem)] max-w-md overflow-y-auto p-5">
+          <DialogHeader className="pr-6">
+            <DialogTitle>{t("employment.onboarding.protocol.actions.emailDialogTitle")}</DialogTitle>
+            <DialogDescription>
+              {t("employment.onboarding.protocol.actions.emailDialogDescription")}
+            </DialogDescription>
+          </DialogHeader>
+          {emailAccepted ? (
+            <div className="space-y-3">
+              <p role="status" aria-live="polite" data-testid="onboarding-protocol-email-feedback" className="text-sm text-emerald-800">
+                {t(emailFeedback?.key ?? "employment.onboarding.protocol.actions.emailAccepted")}
+              </p>
+              <button
+                type="button"
+                data-testid="send-another-onboarding-protocol-email"
+                onClick={() => {
+                  setEmailAccepted(false);
+                  setEmailFeedback(null);
+                }}
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                {t("employment.onboarding.protocol.actions.sendAnother")}
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleEmailSubmit} className="space-y-4" aria-busy={isSendingEmail}>
+              <label className="block text-sm font-medium text-slate-700" htmlFor="onboarding-protocol-recipient">
+                {t("employment.onboarding.protocol.actions.recipientEmailLabel")}
+                <input
+                  id="onboarding-protocol-recipient"
+                  name="recipientEmail"
+                  type="email"
+                  required
+                  maxLength={254}
+                  autoComplete="email"
+                  value={emailRecipient}
+                  onChange={(event) => setEmailRecipient(event.target.value)}
+                  disabled={isSendingEmail}
+                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600 disabled:bg-slate-50"
+                  data-testid="onboarding-protocol-recipient"
+                />
+              </label>
+              {emailFeedback && (
+                <p
+                  role={emailFeedback.error ? "alert" : "status"}
+                  aria-live={emailFeedback.error ? "assertive" : "polite"}
+                  data-testid="onboarding-protocol-email-feedback"
+                  className={`text-sm ${emailFeedback.error ? "text-red-700" : "text-emerald-800"}`}
+                >
+                  {t(emailFeedback.key)}
+                </p>
+              )}
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setEmailDialogOpen(false)}
+                  disabled={isSendingEmail}
+                  className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                >
+                  {t("common.cancel")}
+                </button>
+                <button
+                  type="submit"
+                  data-testid="send-onboarding-protocol-email"
+                  disabled={isSendingEmail || !emailRecipient.trim()}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-60"
+                >
+                  {isSendingEmail && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                  {t(isSendingEmail
+                    ? "employment.onboarding.protocol.actions.emailSending"
+                    : "employment.onboarding.protocol.actions.sendEmail")}
+                </button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {printPreviewOpen && (
-        <section className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
-          <h4 className="text-sm font-semibold text-slate-800">
-            {t("employment.onboarding.protocol.actions.previewTitle")}
-          </h4>
+        <section
+          className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:p-4"
+          aria-busy={previewState === "loading"}
+          aria-label={t("employment.onboarding.protocol.actions.previewTitle")}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <h4 className="text-sm font-semibold text-slate-800">
+              {t("employment.onboarding.protocol.actions.previewTitle")}
+            </h4>
+            <button
+              type="button"
+              onClick={() => setPrintPreviewOpen(false)}
+              className="min-h-10 rounded-lg px-3 text-sm font-medium text-slate-600 hover:bg-white"
+            >
+              {t("employment.onboarding.protocol.actions.closePreview")}
+            </button>
+          </div>
           {preparedUrl ? (
             <iframe
               key={previewVersion}
               ref={iframeRef}
-              src={preparedUrl}
               title={t("employment.onboarding.protocol.actions.previewTitle")}
               data-testid="onboarding-protocol-pdf-preview"
-              onLoad={() => {
-                setPreviewState("ready");
-                setFeedback({ key: "employment.onboarding.protocol.actions.previewReady" });
-              }}
-              onError={() => {
-                setPreviewState("failed");
-                setFeedback({ key: "employment.onboarding.protocol.actions.previewFailed", error: true });
-              }}
               className="h-[60vh] min-h-[360px] w-full rounded-lg border border-slate-200 bg-white sm:min-h-[520px]"
             />
           ) : (
@@ -444,14 +671,14 @@ export function OnboardingProtocolActions({ protectedUrl }: { protectedUrl: stri
             </p>
           )}
           {previewState === "loading" && preparedUrl && (
-            <p role="status" className="text-sm text-slate-600">
+            <p role="status" aria-live="polite" className="text-sm text-slate-600">
               {t("employment.onboarding.protocol.actions.previewLoading")}
             </p>
           )}
           {previewState === "ready" && (
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-slate-600">
-                {t("employment.onboarding.protocol.actions.previewReady")}
+              <p role="status" aria-live="polite" className="text-sm text-slate-600">
+                {t("employment.onboarding.protocol.actions.previewReady", { count: previewPageCount })}
               </p>
               <button
                 type="button"
@@ -474,16 +701,26 @@ export function OnboardingProtocolActions({ protectedUrl }: { protectedUrl: stri
               <p className="text-sm text-amber-800">
                 {t("employment.onboarding.protocol.actions.printFallback")}
               </p>
-              <a
-                href={protectedUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                data-testid="onboarding-protocol-open-pdf"
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              >
-                <ExternalLink className="h-4 w-4" aria-hidden="true" />
-                {t("employment.onboarding.protocol.actions.openPdf")}
-              </a>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <a
+                  href={protectedLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-testid="onboarding-protocol-open-pdf"
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                  {t("employment.onboarding.protocol.actions.openPdf")}
+                </a>
+                <a
+                  href={protectedDownloadUrl.toString()}
+                  data-testid="onboarding-protocol-download-fallback"
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  <Download className="h-4 w-4" aria-hidden="true" />
+                  {t("employment.onboarding.protocol.actions.downloadProtectedPdf")}
+                </a>
+              </div>
               <p className="text-xs text-slate-500">
                 {t("employment.onboarding.protocol.actions.popupGuidance")}
               </p>

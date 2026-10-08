@@ -113,7 +113,7 @@ export function OnboardingTab() {
   const canManage = effectiveRole === "admin" || effectiveRole === "supervisor";
   return (
     <div className="space-y-6">
-      <OnboardingProtocolCard />
+      <OnboardingProtocolCard canEmailProtocol={effectiveRole === "admin"} />
       {canManage && <OnboardingManagement />}
       <EmployeeTraining />
     </div>

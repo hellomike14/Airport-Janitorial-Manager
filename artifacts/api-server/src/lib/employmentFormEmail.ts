@@ -8,6 +8,8 @@ export type EmploymentEmailAttachment = {
 };
 
 export type EmploymentEmail = {
+  /** Optional one-off recipient; existing form mail continues to use the Admin default. */
+  to?: string;
   subject: string;
   text: string;
   attachments: EmploymentEmailAttachment[];
@@ -52,6 +54,10 @@ export async function sendEmploymentFormEmailWithConfig(
   if (!apiKey || !from || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(from)) {
     throw new Error("EMPLOYMENT_EMAIL_NOT_CONFIGURED");
   }
+  const recipient = message.to?.trim().toLowerCase() || EMPLOYMENT_FORMS_RECIPIENT;
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(recipient)) {
+    throw new Error("EMPLOYMENT_EMAIL_INVALID_RECIPIENT");
+  }
 
   const totalBytes = message.attachments.reduce((sum, attachment) => sum + attachment.bytes.byteLength, 0);
   if (totalBytes > MAX_EMPLOYMENT_EMAIL_ATTACHMENT_BYTES) {
@@ -62,7 +68,7 @@ export async function sendEmploymentFormEmailWithConfig(
     method: "POST",
     headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
     body: JSON.stringify({
-      personalizations: [{ to: [{ email: EMPLOYMENT_FORMS_RECIPIENT }] }],
+      personalizations: [{ to: [{ email: recipient }] }],
       from: { email: from },
       subject: message.subject,
       content: [{ type: "text/plain", value: message.text }],

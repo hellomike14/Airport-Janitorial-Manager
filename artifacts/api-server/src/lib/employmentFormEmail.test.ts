@@ -41,9 +41,51 @@ test("completed-form mail always goes to the configured Admin default with priva
   assert.equal(payload.attachments[1]?.type, "image/jpeg");
 });
 
+test("an explicitly supplied recipient is normalized and receives the encoded PDF attachment", async () => {
+  const message: EmploymentEmail = {
+    to: " Person@Example.COM ",
+    subject: "Onboarding protocol",
+    text: "Current protocol attached.",
+    attachments: [{
+      filename: "Marvol_Employee_Onboarding_Protocol_v1.pdf",
+      contentType: "application/pdf",
+      bytes: Buffer.from("%PDF-1.7\ncurrent protocol"),
+    }],
+  };
+  let payload: {
+    personalizations: { to: { email: string }[] }[];
+    attachments: { filename: string; content: string; type: string; disposition: string }[];
+  } | undefined;
+  await sendEmploymentFormEmailWithConfig(
+    message,
+    { SENDGRID_API_KEY: "synthetic-key", SENDGRID_FROM_EMAIL: "sender@marvolenterprises.com" },
+    async (_input, init) => {
+      payload = JSON.parse(String(init?.body)) as typeof payload;
+      return new Response(null, { status: 202 });
+    },
+  );
+  assert.deepEqual(payload?.personalizations[0]?.to, [{ email: "person@example.com" }]);
+  assert.equal(payload?.attachments[0]?.type, "application/pdf");
+  assert.equal(payload?.attachments[0]?.disposition, "attachment");
+  assert.equal(
+    Buffer.from(payload?.attachments[0]?.content ?? "", "base64").toString(),
+    "%PDF-1.7\ncurrent protocol",
+  );
+});
+
 test("mail fails explicitly when SendGrid is not configured or rejects a message", async () => {
   const message: EmploymentEmail = { subject: "Form", text: "test", attachments: [] };
   await assert.rejects(() => sendEmploymentFormEmailWithConfig(message, {}), /EMPLOYMENT_EMAIL_NOT_CONFIGURED/);
+  await assert.rejects(
+    () => sendEmploymentFormEmailWithConfig(
+      { ...message, to: "not-an-email" },
+      { SENDGRID_API_KEY: "synthetic-key", SENDGRID_FROM_EMAIL: "sender@marvolenterprises.com" },
+      async () => {
+        throw new Error("invalid recipient must not reach the provider");
+      },
+    ),
+    /EMPLOYMENT_EMAIL_INVALID_RECIPIENT/,
+  );
   await assert.rejects(
     () => sendEmploymentFormEmailWithConfig(
       message,
