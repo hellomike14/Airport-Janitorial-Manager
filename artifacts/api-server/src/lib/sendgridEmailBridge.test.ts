@@ -41,15 +41,19 @@ test("missing SendGrid configuration never claims delivery", () => {
   assert.equal(outboundEmailStatus({}), "not_configured");
 });
 
-test("only the ten configured external inspector addresses can be selected", () => {
-  assert.equal(INSPECTOR_RECIPIENT_EMAILS.length, 10);
+test("only the eleven configured external inspector addresses can be selected", () => {
+  assert.equal(INSPECTOR_RECIPIENT_EMAILS.length, 11);
   assert.equal(resolveInspectorRecipients(undefined), null);
   assert.deepEqual(resolveInspectorRecipients([" AMBER.NORDICK@GOAA.ORG "]), ["amber.nordick@goaa.org"]);
   assert.deepEqual(resolveInspectorRecipients([...INSPECTOR_RECIPIENT_EMAILS]), [...INSPECTOR_RECIPIENT_EMAILS]);
+  assert.deepEqual(resolveInspectorRecipients(["  MOUSSA.BARMAKI@GOAA.ORG  "]), ["moussa.barmaki@goaa.org"]);
+  assert.ok(INSPECTOR_RECIPIENT_EMAILS.includes("moussa.barmaki@goaa.org"));
   assert.equal(resolveInspectorRecipients(["amber.nordick@goaa.org", "arcolon@goaa.org"]), null);
   assert.equal(resolveInspectorRecipients(["amber.nordick@goaa.org", "AMBER.NORDICK@GOAA.ORG"]), null);
   assert.equal(resolveInspectorRecipients(["amber.nordick@goaa.org", "amber.nordick+other@goaa.org"]), null);
   assert.equal(resolveInspectorRecipients(["attacker@example.com"]), null);
+  assert.equal(resolveInspectorRecipients(["moussa.barmaki@goaa.org.evil.test"]), null);
+  assert.equal(resolveInspectorRecipients(["moussa.barmaki+lookalike@goaa.org"]), null);
   assert.equal(resolveInspectorRecipients([]), null);
 });
 
@@ -61,6 +65,23 @@ test("inbound inspector senders must be allowlisted, envelope-matched, and authe
   assert.equal(isAuthorizedInspectorEmailSender("amber.nordick@goaa.org", "arcolon@goaa.org", "pass"), null);
   assert.equal(isAuthorizedInspectorEmailSender("unknown@goaa.org", "unknown@goaa.org", "pass"), null);
   assert.equal(isAuthorizedInspectorEmailSender("amber.nordick@goaa.org", "amber.nordick@goaa.org", "fail", "unverified"), null);
+});
+
+test("Moussa is an exact authenticated inspector sender; a spoofed From header alone is rejected", () => {
+  const from = "Moussa Barmaki < MOUSSA.BARMAKI@GOAA.ORG >";
+  const sender = "moussa.barmaki@goaa.org";
+  assert.equal(isAuthorizedInspectorEmailSender(from, " MOUSSA.BARMAKI@GOAA.ORG ", "pass"), sender);
+  assert.equal(isAuthorizedInspectorEmailSender(from, "SRS0=fixture@marvolenterprises.com", "pass", "{@goaa.org : pass}"), sender);
+  assert.equal(isAuthorizedInspectorEmailSender(from, "attacker@goaa.org", "pass"), null);
+  assert.equal(isAuthorizedInspectorEmailSender(from, "attacker@goaa.org", "fail", "{@goaa.org : pass-fake}"), null);
+  assert.equal(
+    isAuthorizedInspectorEmailSender("Moussa <moussa.barmaki@goaa.org.evil.test>", "moussa.barmaki@goaa.org.evil.test", "pass"),
+    null,
+  );
+  assert.equal(
+    isAuthorizedInspectorEmailSender("Moussa <moussa.barmaki+lookalike@goaa.org>", "moussa.barmaki+lookalike@goaa.org", "pass"),
+    null,
+  );
 });
 
 test("inbound target classification allows signed replies and exact direct recipients only", () => {

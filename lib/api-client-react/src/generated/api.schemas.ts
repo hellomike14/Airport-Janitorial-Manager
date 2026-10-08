@@ -685,6 +685,66 @@ export interface UpdateChatMessageInput {
   body: string;
 }
 
+export interface MessageReceiptConfirmer {
+  name: string;
+  role: string;
+}
+
+export interface MessageReceiptPreviousVersion {
+  version: number;
+  confirmedBy: MessageReceiptConfirmer;
+  confirmedAt: string;
+}
+
+/**
+ * @nullable
+ */
+export type ChatMessageReceiptDirection =
+  | (typeof ChatMessageReceiptDirection)[keyof typeof ChatMessageReceiptDirection]
+  | null;
+
+export const ChatMessageReceiptDirection = {
+  to_inspector: "to_inspector",
+  from_inspector: "from_inspector",
+} as const;
+
+export type ChatMessageReceiptStatus =
+  (typeof ChatMessageReceiptStatus)[keyof typeof ChatMessageReceiptStatus];
+
+export const ChatMessageReceiptStatus = {
+  not_applicable: "not_applicable",
+  unconfirmed: "unconfirmed",
+  confirmed: "confirmed",
+} as const;
+
+/**
+ * @nullable
+ */
+export type ChatMessageReceiptConfirmedBy = {
+  name: string;
+  role: string;
+} | null;
+
+export interface ChatMessageReceipt {
+  applicable: boolean;
+  /** @nullable */
+  direction: ChatMessageReceiptDirection;
+  status: ChatMessageReceiptStatus;
+  version: number;
+  canConfirm: boolean;
+  /** @nullable */
+  confirmedBy: ChatMessageReceiptConfirmedBy;
+  /** @nullable */
+  confirmedAt: string | null;
+  previousVersions: MessageReceiptPreviousVersion[];
+}
+
+export interface MessageReceiptConfirmationResponse {
+  messageId: number;
+  alreadyConfirmed: boolean;
+  receipt: ChatMessageReceipt;
+}
+
 export type ChatMessageInspectorEmailDeliveryStatus =
   (typeof ChatMessageInspectorEmailDeliveryStatus)[keyof typeof ChatMessageInspectorEmailDeliveryStatus];
 
@@ -710,6 +770,8 @@ export interface ChatMessage {
   /** @nullable */
   afterImagePath: string | null;
   isRead: boolean;
+  receiptVersion: number;
+  receipt: ChatMessageReceipt;
   /** @nullable */
   inspectorWorkflowTaskId: number | null;
   inspectorEmailDeliveryStatus: ChatMessageInspectorEmailDeliveryStatus;

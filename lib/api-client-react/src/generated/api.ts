@@ -88,6 +88,7 @@ import type {
   ListTasksParams,
   LockAdminConfidentialAccess200,
   MarkAllReadRequest,
+  MessageReceiptConfirmationResponse,
   NoStaffMatchError,
   Notification,
   OnboardingHire,
@@ -5115,7 +5116,101 @@ export const useSendConversationMessage = <
 };
 
 /**
- * Admin only. Messages linked to inspector tasks or awaiting email delivery are retained.
+ * Actor identity comes from the verified session. The request accepts no staff identifier and never sends email.
+ * @summary Record an authenticated in-app receipt acknowledgment for an inspector email message
+ */
+export const getConfirmConversationMessageReceiptUrl = (
+  id: number,
+  msgId: number,
+) => {
+  return `/api/conversations/${id}/messages/${msgId}/receipt`;
+};
+
+export const confirmConversationMessageReceipt = async (
+  id: number,
+  msgId: number,
+  options?: RequestInit,
+): Promise<MessageReceiptConfirmationResponse> => {
+  return customFetch<MessageReceiptConfirmationResponse>(
+    getConfirmConversationMessageReceiptUrl(id, msgId),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getConfirmConversationMessageReceiptMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof confirmConversationMessageReceipt>>,
+    TError,
+    { id: number; msgId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof confirmConversationMessageReceipt>>,
+  TError,
+  { id: number; msgId: number },
+  TContext
+> => {
+  const mutationKey = ["confirmConversationMessageReceipt"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof confirmConversationMessageReceipt>>,
+    { id: number; msgId: number }
+  > = (props) => {
+    const { id, msgId } = props ?? {};
+
+    return confirmConversationMessageReceipt(id, msgId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ConfirmConversationMessageReceiptMutationResult = NonNullable<
+  Awaited<ReturnType<typeof confirmConversationMessageReceipt>>
+>;
+
+export type ConfirmConversationMessageReceiptMutationError = ErrorType<void>;
+
+/**
+ * @summary Record an authenticated in-app receipt acknowledgment for an inspector email message
+ */
+export const useConfirmConversationMessageReceipt = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof confirmConversationMessageReceipt>>,
+    TError,
+    { id: number; msgId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof confirmConversationMessageReceipt>>,
+  TError,
+  { id: number; msgId: number },
+  TContext
+> => {
+  return useMutation(
+    getConfirmConversationMessageReceiptMutationOptions(options),
+  );
+};
+
+/**
+ * Admin only. Messages linked to inspector tasks, receipt acknowledgments, or awaiting email delivery are retained.
  * @summary Permanently remove messages before a date from one conversation
  */
 export const getDeleteOldConversationMessagesUrl = (

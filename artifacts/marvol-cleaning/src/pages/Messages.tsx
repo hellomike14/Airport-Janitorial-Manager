@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { InspectorWorkflowCard } from "@/components/InspectorWorkflowCard";
+import { MessageReceiptStatus } from "@/components/MessageReceiptStatus";
 import { trackEvent } from "@/lib/analytics";
 import humanTraffickingFlyer from "@assets/MCO_Human_Trafficing_1787144155521.jpeg";
 import {
@@ -41,6 +42,7 @@ import {
   listStaff,
   listArchivedConversations,
   listInspectorEmailRecipients,
+  confirmConversationMessageReceipt,
   requestUploadUrl,
   type ConversationSummary,
 } from "@workspace/api-client-react";
@@ -710,6 +712,20 @@ export default function Messages() {
     },
   });
 
+  const receiptMutation = useMutation({
+    mutationFn: ({ conversationId, messageId }: { conversationId: number; messageId: number; viewerId: number }) =>
+      confirmConversationMessageReceipt(conversationId, messageId),
+    onSuccess: (confirmation, variables) => {
+      const queryKey = [CONVERSATIONS_KEY, variables.conversationId, "messages", variables.viewerId] as const;
+      qc.setQueryData<typeof messages>(queryKey, (previous) =>
+        previous?.map((message) => message.id === variables.messageId
+          ? { ...message, receipt: confirmation.receipt, receiptVersion: confirmation.receipt.version }
+          : message),
+      );
+      qc.invalidateQueries({ queryKey: [CONVERSATIONS_KEY, variables.conversationId, "messages"] });
+    },
+  });
+
   const handleDelete = (convoId: number, msgId: number) => {
     if (!window.confirm(t("messages.confirmDelete"))) return;
     deleteMutation.mutate({ convoId, msgId });
@@ -1326,6 +1342,36 @@ export default function Messages() {
                         {m.inboundEmailReceivedAt && (
                           <p data-testid={`status-email-received-${m.id}`} className={`text-[10px] mt-1 ${mine ? "text-emerald-100" : "text-slate-500"}`}>
                             Inbound email received · {format(new Date(m.inboundEmailReceivedAt), "MMM d, h:mm a")}
+                          </p>
+                        )}
+                        <MessageReceiptStatus
+                          receipt={m.receipt}
+                          pending={receiptMutation.isPending && receiptMutation.variables?.messageId === m.id}
+                          error={receiptMutation.isError && receiptMutation.variables?.messageId === m.id}
+                          onConfirm={() => {
+                            if (selectedId !== null) {
+                              receiptMutation.mutate({ conversationId: selectedId, messageId: m.id, viewerId: staffId });
+                            }
+                          }}
+                          formatTimestamp={(timestamp) => format(new Date(timestamp), "MMM d, h:mm a")}
+                          labels={{
+                            unconfirmed: t("messages.receiptUnconfirmed"),
+                            confirmed: (name, role, time) => t("messages.receiptConfirmed", { name, role, time }),
+                            scopeNote: t("messages.receiptScopeNote"),
+                            confirm: t("messages.confirmReceipt"),
+                            pending: t("messages.receiptPending"),
+                            error: t("messages.receiptError"),
+                            historyLabel: t("messages.receiptHistoryLabel"),
+                            earlierVersion: (version, name, role, time) =>
+                              t("messages.receiptEarlierVersion", { version, name, role, time }),
+                          }}
+                          tone={mine ? "mine" : "other"}
+                        />
+                        {deleteMutation.isError && deleteMutation.variables?.msgId === m.id && (
+                          <p role="alert" className={`mt-1 text-[11px] font-semibold ${mine ? "text-rose-100" : "text-rose-700"}`}>
+                            {(deleteMutation.error as { status?: number } | null)?.status === 409
+                              ? t("messages.receiptDeleteRetained")
+                              : t("messages.messageDeleteFailed")}
                           </p>
                         )}
                         {m.inspectorWorkflowTaskId && (

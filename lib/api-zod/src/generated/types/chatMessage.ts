@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ChatMessageInspectorEmailDeliveryStatus } from "./chatMessageInspectorEmailDeliveryStatus";
+import type { ChatMessageReceipt } from "./chatMessageReceipt";
 
 export interface ChatMessage {
   id: number;
@@ -18,6 +19,8 @@ export interface ChatMessage {
   /** @nullable */
   afterImagePath: string | null;
   isRead: boolean;
+  receiptVersion: number;
+  receipt: ChatMessageReceipt;
   /** @nullable */
   inspectorWorkflowTaskId: number | null;
   inspectorEmailDeliveryStatus: ChatMessageInspectorEmailDeliveryStatus;

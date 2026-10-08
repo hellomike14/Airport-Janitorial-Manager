@@ -16,6 +16,7 @@ const express = requireApi("express");
 let pg: any;
 let db: any;
 let messagesRouter: any;
+let inboundSendgridRouter: any;
 
 const people = [
   { id: 1, name: "Test Admin One", role: "admin", email: null },
@@ -46,10 +47,13 @@ async function createFixtureTables() {
     "conversations",
     "messages",
     "message_email_outbox",
+    "message_receipt_acknowledgements",
     "conversation_participants",
     "conversation_archives",
     "inbound_email_messages",
     "inspector_task_links",
+    "notifications",
+    "areas",
     "tasks",
   ]);
   for (const table of Object.values(schema)) {
@@ -72,6 +76,7 @@ async function createFixtureTables() {
   // These indexes support the real upsert/conflict paths exercised below.
   await pg.exec("CREATE UNIQUE INDEX conversation_participants_unique ON conversation_participants (conversation_id, staff_id)");
   await pg.exec("CREATE UNIQUE INDEX conversation_archives_unique ON conversation_archives (conversation_id, staff_id)");
+  await pg.exec("CREATE UNIQUE INDEX message_receipt_acknowledgements_message_version_unique ON message_receipt_acknowledgements (message_id, message_version)");
 }
 
 async function seedFixtures() {
@@ -102,7 +107,8 @@ async function seedFixtures() {
       (id,message_id,conversation_id,inspector_id,supervisor_id,inspector_email,inspector_name,supervisor_name,message_body,status,accepted_at)
      VALUES
       (1,201,101,10,1,'fixture-recipient@example.test','Test Inspector','Test Admin One','fixture outbound one','accepted',$1),
-      (2,202,102,10,2,'fixture-recipient@example.test','Test Inspector','Test Supervisor','fixture outbound two','accepted',$2)`,
+       (2,202,102,10,2,'fixture-recipient@example.test','Test Inspector','Test Supervisor','fixture outbound two','accepted',$2),
+       (3,201,101,10,1,'fixture-recipient-two@example.test','Test Inspector','Test Admin One','fixture outbound one','accepted',$1)`,
     [acceptedAtOne, acceptedAtTwo],
   );
   await pg.query(
@@ -121,6 +127,11 @@ async function seedFixtures() {
 }
 
 before(async () => {
+  // Isolated synthetic values exercise inbound authentication without reading
+  // or contacting a real SendGrid account.
+  process.env.SENDGRID_INBOUND_WEBHOOK_SECRET = "fixture-only-webhook-secret-with-32-chars";
+  process.env.SENDGRID_REPLY_TOKEN_SECRET = "fixture-only-reply-token-secret-with-32-chars";
+  process.env.SENDGRID_INBOUND_DOMAIN = "mail.fixture.marvol.test";
   pg = await PGlite.create();
   db = drizzle(pg, { schema });
   mock.module(new URL("../lib/db/src/index.ts", import.meta.url).href, {
@@ -135,11 +146,12 @@ before(async () => {
         ) ?? null,
     },
   });
-  ({ default: messagesRouter } = await import("../artifacts/api-server/src/routes/messages.ts"));
+  ({ default: messagesRouter, inboundSendgridRouter } = await import("../artifacts/api-server/src/routes/messages.ts"));
   await createFixtureTables();
   await seedFixtures();
   const app = express();
   app.use(express.json());
+  app.use("/api/webhooks/sendgrid/inbound", inboundSendgridRouter);
   app.use("/api", messagesRouter);
   app.use((_error: Error, _req: any, res: any, _next: any) => {
     res.status(500).json({ error: "Isolated messages route failed" });
@@ -295,4 +307,259 @@ test("message edits and deletes require the message's original thread ID", async
   }
   const restoredFixture = await pg.query<any>("SELECT id FROM messages WHERE id=202");
   assert.equal(restoredFixture.rows.length, 1);
+});
+
+test("receipt acknowledgment authenticates the inspector, is idempotent, and preserves provider status", async () => {
+  const unauthenticated = await request("/conversations/101/messages/201/receipt", 0, "POST");
+  assert.equal(unauthenticated.status, 401);
+
+  const selfConfirmation = await request("/conversations/101/messages/201/receipt", 1, "POST");
+  assert.equal(selfConfirmation.status, 403);
+
+  const unrelatedConversation = await request("/conversations/104/messages/201/receipt", 3, "POST");
+  assert.equal(unrelatedConversation.status, 403);
+
+  const inspectorRecord = people.find((person) => person.id === 10)!;
+  inspectorRecord.active = false;
+  const inactiveInspector = await request("/conversations/101/messages/201/receipt", 10, "POST");
+  assert.equal(inactiveInspector.status, 401);
+  inspectorRecord.active = true;
+  inspectorRecord.formerEmployee = true;
+  const formerInspector = await request("/conversations/101/messages/201/receipt", 10, "POST");
+  assert.equal(formerInspector.status, 401);
+  inspectorRecord.formerEmployee = false;
+
+  const confirmation = await request("/conversations/101/messages/201/receipt", 10, "POST", {
+    staffId: 1,
+    confirmerStaffId: 1,
+  });
+  assert.equal(confirmation.status, 201);
+  assert.equal(confirmation.data.alreadyConfirmed, false);
+  assert.equal(confirmation.data.receipt.direction, "to_inspector");
+  assert.equal(confirmation.data.receipt.status, "confirmed");
+  assert.deepEqual(confirmation.data.receipt.confirmedBy, {
+    name: "Test Inspector",
+    role: "inspector",
+  });
+  assert.ok(Number.isFinite(Date.parse(confirmation.data.receipt.confirmedAt)));
+
+  const duplicate = await request("/conversations/101/messages/201/receipt", 10, "POST");
+  assert.equal(duplicate.status, 200);
+  assert.equal(duplicate.data.alreadyConfirmed, true);
+  assert.equal(duplicate.data.receipt.confirmedAt, confirmation.data.receipt.confirmedAt);
+
+  const stored = await pg.query<any>(
+    "SELECT message_version, confirmed_by_staff_id FROM message_receipt_acknowledgements WHERE message_id=201",
+  );
+  assert.deepEqual(stored.rows, [{ message_version: 1, confirmed_by_staff_id: 10 }]);
+
+  const history = await messagesFor(2);
+  const outbound = history.data.find((message: any) => message.id === 201);
+  assert.equal(outbound.receipt.status, "confirmed");
+  assert.equal(outbound.receipt.confirmedBy.name, "Test Inspector");
+  assert.equal(outbound.inspectorEmailDeliveryStatus, "accepted");
+  assert.equal(outbound.inspectorEmailAcceptedAt, acceptedAtOne);
+  assert.equal(outbound.inspectorEmailRecipients.length, 2);
+});
+
+test("authorized manager confirms inbound inspector email across shared history", async () => {
+  const inspectorSelfConfirmation = await request("/conversations/102/messages/203/receipt", 10, "POST");
+  assert.equal(inspectorSelfConfirmation.status, 403);
+
+  const confirmation = await request("/conversations/102/messages/203/receipt", 2, "POST", {
+    staffId: 11,
+  });
+  assert.equal(confirmation.status, 201);
+  assert.equal(confirmation.data.receipt.direction, "from_inspector");
+  assert.equal(confirmation.data.receipt.status, "confirmed");
+  assert.deepEqual(confirmation.data.receipt.confirmedBy, {
+    name: "Test Supervisor",
+    role: "supervisor",
+  });
+
+  const history = await messagesFor(1);
+  const inbound = history.data.find((message: any) => message.id === 203);
+  assert.equal(inbound.receipt.status, "confirmed");
+  assert.equal(inbound.inboundEmailReceivedAt, receivedAt);
+});
+
+test("message edits advance receipt versions and retain prior evidence through cleanup", async () => {
+  const edit = await request("/conversations/101/messages/201", 1, "PATCH", {
+    senderId: 1,
+    body: "edited after the first receipt",
+  });
+  assert.equal(edit.status, 200);
+  assert.equal(edit.data.receiptVersion, 2);
+  assert.equal(edit.data.receipt.status, "unconfirmed");
+  assert.deepEqual(edit.data.receipt.previousVersions.map((item: any) => item.version), [1]);
+  assert.equal(edit.data.receipt.previousVersions[0].confirmedBy.name, "Test Inspector");
+
+  const cleanup = await request(
+    "/conversations/101/old-messages?before=2026-09-02T00:00:00.000Z",
+    1,
+    "DELETE",
+  );
+  assert.equal(cleanup.status, 200);
+  assert.deepEqual(cleanup.data, { deleted: 0, retained: 1 });
+
+  const deleteAcknowledged = await request("/conversations/101/messages/201?staffId=1", 1, "DELETE");
+  assert.equal(deleteAcknowledged.status, 409);
+
+  const secondConfirmation = await request("/conversations/101/messages/201/receipt", 10, "POST");
+  assert.equal(secondConfirmation.status, 201);
+  assert.equal(secondConfirmation.data.receipt.version, 2);
+  assert.equal(secondConfirmation.data.receipt.status, "confirmed");
+  assert.deepEqual(secondConfirmation.data.receipt.previousVersions.map((item: any) => item.version), [1]);
+
+  const auditRows = await pg.query<any>(
+    "SELECT message_version, confirmed_by_staff_id FROM message_receipt_acknowledgements WHERE message_id=201 ORDER BY message_version",
+  );
+  assert.deepEqual(auditRows.rows, [
+    { message_version: 1, confirmed_by_staff_id: 10 },
+    { message_version: 2, confirmed_by_staff_id: 10 },
+  ]);
+});
+
+test("additive receipt schema preserves legacy messages and does not cascade-delete audit evidence", async () => {
+  const migrationPg = await PGlite.create();
+  const dialect = new PgDialect();
+  const defaultSql = (column: any) => {
+    if (column.default === undefined) return "";
+    if (is(column.default, SQL)) return ` DEFAULT ${dialect.sqlToQuery(column.default).sql}`;
+    if (typeof column.default === "string") return ` DEFAULT '${column.default.replaceAll("'", "''")}'`;
+    return ` DEFAULT ${String(column.default)}`;
+  };
+  const definition = (column: any) =>
+    `${quote(column.name)} ${column.getSQLType()}${column.notNull ? " NOT NULL" : ""}${column.primary ? " PRIMARY KEY" : ""}${defaultSql(column)}`;
+
+  try {
+    const messagesConfig = getTableConfig(schema.messagesTable);
+    const versionColumn = messagesConfig.columns.find((column: any) => column.name === "receipt_version");
+    assert.ok(versionColumn, "message schema declares a version column");
+    assert.equal(versionColumn.default, 1, "legacy messages migrate as version 1");
+
+    await migrationPg.exec(`CREATE TABLE "messages" (${messagesConfig.columns
+      .filter((column: any) => column.name !== "receipt_version")
+      .map(definition)
+      .join(", ")})`);
+    await migrationPg.exec(
+      `INSERT INTO "messages" ("id","conversation_id","sender_id","body") VALUES (901,902,903,'legacy message')`,
+    );
+    await migrationPg.exec(`ALTER TABLE "messages" ADD COLUMN ${definition(versionColumn)}`);
+
+    const receiptConfig = getTableConfig(schema.messageReceiptAcknowledgementsTable);
+    await migrationPg.exec(`CREATE TABLE ${quote(receiptConfig.name)} (${receiptConfig.columns.map(definition).join(", ")})`);
+    await migrationPg.exec(
+      `CREATE UNIQUE INDEX "message_receipt_acknowledgements_message_version_unique" ON "message_receipt_acknowledgements" ("message_id","message_version")`,
+    );
+
+    const legacy = await migrationPg.query<any>('SELECT id, body, receipt_version FROM "messages" WHERE id=901');
+    assert.deepEqual(legacy.rows, [{ id: 901, body: "legacy message", receipt_version: 1 }]);
+
+    await migrationPg.query(
+      `INSERT INTO "message_receipt_acknowledgements"
+       (conversation_id,message_id,message_version,body_sha256,direction,confirmed_by_staff_id,confirmed_by_name,confirmed_by_role)
+       VALUES (902,901,1,$1,'to_inspector',10,'Test Inspector','inspector')`,
+      ["a".repeat(64)],
+    );
+    await migrationPg.exec('DELETE FROM "messages" WHERE id=901');
+    const evidence = await migrationPg.query<any>(
+      `SELECT conversation_id,message_id,message_version,confirmed_by_name
+       FROM "message_receipt_acknowledgements" WHERE message_id=901`,
+    );
+    assert.deepEqual(evidence.rows, [{
+      conversation_id: 902,
+      message_id: 901,
+      message_version: 1,
+      confirmed_by_name: "Test Inspector",
+    }]);
+  } finally {
+    await migrationPg.close();
+  }
+});
+
+test("authenticated Moussa email enters the existing shared history once; spoofs and lookalikes are rejected", async () => {
+  const recipientList = await request("/inspector-email/recipients", 1);
+  assert.equal(recipientList.status, 200);
+  assert.equal(recipientList.data.emails.includes("moussa.barmaki@goaa.org"), true);
+  assert.equal(recipientList.data.emails.length, 11);
+
+  const webhookPath = "/webhooks/sendgrid/inbound/";
+  const inboundSecret = "fixture-only-webhook-secret-with-32-chars";
+  const approvedFrom = "Moussa Barmaki <MOUSSA.BARMAKI@GOAA.ORG>";
+  const payload = {
+    envelope: {
+      from: "moussa.barmaki@goaa.org",
+      to: ["inspector@mail.fixture.marvol.test"],
+    },
+    from: approvedFrom,
+    text: "Fixture inbound message for route validation; no real email content.",
+    subject: "Synthetic sender authorization test",
+    headers: "Message-ID: <moussa-route-fixture-1@example.test>",
+    SPF: "pass",
+  };
+  const submit = async (body: unknown, secret = inboundSecret) => {
+    const response = await fetch(`${origin}${webhookPath}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-sendgrid-inbound-secret": secret,
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(20_000),
+    });
+    const text = await response.text();
+    return { status: response.status, data: text ? JSON.parse(text) : null };
+  };
+
+  const badCredential = await submit(payload, "incorrect-fixture-credential");
+  assert.equal(badCredential.status, 401);
+
+  const spoofedFrom = await submit({
+    ...payload,
+    envelope: { ...payload.envelope, from: "attacker@goaa.org" },
+    headers: "Message-ID: <moussa-route-spoof@example.test>",
+  });
+  assert.equal(spoofedFrom.status, 403);
+
+  const lookalike = await submit({
+    ...payload,
+    envelope: { ...payload.envelope, from: "moussa.barmaki@goaa.org.evil.test" },
+    from: "Moussa <moussa.barmaki@goaa.org.evil.test>",
+    headers: "Message-ID: <moussa-route-lookalike@example.test>",
+  });
+  assert.equal(lookalike.status, 403);
+
+  const accepted = await submit(payload);
+  assert.equal(accepted.status, 200);
+  assert.equal(accepted.data.duplicate, false);
+  assert.ok(Number.isInteger(accepted.data.messageId));
+
+  const duplicate = await submit(payload);
+  assert.equal(duplicate.status, 200);
+  assert.equal(duplicate.data.duplicate, true);
+  assert.equal(duplicate.data.messageId, accepted.data.messageId);
+
+  const stored = await pg.query<any>(
+    "SELECT id, conversation_id, sender_id, body FROM messages WHERE id=$1",
+    [accepted.data.messageId],
+  );
+  assert.equal(stored.rows.length, 1);
+  assert.equal(stored.rows[0].conversation_id, 101);
+  assert.equal(stored.rows[0].sender_id, 10);
+  assert.match(stored.rows[0].body, /^From inspector: moussa\.barmaki@goaa\.org/);
+
+  const history = await messagesFor(2);
+  const routed = history.data.find((message: any) => message.id === accepted.data.messageId);
+  assert.ok(routed, "the accepted message appears in the existing shared manager history");
+  assert.ok(routed.inboundEmailReceivedAt);
+  assert.equal(routed.receipt.direction, "from_inspector");
+  assert.equal(routed.receipt.status, "unconfirmed");
+  assert.equal(routed.receipt.canConfirm, true);
+
+  const inboundCount = await pg.query<any>(
+    "SELECT count(*)::int AS count FROM inbound_email_messages WHERE message_id=$1",
+    [accepted.data.messageId],
+  );
+  assert.equal(inboundCount.rows[0].count, 1);
 });
