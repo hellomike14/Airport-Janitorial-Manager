@@ -983,6 +983,19 @@ export interface OnboardingProtocolEmailResponse {
   accepted: boolean;
 }
 
+export interface EmploymentPdfEmailInput {
+  /**
+   * @minLength 3
+   * @maxLength 254
+   */
+  recipientEmail: string;
+}
+
+export const AcceptedEmailResponseValue = {
+  accepted: true,
+} as const;
+export type AcceptedEmailResponse = typeof AcceptedEmailResponseValue;
+
 export type EmploymentFormSubmissionSummaryEmailStatus =
   (typeof EmploymentFormSubmissionSummaryEmailStatus)[keyof typeof EmploymentFormSubmissionSummaryEmailStatus];
 

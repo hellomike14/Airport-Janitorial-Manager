@@ -1,7 +1,11 @@
 import type { Request, Response, NextFunction } from "express";
 import { assertAdmin, confidentialCookie, confidentialIdentity, confidentialService } from "../lib/confidentialAccess";
 import { confidentialFailure, confidentialSameOrigin } from "../routes/confidentialAccess";
-import { isEmploymentFormObjectPath, isPublicBlankEmploymentTemplate } from "../routes/employmentForms";
+import {
+  isEmploymentFormObjectPath,
+  isPublicBlankEmploymentEmail,
+  isPublicBlankEmploymentTemplate,
+} from "../routes/employmentForms";
 import { db } from "@workspace/db";
 import { objectUploadsTable } from "@workspace/db/schema";
 import { and, eq } from "drizzle-orm";
@@ -27,6 +31,7 @@ export function isConfidentialRequest(path: string, method: string) {
   // Classify the same canonical path so encoded object URLs cannot skip the lock.
   try { path = decodeURIComponent(path); } catch { return true; }
   if (isPublicBlankEmploymentTemplate(path, method)) return false;
+  if (isPublicBlankEmploymentEmail(path, method)) return false;
   if (/^\/applications(?:\/|$)/i.test(path)) return method !== "POST" || path.toLowerCase() !== "/applications";
   if (/^\/employment-form-submissions(?:\/|$)/i.test(path)) {
     return method !== "POST" || path.toLowerCase() !== "/employment-form-submissions";

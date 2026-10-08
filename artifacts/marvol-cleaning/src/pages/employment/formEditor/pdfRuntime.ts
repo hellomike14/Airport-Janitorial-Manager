@@ -71,7 +71,7 @@ export type PreparedPdfPrintDocument = {
 export async function preparePdfPrintDocument(
   doc: PDFDocumentProxy,
   frame: HTMLIFrameElement,
-  options: { annotationMode?: number; signal?: AbortSignal } = {},
+  options: { annotationMode?: number; signal?: AbortSignal; title?: string } = {},
 ): Promise<PreparedPdfPrintDocument> {
   const images: { src: string; width: number; height: number; page: number }[] = [];
   if (doc.numPages < 1) throw new Error("The PDF has no pages");
@@ -116,10 +116,20 @@ export async function preparePdfPrintDocument(
   const first = images[0];
   const printDocument = frame.contentDocument;
   if (!first || !printDocument) throw new Error("Print frame is unavailable");
+  const title = (options.title ?? "Marvol Employee Onboarding Protocol").replace(/[&<>"']/g, (character) => {
+    switch (character) {
+      case "&": return "&amp;";
+      case "<": return "&lt;";
+      case ">": return "&gt;";
+      case "\"": return "&quot;";
+      case "'": return "&#39;";
+      default: return character;
+    }
+  });
   printDocument.open();
   printDocument.write(`<!doctype html><html lang="en"><head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Marvol Employee Onboarding Protocol</title>
+    <title>${title}</title>
     <style>
       @page { size: ${first.width}pt ${first.height}pt; margin: 0; }
       html, body { margin: 0; padding: 0; }

@@ -1188,6 +1188,100 @@ paths:
         "404":
           description: Application not found
 
+  /applications/{id}/pdf:
+    get:
+      operationId: getApplicationPdf
+      tags: [employment]
+      summary: Render a confidential application PDF (verified Admin plus access code only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Server-rendered PDF containing the saved application fields
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "400": { description: Invalid application id }
+        "403": { description: Administrator and confidential access required }
+        "404": { description: Application not found }
+
+  /applications/{id}/email-pdf:
+    post:
+      operationId: emailApplicationPdf
+      tags: [employment]
+      summary: Email a confidential application PDF (verified Admin plus access code only)
+      description: The PDF is generated from the saved application record on the server; client-supplied files and URLs are not accepted.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmploymentPdfEmailInput"
+      responses:
+        "202":
+          description: The configured email provider accepted the message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptedEmailResponse"
+        "400": { description: Invalid id or recipient address }
+        "403": { description: Administrator and confidential access required }
+        "404": { description: Application not found }
+        "413": { description: PDF exceeds the supported attachment limit }
+        "502": { description: Email provider rejected the message }
+        "503": { description: Email delivery is not configured }
+
+  /applications/{id}/documents/{documentIndex}/email:
+    post:
+      operationId: emailApplicationDocumentPdf
+      tags: [employment]
+      summary: Email one uploaded application PDF (verified Admin plus access code only)
+      description: The document is selected from the saved application record by index; arbitrary paths, URLs, and attachments are not accepted.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: documentIndex
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 0
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmploymentPdfEmailInput"
+      responses:
+        "202":
+          description: The configured email provider accepted the message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptedEmailResponse"
+        "400": { description: "Invalid id, document index, or recipient address" }
+        "403": { description: Administrator and confidential access required }
+        "404": { description: Application or document not found }
+        "413": { description: PDF exceeds the supported attachment limit }
+        "415": { description: The selected upload is not a PDF }
+        "502": { description: Email provider rejected the message }
+        "503": { description: Email delivery is not configured or the stored document is unavailable }
+
   /applications/{id}:
     get:
       operationId: getApplication
@@ -1317,12 +1411,44 @@ paths:
         "404":
           description: Submission not found
 
+  /employment-form-submissions/{id}/email-pdf:
+    post:
+      operationId: emailEmploymentFormSubmissionPdf
+      tags: [employment]
+      summary: Email one completed standalone form PDF (Admin plus confidential code only)
+      description: The PDF is read from the selected private submission on the server. ID photos, client-supplied files, and URLs are not attached.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmploymentPdfEmailInput"
+      responses:
+        "202":
+          description: The configured email provider accepted the message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptedEmailResponse"
+        "400": { description: Invalid id or recipient address }
+        "403": { description: Administrator and confidential access required }
+        "404": { description: Submission not found }
+        "413": { description: PDF exceeds the supported attachment limit }
+        "502": { description: Email provider rejected the message }
+        "503": { description: Email delivery is not configured or the protected PDF is unavailable }
+
   /onboarding-protocol/email:
     post:
       operationId: emailOnboardingProtocol
       tags: [employment]
-      summary: Send the current onboarding protocol PDF to an administrator-selected recipient
-      description: Requires an authenticated administrator session. The PDF is read from protected storage by the server and is never accepted from the client.
+      summary: Send the current onboarding protocol PDF to a staff-selected recipient
+      description: Requires an authenticated staff session. The PDF is read from protected storage by the server and is never accepted from the client.
       requestBody:
         required: true
         content:
@@ -1338,7 +1464,7 @@ paths:
                 $ref: "#/components/schemas/OnboardingProtocolEmailResponse"
         "400": { description: Invalid recipient address }
         "401": { description: Authenticated staff session required }
-        "403": { description: Administrator role required }
+        "403": { description: Authorized staff role required }
         "413": { description: The onboarding protocol exceeds the email attachment limit }
         "502": { description: Email provider rejected the message }
         "503": { description: Email delivery is not configured or the protected PDF is unavailable }
@@ -1800,6 +1926,37 @@ paths:
           description: Form not found
         "503":
           description: Form temporarily unavailable
+  /employment-forms/{formId}/email:
+    post:
+      operationId: emailEmploymentBlankForm
+      tags: [Employment]
+      summary: Send a fixed blank Employment template PDF to a validated recipient
+      description: Public endpoint with per-IP rate limiting. Only one of the three server-allowlisted blank templates can be attached; client file and URL inputs are rejected.
+      parameters:
+        - name: formId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/EmploymentFormId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmploymentPdfEmailInput"
+      responses:
+        "202":
+          description: The configured email provider accepted the message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptedEmailResponse"
+        "400": { description: Invalid form id or recipient address }
+        "404": { description: Template not found }
+        "413": { description: PDF exceeds the supported attachment limit }
+        "429": { description: Public email rate limit exceeded }
+        "502": { description: Email provider rejected the message }
+        "503": { description: Email delivery is not configured or the template is unavailable }
   /employee-training/video:
     get:
       operationId: getEmployeeTrainingVideo
@@ -3290,6 +3447,24 @@ components:
       additionalProperties: false
       properties:
         accepted: { type: boolean }
+      required: [accepted]
+
+    EmploymentPdfEmailInput:
+      type: object
+      additionalProperties: false
+      properties:
+        recipientEmail:
+          type: string
+          format: email
+          minLength: 3
+          maxLength: 254
+      required: [recipientEmail]
+
+    AcceptedEmailResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        accepted: { type: boolean, const: true }
       required: [accepted]
 
     EmploymentFormSubmissionSummary:

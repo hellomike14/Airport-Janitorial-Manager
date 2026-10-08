@@ -2,6 +2,7 @@ import { lazy, Suspense, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Download, ExternalLink, FileText, PenLine } from "lucide-react";
 import type { EmploymentFormId } from "./formEditor/formSources";
+import { PdfDocumentActions } from "./PdfDocumentActions";
 
 const EmploymentFormEditor = lazy(() => import("./formEditor/EmploymentFormEditor"));
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
@@ -73,6 +74,12 @@ export function EmploymentFormsLibrary({ variant = "employment" }: Props) {
                 <Download className="h-4 w-4" aria-hidden="true" />
                 {t("employment.forms.download")}
               </a>
+              <PdfDocumentActions
+                title={t(`employment.forms.${form.title}`)}
+                pdfUrl={url}
+                emailEndpoint={`${url}/email`}
+                testId={`blank-form-${form.id}`}
+              />
             </div>
           </article>
         );

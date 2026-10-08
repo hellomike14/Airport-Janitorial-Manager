@@ -1621,6 +1621,56 @@ export const ResendApplicationEmailResponse = zod.object({
 });
 
 /**
+ * @summary Render a confidential application PDF (verified Admin plus access code only)
+ */
+export const GetApplicationPdfParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * The PDF is generated from the saved application record on the server; client-supplied files and URLs are not accepted.
+ * @summary Email a confidential application PDF (verified Admin plus access code only)
+ */
+export const EmailApplicationPdfParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const emailApplicationPdfBodyRecipientEmailMin = 3;
+export const emailApplicationPdfBodyRecipientEmailMax = 254;
+
+export const EmailApplicationPdfBody = zod.object({
+  recipientEmail: zod
+    .string()
+    .email()
+    .min(emailApplicationPdfBodyRecipientEmailMin)
+    .max(emailApplicationPdfBodyRecipientEmailMax),
+});
+
+/**
+ * The document is selected from the saved application record by index; arbitrary paths, URLs, and attachments are not accepted.
+ * @summary Email one uploaded application PDF (verified Admin plus access code only)
+ */
+export const emailApplicationDocumentPdfPathDocumentIndexMin = 0;
+
+export const EmailApplicationDocumentPdfParams = zod.object({
+  id: zod.coerce.number(),
+  documentIndex: zod.coerce
+    .number()
+    .min(emailApplicationDocumentPdfPathDocumentIndexMin),
+});
+
+export const emailApplicationDocumentPdfBodyRecipientEmailMin = 3;
+export const emailApplicationDocumentPdfBodyRecipientEmailMax = 254;
+
+export const EmailApplicationDocumentPdfBody = zod.object({
+  recipientEmail: zod
+    .string()
+    .email()
+    .min(emailApplicationDocumentPdfBodyRecipientEmailMin)
+    .max(emailApplicationDocumentPdfBodyRecipientEmailMax),
+});
+
+/**
  * @summary Get a confidential application (verified Admin plus access code only)
  */
 export const GetApplicationParams = zod.object({
@@ -1804,8 +1854,27 @@ export const ResendEmploymentFormSubmissionEmailResponse = zod.object({
 });
 
 /**
- * Requires an authenticated administrator session. The PDF is read from protected storage by the server and is never accepted from the client.
- * @summary Send the current onboarding protocol PDF to an administrator-selected recipient
+ * The PDF is read from the selected private submission on the server. ID photos, client-supplied files, and URLs are not attached.
+ * @summary Email one completed standalone form PDF (Admin plus confidential code only)
+ */
+export const EmailEmploymentFormSubmissionPdfParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const emailEmploymentFormSubmissionPdfBodyRecipientEmailMin = 3;
+export const emailEmploymentFormSubmissionPdfBodyRecipientEmailMax = 254;
+
+export const EmailEmploymentFormSubmissionPdfBody = zod.object({
+  recipientEmail: zod
+    .string()
+    .email()
+    .min(emailEmploymentFormSubmissionPdfBodyRecipientEmailMin)
+    .max(emailEmploymentFormSubmissionPdfBodyRecipientEmailMax),
+});
+
+/**
+ * Requires an authenticated staff session. The PDF is read from protected storage by the server and is never accepted from the client.
+ * @summary Send the current onboarding protocol PDF to a staff-selected recipient
  */
 export const emailOnboardingProtocolBodyRecipientEmailMin = 3;
 export const emailOnboardingProtocolBodyRecipientEmailMax = 254;
@@ -2167,6 +2236,25 @@ export const GetEmploymentI9FormQueryParams = zod.object({
  */
 export const GetEmploymentW4FormQueryParams = zod.object({
   download: zod.enum(["1"]).optional(),
+});
+
+/**
+ * Public endpoint with per-IP rate limiting. Only one of the three server-allowlisted blank templates can be attached; client file and URL inputs are rejected.
+ * @summary Send a fixed blank Employment template PDF to a validated recipient
+ */
+export const EmailEmploymentBlankFormParams = zod.object({
+  formId: zod.enum(["job-application", "i-9", "w-4"]),
+});
+
+export const emailEmploymentBlankFormBodyRecipientEmailMin = 3;
+export const emailEmploymentBlankFormBodyRecipientEmailMax = 254;
+
+export const EmailEmploymentBlankFormBody = zod.object({
+  recipientEmail: zod
+    .string()
+    .email()
+    .min(emailEmploymentBlankFormBodyRecipientEmailMin)
+    .max(emailEmploymentBlankFormBodyRecipientEmailMax),
 });
 
 /**

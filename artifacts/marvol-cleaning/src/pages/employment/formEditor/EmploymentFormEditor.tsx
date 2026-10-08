@@ -4,9 +4,10 @@ import { ChevronLeft, ChevronRight, Download, Loader2, Minus, Plus, Printer, Ref
 import type { PDFDocumentLoadingTask, PDFDocumentProxy } from "pdfjs-dist";
 import { useSubmitEmploymentForm } from "@workspace/api-client-react";
 import { fetchFormBytes, type EmploymentFormId } from "./formSources";
-import { downloadBytes, openDocument, printDocument } from "./pdfRuntime";
+import { downloadBytes, openDocument } from "./pdfRuntime";
 import { uploadEmploymentFormFile } from "./privateUpload";
 import { PdfPage } from "./PdfPage";
+import { PdfPrintPreview } from "../PdfPrintPreview";
 
 interface Props {
   formId: EmploymentFormId;
@@ -31,7 +32,8 @@ export default function EmploymentFormEditor({ formId, title, onClose, onSubmitt
   const [dirty, setDirty] = useState(false);
   const editRevision = useRef(0);
   const [confirmClose, setConfirmClose] = useState(false);
-  const [busy, setBusy] = useState<"save" | "print" | "submit" | null>(null);
+  const [busy, setBusy] = useState<"save" | "submit" | null>(null);
+  const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -121,11 +123,10 @@ export default function EmploymentFormEditor({ formId, title, onClose, onSubmitt
     } catch { setNotice({ kind: "err", text: t("employment.forms.editor.saveError") }); }
     finally { setBusy(null); }
   };
-  const onPrint = async () => {
-    setBusy("print"); setNotice(null);
-    try { if (!doc) throw new Error("no document"); await printDocument(doc); }
-    catch { setNotice({ kind: "err", text: t("employment.forms.editor.printError") }); }
-    finally { setBusy(null); }
+  const onPrint = () => {
+    if (!doc) return;
+    setNotice(null);
+    setPrintPreviewOpen(true);
   };
   const onPhotoSelect = (files: FileList | null) => {
     if (!files?.length) return;
@@ -194,7 +195,7 @@ export default function EmploymentFormEditor({ formId, title, onClose, onSubmitt
 
   return (
     <div role="dialog" aria-modal="true" aria-label={title} data-testid="form-editor"
-      className="fixed inset-0 z-[80] flex flex-col bg-slate-200">
+      className={`fixed inset-0 flex flex-col bg-slate-200 ${printPreviewOpen ? "z-40" : "z-[80]"}`}>
       <header className="flex flex-wrap items-center gap-2 border-b border-slate-300 bg-white px-3 py-2 sm:px-5">
         <div className="mr-auto min-w-0">
           <h2 className="truncate text-base font-semibold text-slate-900">{title}</h2>
@@ -209,7 +210,7 @@ export default function EmploymentFormEditor({ formId, title, onClose, onSubmitt
         </button>
         <button type="button" className={`${BTN} border border-slate-300 text-slate-700 hover:bg-slate-50`}
           onClick={onPrint} disabled={!doc || busy !== null} data-testid="form-editor-print">
-          {busy === "print" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Printer className="h-4 w-4" aria-hidden="true" />}
+          <Printer className="h-4 w-4" aria-hidden="true" />
           {t("employment.forms.editor.print")}
         </button>
         <button type="button" className={`${BTN} text-slate-700 hover:bg-slate-100`}
@@ -365,6 +366,13 @@ export default function EmploymentFormEditor({ formId, title, onClose, onSubmitt
           </div>
         </div>
       )}
+      <PdfPrintPreview
+        open={printPreviewOpen}
+        title={title}
+        document={doc}
+        onOpenChange={setPrintPreviewOpen}
+        testId="form-editor-preview"
+      />
     </div>
   );
 }

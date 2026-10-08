@@ -1,6 +1,8 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
-import { Router, type IRouter, type Request, type Response } from "express";
+import { Router, type IRouter, type Request, type RequestHandler, type Response } from "express";
 import {
+  EmailEmploymentFormSubmissionPdfBody,
+  EmailEmploymentFormSubmissionPdfParams,
   GetEmploymentFormSubmissionResponse,
   ListEmploymentFormSubmissionsResponse,
   ResendEmploymentFormSubmissionEmailResponse,
@@ -26,12 +28,14 @@ import {
 const storage = new ObjectStorageService();
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const SUPPORTED_PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const pdfSignature = Buffer.from("%PDF-");
 
 type RouterDependencies = {
   copyApplicantSubmissionObject: (sourcePath: string) => Promise<string>;
   getObjectMetadata: (sourcePath: string) => Promise<{ sizeBytes: number; contentType: string }>;
   readObjectBytes: (path: string, maxBytes: number) => Promise<{ bytes: Buffer; sizeBytes: number; contentType: string }>;
   sendEmail: EmploymentEmailSender;
+  authorizeAdmin: RequestHandler;
 };
 
 const defaultDependencies: RouterDependencies = {
@@ -39,12 +43,31 @@ const defaultDependencies: RouterDependencies = {
   getObjectMetadata: path => storage.getObjectEntityMetadata(path),
   readObjectBytes: (path, maxBytes) => storage.readObjectEntityBytes(path, maxBytes),
   sendEmail: sendEmploymentFormEmail,
+  authorizeAdmin: requireStaffRole("admin"),
 };
 
 function formLabel(formId: "job-application" | "i-9" | "w-4"): string {
   if (formId === "i-9") return "Form I-9";
   if (formId === "w-4") return "Form W-4";
   return "Job application";
+}
+
+function emailFailure(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+  if (message === "EMPLOYMENT_EMAIL_NOT_CONFIGURED") {
+    return { status: 503, reason: "email_not_configured", error: "Email delivery is not configured." };
+  }
+  if (message === "EMPLOYMENT_EMAIL_ATTACHMENTS_TOO_LARGE") {
+    return { status: 413, reason: "attachment_too_large", error: "The PDF is too large to email." };
+  }
+  if (message === "EMPLOYMENT_EMAIL_INVALID_RECIPIENT") {
+    return { status: 400, reason: "invalid_recipient", error: "Enter a valid recipient email address." };
+  }
+  return {
+    status: 502,
+    reason: message.startsWith("EMPLOYMENT_EMAIL_REJECTED_") ? "provider_rejected" : "provider_unavailable",
+    error: "The completed form PDF could not be emailed. Please try again.",
+  };
 }
 
 async function getAttachments(
@@ -242,7 +265,7 @@ export function createEmploymentFormSubmissionsRouter(
     res.status(201).json({ success: true, emailSent });
   });
 
-  router.get("/", requireStaffRole("admin"), async (req: Request, res: Response): Promise<void> => {
+  router.get("/", deps.authorizeAdmin, async (req: Request, res: Response): Promise<void> => {
     res.setHeader("Cache-Control", "private, no-store");
     const rows = await db.select({
       id: employmentFormSubmissionsTable.id,
@@ -257,7 +280,7 @@ export function createEmploymentFormSubmissionsRouter(
     res.json(ListEmploymentFormSubmissionsResponse.parse(rows));
   });
 
-  router.get("/:id", requireStaffRole("admin"), async (req: Request, res: Response): Promise<void> => {
+  router.get("/:id", deps.authorizeAdmin, async (req: Request, res: Response): Promise<void> => {
     res.setHeader("Cache-Control", "private, no-store");
     const id = Number(req.params.id);
     if (!Number.isSafeInteger(id) || id <= 0) {
@@ -273,7 +296,7 @@ export function createEmploymentFormSubmissionsRouter(
     res.json(GetEmploymentFormSubmissionResponse.parse(row));
   });
 
-  router.post("/:id/resend-email", requireStaffRole("admin"), async (req: Request, res: Response): Promise<void> => {
+  router.post("/:id/resend-email", deps.authorizeAdmin, async (req: Request, res: Response): Promise<void> => {
     res.setHeader("Cache-Control", "private, no-store");
     const id = Number(req.params.id);
     if (!Number.isSafeInteger(id) || id <= 0) {
@@ -301,6 +324,66 @@ export function createEmploymentFormSubmissionsRouter(
       // Return the provider result without exposing record data.
     }
     res.json(ResendEmploymentFormSubmissionEmailResponse.parse({ success: true, emailSent }));
+  });
+
+  router.post("/:id/email-pdf", deps.authorizeAdmin, async (req: Request, res: Response): Promise<void> => {
+    res.setHeader("Cache-Control", "private, no-store");
+    const params = EmailEmploymentFormSubmissionPdfParams.safeParse(req.params);
+    const body = EmailEmploymentFormSubmissionPdfBody.strict().safeParse(req.body);
+    if (!params.success || !body.success) {
+      res.status(400).json({ error: "Enter a valid submission id and recipient email address." });
+      return;
+    }
+    const [submission] = await db.select().from(employmentFormSubmissionsTable)
+      .where(eq(employmentFormSubmissionsTable.id, params.data.id)).limit(1);
+    if (!submission) {
+      res.status(404).json({ error: "Submission not found." });
+      return;
+    }
+
+    let pdf: Buffer;
+    try {
+      const metadata = await deps.getObjectMetadata(submission.completedPdfPath);
+      if (metadata.sizeBytes <= 0 || metadata.sizeBytes > MAX_EMPLOYMENT_EMAIL_ATTACHMENT_BYTES) {
+        res.status(413).json({ error: "The completed form PDF is too large to email." });
+        return;
+      }
+      if (metadata.contentType !== "application/pdf") throw new Error("INVALID_STORED_PDF");
+      const stored = await deps.readObjectBytes(submission.completedPdfPath, MAX_EMPLOYMENT_EMAIL_ATTACHMENT_BYTES);
+      pdf = Buffer.from(stored.bytes);
+      if (stored.sizeBytes !== pdf.byteLength ||
+          stored.sizeBytes > MAX_EMPLOYMENT_EMAIL_ATTACHMENT_BYTES ||
+          stored.contentType !== "application/pdf" ||
+          pdf.byteLength < pdfSignature.byteLength ||
+          !pdf.subarray(0, pdfSignature.byteLength).equals(pdfSignature)) {
+        throw new Error("INVALID_STORED_PDF");
+      }
+    } catch {
+      res.status(503).json({ error: "The completed form PDF is unavailable. Please try again." });
+      return;
+    }
+
+    try {
+      await deps.sendEmail({
+        to: body.data.recipientEmail,
+        subject: `Confidential completed Marvol ${formLabel(submission.formId)}`,
+        text: "The confidential completed Marvol employment form PDF is attached.",
+        attachments: [{
+          filename: sanitizeEmailFilename(`Marvol-${submission.formId}-completed.pdf`),
+          contentType: "application/pdf",
+          bytes: pdf,
+        }],
+      });
+      req.log?.info({ feature: "employment_form_submission_pdf_email", outcome: "accepted" }, "Completed form PDF email accepted");
+      res.status(202).json({ accepted: true });
+    } catch (error) {
+      const failure = emailFailure(error);
+      req.log?.error(
+        { feature: "employment_form_submission_pdf_email", outcome: "failed", reason: failure.reason },
+        "Completed form PDF email failed",
+      );
+      res.status(failure.status).json({ error: failure.error });
+    }
   });
 
   return router;

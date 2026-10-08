@@ -14,5 +14,7 @@ test("the public applicant form library offers all three editable and downloadab
     expect(screen.getByTestId(`fill-online-${id}`)).toBeTruthy();
     expect(screen.getByTestId(`open-${id}`).getAttribute("href")).toBe(`/api/employment-forms/${id}`);
     expect(screen.getByTestId(`download-${id}`).getAttribute("href")).toBe(`/api/employment-forms/${id}?download=1`);
+    expect(screen.getByTestId(`blank-form-${id}-email`)).toBeTruthy();
+    expect(screen.getByTestId(`blank-form-${id}-print-open`)).toBeTruthy();
   }
 });

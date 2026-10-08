@@ -10,6 +10,7 @@ import {
   useResendEmploymentFormSubmissionEmail,
 } from "@workspace/api-client-react";
 import type { EmploymentFormId } from "./formEditor/formSources";
+import { PdfDocumentActions } from "./PdfDocumentActions";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -92,11 +93,19 @@ function SubmissionDetail({ id, onBack }: { id: number; onBack: () => void }) {
           </p>
         )}
         <div className="mt-5 space-y-2">
-          <a href={fileUrl(data.completedPdfPath)} className="flex min-h-[44px] items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-emerald-800 hover:bg-emerald-50" data-testid="submitted-completed-pdf">
-            <FileText className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span className="min-w-0 flex-1 truncate">{t("employment.submittedForms.completedPdf")}</span>
-            <Download className="h-4 w-4 shrink-0" aria-hidden="true" />
-          </a>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <a href={fileUrl(data.completedPdfPath)} className="flex min-h-[44px] min-w-[16rem] flex-1 items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-emerald-800 hover:bg-emerald-50" data-testid="submitted-completed-pdf">
+              <FileText className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span className="min-w-0 flex-1 truncate">{t("employment.submittedForms.completedPdf")}</span>
+              <Download className="h-4 w-4 shrink-0" aria-hidden="true" />
+            </a>
+            <PdfDocumentActions
+              title={`${formTitle(data.formId, t)} — ${t("employment.submittedForms.completedPdf")}`}
+              pdfUrl={`${BASE_URL}/api/storage${data.completedPdfPath}`}
+              emailEndpoint={`${BASE_URL}/api/employment-form-submissions/${id}/email-pdf`}
+              testId={`submitted-form-${id}-completed-pdf`}
+            />
+          </div>
           {data.idPhotos.map((photo, index) => (
             <a key={`${photo.path}-${index}`} href={fileUrl(photo.path)}
               className="flex min-h-[44px] items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-emerald-800 hover:bg-emerald-50">

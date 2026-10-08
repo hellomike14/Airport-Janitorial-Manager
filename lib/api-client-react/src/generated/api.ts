@@ -17,6 +17,7 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  AcceptedEmailResponse,
   AddAreaTaskExclusionRequest,
   ApplicationSubmissionReceipt,
   AreaEffectiveTask,
@@ -54,9 +55,11 @@ import type {
   DiagnosticStoreUnavailableError,
   EmailDeliveryReceipt,
   EmployeeTrainingStatus,
+  EmploymentFormId,
   EmploymentFormSubmission,
   EmploymentFormSubmissionRequest,
   EmploymentFormSubmissionSummary,
+  EmploymentPdfEmailInput,
   ErrorEnvelope,
   GetAdminConfidentialAccessStatus200,
   GetDashboardParams,
@@ -5841,6 +5844,297 @@ export const useResendApplicationEmail = <
 };
 
 /**
+ * @summary Render a confidential application PDF (verified Admin plus access code only)
+ */
+export const getGetApplicationPdfUrl = (id: number) => {
+  return `/api/applications/${id}/pdf`;
+};
+
+export const getApplicationPdf = async (
+  id: number,
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getGetApplicationPdfUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetApplicationPdfQueryKey = (id: number) => {
+  return [`/api/applications/${id}/pdf`] as const;
+};
+
+export const getGetApplicationPdfQueryOptions = <
+  TData = Awaited<ReturnType<typeof getApplicationPdf>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getApplicationPdf>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetApplicationPdfQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getApplicationPdf>>
+  > = ({ signal }) => getApplicationPdf(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getApplicationPdf>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetApplicationPdfQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getApplicationPdf>>
+>;
+export type GetApplicationPdfQueryError = ErrorType<void>;
+
+/**
+ * @summary Render a confidential application PDF (verified Admin plus access code only)
+ */
+
+export function useGetApplicationPdf<
+  TData = Awaited<ReturnType<typeof getApplicationPdf>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getApplicationPdf>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetApplicationPdfQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * The PDF is generated from the saved application record on the server; client-supplied files and URLs are not accepted.
+ * @summary Email a confidential application PDF (verified Admin plus access code only)
+ */
+export const getEmailApplicationPdfUrl = (id: number) => {
+  return `/api/applications/${id}/email-pdf`;
+};
+
+export const emailApplicationPdf = async (
+  id: number,
+  employmentPdfEmailInput: EmploymentPdfEmailInput,
+  options?: RequestInit,
+): Promise<AcceptedEmailResponse> => {
+  return customFetch<AcceptedEmailResponse>(getEmailApplicationPdfUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(employmentPdfEmailInput),
+  });
+};
+
+export const getEmailApplicationPdfMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof emailApplicationPdf>>,
+    TError,
+    { id: number; data: BodyType<EmploymentPdfEmailInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof emailApplicationPdf>>,
+  TError,
+  { id: number; data: BodyType<EmploymentPdfEmailInput> },
+  TContext
+> => {
+  const mutationKey = ["emailApplicationPdf"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof emailApplicationPdf>>,
+    { id: number; data: BodyType<EmploymentPdfEmailInput> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return emailApplicationPdf(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type EmailApplicationPdfMutationResult = NonNullable<
+  Awaited<ReturnType<typeof emailApplicationPdf>>
+>;
+export type EmailApplicationPdfMutationBody = BodyType<EmploymentPdfEmailInput>;
+export type EmailApplicationPdfMutationError = ErrorType<void>;
+
+/**
+ * @summary Email a confidential application PDF (verified Admin plus access code only)
+ */
+export const useEmailApplicationPdf = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof emailApplicationPdf>>,
+    TError,
+    { id: number; data: BodyType<EmploymentPdfEmailInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof emailApplicationPdf>>,
+  TError,
+  { id: number; data: BodyType<EmploymentPdfEmailInput> },
+  TContext
+> => {
+  return useMutation(getEmailApplicationPdfMutationOptions(options));
+};
+
+/**
+ * The document is selected from the saved application record by index; arbitrary paths, URLs, and attachments are not accepted.
+ * @summary Email one uploaded application PDF (verified Admin plus access code only)
+ */
+export const getEmailApplicationDocumentPdfUrl = (
+  id: number,
+  documentIndex: number,
+) => {
+  return `/api/applications/${id}/documents/${documentIndex}/email`;
+};
+
+export const emailApplicationDocumentPdf = async (
+  id: number,
+  documentIndex: number,
+  employmentPdfEmailInput: EmploymentPdfEmailInput,
+  options?: RequestInit,
+): Promise<AcceptedEmailResponse> => {
+  return customFetch<AcceptedEmailResponse>(
+    getEmailApplicationDocumentPdfUrl(id, documentIndex),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(employmentPdfEmailInput),
+    },
+  );
+};
+
+export const getEmailApplicationDocumentPdfMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof emailApplicationDocumentPdf>>,
+    TError,
+    {
+      id: number;
+      documentIndex: number;
+      data: BodyType<EmploymentPdfEmailInput>;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof emailApplicationDocumentPdf>>,
+  TError,
+  {
+    id: number;
+    documentIndex: number;
+    data: BodyType<EmploymentPdfEmailInput>;
+  },
+  TContext
+> => {
+  const mutationKey = ["emailApplicationDocumentPdf"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof emailApplicationDocumentPdf>>,
+    {
+      id: number;
+      documentIndex: number;
+      data: BodyType<EmploymentPdfEmailInput>;
+    }
+  > = (props) => {
+    const { id, documentIndex, data } = props ?? {};
+
+    return emailApplicationDocumentPdf(id, documentIndex, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type EmailApplicationDocumentPdfMutationResult = NonNullable<
+  Awaited<ReturnType<typeof emailApplicationDocumentPdf>>
+>;
+export type EmailApplicationDocumentPdfMutationBody =
+  BodyType<EmploymentPdfEmailInput>;
+export type EmailApplicationDocumentPdfMutationError = ErrorType<void>;
+
+/**
+ * @summary Email one uploaded application PDF (verified Admin plus access code only)
+ */
+export const useEmailApplicationDocumentPdf = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof emailApplicationDocumentPdf>>,
+    TError,
+    {
+      id: number;
+      documentIndex: number;
+      data: BodyType<EmploymentPdfEmailInput>;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof emailApplicationDocumentPdf>>,
+  TError,
+  {
+    id: number;
+    documentIndex: number;
+    data: BodyType<EmploymentPdfEmailInput>;
+  },
+  TContext
+> => {
+  return useMutation(getEmailApplicationDocumentPdfMutationOptions(options));
+};
+
+/**
  * @summary Get a confidential application (verified Admin plus access code only)
  */
 export const getGetApplicationUrl = (id: number) => {
@@ -6364,8 +6658,102 @@ export const useResendEmploymentFormSubmissionEmail = <
 };
 
 /**
- * Requires an authenticated administrator session. The PDF is read from protected storage by the server and is never accepted from the client.
- * @summary Send the current onboarding protocol PDF to an administrator-selected recipient
+ * The PDF is read from the selected private submission on the server. ID photos, client-supplied files, and URLs are not attached.
+ * @summary Email one completed standalone form PDF (Admin plus confidential code only)
+ */
+export const getEmailEmploymentFormSubmissionPdfUrl = (id: number) => {
+  return `/api/employment-form-submissions/${id}/email-pdf`;
+};
+
+export const emailEmploymentFormSubmissionPdf = async (
+  id: number,
+  employmentPdfEmailInput: EmploymentPdfEmailInput,
+  options?: RequestInit,
+): Promise<AcceptedEmailResponse> => {
+  return customFetch<AcceptedEmailResponse>(
+    getEmailEmploymentFormSubmissionPdfUrl(id),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(employmentPdfEmailInput),
+    },
+  );
+};
+
+export const getEmailEmploymentFormSubmissionPdfMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof emailEmploymentFormSubmissionPdf>>,
+    TError,
+    { id: number; data: BodyType<EmploymentPdfEmailInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof emailEmploymentFormSubmissionPdf>>,
+  TError,
+  { id: number; data: BodyType<EmploymentPdfEmailInput> },
+  TContext
+> => {
+  const mutationKey = ["emailEmploymentFormSubmissionPdf"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof emailEmploymentFormSubmissionPdf>>,
+    { id: number; data: BodyType<EmploymentPdfEmailInput> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return emailEmploymentFormSubmissionPdf(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type EmailEmploymentFormSubmissionPdfMutationResult = NonNullable<
+  Awaited<ReturnType<typeof emailEmploymentFormSubmissionPdf>>
+>;
+export type EmailEmploymentFormSubmissionPdfMutationBody =
+  BodyType<EmploymentPdfEmailInput>;
+export type EmailEmploymentFormSubmissionPdfMutationError = ErrorType<void>;
+
+/**
+ * @summary Email one completed standalone form PDF (Admin plus confidential code only)
+ */
+export const useEmailEmploymentFormSubmissionPdf = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof emailEmploymentFormSubmissionPdf>>,
+    TError,
+    { id: number; data: BodyType<EmploymentPdfEmailInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof emailEmploymentFormSubmissionPdf>>,
+  TError,
+  { id: number; data: BodyType<EmploymentPdfEmailInput> },
+  TContext
+> => {
+  return useMutation(
+    getEmailEmploymentFormSubmissionPdfMutationOptions(options),
+  );
+};
+
+/**
+ * Requires an authenticated staff session. The PDF is read from protected storage by the server and is never accepted from the client.
+ * @summary Send the current onboarding protocol PDF to a staff-selected recipient
  */
 export const getEmailOnboardingProtocolUrl = () => {
   return `/api/onboarding-protocol/email`;
@@ -6432,7 +6820,7 @@ export type EmailOnboardingProtocolMutationBody =
 export type EmailOnboardingProtocolMutationError = ErrorType<void>;
 
 /**
- * @summary Send the current onboarding protocol PDF to an administrator-selected recipient
+ * @summary Send the current onboarding protocol PDF to a staff-selected recipient
  */
 export const useEmailOnboardingProtocol = <
   TError = ErrorType<void>,
@@ -8117,6 +8505,98 @@ export function useGetEmploymentW4Form<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * Public endpoint with per-IP rate limiting. Only one of the three server-allowlisted blank templates can be attached; client file and URL inputs are rejected.
+ * @summary Send a fixed blank Employment template PDF to a validated recipient
+ */
+export const getEmailEmploymentBlankFormUrl = (formId: EmploymentFormId) => {
+  return `/api/employment-forms/${formId}/email`;
+};
+
+export const emailEmploymentBlankForm = async (
+  formId: EmploymentFormId,
+  employmentPdfEmailInput: EmploymentPdfEmailInput,
+  options?: RequestInit,
+): Promise<AcceptedEmailResponse> => {
+  return customFetch<AcceptedEmailResponse>(
+    getEmailEmploymentBlankFormUrl(formId),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(employmentPdfEmailInput),
+    },
+  );
+};
+
+export const getEmailEmploymentBlankFormMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof emailEmploymentBlankForm>>,
+    TError,
+    { formId: EmploymentFormId; data: BodyType<EmploymentPdfEmailInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof emailEmploymentBlankForm>>,
+  TError,
+  { formId: EmploymentFormId; data: BodyType<EmploymentPdfEmailInput> },
+  TContext
+> => {
+  const mutationKey = ["emailEmploymentBlankForm"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof emailEmploymentBlankForm>>,
+    { formId: EmploymentFormId; data: BodyType<EmploymentPdfEmailInput> }
+  > = (props) => {
+    const { formId, data } = props ?? {};
+
+    return emailEmploymentBlankForm(formId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type EmailEmploymentBlankFormMutationResult = NonNullable<
+  Awaited<ReturnType<typeof emailEmploymentBlankForm>>
+>;
+export type EmailEmploymentBlankFormMutationBody =
+  BodyType<EmploymentPdfEmailInput>;
+export type EmailEmploymentBlankFormMutationError = ErrorType<void>;
+
+/**
+ * @summary Send a fixed blank Employment template PDF to a validated recipient
+ */
+export const useEmailEmploymentBlankForm = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof emailEmploymentBlankForm>>,
+    TError,
+    { formId: EmploymentFormId; data: BodyType<EmploymentPdfEmailInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof emailEmploymentBlankForm>>,
+  TError,
+  { formId: EmploymentFormId; data: BodyType<EmploymentPdfEmailInput> },
+  TContext
+> => {
+  return useMutation(getEmailEmploymentBlankFormMutationOptions(options));
+};
 
 /**
  * @summary Private employee training video with HTTP byte ranges

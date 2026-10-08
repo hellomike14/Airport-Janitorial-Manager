@@ -10,6 +10,18 @@ import { isConfidentialRequest } from "../middlewares/confidentialAreas";
 test("confidential classification leaves operational APIs and the session bridge alone", () => {
   for (const path of ["/identity-documents/context", "/quickbooks/callback", "/staff/confidential", "/staff/former", "/auth-diagnostics", "/storage/objects/hr-identity/original/example", "/applications", "/applications/17"]) assert.equal(isConfidentialRequest(path, "GET"), true, path);
   assert.equal(isConfidentialRequest("/employment-forms/i-9", "POST"), true);
+  for (const path of ["/employment-forms/job-application/email", "/employment-forms/i-9/email", "/employment-forms/w-4/email"]) {
+    assert.equal(isConfidentialRequest(path, "POST"), false, path);
+  }
+  assert.equal(isConfidentialRequest("/employment-forms/i-9/email", "GET"), true);
+  for (const [path, method] of [
+    ["/applications/42/pdf", "GET"],
+    ["/applications/42/email-pdf", "POST"],
+    ["/applications/42/documents/0/email", "POST"],
+    ["/employment-form-submissions/42/email-pdf", "POST"],
+  ]) {
+    assert.equal(isConfidentialRequest(path, method), true, `${method} ${path}`);
+  }
   for (const path of ["/QuickBooks/status", "/staff/%63onfidential", "/storage/objects/%68r-identity/original/example"]) assert.equal(isConfidentialRequest(path, "GET"), true, path);
   for (const path of ["/EMPLOYMENT-FORMS/i-9", "/storage/objects/uploads/8a6c3ec0-65c4-4301-8abe-232454503365", "/storage/objects/uploads/%38a6c3ec0-65c4-4301-8abe-232454503365"]) assert.equal(isConfidentialRequest(path, "GET"), false, path);
   for (const path of ["/staff", "/staff/me", "/tasks", "/assignments", "/employee-training", "/onboarding-protocol"]) assert.equal(isConfidentialRequest(path, "GET"), false, path);

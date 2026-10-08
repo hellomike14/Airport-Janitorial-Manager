@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, Loader2, Printer, Save, FileText, Mail, RefreshCw } from "lucide-react";
+import { ChevronLeft, Download, Loader2, Save, FileText, Mail, RefreshCw } from "lucide-react";
 import {
   useListApplications,
   useGetApplication,
@@ -13,7 +13,7 @@ import {
 import type { JobApplication, UpdateApplicationRequestStatus } from "@workspace/api-client-react";
 import { EMPLOYER_SECTIONS, PUBLIC_SECTIONS } from "./formConfig";
 import { FieldGrid } from "./FormField";
-import { buildApplicationPDF } from "./applicationPdf";
+import { PdfDocumentActions } from "./PdfDocumentActions";
 
 const STATUSES: UpdateApplicationRequestStatus[] = ["new", "reviewing", "hired", "rejected"];
 
@@ -39,7 +39,6 @@ function ApplicationDetail({ id, onBack }: { id: number; onBack: () => void }) {
   const { data: app, isLoading } = useGetApplication(id);
   const update = useUpdateApplication();
   const resendEmail = useResendApplicationEmail();
-  const printWindow = useRef<Window | null>(null);
 
   const [status, setStatus] = useState<UpdateApplicationRequestStatus>("new");
   const [groups, setGroups] = useState<Record<string, Record<string, unknown>>>({
@@ -48,8 +47,6 @@ function ApplicationDetail({ id, onBack }: { id: number; onBack: () => void }) {
   });
   const [saved, setSaved] = useState(false);
   const [emailNotice, setEmailNotice] = useState<"sent" | "failed" | null>(null);
-  useEffect(() => () => { printWindow.current?.close(); }, []);
-
   useEffect(() => {
     if (app) {
       setStatus(app.status as UpdateApplicationRequestStatus);
@@ -74,22 +71,6 @@ function ApplicationDetail({ id, onBack }: { id: number; onBack: () => void }) {
     setTimeout(() => setSaved(false), 2000);
   };
 
-  const handlePrint = () => {
-    if (!app) return;
-    const merged: JobApplication = {
-      ...app,
-      status,
-      i9Employer: groups.i9Employer,
-      w4Employer: groups.w4Employer,
-    };
-    const html = buildApplicationPDF(merged, t);
-    const win = window.open("", "_blank");
-    if (!win) return;
-    printWindow.current = win;
-    win.document.write(html);
-    win.document.close();
-  };
-
   const handleResendEmail = async () => {
     setEmailNotice(null);
     try {
@@ -112,6 +93,11 @@ function ApplicationDetail({ id, onBack }: { id: number; onBack: () => void }) {
     );
   }
 
+  const hasUnsavedPdfChanges = status !== app.status ||
+    JSON.stringify(groups.i9Employer) !== JSON.stringify((app.i9Employer as Record<string, unknown>) ?? {}) ||
+    JSON.stringify(groups.w4Employer) !== JSON.stringify((app.w4Employer as Record<string, unknown>) ?? {});
+  const pdfUrl = `${import.meta.env.BASE_URL?.replace(/\/$/, "") ?? ""}/api/applications/${id}/pdf`;
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -131,13 +117,6 @@ function ApplicationDetail({ id, onBack }: { id: number; onBack: () => void }) {
             </button>
           )}
           <button
-            onClick={handlePrint}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
-          >
-            <Printer className="w-4 h-4" />
-            {t("employment.detail.printPdf")}
-          </button>
-          <button
             onClick={handleSave}
             disabled={update.isPending}
             className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
@@ -147,6 +126,27 @@ function ApplicationDetail({ id, onBack }: { id: number; onBack: () => void }) {
           </button>
         </div>
       </div>
+      {hasUnsavedPdfChanges ? (
+        <p role="status" data-testid="application-pdf-save-required"
+          className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          {t("employment.detail.saveBeforePdf")}
+        </p>
+      ) : (
+        <div className="flex flex-wrap items-center gap-3">
+          <PdfDocumentActions
+            title={`${app.firstName} ${app.lastName} — ${t("employment.sections.application")}`}
+            pdfUrl={pdfUrl}
+            emailEndpoint={`${pdfUrl.replace(/\/pdf$/, "/email-pdf")}`}
+            testId={`application-${id}-pdf`}
+          />
+          <a href={pdfUrl} download="Marvol_Employment_Application.pdf"
+            data-testid={`application-${id}-pdf-download`}
+            className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            <Download className="h-4 w-4" aria-hidden="true" />
+            {t("employment.forms.download")}
+          </a>
+        </div>
+      )}
       {emailNotice && (
         <p role={emailNotice === "sent" ? "status" : "alert"}
           className={`rounded-lg px-3 py-2 text-sm ${emailNotice === "sent" ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-900"}`}>
@@ -228,19 +228,33 @@ function ApplicationDetail({ id, onBack }: { id: number; onBack: () => void }) {
             {t("employment.sections.documents")}
           </h3>
           <ul className="space-y-2">
-            {app.documents.map((doc, i) => (
-              <li key={`${doc.path}-${i}`}>
-                <a
-                  href={`${import.meta.env.BASE_URL?.replace(/\/$/, "") ?? ""}/api/storage${doc.path}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-2 text-sm text-emerald-700 hover:underline"
-                >
-                  <FileText className="w-4 h-4" />
-                  {doc.name}
-                </a>
-              </li>
-            ))}
+            {app.documents.map((doc, i) => {
+              const documentUrl = `${import.meta.env.BASE_URL?.replace(/\/$/, "") ?? ""}/api/storage${doc.path}`;
+              const isPdf = doc.contentType === "application/pdf" || /\.pdf$/i.test(doc.name);
+              return (
+                <li key={`${doc.path}-${i}`}>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <a
+                      href={documentUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex min-h-11 items-center gap-2 text-sm text-emerald-700 hover:underline"
+                    >
+                      <FileText className="w-4 h-4" />
+                      {doc.name}
+                    </a>
+                    {isPdf && (
+                      <PdfDocumentActions
+                        title={doc.name}
+                        pdfUrl={documentUrl}
+                        emailEndpoint={`${import.meta.env.BASE_URL?.replace(/\/$/, "") ?? ""}/api/applications/${id}/documents/${i}/email`}
+                        testId={`application-${id}-document-${i}`}
+                      />
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}

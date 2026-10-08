@@ -1,10 +1,18 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db } from "@workspace/db";
 import { jobApplicationsTable, objectUploadsTable, type JobApplication } from "@workspace/db/schema";
-import { SubmitApplicationBody, UpdateApplicationBody } from "@workspace/api-zod";
+import {
+  EmailApplicationDocumentPdfBody,
+  EmailApplicationDocumentPdfParams,
+  EmailApplicationPdfBody,
+  EmailApplicationPdfParams,
+  SubmitApplicationBody,
+  UpdateApplicationBody,
+} from "@workspace/api-zod";
 import { eq, desc, and, isNull } from "drizzle-orm";
 import { requireStaffRole } from "../middlewares/requireStaffRole";
 import { ObjectStorageService } from "../lib/objectStorage";
+import { createEmploymentApplicationPdf } from "../lib/employmentApplicationPdf";
 import {
   formatCompletedFields,
   MAX_EMPLOYMENT_EMAIL_ATTACHMENT_BYTES,
@@ -21,6 +29,7 @@ type ApplicationsRouterDependencies = {
   getObjectMetadata: (sourcePath: string) => Promise<{ sizeBytes: number; contentType: string }>;
   readObjectBytes: (path: string, maxBytes: number) => Promise<{ bytes: Buffer; sizeBytes: number; contentType: string }>;
   sendEmail: EmploymentEmailSender;
+  authorizeAdmin: import("express").RequestHandler;
 };
 
 const defaultDependencies: ApplicationsRouterDependencies = {
@@ -28,7 +37,52 @@ const defaultDependencies: ApplicationsRouterDependencies = {
   getObjectMetadata: sourcePath => objectStorageService.getObjectEntityMetadata(sourcePath),
   readObjectBytes: (path, maxBytes) => objectStorageService.readObjectEntityBytes(path, maxBytes),
   sendEmail: sendEmploymentFormEmail,
+  authorizeAdmin: requireStaffRole("admin"),
 };
+
+const pdfSignature = Buffer.from("%PDF-");
+const maxApplicationDocumentBytes = 10 * 1024 * 1024;
+
+function emailFailure(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+  if (message === "EMPLOYMENT_EMAIL_NOT_CONFIGURED") {
+    return { status: 503, reason: "email_not_configured", error: "Email delivery is not configured." };
+  }
+  if (message === "EMPLOYMENT_EMAIL_ATTACHMENTS_TOO_LARGE" || message === "APPLICATION_PDF_TOO_LARGE") {
+    return { status: 413, reason: "attachment_too_large", error: "The PDF is too large to email." };
+  }
+  if (message === "EMPLOYMENT_EMAIL_INVALID_RECIPIENT") {
+    return { status: 400, reason: "invalid_recipient", error: "Enter a valid recipient email address." };
+  }
+  return {
+    status: 502,
+    reason: message.startsWith("EMPLOYMENT_EMAIL_REJECTED_") ? "provider_rejected" : "provider_unavailable",
+    error: "The application PDF could not be emailed. Please try again.",
+  };
+}
+
+function recordPdfEmailOutcome(req: Request, outcome: "accepted" | "failed", reason?: string) {
+  const fields = {
+    feature: "application_pdf_email",
+    outcome,
+    ...(reason ? { reason } : {}),
+  };
+  if (outcome === "accepted") req.log?.info(fields, "Application PDF email accepted");
+  else req.log?.error(fields, "Application PDF email failed");
+}
+
+function parsePositiveId(raw: string | string[] | undefined): number | null {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  const id = Number(value);
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+function applicationPdfResponse(res: Response, pdf: Buffer): void {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", 'inline; filename="Marvol_Employment_Application.pdf"');
+  res.send(pdf);
+}
 
 function applicationEmailText(application: {
   firstName: string;
@@ -101,7 +155,7 @@ async function deliverApplicationEmail(application: {
 /**
  * GET /applications — confidential completed submissions (Admin and access code).
  */
-router.get("/", requireStaffRole("admin"), async (req: Request, res: Response) => {
+  router.get("/", deps.authorizeAdmin, async (req: Request, res: Response) => {
   res.setHeader("Cache-Control", "private, no-store");
   try {
     const status = typeof req.query.status === "string" ? req.query.status : undefined;
@@ -234,7 +288,7 @@ router.post("/", async (req: Request, res: Response) => {
   res.status(201).json({ success: true, emailSent });
 });
 
-router.post("/:id/resend-email", requireStaffRole("admin"), async (req: Request, res: Response) => {
+  router.post("/:id/resend-email", deps.authorizeAdmin, async (req: Request, res: Response) => {
   res.setHeader("Cache-Control", "private, no-store");
   const id = Number(req.params.id);
   if (!Number.isSafeInteger(id) || id <= 0) {
@@ -264,7 +318,7 @@ router.post("/:id/resend-email", requireStaffRole("admin"), async (req: Request,
 /**
  * GET /applications/:id — single application detail.
  */
-router.get("/:id", requireStaffRole("admin"), async (req: Request, res: Response) => {
+  router.get("/:id", deps.authorizeAdmin, async (req: Request, res: Response) => {
   res.setHeader("Cache-Control", "private, no-store");
   const id = Number(req.params.id);
   if (Number.isNaN(id)) {
@@ -288,10 +342,162 @@ router.get("/:id", requireStaffRole("admin"), async (req: Request, res: Response
   }
 });
 
+  router.get("/:id/pdf", deps.authorizeAdmin, async (req: Request, res: Response): Promise<void> => {
+    res.setHeader("Cache-Control", "private, no-store");
+    const id = parsePositiveId(req.params.id);
+    if (id === null) {
+      res.status(400).json({ error: "Invalid application id" });
+      return;
+    }
+    const [application] = await db.select().from(jobApplicationsTable)
+      .where(eq(jobApplicationsTable.id, id)).limit(1);
+    if (!application) {
+      res.status(404).json({ error: "Application not found" });
+      return;
+    }
+    try {
+      const pdf = await createEmploymentApplicationPdf(application);
+      if (pdf.byteLength > MAX_EMPLOYMENT_EMAIL_ATTACHMENT_BYTES) throw new Error("APPLICATION_PDF_TOO_LARGE");
+      if (!pdf.subarray(0, pdfSignature.byteLength).equals(pdfSignature)) throw new Error("INVALID_APPLICATION_PDF");
+      applicationPdfResponse(res, pdf);
+    } catch (error) {
+      req.log?.error({ feature: "application_pdf", reason: "render_failed" }, "Application PDF could not be generated");
+      const status = error instanceof Error && error.message === "APPLICATION_PDF_TOO_LARGE" ? 413 : 503;
+      res.status(status).json({
+        error: status === 413
+          ? "The application PDF exceeds the supported size limit."
+          : "The application PDF could not be prepared. Please try again.",
+      });
+    }
+  });
+
+  router.post("/:id/email-pdf", deps.authorizeAdmin, async (req: Request, res: Response): Promise<void> => {
+    res.setHeader("Cache-Control", "private, no-store");
+    const params = EmailApplicationPdfParams.safeParse(req.params);
+    const body = EmailApplicationPdfBody.strict().safeParse(req.body);
+    if (!params.success || !body.success) {
+      recordPdfEmailOutcome(req, "failed", "invalid_request");
+      res.status(400).json({ error: "Enter a valid application id and recipient email address." });
+      return;
+    }
+    const [application] = await db.select().from(jobApplicationsTable)
+      .where(eq(jobApplicationsTable.id, params.data.id)).limit(1);
+    if (!application) {
+      recordPdfEmailOutcome(req, "failed", "application_not_found");
+      res.status(404).json({ error: "Application not found." });
+      return;
+    }
+    let pdf: Buffer;
+    try {
+      pdf = await createEmploymentApplicationPdf(application);
+      if (pdf.byteLength > MAX_EMPLOYMENT_EMAIL_ATTACHMENT_BYTES) {
+        res.status(413).json({ error: "The application PDF exceeds the supported size limit." });
+        return;
+      }
+      if (!pdf.subarray(0, pdfSignature.byteLength).equals(pdfSignature)) {
+        throw new Error("INVALID_APPLICATION_PDF");
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message === "APPLICATION_PDF_TOO_LARGE") {
+        res.status(413).json({ error: "The application PDF exceeds the supported size limit." });
+        return;
+      }
+      req.log?.error({ feature: "application_pdf_email", reason: "render_failed" }, "Application PDF email could not be prepared");
+      res.status(503).json({ error: "The application PDF could not be prepared. Please try again." });
+      return;
+    }
+    try {
+      await deps.sendEmail({
+        to: body.data.recipientEmail,
+        subject: "Confidential Marvol employment application",
+        text: "The confidential completed Marvol employment application PDF is attached.",
+        attachments: [{
+          filename: "Marvol_Employment_Application.pdf",
+          contentType: "application/pdf",
+          bytes: pdf,
+        }],
+      });
+      recordPdfEmailOutcome(req, "accepted");
+      res.status(202).json({ accepted: true });
+    } catch (error) {
+      const failure = emailFailure(error);
+      recordPdfEmailOutcome(req, "failed", failure.reason);
+      res.status(failure.status).json({ error: failure.error });
+    }
+  });
+
+  router.post("/:id/documents/:documentIndex/email", deps.authorizeAdmin, async (req: Request, res: Response): Promise<void> => {
+    res.setHeader("Cache-Control", "private, no-store");
+    const params = EmailApplicationDocumentPdfParams.safeParse(req.params);
+    const body = EmailApplicationDocumentPdfBody.strict().safeParse(req.body);
+    if (!params.success || !body.success) {
+      res.status(400).json({ error: "Enter a valid application, document, and recipient." });
+      return;
+    }
+    const [application] = await db.select().from(jobApplicationsTable)
+      .where(eq(jobApplicationsTable.id, params.data.id)).limit(1);
+    if (!application) {
+      res.status(404).json({ error: "Application not found." });
+      return;
+    }
+    const documents = application.documents as Array<{ name: string; path: string; contentType?: string }> | null;
+    const selected = documents?.[params.data.documentIndex];
+    if (!selected) {
+      res.status(404).json({ error: "Application document not found." });
+      return;
+    }
+    let file: Awaited<ReturnType<ApplicationsRouterDependencies["readObjectBytes"]>>;
+    try {
+      file = await deps.readObjectBytes(selected.path, maxApplicationDocumentBytes);
+    } catch (error) {
+      const tooLarge = error instanceof Error && error.message === "EMPLOYMENT_EMAIL_ATTACHMENTS_TOO_LARGE";
+      req.log?.error(
+        { feature: "application_document_pdf_email", reason: tooLarge ? "attachment_too_large" : "document_unavailable" },
+        "Application document could not be loaded for email",
+      );
+      res.status(tooLarge ? 413 : 503).json({
+        error: tooLarge
+          ? "The uploaded PDF is too large to email."
+          : "The uploaded document is unavailable. Please try again.",
+      });
+      return;
+    }
+    if (file.sizeBytes <= 0 || file.sizeBytes > maxApplicationDocumentBytes) {
+      res.status(413).json({ error: "The uploaded PDF is too large to email." });
+      return;
+    }
+    if (file.sizeBytes !== file.bytes.byteLength ||
+        file.contentType !== "application/pdf" ||
+        (selected.contentType && selected.contentType !== "application/pdf") ||
+        file.bytes.byteLength < pdfSignature.byteLength ||
+        !file.bytes.subarray(0, pdfSignature.byteLength).equals(pdfSignature)) {
+      res.status(415).json({ error: "The selected uploaded document is not a valid PDF." });
+      return;
+    }
+    try {
+      await deps.sendEmail({
+        to: body.data.recipientEmail,
+        subject: "Confidential Marvol application document",
+        text: "The selected confidential Marvol application PDF is attached.",
+        attachments: [{
+          filename: sanitizeEmailFilename(selected.name),
+          contentType: "application/pdf",
+          bytes: file.bytes,
+        }],
+      });
+      recordPdfEmailOutcome(req, "accepted");
+      res.status(202).json({ accepted: true });
+    } catch (error) {
+      const failure = emailFailure(error);
+      recordPdfEmailOutcome(req, "failed", failure.reason);
+      res.status(failure.status).json({ error: failure.error });
+    }
+  });
+
 /**
  * PATCH /applications/:id — update status and employer-side I-9/W-4 fields.
  */
-router.patch("/:id", requireStaffRole("admin"), async (req: Request, res: Response) => {
+  router.patch("/:id", deps.authorizeAdmin, async (req: Request, res: Response) => {
   res.setHeader("Cache-Control", "private, no-store");
   const id = Number(req.params.id);
   if (Number.isNaN(id)) {
