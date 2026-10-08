@@ -41,7 +41,7 @@ function recordEmailOutcome(
 export function createOnboardingProtocolRouter(
   storage: OnboardingProtocolStorage = new ObjectStorageService(),
   authorize: RequestHandler = requireStaffRole("admin", "supervisor", "staff", "inspector"),
-  authorizeEmail: RequestHandler = requireStaffRole("admin"),
+  authorizeEmail: RequestHandler = requireStaffRole("admin", "supervisor", "staff", "inspector"),
   sendEmail: EmploymentEmailSender = sendEmploymentFormEmail,
 ): IRouter {
   const router = Router();
@@ -81,13 +81,18 @@ export function createOnboardingProtocolRouter(
     let pdf: Buffer;
     try {
       const metadata = await storage.getObjectEntityMetadata(objectPath);
-      if (metadata.sizeBytes > MAX_EMPLOYMENT_EMAIL_ATTACHMENT_BYTES) {
+      if (metadata.sizeBytes <= 0 || metadata.sizeBytes > MAX_EMPLOYMENT_EMAIL_ATTACHMENT_BYTES) {
         recordEmailOutcome(req, "failed", "attachment_too_large");
         res.status(413).json({ error: "The onboarding protocol is too large to email." });
         return;
       }
       const stored = await storage.readObjectEntityBytes(objectPath, MAX_EMPLOYMENT_EMAIL_ATTACHMENT_BYTES);
       pdf = Buffer.from(stored.bytes);
+      if (stored.sizeBytes !== pdf.byteLength ||
+          stored.sizeBytes > MAX_EMPLOYMENT_EMAIL_ATTACHMENT_BYTES ||
+          stored.contentType !== "application/pdf") {
+        throw new Error("INVALID_STORED_PDF");
+      }
     } catch (error) {
       recordEmailOutcome(
         req,

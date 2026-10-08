@@ -85,7 +85,7 @@ function createApp(state: TestState = {}) {
   app.use(createOnboardingProtocolRouter(
     storage,
     testRoleGate(["admin", "supervisor", "staff", "inspector"]),
-    testRoleGate(["admin"]),
+    testRoleGate(["admin", "supervisor", "staff", "inspector"]),
     async (message) => {
       if (state.emailFailure) throw state.emailFailure;
       emails.push(message);
@@ -131,7 +131,7 @@ test("protected protocol download preserves bytes, headers and role access", asy
   });
 });
 
-test("admin email route validates recipients and attaches the current protected PDF", async () => {
+test("authorized staff email route validates recipients and attaches only the current protected PDF", async () => {
   const emails: EmploymentEmail[] = [];
   const logs: LogEntry[] = [];
   await withServer({ emails, logs }, async (url, context) => {
@@ -146,26 +146,28 @@ test("admin email route validates recipients and attaches the current protected 
     });
 
     assert.equal((await post(null, { recipientEmail: "person@example.com" })).status, 401);
-    assert.equal((await post("staff", { recipientEmail: "person@example.com" })).status, 403);
-    assert.equal((await post("admin", { recipientEmail: "not-an-email" })).status, 400);
-    assert.equal((await post("admin", {
+    assert.equal((await post("applicant", { recipientEmail: "person@example.com" })).status, 403);
+    assert.equal((await post("staff", { recipientEmail: "not-an-email" })).status, 400);
+    assert.equal((await post("staff", {
       recipientEmail: "person@example.com",
       pdf: "client-supplied-content-must-be-rejected",
     })).status, 400);
     assert.equal(emails.length, 0);
 
-    const response = await post("admin", { recipientEmail: "person@example.com" });
-    assert.equal(response.status, 202);
-    assert.deepEqual(await response.json(), { accepted: true });
-    assert.equal(context.reads.metadata, 1);
-    assert.equal(context.reads.bytes, 1);
-    assert.equal(emails.length, 1);
-    assert.equal(emails[0]?.to, "person@example.com");
+    for (const role of ["admin", "supervisor", "staff", "inspector"]) {
+      const response = await post(role, { recipientEmail: `${role}@example.invalid` });
+      assert.equal(response.status, 202);
+      assert.deepEqual(await response.json(), { accepted: true });
+    }
+    assert.equal(context.reads.metadata, 4);
+    assert.equal(context.reads.bytes, 4);
+    assert.equal(emails.length, 4);
+    assert.equal(emails[0]?.to, "admin@example.invalid");
     assert.equal(emails[0]?.attachments.length, 1);
     assert.equal(emails[0]?.attachments[0]?.filename, "Marvol_Employee_Onboarding_Protocol_v1.pdf");
     assert.equal(emails[0]?.attachments[0]?.contentType, "application/pdf");
     assert.deepEqual(emails[0]?.attachments[0]?.bytes, PDF);
-    assert.equal(logs.length, 3);
+    assert.equal(logs.length, 6);
     assert.deepEqual(logs[0]?.fields, {
       feature: "onboarding_protocol_email",
       outcome: "failed",

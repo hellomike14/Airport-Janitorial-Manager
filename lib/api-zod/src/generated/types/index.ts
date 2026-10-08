@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./acceptedEmailResponse";
 export * from "./addAreaTaskExclusionRequest";
 export * from "./applicationSubmissionReceipt";
 export * from "./applicationUploadDocument";
@@ -70,6 +71,7 @@ export * from "./employmentFormSubmission";
 export * from "./employmentFormSubmissionRequest";
 export * from "./employmentFormSubmissionSummary";
 export * from "./employmentFormSubmissionSummaryEmailStatus";
+export * from "./employmentPdfEmailInput";
 export * from "./errorEnvelope";
 export * from "./getAdminConfidentialAccessStatus200";
 export * from "./getDashboardParams";

@@ -111,9 +111,10 @@ function HireCard({ hire }: { hire: OnboardingHire }) {
 export function OnboardingTab() {
   const { effectiveRole } = useAuth();
   const canManage = effectiveRole === "admin" || effectiveRole === "supervisor";
+  const canEmailProtocol = ["admin", "supervisor", "staff", "inspector"].includes(effectiveRole);
   return (
     <div className="space-y-6">
-      <OnboardingProtocolCard canEmailProtocol={effectiveRole === "admin"} />
+      <OnboardingProtocolCard canEmailProtocol={canEmailProtocol} />
       {canManage && <OnboardingManagement />}
       <EmployeeTraining />
     </div>

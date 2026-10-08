@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import express from "express";
+import express, { type RequestHandler } from "express";
 import { once } from "node:events";
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
@@ -8,6 +8,12 @@ import { db, pool } from "@workspace/db";
 import { employmentFormSubmissionsTable, objectUploadsTable } from "@workspace/db/schema";
 import { createEmploymentFormSubmissionsRouter } from "./employmentFormSubmissions";
 import type { EmploymentEmail } from "../lib/employmentFormEmail";
+
+const testAdminGate: RequestHandler = (req, res, next) => {
+  const role = req.headers["x-test-role"];
+  if (role === "admin") next();
+  else res.status(role ? 403 : 401).end();
+};
 
 test("standalone PDF and ID photos are snapshotted privately, emailed, and reduced to a receipt", async () => {
   const nonce = randomUUID();
@@ -26,8 +32,10 @@ test("standalone PDF and ID photos are snapshotted privately, emailed, and reduc
   const router = createEmploymentFormSubmissionsRouter({
     getObjectMetadata: async path => {
       const input = inputs.find(item => item.path === path);
-      assert.ok(input);
-      return { sizeBytes: input.bytes.byteLength, contentType: input.type };
+      if (input) return { sizeBytes: input.bytes.byteLength, contentType: input.type };
+      const snapshot = fileData.get(path);
+      assert.ok(snapshot, `Unexpected object metadata path: ${path}`);
+      return { sizeBytes: snapshot.bytes.byteLength, contentType: snapshot.contentType };
     },
     copyApplicantSubmissionObject: async path => {
       const index = inputs.findIndex(item => item.path === path);
@@ -40,6 +48,7 @@ test("standalone PDF and ID photos are snapshotted privately, emailed, and reduc
       return { ...file, sizeBytes: file.bytes.byteLength };
     },
     sendEmail: async message => { sentEmails.push(message); },
+    authorizeAdmin: testAdminGate,
   });
   const app = express();
   app.use(express.json());
@@ -93,6 +102,34 @@ test("standalone PDF and ID photos are snapshotted privately, emailed, and reduc
     assert.equal(saved.emailStatus, "sent");
     assert.equal(saved.completedPdfPath, snapshots[0]);
     assert.deepEqual(saved.idPhotos.map(photo => photo.path), snapshots.slice(1));
+
+    const emailEndpoint = `${base}/${saved.id}/email-pdf`;
+    const postPdfEmail = (role: string | null, body: unknown) => fetch(emailEndpoint, {
+      method: "POST",
+      headers: {
+        ...(role ? { "x-test-role": role } : {}),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+    assert.equal((await postPdfEmail(null, { recipientEmail: "recipient@example.invalid" })).status, 401);
+    assert.equal((await postPdfEmail("staff", { recipientEmail: "recipient@example.invalid" })).status, 403);
+    assert.equal((await postPdfEmail("admin", {
+      recipientEmail: "recipient@example.invalid",
+      attachments: ["client-supplied"],
+    })).status, 400);
+    assert.equal(sentEmails.length, 1, "rejected callers and extra attachment data never send");
+
+    const emailedPdf = await postPdfEmail("admin", { recipientEmail: "recipient@example.invalid" });
+    const emailReceipt = await emailedPdf.text();
+    assert.equal(emailedPdf.status, 202, emailReceipt);
+    assert.deepEqual(JSON.parse(emailReceipt), { accepted: true });
+    assert.equal(emailedPdf.headers.get("cache-control"), "private, no-store");
+    assert.equal(sentEmails.length, 2);
+    assert.equal(sentEmails[1]?.to, "recipient@example.invalid");
+    assert.equal(sentEmails[1]?.attachments.length, 1, "ID photos are never included in manual PDF email");
+    assert.equal(sentEmails[1]?.attachments[0]?.contentType, "application/pdf");
+    assert.deepEqual(sentEmails[1]?.attachments[0]?.bytes, inputs[0]!.bytes);
     for (let index = 0; index < inputs.length; index++) {
       const [draft] = await db.select().from(objectUploadsTable).where(eq(objectUploadsTable.objectPath, inputs[index]!.path));
       const [snapshot] = await db.select().from(objectUploadsTable).where(eq(objectUploadsTable.objectPath, snapshots[index]!));

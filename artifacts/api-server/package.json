@@ -22,6 +22,7 @@
     "heic-convert": "2.1.0",
     "http-proxy-middleware": "^4.2.0",
     "multer": "^2.3.0",
+    "pdfkit": "^0.20.2",
     "pino": "^10.4.0",
     "pino-http": "^11.0.0",
     "sharp": "0.35.5",
@@ -33,6 +34,7 @@
     "@types/express": "^5.0.6",
     "@types/multer": "^2.2.0",
     "@types/node": "catalog:",
+    "@types/pdfkit": "^0.17.6",
     "esbuild": "^0.27.3",
     "pino-pretty": "^13.2.0",
     "tsx": "catalog:"

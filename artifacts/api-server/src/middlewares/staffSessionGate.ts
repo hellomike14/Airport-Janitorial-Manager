@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
-import { isPublicBlankEmploymentTemplate } from "../routes/employmentForms";
+import { isPublicBlankEmploymentEmail, isPublicBlankEmploymentTemplate } from "../routes/employmentForms";
 
 export function createStaffSessionGate(hasSession: (req: Request) => boolean, resolveActor: (req: Request) => Promise<unknown>) {
   return async (req: Request, res: Response, next: NextFunction) => {
@@ -12,6 +12,7 @@ export function createStaffSessionGate(hasSession: (req: Request) => boolean, re
     const publicRequest = req.path === "/health" || req.path === "/healthz" ||
       (req.method === "POST" && ["/applications", "/employment-form-submissions", "/storage/uploads/request-url"].includes(req.path)) ||
       isPublicBlankEmploymentTemplate(req.path, req.method) ||
+      isPublicBlankEmploymentEmail(req.path, req.method) ||
       (req.method === "GET" && req.path.startsWith("/storage/public-objects/"));
     if (publicRequest) { next(); return; }
     // The identity route owns all four structured failure responses, including

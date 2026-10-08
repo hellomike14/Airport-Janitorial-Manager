@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   submit: vi.fn(),
   upload: vi.fn(),
   destroy: vi.fn(),
+  preparePrint: vi.fn(),
+  printNow: vi.fn(),
 }));
 
 vi.mock("@workspace/api-client-react", () => ({
@@ -25,7 +27,8 @@ vi.mock("./pdfRuntime", () => ({
     task: { destroy: mocks.destroy },
     doc: { numPages: 1, saveDocument: mocks.saveDocument },
   }),
-  printDocument: vi.fn(),
+  loadPdfjs: async () => ({ AnnotationMode: { ENABLE_STORAGE: 1 } }),
+  preparePdfPrintDocument: mocks.preparePrint,
 }));
 vi.mock("./PdfPage", () => ({ PdfPage: () => <div data-testid="mock-pdf-page" /> }));
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
@@ -45,6 +48,8 @@ beforeEach(() => {
   });
   mocks.saveDocument.mockReset().mockResolvedValue(new Uint8Array([37, 80, 68, 70, 45, 49]));
   mocks.submit.mockReset().mockResolvedValue({ success: true, emailSent: true });
+  mocks.preparePrint.mockReset().mockResolvedValue({ pageCount: 1, print: mocks.printNow });
+  mocks.printNow.mockReset();
   mocks.upload.mockReset().mockImplementation(async (file: File) => ({
     name: file.name,
     path: `/objects/uploads/${file.name}`,
@@ -55,6 +60,29 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+});
+
+test("filled form pages are prepared first and print only after a separate user click", async () => {
+  render(<EmploymentFormEditor formId="i-9" title="Form I-9" onClose={() => {}} onSubmitted={() => {}} />);
+  await screen.findByTestId("form-editor-print");
+  await waitFor(() => expect((screen.getByTestId("form-editor-print") as HTMLButtonElement).disabled).toBe(false));
+
+  fireEvent.click(screen.getByTestId("form-editor-print"));
+  await waitFor(() => expect(mocks.preparePrint).toHaveBeenCalledTimes(1));
+  expect(await screen.findByTestId("form-editor-preview-pages")).toBeTruthy();
+  expect(mocks.preparePrint).toHaveBeenCalledWith(
+    expect.objectContaining({ numPages: 1 }),
+    expect.any(HTMLIFrameElement),
+    expect.objectContaining({
+      annotationMode: 1,
+      signal: expect.any(AbortSignal),
+      title: "Form I-9",
+    }),
+  );
+  expect(mocks.printNow).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByTestId("form-editor-preview-print"));
+  expect(mocks.printNow).toHaveBeenCalledTimes(1);
 });
 
 test("submitting the edited PDF and ID photos stores contact details and clears the editor after the receipt", async () => {
