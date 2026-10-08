@@ -3,7 +3,7 @@ import { z } from "zod";
 import { ObjectNotFoundError, ObjectStorageService } from "../lib/objectStorage";
 import { requireStaffRole } from "../middlewares/requireStaffRole";
 
-const objectPath = "/objects/uploads/77cdc8b2-f557-4199-befb-4194df1cd299";
+const objectPath = "/objects/uploads/717d414a-0c8c-4fed-9e44-4f72c57298a1";
 const filename = "Marvol_Employee_Onboarding_Protocol_v1.pdf";
 const options = z.object({ download: z.enum(["1"]).optional() });
 
