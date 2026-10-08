@@ -1,5 +1,6 @@
 import { FileText, ExternalLink, Download } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { OnboardingProtocolActions } from "./OnboardingProtocolActions";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -42,6 +43,7 @@ export function OnboardingProtocolCard() {
           {t("employment.onboarding.protocol.download")}
         </a>
       </div>
+      <OnboardingProtocolActions protectedUrl={url} />
     </section>
   );
 }
