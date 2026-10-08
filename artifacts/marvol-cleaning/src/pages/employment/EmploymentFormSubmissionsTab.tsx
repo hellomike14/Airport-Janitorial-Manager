@@ -11,12 +11,15 @@ import {
 } from "@workspace/api-client-react";
 import type { EmploymentFormId } from "./formEditor/formSources";
 import { PdfDocumentActions } from "./PdfDocumentActions";
+import { getOnboardingForm } from "./onboardingFormCatalog";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
 function formTitle(formId: EmploymentFormId, t: (key: string) => string) {
-  const key = formId === "i-9" ? "i9" : formId === "w-4" ? "w4" : "jobApplication";
-  return t(`employment.forms.${key}`);
+  if (formId === "i-9") return t("employment.forms.i9");
+  if (formId === "w-4") return t("employment.forms.w4");
+  if (formId === "job-application") return t("employment.forms.jobApplication");
+  return getOnboardingForm(formId)?.title ?? "Marvol onboarding form";
 }
 
 function SubmissionDetail({ id, onBack }: { id: number; onBack: () => void }) {

@@ -2,7 +2,40 @@ import { pgTable, text, serial, jsonb, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
-export type EmploymentFormId = "job-application" | "i-9" | "w-4";
+export type EmploymentFormId =
+  | "job-application"
+  | "i-9"
+  | "w-4"
+  | "onboarding-cover"
+  | "administrative-checklist"
+  | "conditional-offer"
+  | "offer-acceptance"
+  | "acceptance-receipt"
+  | "start-confirmation"
+  | "offer-tracking"
+  | "emergency-contact"
+  | "payroll-setup"
+  | "language-accessibility"
+  | "uniform-equipment-issue"
+  | "site-orientation"
+  | "orientation-acknowledgment"
+  | "training-attendance"
+  | "video-attestation"
+  | "knowledge-check"
+  | "knowledge-check-guide"
+  | "practical-assessment"
+  | "buddy-shift"
+  | "independent-work-release"
+  | "day-7-review"
+  | "day-30-review"
+  | "day-60-review"
+  | "day-90-review"
+  | "exception-correction"
+  | "badging-checklist"
+  | "badge-rules-acknowledgment"
+  | "badge-control"
+  | "i9-everify-tracker"
+  | "training-matrix";
 export type EmploymentFormEmailStatus = "pending" | "sent" | "failed";
 
 export type EmploymentFormAttachment = {
@@ -13,7 +46,19 @@ export type EmploymentFormAttachment = {
 
 export const employmentFormSubmissionsTable = pgTable("employment_form_submissions", {
   id: serial("id").primaryKey(),
-  formId: text("form_id", { enum: ["job-application", "i-9", "w-4"] }).notNull(),
+  formId: text("form_id", {
+    enum: [
+      "job-application", "i-9", "w-4", "onboarding-cover", "administrative-checklist",
+      "conditional-offer", "offer-acceptance", "acceptance-receipt", "start-confirmation",
+      "offer-tracking", "emergency-contact", "payroll-setup", "language-accessibility",
+      "uniform-equipment-issue", "site-orientation", "orientation-acknowledgment",
+      "training-attendance", "video-attestation", "knowledge-check", "knowledge-check-guide",
+      "practical-assessment", "buddy-shift", "independent-work-release", "day-7-review",
+      "day-30-review", "day-60-review", "day-90-review", "exception-correction",
+      "badging-checklist", "badge-rules-acknowledgment", "badge-control",
+      "i9-everify-tracker", "training-matrix",
+    ],
+  }).notNull(),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   email: text("email").notNull(),

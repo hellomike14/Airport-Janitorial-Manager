@@ -1,24 +1,121 @@
 import { lazy, Suspense, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Download, ExternalLink, FileText, PenLine } from "lucide-react";
-import type { EmploymentFormId } from "./formEditor/formSources";
+import { useAuth } from "@/contexts/AuthContext";
+import { ConfidentialBoundary } from "@/components/confidential/ConfidentialBoundary";
+import type { EmploymentFormId, EmploymentTemplateId } from "./formEditor/formSources";
+import { onboardingForms, onboardingIndex } from "./onboardingFormCatalog";
 import { PdfDocumentActions } from "./PdfDocumentActions";
 
 const EmploymentFormEditor = lazy(() => import("./formEditor/EmploymentFormEditor"));
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 const FORM_EMAIL_RECIPIENT = "admin@marvolenterprises.com";
-const forms: { id: EmploymentFormId; title: string; description: string }[] = [
-  { id: "job-application", title: "jobApplication", description: "jobApplicationDescription" },
-  { id: "i-9", title: "i9", description: "i9Description" },
-  { id: "w-4", title: "w4", description: "w4Description" },
+
+type FormItem = {
+  id: EmploymentTemplateId;
+  title: string;
+  description: string;
+  fillable: boolean;
+  restricted?: boolean;
+};
+
+const originalForms: FormItem[] = [
+  { id: "job-application", title: "jobApplication", description: "jobApplicationDescription", fillable: true },
+  { id: "i-9", title: "i9", description: "i9Description", fillable: true },
+  { id: "w-4", title: "w4", description: "w4Description", fillable: true },
 ];
+const companyForms: FormItem[] = onboardingForms.map(form => ({
+  id: form.id,
+  title: form.title,
+  description: `${form.owner} · ${form.pages} pages · ${form.fieldCount} fillable fields`,
+  fillable: true,
+  restricted: form.restricted,
+}));
+const indexForm: FormItem = {
+  id: onboardingIndex.id,
+  title: onboardingIndex.title,
+  description: `${onboardingIndex.pages}-page packet index`,
+  fillable: false,
+};
+
+function FormCard({
+  form,
+  title,
+  description,
+  onFill,
+}: {
+  form: FormItem;
+  title: string;
+  description: string;
+  onFill: (id: EmploymentFormId) => void;
+}) {
+  const { t } = useTranslation();
+  const url = `${BASE_URL}/api/employment-forms/${form.id}`;
+  return (
+    <article data-testid={`form-card-${form.id}`} className="mt-5 rounded-xl border border-slate-200 p-4 sm:p-5">
+      <div className="flex items-start gap-3">
+        <FileText className="h-8 w-8 shrink-0 text-emerald-600" aria-hidden="true" />
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="font-semibold text-slate-800">{title}</h3>
+            {form.fillable && (
+              <span data-testid={`fillable-${form.id}`}
+                className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                {t("employment.forms.fillable")}
+              </span>
+            )}
+            {form.restricted && (
+              <span data-testid={`restricted-${form.id}`}
+                className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                Admin only
+              </span>
+            )}
+          </div>
+          <p className="mt-1 text-sm text-slate-500">{description}</p>
+        </div>
+      </div>
+      <div className="mt-4 flex flex-wrap gap-3">
+        {form.fillable && (
+          <button type="button" onClick={() => onFill(form.id as EmploymentFormId)}
+            data-testid={`fill-online-${form.id}`}
+            className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
+            <PenLine className="h-4 w-4" aria-hidden="true" />
+            {t("employment.forms.fillOnline")}
+          </button>
+        )}
+        <a href={url} target="_blank" rel="noopener noreferrer" data-testid={`open-${form.id}`}
+          className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700">
+          <ExternalLink className="h-4 w-4" aria-hidden="true" />
+          {t("employment.forms.open")}
+        </a>
+        <a href={`${url}?download=1`} data-testid={`download-${form.id}`}
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+          <Download className="h-4 w-4" aria-hidden="true" />
+          {t("employment.forms.download")}
+        </a>
+        <PdfDocumentActions
+          title={title}
+          pdfUrl={url}
+          emailEndpoint={`${url}/email`}
+          testId={`blank-form-${form.id}`}
+        />
+      </div>
+    </article>
+  );
+}
 
 type Props = { variant?: "employment" | "applicant" };
 
 export function EmploymentFormsLibrary({ variant = "employment" }: Props) {
   const { t } = useTranslation();
+  const { effectiveRole } = useAuth();
   const [editing, setEditing] = useState<EmploymentFormId | null>(null);
   const [delivery, setDelivery] = useState<"sent" | "failed" | null>(null);
+  const visibleForms = [
+    ...originalForms,
+    ...companyForms.filter(form => !form.restricted),
+  ];
+  const indexTitle = indexForm.title;
 
   return (
     <section
@@ -38,59 +135,50 @@ export function EmploymentFormsLibrary({ variant = "employment" }: Props) {
           {t(delivery === "sent" ? "employment.forms.submissionSent" : "employment.forms.submissionEmailFailed")}
         </p>
       )}
-      {forms.map((form) => {
-        const url = `${BASE_URL}/api/employment-forms/${form.id}`;
+      {visibleForms.map(form => {
+        const title = ["job-application", "i-9", "w-4"].includes(form.id)
+          ? t(`employment.forms.${form.title}`)
+          : form.title;
+        const description = ["job-application", "i-9", "w-4"].includes(form.id)
+          ? t(`employment.forms.${form.description}`)
+          : form.description;
         return (
-          <article key={form.id} className="mt-5 rounded-xl border border-slate-200 p-4 sm:p-5">
-            <div className="flex items-start gap-3">
-              <FileText className="h-8 w-8 shrink-0 text-emerald-600" aria-hidden="true" />
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="font-semibold text-slate-800">{t(`employment.forms.${form.title}`)}</h3>
-                  <span data-testid={`fillable-${form.id}`}
-                    className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                    {t("employment.forms.fillable")}
-                  </span>
-                </div>
-                <p className="mt-1 text-sm text-slate-500">{t(`employment.forms.${form.description}`)}</p>
-              </div>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-3">
-              <button type="button" onClick={() => { setDelivery(null); setEditing(form.id); }}
-                data-testid={`fill-online-${form.id}`}
-                className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
-                <PenLine className="h-4 w-4" aria-hidden="true" />
-                {t("employment.forms.fillOnline")}
-              </button>
-              <a href={url} target="_blank" rel="noopener noreferrer"
-                data-testid={`open-${form.id}`}
-                className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700">
-                <ExternalLink className="h-4 w-4" aria-hidden="true" />
-                {t("employment.forms.open")}
-              </a>
-              <a href={`${url}?download=1`}
-                data-testid={`download-${form.id}`}
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-                <Download className="h-4 w-4" aria-hidden="true" />
-                {t("employment.forms.download")}
-              </a>
-              <PdfDocumentActions
-                title={t(`employment.forms.${form.title}`)}
-                pdfUrl={url}
-                emailEndpoint={`${url}/email`}
-                testId={`blank-form-${form.id}`}
-              />
-            </div>
-          </article>
+          <FormCard key={form.id} form={form} title={title} description={description}
+            onFill={id => { setDelivery(null); setEditing(id); }} />
         );
       })}
+      {variant === "employment" && effectiveRole === "admin" && (
+        <section className="mt-8 border-t border-slate-200 pt-4" aria-labelledby="restricted-forms-title">
+          <h3 id="restricted-forms-title" className="text-sm font-semibold uppercase tracking-wide text-slate-600">
+            Admin-only onboarding templates
+          </h3>
+          <p className="mt-1 text-sm text-slate-500">
+            These seven blank PDFs contain assessor or administrative material. Access is protected by the confidential Admin boundary.
+          </p>
+          <ConfidentialBoundary>
+            {companyForms.filter(form => form.restricted).map(form => (
+              <FormCard key={form.id} form={form} title={form.title} description={form.description}
+                onFill={id => { setDelivery(null); setEditing(id); }} />
+            ))}
+          </ConfidentialBoundary>
+        </section>
+      )}
+      <section className="mt-8 border-t border-slate-200 pt-4" aria-labelledby="onboarding-index-title">
+        <h3 id="onboarding-index-title" className="text-sm font-semibold uppercase tracking-wide text-slate-600">
+          Packet index
+        </h3>
+        <FormCard form={indexForm} title={indexTitle} description={indexForm.description}
+          onFill={() => {}} />
+      </section>
       <p className="mt-5 text-sm text-slate-500">{t("employment.forms.fillableHelp")}</p>
       {editing && (
         <Suspense fallback={null}>
           <EmploymentFormEditor
             key={editing}
             formId={editing}
-            title={t(`employment.forms.${forms.find((form) => form.id === editing)!.title}`)}
+            title={originalForms.some(form => form.id === editing)
+              ? t(`employment.forms.${originalForms.find(form => form.id === editing)!.title}`)
+              : companyForms.find(form => form.id === editing)!.title}
             onClose={() => setEditing(null)}
             onSubmitted={(emailSent) => {
               setEditing(null);

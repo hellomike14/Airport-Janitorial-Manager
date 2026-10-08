@@ -1,33 +1,56 @@
 import { Router, type IRouter, type RequestHandler } from "express";
-import { z } from "zod";
 import { ObjectNotFoundError, ObjectStorageService } from "../lib/objectStorage";
 import { requireStaffRole } from "../middlewares/requireStaffRole";
 import {
   EmailEmploymentBlankFormBody,
   EmailEmploymentBlankFormParams,
+  GetEmploymentFormTemplateParamsSchema,
+  GetEmploymentFormTemplateQueryParams,
 } from "@workspace/api-zod";
+import {
+  getOnboardingCompanyForms,
+  getOnboardingFormTemplate,
+  ONBOARDING_INDEX_ID,
+  readOnboardingFormTemplate,
+} from "../lib/onboardingFormAssets";
 import {
   MAX_EMPLOYMENT_EMAIL_ATTACHMENT_BYTES,
   sendEmploymentFormEmail,
   type EmploymentEmailSender,
 } from "../lib/employmentFormEmail";
 
-const forms = {
-  "job-application": {
+type EmploymentTemplate = {
+  filename: string;
+  restricted: boolean;
+  objectPath?: string;
+};
+
+const forms = new Map<string, EmploymentTemplate>([
+  ["job-application", {
     objectPath: "/objects/uploads/354716d4-2967-439f-a9f3-ac4bf6ad01e8",
     filename: "Marvol_Fillable_Job_Application_April_2026.pdf",
-  },
-  "i-9": {
+    restricted: false,
+  }],
+  ["i-9", {
     objectPath: "/objects/uploads/8a6c3ec0-65c4-4301-8abe-232454503365",
     filename: "Form_I-9_Fillable.pdf",
-  },
-  "w-4": {
+    restricted: false,
+  }],
+  ["w-4", {
     objectPath: "/objects/uploads/979c8345-1282-41d9-b526-5295bbb31be7",
     filename: "Form_W-4_2026_Fillable.pdf",
-  },
-};
-const formId = z.enum(["job-application", "i-9", "w-4"]);
-const options = z.object({ download: z.enum(["1"]).optional() });
+    restricted: false,
+  }],
+]);
+for (const form of getOnboardingCompanyForms()) {
+  if (forms.has(form.id)) throw new Error(`Duplicate employment form id: ${form.id}`);
+  forms.set(form.id, { filename: form.filename, restricted: form.restricted });
+}
+const indexTemplate = getOnboardingFormTemplate(ONBOARDING_INDEX_ID);
+if (!indexTemplate || forms.has(ONBOARDING_INDEX_ID)) {
+  throw new Error("Onboarding form index is missing or duplicated");
+}
+forms.set(ONBOARDING_INDEX_ID, { filename: indexTemplate.filename, restricted: false });
 const pdfSignature = Buffer.from("%PDF-");
 const emailUnavailableMessage = "The blank form could not be emailed. Please try again.";
 const emailRateWindowMs = 10 * 60_000;
@@ -77,15 +100,23 @@ function recordEmailOutcome(
 }
 
 export const isEmploymentFormObjectPath = (path: string) =>
-  Object.values(forms).some(form => form.objectPath === path);
+  [...forms.values()].some(form => form.objectPath === path);
+
+function getTemplateIdFromPath(path: string, suffix: "template" | "email"): string | null {
+  const pattern = suffix === "template"
+    ? /^\/employment-forms\/([^/]+)\/?$/i
+    : /^\/employment-forms\/([^/]+)\/email\/?$/i;
+  return path.match(pattern)?.[1]?.toLowerCase() ?? null;
+}
+
 export function isPublicBlankEmploymentTemplate(path: string, method: string): boolean {
   if (method !== "GET" && method !== "HEAD") return false;
   let decoded: string;
   try { decoded = decodeURIComponent(path); } catch { return false; }
-  const normalized = decoded.toLowerCase();
-  if (/^\/employment-forms\/(?:job-application|i-9|w-4)\/?$/.test(normalized)) return true;
+  const id = getTemplateIdFromPath(decoded, "template");
+  if (id && forms.get(id)?.restricted === false) return true;
   const prefix = "/storage/objects/";
-  if (!normalized.startsWith(prefix)) return false;
+  if (!decoded.toLowerCase().startsWith(prefix)) return false;
   const objectPath = `/objects/${decoded.slice(prefix.length)}`;
   return isEmploymentFormObjectPath(objectPath);
 }
@@ -94,7 +125,8 @@ export function isPublicBlankEmploymentEmail(path: string, method: string): bool
   if (method !== "POST") return false;
   let decoded: string;
   try { decoded = decodeURIComponent(path); } catch { return false; }
-  return /^\/employment-forms\/(?:job-application|i-9|w-4)\/email\/?$/i.test(decoded);
+  const id = getTemplateIdFromPath(decoded, "email");
+  return id !== null && forms.get(id)?.restricted === false;
 }
 
 export function createEmploymentFormsRouter(
@@ -104,28 +136,40 @@ export function createEmploymentFormsRouter(
 ): IRouter {
   const router: IRouter = Router();
   const rateLimitBlankEmail = createPublicTemplateEmailRateLimit();
-  router.get("/employment-forms/:formId", authorize, async (req, res) => {
+  const authorizeRestrictedTemplate: RequestHandler = (req, res, next) => {
+    const rawId = Array.isArray(req.params.formId) ? req.params.formId[0] : req.params.formId;
+    const template = typeof rawId === "string" ? forms.get(rawId) : undefined;
+    if (!template?.restricted) { next(); return; }
+    return requireStaffRole("admin")(req, res, next);
+  };
+  router.get("/employment-forms/:formId", authorize, authorizeRestrictedTemplate, async (req, res) => {
     res.setHeader("Cache-Control", "private, no-store");
-    const id = formId.safeParse(req.params.formId);
+    const id = GetEmploymentFormTemplateParamsSchema.safeParse(req.params);
     if (!id.success) {
       res.status(404).json({ error: "Employment form not found" });
       return;
     }
-    const parsed = options.safeParse(req.query);
+    const parsed = GetEmploymentFormTemplateQueryParams.safeParse(req.query);
     if (!parsed.success) {
       res.status(400).json({ error: "Invalid download option" });
       return;
     }
-    const form = forms[id.data];
+    const form = forms.get(id.data.formId);
+    if (!form) {
+      res.status(404).json({ error: "Employment form not found" });
+      return;
+    }
     try {
-      const file = await storage.getObjectEntityFile(form.objectPath);
-      const [pdf] = await file.download();
+      const pdf = form.objectPath
+        ? (await (await storage.getObjectEntityFile(form.objectPath)).download())[0]
+        : await readOnboardingFormTemplate(id.data.formId);
+      if (!pdf) throw new Error("EMPTY_FORM_PDF");
       res.setHeader("X-Content-Type-Options", "nosniff");
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `${parsed.data.download ? "attachment" : "inline"}; filename="${form.filename}"`);
       res.send(pdf);
     } catch (error) {
-      console.error("Employment form PDF could not be retrieved");
+      req.log?.error({ formId: id.data.formId }, "Employment form PDF could not be retrieved");
       res.status(error instanceof ObjectNotFoundError ? 404 : 503)
         .json({ error: "The form PDF is unavailable. Please try again." });
     }
@@ -134,6 +178,7 @@ export function createEmploymentFormsRouter(
   router.post(
     "/employment-forms/:formId/email",
     authorize,
+    authorizeRestrictedTemplate,
     rateLimitBlankEmail,
     async (req, res): Promise<void> => {
       res.setHeader("Cache-Control", "no-store");
@@ -150,21 +195,35 @@ export function createEmploymentFormsRouter(
         return;
       }
 
-      const form = forms[params.data.formId];
+      const form = forms.get(params.data.formId);
+      if (!form) {
+        recordEmailOutcome(req, "failed", "form_not_found");
+        res.status(404).json({ error: "Employment form not found." });
+        return;
+      }
       let pdf: Buffer;
       try {
-        const metadata = await storage.getObjectEntityMetadata(form.objectPath);
-        if (metadata.sizeBytes <= 0 || metadata.sizeBytes > MAX_EMPLOYMENT_EMAIL_ATTACHMENT_BYTES) {
-          recordEmailOutcome(req, "failed", "attachment_too_large");
-          res.status(413).json({ error: "The blank form is too large to email." });
-          return;
-        }
-        const stored = await storage.readObjectEntityBytes(form.objectPath, MAX_EMPLOYMENT_EMAIL_ATTACHMENT_BYTES);
-        pdf = Buffer.from(stored.bytes);
-        if (stored.sizeBytes !== pdf.byteLength ||
-            stored.sizeBytes > MAX_EMPLOYMENT_EMAIL_ATTACHMENT_BYTES ||
-            stored.contentType !== "application/pdf") {
-          throw new Error("INVALID_STORED_PDF");
+        if (form.objectPath) {
+          const metadata = await storage.getObjectEntityMetadata(form.objectPath);
+          if (metadata.sizeBytes <= 0 || metadata.sizeBytes > MAX_EMPLOYMENT_EMAIL_ATTACHMENT_BYTES) {
+            recordEmailOutcome(req, "failed", "attachment_too_large");
+            res.status(413).json({ error: "The blank form is too large to email." });
+            return;
+          }
+          const stored = await storage.readObjectEntityBytes(form.objectPath, MAX_EMPLOYMENT_EMAIL_ATTACHMENT_BYTES);
+          pdf = Buffer.from(stored.bytes);
+          if (stored.sizeBytes !== pdf.byteLength ||
+              stored.sizeBytes > MAX_EMPLOYMENT_EMAIL_ATTACHMENT_BYTES ||
+              stored.contentType !== "application/pdf") {
+            throw new Error("INVALID_STORED_PDF");
+          }
+        } else {
+          pdf = await readOnboardingFormTemplate(params.data.formId);
+          if (pdf.byteLength <= 0 || pdf.byteLength > MAX_EMPLOYMENT_EMAIL_ATTACHMENT_BYTES) {
+            recordEmailOutcome(req, "failed", "attachment_too_large");
+            res.status(413).json({ error: "The blank form is too large to email." });
+            return;
+          }
         }
       } catch (error) {
         recordEmailOutcome(req, "failed", error instanceof ObjectNotFoundError ? "pdf_missing" : "pdf_unavailable");

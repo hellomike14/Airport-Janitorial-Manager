@@ -941,6 +941,76 @@ export const EmploymentFormId = {
   "job-application": "job-application",
   "i-9": "i-9",
   "w-4": "w-4",
+  "onboarding-cover": "onboarding-cover",
+  "administrative-checklist": "administrative-checklist",
+  "conditional-offer": "conditional-offer",
+  "offer-acceptance": "offer-acceptance",
+  "acceptance-receipt": "acceptance-receipt",
+  "start-confirmation": "start-confirmation",
+  "offer-tracking": "offer-tracking",
+  "emergency-contact": "emergency-contact",
+  "payroll-setup": "payroll-setup",
+  "language-accessibility": "language-accessibility",
+  "uniform-equipment-issue": "uniform-equipment-issue",
+  "site-orientation": "site-orientation",
+  "orientation-acknowledgment": "orientation-acknowledgment",
+  "training-attendance": "training-attendance",
+  "video-attestation": "video-attestation",
+  "knowledge-check": "knowledge-check",
+  "knowledge-check-guide": "knowledge-check-guide",
+  "practical-assessment": "practical-assessment",
+  "buddy-shift": "buddy-shift",
+  "independent-work-release": "independent-work-release",
+  "day-7-review": "day-7-review",
+  "day-30-review": "day-30-review",
+  "day-60-review": "day-60-review",
+  "day-90-review": "day-90-review",
+  "exception-correction": "exception-correction",
+  "badging-checklist": "badging-checklist",
+  "badge-rules-acknowledgment": "badge-rules-acknowledgment",
+  "badge-control": "badge-control",
+  "i9-everify-tracker": "i9-everify-tracker",
+  "training-matrix": "training-matrix",
+} as const;
+
+export type EmploymentFormTemplateId =
+  (typeof EmploymentFormTemplateId)[keyof typeof EmploymentFormTemplateId];
+
+export const EmploymentFormTemplateId = {
+  "job-application": "job-application",
+  "i-9": "i-9",
+  "w-4": "w-4",
+  "onboarding-cover": "onboarding-cover",
+  "administrative-checklist": "administrative-checklist",
+  "conditional-offer": "conditional-offer",
+  "offer-acceptance": "offer-acceptance",
+  "acceptance-receipt": "acceptance-receipt",
+  "start-confirmation": "start-confirmation",
+  "offer-tracking": "offer-tracking",
+  "emergency-contact": "emergency-contact",
+  "payroll-setup": "payroll-setup",
+  "language-accessibility": "language-accessibility",
+  "uniform-equipment-issue": "uniform-equipment-issue",
+  "site-orientation": "site-orientation",
+  "orientation-acknowledgment": "orientation-acknowledgment",
+  "training-attendance": "training-attendance",
+  "video-attestation": "video-attestation",
+  "knowledge-check": "knowledge-check",
+  "knowledge-check-guide": "knowledge-check-guide",
+  "practical-assessment": "practical-assessment",
+  "buddy-shift": "buddy-shift",
+  "independent-work-release": "independent-work-release",
+  "day-7-review": "day-7-review",
+  "day-30-review": "day-30-review",
+  "day-60-review": "day-60-review",
+  "day-90-review": "day-90-review",
+  "exception-correction": "exception-correction",
+  "badging-checklist": "badging-checklist",
+  "badge-rules-acknowledgment": "badge-rules-acknowledgment",
+  "badge-control": "badge-control",
+  "i9-everify-tracker": "i9-everify-tracker",
+  "training-matrix": "training-matrix",
+  "onboarding-index": "onboarding-index",
 } as const;
 
 export type ApplicationUploadDocument = UploadedDocument & {
@@ -1643,6 +1713,20 @@ export type GetInspectorWorkflow200 = {
   /** @nullable */
   completionEmailDeliveryStatus?: GetInspectorWorkflow200CompletionEmailDeliveryStatus;
 };
+
+export type GetEmploymentFormTemplateParams = {
+  /**
+   * Set to 1 to download instead of opening inline.
+   */
+  download?: GetEmploymentFormTemplateDownload;
+};
+
+export type GetEmploymentFormTemplateDownload =
+  (typeof GetEmploymentFormTemplateDownload)[keyof typeof GetEmploymentFormTemplateDownload];
+
+export const GetEmploymentFormTemplateDownload = {
+  NUMBER_1: "1",
+} as const;
 
 export type GetEmploymentJobApplicationParams = {
   /**

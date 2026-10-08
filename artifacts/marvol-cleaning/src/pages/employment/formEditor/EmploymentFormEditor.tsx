@@ -40,6 +40,7 @@ export default function EmploymentFormEditor({ formId, title, onClose, onSubmitt
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [idPhotoFiles, setIdPhotoFiles] = useState<File[]>([]);
+  const supportsIdPhotoAttachments = ["job-application", "i-9", "w-4"].includes(formId);
   const [current, setCurrent] = useState(1);
   const [zoom, setZoom] = useState(1);
   const [width, setWidth] = useState(0);
@@ -330,16 +331,20 @@ export default function EmploymentFormEditor({ formId, title, onClose, onSubmitt
             </label>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <label className="inline-flex min-h-[40px] cursor-pointer items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-              <Upload className="h-4 w-4" aria-hidden="true" />
-              {t("employment.forms.editor.addIdPhotos")}
-              <input ref={photoPicker} type="file" accept="image/jpeg,image/png,image/webp" multiple
-                className="sr-only" onChange={event => onPhotoSelect(event.target.files)} />
-            </label>
-            {idPhotoFiles.length > 0 && (
-              <span className="min-w-0 truncate text-xs text-slate-500">
-                {t("employment.forms.editor.photosSelected", { count: idPhotoFiles.length, names: idPhotoFiles.map(file => file.name).join(", ") })}
-              </span>
+            {supportsIdPhotoAttachments && (
+              <>
+                <label className="inline-flex min-h-[40px] cursor-pointer items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                  <Upload className="h-4 w-4" aria-hidden="true" />
+                  {t("employment.forms.editor.addIdPhotos")}
+                  <input ref={photoPicker} type="file" accept="image/jpeg,image/png,image/webp" multiple
+                    className="sr-only" onChange={event => onPhotoSelect(event.target.files)} />
+                </label>
+                {idPhotoFiles.length > 0 && (
+                  <span className="min-w-0 truncate text-xs text-slate-500">
+                    {t("employment.forms.editor.photosSelected", { count: idPhotoFiles.length, names: idPhotoFiles.map(file => file.name).join(", ") })}
+                  </span>
+                )}
+              </>
             )}
             <button type="submit" disabled={!doc || busy !== null}
               className="ml-auto inline-flex min-h-[40px] items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"

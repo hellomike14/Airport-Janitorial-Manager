@@ -1,7 +1,7 @@
 import path from "path";
 import { fileURLToPath } from "url";
 import { build as esbuild } from "esbuild";
-import { rm, readFile } from "fs/promises";
+import { cp, rm, readFile } from "fs/promises";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -68,6 +68,12 @@ async function buildAll() {
     external: externals,
     logLevel: "info",
   });
+
+  await cp(
+    path.resolve(__dirname, "assets/onboarding-forms"),
+    path.resolve(distDir, "assets/onboarding-forms"),
+    { recursive: true },
+  );
 }
 
 buildAll().catch((err) => {
