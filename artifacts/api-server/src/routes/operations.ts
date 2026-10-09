@@ -28,6 +28,8 @@ import {
   gpsProblem,
   INSPECTION_CHECKS,
   isCurrentEmployee,
+  isEligibleOperationsEmployee,
+  eligibleOperationsStaff,
   inspectionScore,
   orlandoDate,
   paidMinutes,
@@ -957,28 +959,23 @@ router.get("/audit", manager, async (req, res) => {
       .groupBy(tasksTable.areaId, tasksTable.taskName, tasksTable.isSpecial)
       .having(sql`count(*) > 1`),
   ]);
-  const current = new Set(
-    staff.filter((s) => s.active && !s.formerEmployee).map((s) => s.id),
-  );
+  const eligibleStaff = eligibleOperationsStaff(staff);
+  const current = new Set(eligibleStaff.map((s) => s.id));
   const activeAreas = areas.filter((a) => !a.archived);
   const covered = new Set(
     assignments.filter((a) => current.has(a.staffId)).map((a) => a.areaId),
   );
   const groups = new Map<string, typeof schedules>();
-  for (const shift of schedules) {
+  const eligibleSchedules = schedules.filter((shift) =>
+    current.has(shift.staffId),
+  );
+  for (const shift of eligibleSchedules) {
     const key = `${shift.staffId}:${shift.dayOfWeek}:${shift.startTime}:${shift.endTime}`;
     groups.set(key, [...(groups.get(key) ?? []), shift]);
   }
   return res.json({
     date: day.data,
     uncoveredAreas: activeAreas.filter((a) => !covered.has(a.id)),
-    ineligibleSchedules: schedules
-      .filter((s) => !current.has(s.staffId))
-      .map((s) => ({
-        ...s,
-        staffName:
-          staff.find((p) => p.id === s.staffId)?.name ?? "Missing staff record",
-      })),
     duplicateShifts: [...groups.values()]
       .filter((g) => g.length > 1)
       .map((g) => ({
@@ -991,8 +988,8 @@ router.get("/audit", manager, async (req, res) => {
       })),
     duplicateTasks: duplicates,
     archivedAreas: areas.filter((a) => a.archived),
-    missingStaffEmails: staff
-      .filter((s) => s.active && !s.formerEmployee && !s.email?.trim())
+    missingStaffEmails: eligibleStaff
+      .filter((s) => !s.email?.trim())
       .map((s) => ({ id: s.id, name: s.name })),
   });
 });

@@ -1,4 +1,8 @@
 import { useState, useRef, useCallback } from "react";
+import {
+  BrandedOperationalPhoto,
+  BrandedOperationalPhotoDownload,
+} from "@/components/BrandedOperationalPhoto";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -305,7 +309,12 @@ export default function PhotoShare() {
       <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
         {preview ? (
           <div className="relative rounded-xl overflow-hidden border border-slate-200 aspect-video bg-slate-50">
-            <img src={preview} alt="Preview" className="w-full h-full object-cover" />
+            <BrandedOperationalPhoto
+              src={preview}
+              alt="Photo Share preview"
+              className="h-full w-full object-cover"
+              wrapperClassName="relative block h-full w-full overflow-hidden"
+            />
             {uploading && (
               <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                 <Loader2 className="w-8 h-8 text-white animate-spin" />
@@ -495,11 +504,11 @@ export default function PhotoShare() {
                 className="relative cursor-pointer"
                 onClick={() => setLightbox(imageUrl(photo.imagePath))}
               >
-                <img
+                <BrandedOperationalPhoto
                   src={imageUrl(photo.imagePath)}
                   alt={photo.caption ?? "Shared photo"}
-                  className="w-full aspect-video object-cover"
-                  loading="lazy"
+                  className="h-full w-full object-cover"
+                  wrapperClassName="relative block aspect-video w-full overflow-hidden"
                 />
                 <div className="absolute inset-0 bg-black/0 hover:bg-black/10 transition-all flex items-center justify-center">
                   <ZoomIn className="w-6 h-6 text-white opacity-0 hover:opacity-100 drop-shadow-lg transition-opacity" />
@@ -518,12 +527,19 @@ export default function PhotoShare() {
           <button className="absolute top-4 right-4 text-white/70 hover:text-white">
             <X className="w-7 h-7" />
           </button>
-          <img
-            src={lightbox}
-            alt="Photo"
-            className="max-w-full max-h-full rounded-xl shadow-2xl object-contain"
-            onClick={(e) => e.stopPropagation()}
-          />
+          <div className="max-h-full max-w-full" onClick={(e) => e.stopPropagation()}>
+            <BrandedOperationalPhoto
+              src={lightbox}
+              alt="Shared operational photo"
+              className="max-h-full max-w-full rounded-xl object-contain"
+            />
+          </div>
+          <div className="absolute bottom-5 right-5">
+            <BrandedOperationalPhotoDownload
+              src={lightbox}
+              filename="marvol-shared-operational-photo.jpg"
+            />
+          </div>
         </div>
       )}
     </div>

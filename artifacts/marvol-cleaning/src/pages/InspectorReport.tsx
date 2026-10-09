@@ -1,4 +1,5 @@
 import React, { useMemo, useRef } from "react";
+import { BrandedOperationalPhoto } from "@/components/BrandedOperationalPhoto";
 import { format, subDays, parseISO } from "date-fns";
 import { useTranslation } from "react-i18next";
 import { getDateLocale } from "@/i18n/dateLocale";
@@ -74,8 +75,11 @@ function IssueImage({ path, label }: { path: string | null; label: string }) {
   return (
     <div className="flex flex-col gap-1">
       <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{label}</span>
-      <img src={url} alt={label} className="w-28 h-20 object-cover rounded-xl border border-slate-200 shadow-sm"
-        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+      <BrandedOperationalPhoto
+        src={url}
+        alt={label}
+        className="h-20 w-28 rounded-xl border border-slate-200 object-cover shadow-sm"
+      />
     </div>
   );
 }
@@ -99,11 +103,21 @@ function buildIssuePDF(issue: any, t: (key: string, opts?: any) => string): stri
       <div style="display:flex;gap:20px;flex-wrap:wrap;">
         ${beforeUrl ? `<div>
           <div style="font-size:10px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">${t("issuePdf.before")}</div>
-          <img src="${beforeUrl}" style="width:220px;height:155px;object-fit:cover;border-radius:10px;border:1px solid #e2e8f0;" onerror="this.style.display='none'" />
+          <div style="position:relative;display:inline-block;">
+            <img src="${beforeUrl}" style="width:220px;height:155px;object-fit:cover;border-radius:10px;border:1px solid #e2e8f0;" onerror="this.style.display='none'" />
+            <span style="position:absolute;right:8px;bottom:8px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;padding:4px;border-radius:6px;background:rgba(255,255,255,.94);border:1px solid rgba(6,78,59,.55);">
+              <img src="${logoMarkUrl}" style="width:100%;height:100%;object-fit:contain;" onerror="this.parentElement.style.display='none'" />
+            </span>
+          </div>
         </div>` : ''}
         ${afterUrl ? `<div>
           <div style="font-size:10px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">${t("issuePdf.after")}</div>
-          <img src="${afterUrl}" style="width:220px;height:155px;object-fit:cover;border-radius:10px;border:1px solid #e2e8f0;" onerror="this.style.display='none'" />
+          <div style="position:relative;display:inline-block;">
+            <img src="${afterUrl}" style="width:220px;height:155px;object-fit:cover;border-radius:10px;border:1px solid #e2e8f0;" onerror="this.style.display='none'" />
+            <span style="position:absolute;right:8px;bottom:8px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;padding:4px;border-radius:6px;background:rgba(255,255,255,.94);border:1px solid rgba(6,78,59,.55);">
+              <img src="${logoMarkUrl}" style="width:100%;height:100%;object-fit:contain;" onerror="this.parentElement.style.display='none'" />
+            </span>
+          </div>
         </div>` : ''}
       </div>
     </div>` : '';

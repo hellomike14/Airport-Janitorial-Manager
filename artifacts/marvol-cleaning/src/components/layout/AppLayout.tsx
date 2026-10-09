@@ -1,4 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
+import {
+  BrandedOperationalPhoto,
+  BrandedOperationalPhotoDownload,
+} from "@/components/BrandedOperationalPhoto";
 import { createPortal } from "react-dom";
 import { Link, useLocation } from "wouter";
 import {
@@ -387,7 +391,7 @@ function NotificationBell({ staffId }: { staffId: number }) {
                             setLightboxImage(imageUrl(n.beforeImagePath!));
                           }}
                         >
-                          <img src={imageUrl(n.beforeImagePath)} alt="Before" className="w-12 h-12 rounded-md object-cover border border-blue-200" />
+                          <BrandedOperationalPhoto src={imageUrl(n.beforeImagePath)} alt="Before" className="h-12 w-12 rounded-md border border-blue-200 object-cover" compact />
                           <span>Before</span>
                         </button>
                       )}
@@ -401,7 +405,7 @@ function NotificationBell({ staffId }: { staffId: number }) {
                             setLightboxImage(imageUrl(n.afterImagePath!));
                           }}
                         >
-                          <img src={imageUrl(n.afterImagePath)} alt="After" className="w-12 h-12 rounded-md object-cover border border-emerald-200" />
+                          <BrandedOperationalPhoto src={imageUrl(n.afterImagePath)} alt="After" className="h-12 w-12 rounded-md border border-emerald-200 object-cover" compact />
                           <span>After</span>
                         </button>
                       )}
@@ -432,12 +436,19 @@ function NotificationBell({ staffId }: { staffId: number }) {
           >
             <X className="w-7 h-7" />
           </button>
-          <img
-            src={lightboxImage}
-            alt="Notification photo"
-            className="max-w-full max-h-full rounded-xl object-contain"
-            onClick={(event) => event.stopPropagation()}
-          />
+          <div className="max-h-full max-w-full" onClick={(event) => event.stopPropagation()}>
+            <BrandedOperationalPhoto
+              src={lightboxImage}
+              alt="Issue notification photo"
+              className="max-h-full max-w-full rounded-xl object-contain"
+            />
+          </div>
+          <div className="absolute bottom-5 right-5">
+            <BrandedOperationalPhotoDownload
+              src={lightboxImage}
+              filename="marvol-issue-notification-photo.jpg"
+            />
+          </div>
         </div>,
         document.body
       )}

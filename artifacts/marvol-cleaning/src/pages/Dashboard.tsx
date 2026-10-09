@@ -18,6 +18,10 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import RefreshButton from "@/components/RefreshButton";
+import {
+  BrandedOperationalPhoto,
+  BrandedOperationalPhotoDownload,
+} from "@/components/BrandedOperationalPhoto";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -168,11 +172,12 @@ export default function Dashboard() {
                 onClick={() => setLightbox(imageUrl(photo.imagePath))}
               >
                 <div className="relative aspect-square">
-                  <img
+                  <BrandedOperationalPhoto
                     src={imageUrl(photo.imagePath)}
-                    alt={photo.caption ?? "Shared photo"}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
+                    alt={photo.caption ?? "Shared operational photo"}
+                    className="h-full w-full object-cover"
+                    wrapperClassName="relative block aspect-square w-full overflow-hidden"
+                    compact
                   />
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center">
                     <ZoomIn className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 drop-shadow-lg transition-opacity" />
@@ -237,12 +242,19 @@ export default function Dashboard() {
           <button className="absolute top-4 right-4 text-white/70 hover:text-white">
             <X className="w-7 h-7" />
           </button>
-          <img
-            src={lightbox}
-            alt="Photo"
-            className="max-w-full max-h-full rounded-xl shadow-2xl object-contain"
-            onClick={(e) => e.stopPropagation()}
-          />
+          <div className="max-h-full max-w-full" onClick={(e) => e.stopPropagation()}>
+            <BrandedOperationalPhoto
+              src={lightbox}
+              alt="Shared operational photo"
+              className="max-h-full max-w-full rounded-xl object-contain"
+            />
+          </div>
+          <div className="absolute bottom-5 right-5">
+            <BrandedOperationalPhotoDownload
+              src={lightbox}
+              filename="marvol-dashboard-operational-photo.jpg"
+            />
+          </div>
         </div>
       )}
     </div>
