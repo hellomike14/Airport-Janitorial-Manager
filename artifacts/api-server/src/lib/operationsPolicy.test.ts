@@ -9,6 +9,8 @@ import {
   isCurrentEmployee,
   monthRange,
   orlandoDate,
+  orlandoStartOfDay,
+  orlandoStartOfNextDay,
   overlaps,
   paidMinutes,
   previousMonth,
@@ -37,6 +39,16 @@ test("Orlando work dates respect midnight and DST independently of host timezone
   });
   assert.equal(validDate("2026-02-29"), false);
   assert.equal(validDate("2024-02-29"), true);
+});
+
+test("Orlando local-midnight bounds use 23- and 25-hour DST days", () => {
+  assert.equal(orlandoStartOfDay("2026-03-08").toISOString(), "2026-03-08T05:00:00.000Z");
+  assert.equal(orlandoStartOfNextDay("2026-03-08").toISOString(), "2026-03-09T04:00:00.000Z");
+  assert.equal(orlandoStartOfNextDay("2026-03-08").getTime() - orlandoStartOfDay("2026-03-08").getTime(), 23 * 60 * 60 * 1000);
+
+  assert.equal(orlandoStartOfDay("2026-11-01").toISOString(), "2026-11-01T04:00:00.000Z");
+  assert.equal(orlandoStartOfNextDay("2026-11-01").toISOString(), "2026-11-02T05:00:00.000Z");
+  assert.equal(orlandoStartOfNextDay("2026-11-01").getTime() - orlandoStartOfDay("2026-11-01").getTime(), 25 * 60 * 60 * 1000);
 });
 test("GPS checks reject inaccurate and off-site points", () => {
   const settings = {

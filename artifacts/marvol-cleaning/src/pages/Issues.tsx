@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { format } from "date-fns";
 import { useTranslation } from "react-i18next";
 import { getDateLocale } from "@/i18n/dateLocale";
@@ -12,6 +12,7 @@ import {
   useAssignIssue,
   useCompleteIssue,
   useListAssignments,
+  useListInspectorAssignments,
   type Issue,
   requestUploadUrl,
   type UploadUrlRequest,
@@ -41,6 +42,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { StaffName } from "@/components/StaffName";
+import { InspectorAssignmentsSection } from "@/components/InspectorAssignmentsSection";
+import { parseInspectorAssignmentTaskId } from "@/lib/inspectorAssignmentLinks";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -460,6 +463,27 @@ export default function Issues() {
   );
   const { data: areas } = useListAreas();
   const { data: staffList = [] } = useListStaff();
+  const {
+    data: inspectorAssignments = [],
+    isLoading: inspectorAssignmentsLoading,
+    isError: inspectorAssignmentsError,
+  } = useListInspectorAssignments({}, {
+    query: {
+      queryKey: ["/api/inspector-assignments"],
+      enabled: Boolean(currentUser),
+      refetchInterval: 5000,
+    },
+  });
+  const [assignmentTaskId] = useState(() => parseInspectorAssignmentTaskId(window.location.search));
+  const scrolledAssignmentIdRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!assignmentTaskId || scrolledAssignmentIdRef.current === assignmentTaskId) return;
+    if (!inspectorAssignments.some((assignment) => assignment.task.id === assignmentTaskId)) return;
+    const target = document.getElementById(`inspector-assignment-${assignmentTaskId}`);
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    scrolledAssignmentIdRef.current = assignmentTaskId;
+  }, [assignmentTaskId, inspectorAssignments]);
 
   const userId = currentUser?.id ?? 1;
 
@@ -631,6 +655,13 @@ export default function Issues() {
           ))}
         </div>
       )}
+
+      <InspectorAssignmentsSection
+        assignments={inspectorAssignments}
+        isLoading={inspectorAssignmentsLoading}
+        isError={inspectorAssignmentsError}
+        highlightedTaskId={assignmentTaskId}
+      />
 
       {isReporting && (
         <div className="bg-rose-50 rounded-3xl p-6 border border-rose-100 shadow-sm">

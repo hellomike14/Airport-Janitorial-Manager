@@ -16,6 +16,8 @@ export const INSPECTION_CHECKS = [
   "Walkways clear and safe",
 ] as const;
 
+const ORLANDO_TIME_ZONE = "America/New_York";
+
 export function isCurrentEmployee(employee: {
   active?: unknown;
   formerEmployee?: unknown;
@@ -30,12 +32,54 @@ export function isCurrentEmployee(employee: {
 
 export function orlandoDate(now = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/New_York",
+    timeZone: ORLANDO_TIME_ZONE,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   }).format(now);
 }
+
+/** Convert an Orlando calendar date's local midnight into its exact UTC instant. */
+export function orlandoStartOfDay(dateKey: string): Date {
+  if (!validDate(dateKey)) throw new RangeError("Expected a valid Orlando calendar date");
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const targetWallTime = new Date(0);
+  targetWallTime.setUTCFullYear(year!, month! - 1, day!);
+  targetWallTime.setUTCHours(0, 0, 0, 0);
+
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: ORLANDO_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  });
+  let instant = targetWallTime.getTime();
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const parts = formatter.formatToParts(new Date(instant));
+    const value = (type: Intl.DateTimeFormatPartTypes) =>
+      Number(parts.find((part) => part.type === type)!.value);
+    const representedWallTime = new Date(0);
+    representedWallTime.setUTCFullYear(value("year"), value("month") - 1, value("day"));
+    representedWallTime.setUTCHours(value("hour"), value("minute"), value("second"), 0);
+    const correction = targetWallTime.getTime() - representedWallTime.getTime();
+    if (correction === 0) return new Date(instant);
+    instant += correction;
+  }
+  throw new RangeError(`Could not resolve Orlando midnight for ${dateKey}`);
+}
+
+/** Start of the next Orlando calendar day, including 23- and 25-hour DST days. */
+export function orlandoStartOfNextDay(dateKey: string): Date {
+  if (!validDate(dateKey)) throw new RangeError("Expected a valid Orlando calendar date");
+  const nextDate = new Date(`${dateKey}T12:00:00.000Z`);
+  nextDate.setUTCDate(nextDate.getUTCDate() + 1);
+  return orlandoStartOfDay(nextDate.toISOString().slice(0, 10));
+}
+
 export function validDate(value: string): boolean {
   return (
     /^\d{4}-\d{2}-\d{2}$/.test(value) &&

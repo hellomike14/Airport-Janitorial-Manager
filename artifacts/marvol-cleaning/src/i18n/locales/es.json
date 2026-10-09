@@ -557,6 +557,28 @@
     "reported": "Reportado",
     "pdf": "PDF"
   },
+  "inspectorAssignments": {
+    "title": "Asignaciones Especiales del Inspector",
+    "subtitle": "Tareas vinculadas a correos y su estado de asignación actual.",
+    "loading": "Cargando asignaciones del inspector...",
+    "loadError": "No se pudieron cargar las asignaciones del inspector.",
+    "empty": "No hay asignaciones del inspector vinculadas a correos para esta vista.",
+    "taskDate": "Fecha de la tarea",
+    "assignedTo": "Asignado a",
+    "awaitingAssignment": "Esperando reasignación",
+    "dueAt": "Fecha límite",
+    "completedAt": "Completada",
+    "taskNotes": "Notas de la tarea",
+    "taskPhotos": "Fotos de la tarea",
+    "viewSource": "Ver correo original",
+    "viewAssignment": "Ver asignación especial",
+    "viewReport": "Ver en el informe del inspector",
+    "sourceEmail": "Correo original del inspector",
+    "sender": "Remitente",
+    "subject": "Asunto",
+    "receivedAt": "Recibido",
+    "unavailable": "No disponible"
+  },
   "completedJobs": {
     "title": "Trabajos Completados",
     "subtitle": "Ver todas las tareas de limpieza completadas en cada área.",

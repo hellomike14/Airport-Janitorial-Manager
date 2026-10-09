@@ -557,6 +557,28 @@
     "reported": "Signalé",
     "pdf": "PDF"
   },
+  "inspectorAssignments": {
+    "title": "Affectations Spéciales de l'Inspecteur",
+    "subtitle": "Tâches liées aux e-mails et état actuel de leur affectation.",
+    "loading": "Chargement des affectations de l'inspecteur...",
+    "loadError": "Impossible de charger les affectations de l'inspecteur.",
+    "empty": "Aucune affectation liée à un e-mail n'est disponible dans cette vue.",
+    "taskDate": "Date de la tâche",
+    "assignedTo": "Affecté à",
+    "awaitingAssignment": "En attente de réaffectation",
+    "dueAt": "Échéance",
+    "completedAt": "Terminée",
+    "taskNotes": "Notes de la tâche",
+    "taskPhotos": "Photos de la tâche",
+    "viewSource": "Voir l'e-mail source",
+    "viewAssignment": "Voir l'affectation spéciale",
+    "viewReport": "Voir dans le rapport de l'inspecteur",
+    "sourceEmail": "E-mail original de l'inspecteur",
+    "sender": "Expéditeur",
+    "subject": "Objet",
+    "receivedAt": "Reçu",
+    "unavailable": "Indisponible"
+  },
   "completedJobs": {
     "title": "Travaux Terminés",
     "subtitle": "Voir toutes les tâches de nettoyage terminées dans chaque zone.",

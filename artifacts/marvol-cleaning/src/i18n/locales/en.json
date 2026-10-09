@@ -557,6 +557,28 @@
     "reported": "Reported",
     "pdf": "PDF"
   },
+  "inspectorAssignments": {
+    "title": "Inspector Special Assignments",
+    "subtitle": "Email-linked tasks and their current assignment status.",
+    "loading": "Loading inspector assignments...",
+    "loadError": "Inspector assignments could not be loaded.",
+    "empty": "No email-linked inspector assignments are available for this view.",
+    "taskDate": "Task date",
+    "assignedTo": "Assigned to",
+    "awaitingAssignment": "Awaiting reassignment",
+    "dueAt": "Due",
+    "completedAt": "Completed",
+    "taskNotes": "Task notes",
+    "taskPhotos": "Task photos",
+    "viewSource": "View source email",
+    "viewAssignment": "View Special Assignment",
+    "viewReport": "View in Inspector Report",
+    "sourceEmail": "Original inspector email",
+    "sender": "Sender",
+    "subject": "Subject",
+    "receivedAt": "Received",
+    "unavailable": "Unavailable"
+  },
   "completedJobs": {
     "title": "Completed Jobs",
     "subtitle": "View all completed cleaning tasks across every area.",

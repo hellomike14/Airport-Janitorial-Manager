@@ -1597,6 +1597,67 @@ function MonthlyPanel({ admin }: { admin: boolean }) {
     </Panel>
   );
 }
+
+function WorkbookDownloadPanel({ kind }: { kind: "petty-cash" | "uniform" }) {
+  const isPettyCash = kind === "petty-cash";
+  const [downloading, setDownloading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function downloadUniformWorkbook() {
+    setDownloading(true);
+    setError("");
+    try {
+      const response = await fetch("/api/operations/workbooks/uniform", {
+        credentials: "same-origin",
+      });
+      if (!response.ok) {
+        const result = await response.json().catch(() => null) as { error?: string } | null;
+        throw new Error(result?.error ?? "Unable to download the workbook.");
+      }
+      const workbook = await response.blob();
+      const downloadUrl = URL.createObjectURL(workbook);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = "Marvol_Uniform_inventory_system.xlsx";
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to download the workbook.");
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  return (
+    <Panel title={isPettyCash ? "Petty Cash" : "Uniform Stock"}>
+      <p className="text-sm text-slate-600">
+        {isPettyCash
+          ? "Download the blank petty cash reconciliation workbook."
+          : "Download the private uniform inventory workbook. Employee issuance details are restricted to managers."}
+      </p>
+      {isPettyCash ? (
+        <a
+          href="/templates/Marvol_Petty_Cash_Reconciliation.xlsx"
+          download="Marvol_Petty_Cash_Reconciliation.xlsx"
+          className="inline-flex min-h-10 items-center justify-center rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2"
+        >
+          Download Excel template
+        </a>
+      ) : (
+        <button
+          type="button"
+          onClick={downloadUniformWorkbook}
+          disabled={downloading}
+          className="inline-flex min-h-10 items-center justify-center rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {downloading ? "Preparing download…" : "Download Uniform workbook"}
+        </button>
+      )}
+      {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
+    </Panel>
+  );
+}
+
 export default function Operations() {
   const { effectiveRole } = useAuth();
   const manager = effectiveRole === "admin" || effectiveRole === "supervisor",
@@ -1609,6 +1670,8 @@ export default function Operations() {
         "Quality",
         "Readiness",
         "Monthly report",
+        "Petty Cash",
+        "Uniform Stock",
       ]
     : ["My time", "Safety", "Supplies"];
   const [tab, setTab] = useState(0);
@@ -1620,7 +1683,7 @@ export default function Operations() {
       <div className="print:hidden">
         <h1 className="text-2xl font-bold text-slate-900">Operations</h1>
         <p className="text-sm text-slate-500 mt-1">
-          Timekeeping, safety, supplies and service records.
+          Timekeeping, safety, supplies, service records and manager workbooks.
         </p>
       </div>
       <div
@@ -1647,6 +1710,8 @@ export default function Operations() {
         {manager && tab === 3 && <QualityPanel admin={admin} />}
         {manager && tab === 4 && <ReadinessPanel admin={admin} />}
         {manager && tab === 5 && <MonthlyPanel admin={admin} />}
+        {manager && tab === 6 && <WorkbookDownloadPanel kind="petty-cash" />}
+        {manager && tab === 7 && <WorkbookDownloadPanel kind="uniform" />}
       </div>
     </div>
   );

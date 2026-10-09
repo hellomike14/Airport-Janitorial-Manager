@@ -8,6 +8,7 @@
 
 export interface ConversationSummary {
   id: number;
+  conversationIds: number[];
   isGroup: boolean;
   /** @nullable */
   groupName: string | null;

@@ -70,6 +70,7 @@ import type {
   GetIdentityDocumentContext200,
   GetInspectorWorkflow200,
   HealthStatus,
+  InspectorAssignmentReport,
   InspectorEmailRecipientsResponse,
   InvalidDiagnosticCodeError,
   Issue,
@@ -82,6 +83,7 @@ import type {
   ListConversationsParams,
   ListIdentityDocumentPhotos200,
   ListIdentityDocumentPhotosParams,
+  ListInspectorAssignmentsParams,
   ListIssuesParams,
   ListNotificationsParams,
   ListSpecialTasksParams,
@@ -8025,6 +8027,186 @@ export function useGetInspectorWorkflow<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetInspectorWorkflowQueryOptions(taskId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List existing email-linked inspector assignments visible to the authenticated actor
+ */
+export const getListInspectorAssignmentsUrl = (
+  params?: ListInspectorAssignmentsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/inspector-assignments?${stringifiedParams}`
+    : `/api/inspector-assignments`;
+};
+
+export const listInspectorAssignments = async (
+  params?: ListInspectorAssignmentsParams,
+  options?: RequestInit,
+): Promise<InspectorAssignmentReport[]> => {
+  return customFetch<InspectorAssignmentReport[]>(
+    getListInspectorAssignmentsUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListInspectorAssignmentsQueryKey = (
+  params?: ListInspectorAssignmentsParams,
+) => {
+  return [`/api/inspector-assignments`, ...(params ? [params] : [])] as const;
+};
+
+export const getListInspectorAssignmentsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listInspectorAssignments>>,
+  TError = ErrorType<void>,
+>(
+  params?: ListInspectorAssignmentsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listInspectorAssignments>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListInspectorAssignmentsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listInspectorAssignments>>
+  > = ({ signal }) =>
+    listInspectorAssignments(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listInspectorAssignments>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListInspectorAssignmentsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listInspectorAssignments>>
+>;
+export type ListInspectorAssignmentsQueryError = ErrorType<void>;
+
+/**
+ * @summary List existing email-linked inspector assignments visible to the authenticated actor
+ */
+
+export function useListInspectorAssignments<
+  TData = Awaited<ReturnType<typeof listInspectorAssignments>>,
+  TError = ErrorType<void>,
+>(
+  params?: ListInspectorAssignmentsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listInspectorAssignments>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListInspectorAssignmentsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Employee issuance data is streamed only after the authenticated actor is verified as an administrator or supervisor.
+ * @summary Download the private uniform workbook for managers
+ */
+export const getDownloadUniformWorkbookUrl = () => {
+  return `/api/operations/workbooks/uniform`;
+};
+
+export const downloadUniformWorkbook = async (
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getDownloadUniformWorkbookUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getDownloadUniformWorkbookQueryKey = () => {
+  return [`/api/operations/workbooks/uniform`] as const;
+};
+
+export const getDownloadUniformWorkbookQueryOptions = <
+  TData = Awaited<ReturnType<typeof downloadUniformWorkbook>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof downloadUniformWorkbook>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getDownloadUniformWorkbookQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof downloadUniformWorkbook>>
+  > = ({ signal }) => downloadUniformWorkbook({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof downloadUniformWorkbook>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type DownloadUniformWorkbookQueryResult = NonNullable<
+  Awaited<ReturnType<typeof downloadUniformWorkbook>>
+>;
+export type DownloadUniformWorkbookQueryError = ErrorType<void>;
+
+/**
+ * @summary Download the private uniform workbook for managers
+ */
+
+export function useDownloadUniformWorkbook<
+  TData = Awaited<ReturnType<typeof downloadUniformWorkbook>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof downloadUniformWorkbook>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getDownloadUniformWorkbookQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

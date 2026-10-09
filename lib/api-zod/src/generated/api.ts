@@ -1304,6 +1304,7 @@ export const ListConversationsQueryParams = zod.object({
 
 export const ListConversationsResponseItem = zod.object({
   id: zod.number(),
+  conversationIds: zod.array(zod.number()),
   isGroup: zod.boolean(),
   groupName: zod.string().nullable(),
   participantCount: zod.number(),
@@ -1330,6 +1331,7 @@ export const StartConversationBody = zod.object({
 
 export const StartConversationResponse = zod.object({
   id: zod.number(),
+  conversationIds: zod.array(zod.number()),
   isGroup: zod.boolean(),
   groupName: zod.string().nullable(),
   participantCount: zod.number(),
@@ -2323,6 +2325,81 @@ export const GetInspectorWorkflowResponse = zod.object({
     ])
     .nullish(),
 });
+
+/**
+ * @summary List existing email-linked inspector assignments visible to the authenticated actor
+ */
+export const ListInspectorAssignmentsQueryParams = zod.object({
+  from: zod
+    .date()
+    .optional()
+    .describe("Inclusive start date for the source email's received date."),
+  to: zod
+    .date()
+    .optional()
+    .describe("Inclusive end date for the source email's received date."),
+});
+
+export const listInspectorAssignmentsResponseRemainingSecondsMin = 0;
+
+export const ListInspectorAssignmentsResponseItem = zod.object({
+  source: zod.object({
+    conversationId: zod.number(),
+    messageId: zod.number(),
+  }),
+  sourceEmail: zod.object({
+    senderEmail: zod.string().nullable(),
+    subject: zod.string().nullable(),
+    body: zod.string().nullable(),
+    storedMessageBody: zod.string(),
+    receivedAt: zod.date(),
+  }),
+  task: zod.object({
+    id: zod.number(),
+    name: zod.string(),
+    taskDate: zod.string().describe("Scheduled task date in YYYY-MM-DD form."),
+    completed: zod.boolean(),
+    completedAt: zod.date().nullable(),
+    completedById: zod.number().nullable(),
+    taskNotes: zod.string().nullable(),
+    beforeImagePath: zod.string().nullable(),
+    afterImagePath: zod.string().nullable(),
+    createdAt: zod.date(),
+  }),
+  area: zod.object({
+    id: zod.number(),
+    name: zod.string(),
+    terminal: zod.string(),
+  }),
+  assignedStaff: zod
+    .object({
+      id: zod.number(),
+      name: zod.string(),
+    })
+    .nullable(),
+  assignmentMethod: zod.enum(["fresh_gps", "area_roster_workload"]),
+  assignmentDistanceMeters: zod.number().nullable(),
+  dueAt: zod.date(),
+  remainingSeconds: zod
+    .number()
+    .min(listInspectorAssignmentsResponseRemainingSecondsMin),
+  status: zod.enum(["assigned", "overdue", "escalated", "completed"]),
+  escalatedAt: zod.date().nullable(),
+  history: zod.array(
+    zod.object({
+      assignedStaffId: zod.number(),
+      assignedById: zod.number().nullable(),
+      event: zod.enum(["assigned", "reassigned"]),
+      method: zod.enum(["fresh_gps", "area_roster_workload"]),
+      distanceMeters: zod.number().nullable(),
+      provenance: zod.string(),
+      createdAt: zod.date(),
+    }),
+  ),
+});
+export const ListInspectorAssignmentsResponse = zod.array(
+  ListInspectorAssignmentsResponseItem,
+);
 
 /**
  * Accepts a limited set of diagnostic codes without requiring an authenticated session.

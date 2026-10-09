@@ -2,7 +2,7 @@ import React, { useMemo, useRef } from "react";
 import { format, subDays, parseISO } from "date-fns";
 import { useTranslation } from "react-i18next";
 import { getDateLocale } from "@/i18n/dateLocale";
-import { useListIssues } from "@workspace/api-client-react";
+import { useListIssues, useListInspectorAssignments } from "@workspace/api-client-react";
 import {
   Printer,
   Calendar,
@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StaffName } from "@/components/StaffName";
+import { InspectorAssignmentsSection } from "@/components/InspectorAssignmentsSection";
+import { parseInspectorReportLink } from "@/lib/inspectorAssignmentLinks";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -260,16 +262,42 @@ export default function InspectorReport() {
   const dateLocale = getDateLocale(i18n.language);
   const today = format(new Date(), "yyyy-MM-dd");
   const sevenDaysAgo = format(subDays(new Date(), 7), "yyyy-MM-dd");
+  const [reportLink] = React.useState(() => parseInspectorReportLink(window.location.search));
 
-  const [from, setFrom] = React.useState(sevenDaysAgo);
-  const [to, setTo] = React.useState(today);
-  const [fetchParams, setFetchParams] = React.useState({ from: sevenDaysAgo, to: today });
+  const initialFrom = reportLink.from ?? sevenDaysAgo;
+  const initialTo = reportLink.to ?? today;
+  const [from, setFrom] = React.useState(initialFrom);
+  const [to, setTo] = React.useState(initialTo);
+  const [fetchParams, setFetchParams] = React.useState({ from: initialFrom, to: initialTo });
   const printRef = useRef<HTMLDivElement>(null);
+  const scrolledAssignmentIdRef = useRef<number | null>(null);
 
   const { data: issues = [], isLoading } = useListIssues({
     from: fetchParams.from,
     to: fetchParams.to,
   });
+  const {
+    data: inspectorAssignments = [],
+    isLoading: inspectorAssignmentsLoading,
+    isError: inspectorAssignmentsError,
+  } = useListInspectorAssignments({
+    from: fetchParams.from,
+    to: fetchParams.to,
+  }, {
+    query: {
+      queryKey: ["/api/inspector-assignments", fetchParams],
+      refetchInterval: 5000,
+    },
+  });
+  React.useEffect(() => {
+    const assignmentTaskId = reportLink.assignmentTaskId;
+    if (!assignmentTaskId || scrolledAssignmentIdRef.current === assignmentTaskId) return;
+    if (!inspectorAssignments.some((assignment) => assignment.task.id === assignmentTaskId)) return;
+    const target = document.getElementById(`inspector-assignment-${assignmentTaskId}`);
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    scrolledAssignmentIdRef.current = assignmentTaskId;
+  }, [reportLink.assignmentTaskId, inspectorAssignments]);
 
   const stats = useMemo(() => {
     const total = issues.length;
@@ -509,6 +537,13 @@ export default function InspectorReport() {
               </div>
             );
           })}
+
+          <InspectorAssignmentsSection
+            assignments={inspectorAssignments}
+            isLoading={inspectorAssignmentsLoading}
+            isError={inspectorAssignmentsError}
+            highlightedTaskId={reportLink.assignmentTaskId}
+          />
 
           {/* Report footer */}
           {!isLoading && issues.length > 0 && (

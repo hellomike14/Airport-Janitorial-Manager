@@ -1801,6 +1801,51 @@ paths:
         "403": { description: Not authorized for this workflow }
         "404": { description: Inspector workflow task not found }
 
+  /inspector-assignments:
+    get:
+      operationId: listInspectorAssignments
+      tags: [messages]
+      summary: List existing email-linked inspector assignments visible to the authenticated actor
+      parameters:
+        - name: from
+          in: query
+          required: false
+          schema: { type: string, format: date }
+          description: Inclusive start date for the source email's received date.
+        - name: to
+          in: query
+          required: false
+          schema: { type: string, format: date }
+          description: Inclusive end date for the source email's received date.
+      responses:
+        "200":
+          description: Existing linked assignments, filtered by actor visibility and source email date.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InspectorAssignmentReport"
+        "400": { description: Invalid or incomplete date range }
+        "401": { description: Login session required }
+        "403": { description: Role is not allowed to view inspector assignments }
+
+  /operations/workbooks/uniform:
+    get:
+      operationId: downloadUniformWorkbook
+      tags: [operations]
+      summary: Download the private uniform workbook for managers
+      description: Employee issuance data is streamed only after the authenticated actor is verified as an administrator or supervisor.
+      responses:
+        "200":
+          description: Private uniform workbook.
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+        "401": { description: Login session required }
+        "403": { description: Only administrators and supervisors may download this workbook }
+        "404": { description: Uniform workbook is unavailable }
+
   /internal/inspector-sla-sweep:
     post:
       operationId: runInspectorSlaSweep
@@ -2131,6 +2176,73 @@ components:
       in: header
       name: X-SendGrid-Inbound-Secret
   schemas:
+    InspectorAssignmentHistoryItem:
+      type: object
+      required: [assignedStaffId, assignedById, event, method, distanceMeters, provenance, createdAt]
+      properties:
+        assignedStaffId: { type: integer }
+        assignedById: { type: ["integer", "null"] }
+        event: { type: string, enum: [assigned, reassigned] }
+        method: { type: string, enum: [fresh_gps, area_roster_workload] }
+        distanceMeters: { type: ["number", "null"] }
+        provenance: { type: string }
+        createdAt: { type: string, format: date-time }
+    InspectorAssignmentReport:
+      type: object
+      required: [source, sourceEmail, task, area, assignedStaff, assignmentMethod, assignmentDistanceMeters, dueAt, remainingSeconds, status, escalatedAt, history]
+      properties:
+        source:
+          type: object
+          required: [conversationId, messageId]
+          properties:
+            conversationId: { type: integer }
+            messageId: { type: integer }
+        sourceEmail:
+          type: object
+          required: [senderEmail, subject, body, storedMessageBody, receivedAt]
+          properties:
+            senderEmail: { type: ["string", "null"] }
+            subject: { type: ["string", "null"] }
+            body: { type: ["string", "null"] }
+            storedMessageBody: { type: string }
+            receivedAt: { type: string, format: date-time }
+        task:
+          type: object
+          required: [id, name, taskDate, completed, completedAt, completedById, taskNotes, beforeImagePath, afterImagePath, createdAt]
+          properties:
+            id: { type: integer }
+            name: { type: string }
+            taskDate: { type: string, description: "Scheduled task date in YYYY-MM-DD form." }
+            completed: { type: boolean }
+            completedAt: { type: ["string", "null"], format: date-time }
+            completedById: { type: ["integer", "null"] }
+            taskNotes: { type: ["string", "null"] }
+            beforeImagePath: { type: ["string", "null"] }
+            afterImagePath: { type: ["string", "null"] }
+            createdAt: { type: string, format: date-time }
+        area:
+          type: object
+          required: [id, name, terminal]
+          properties:
+            id: { type: integer }
+            name: { type: string }
+            terminal: { type: string }
+        assignedStaff:
+          type: ["object", "null"]
+          required: [id, name]
+          properties:
+            id: { type: integer }
+            name: { type: string }
+        assignmentMethod: { type: string, enum: [fresh_gps, area_roster_workload] }
+        assignmentDistanceMeters: { type: ["number", "null"] }
+        dueAt: { type: string, format: date-time }
+        remainingSeconds: { type: integer, minimum: 0 }
+        status: { type: string, enum: [assigned, overdue, escalated, completed] }
+        escalatedAt: { type: ["string", "null"], format: date-time }
+        history:
+          type: array
+          items:
+            $ref: "#/components/schemas/InspectorAssignmentHistoryItem"
     TrainingVersion:
       type: object
       required: [version, title, duration, videoUrl]
@@ -3004,6 +3116,10 @@ components:
       properties:
         id:
           type: integer
+        conversationIds:
+          type: array
+          items:
+            type: integer
         isGroup:
           type: boolean
         groupName:
@@ -3030,6 +3146,7 @@ components:
           type: string
       required:
         - id
+        - conversationIds
         - isGroup
         - groupName
         - participantCount

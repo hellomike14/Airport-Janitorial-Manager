@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, Clock3, MapPin, Route, UserRound } from "lucide-react";
-import { useGetInspectorWorkflow } from "@workspace/api-client-react";
+import { useGetInspectorWorkflow, type InspectorAssignmentReport } from "@workspace/api-client-react";
 
 function duration(seconds: number) {
   const safe = Math.max(0, seconds);
@@ -21,23 +21,35 @@ function deliveryLabel(status: string | null | undefined) {
   }[status] ?? status;
 }
 
-export function InspectorWorkflowCard({ taskId, compact = false }: { taskId: number; compact?: boolean }) {
+export function InspectorWorkflowCard({
+  taskId,
+  compact = false,
+  workflowData,
+  showDeliveryStatus = true,
+}: {
+  taskId: number;
+  compact?: boolean;
+  workflowData?: InspectorAssignmentReport;
+  showDeliveryStatus?: boolean;
+}) {
   const [now, setNow] = useState(Date.now());
-  const { data, isLoading, error } = useGetInspectorWorkflow(taskId, {
+  const workflowQuery = useGetInspectorWorkflow(taskId, {
     query: {
       queryKey: [`/api/inspector-workflow/${taskId}`],
       refetchInterval: 5000,
       staleTime: 0,
+      enabled: !workflowData,
     },
   });
+  const data = workflowData ?? workflowQuery.data;
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
 
-  if (isLoading) return <div className="mt-2 text-xs text-slate-400">Loading inspector assignment…</div>;
-  if (error || !data) return <div className="mt-2 text-xs text-rose-600">Inspector assignment details are temporarily unavailable.</div>;
+  if (!workflowData && workflowQuery.isLoading) return <div className="mt-2 text-xs text-slate-400">Loading inspector assignment…</div>;
+  if ((!workflowData && workflowQuery.error) || !data) return <div className="mt-2 text-xs text-rose-600">Inspector assignment details are temporarily unavailable.</div>;
 
   const seconds = Math.max(0, Math.ceil((new Date(data.dueAt).getTime() - now) / 1000));
   const overdue = data.status === "overdue" || data.status === "escalated" || (data.status === "assigned" && seconds === 0);
@@ -70,7 +82,11 @@ export function InspectorWorkflowCard({ taskId, compact = false }: { taskId: num
             <span className="flex items-center gap-1"><Route className="h-3.5 w-3.5" />{method}{data.assignmentDistanceMeters != null ? ` · ${Math.round(data.assignmentDistanceMeters)} m` : ""}</span>
             <span>Due: {new Date(data.dueAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
           </div>
-          <p className="mt-2 font-semibold">Completion email: {deliveryLabel(data.completionEmailDeliveryStatus)}</p>
+          {showDeliveryStatus && (
+            <p className="mt-2 font-semibold">
+              Completion email: {deliveryLabel("completionEmailDeliveryStatus" in data ? data.completionEmailDeliveryStatus : undefined)}
+            </p>
+          )}
           {data.history.length > 0 && (
             <ol className="mt-2 border-t border-current/15 pt-2 space-y-1">
               {data.history.map((item, index) => (
