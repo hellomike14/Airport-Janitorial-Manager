@@ -71,6 +71,7 @@ router.get("/staff-options", manager, async (_req, res) => {
         name: staffTable.name,
         active: staffTable.active,
         formerEmployee: staffTable.formerEmployee,
+        role: staffTable.role,
       })
       .from(staffTable)
       .orderBy(staffTable.name),
@@ -440,6 +441,7 @@ router.get("/badges", async (req, res) => {
       name: staffTable.name,
       active: staffTable.active,
       formerEmployee: staffTable.formerEmployee,
+      role: staffTable.role,
     })
     .from(staffBadgesTable)
     .innerJoin(staffTable, eq(staffBadgesTable.staffId, staffTable.id))

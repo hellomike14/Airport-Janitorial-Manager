@@ -113,6 +113,7 @@ export type StaffOption = {
   name: string;
   active: boolean;
   formerEmployee?: boolean;
+  role: "staff" | "supervisor" | "admin" | "inspector";
 };
 export type ChecklistItem = {
   taskName: string;
