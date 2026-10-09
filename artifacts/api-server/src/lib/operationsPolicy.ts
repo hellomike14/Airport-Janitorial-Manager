@@ -16,6 +16,13 @@ export const INSPECTION_CHECKS = [
   "Walkways clear and safe",
 ] as const;
 
+export function isCurrentEmployee(employee: {
+  active?: unknown;
+  formerEmployee?: unknown;
+}): boolean {
+  return employee.active === true && employee.formerEmployee === false;
+}
+
 export function orlandoDate(now = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/New_York",

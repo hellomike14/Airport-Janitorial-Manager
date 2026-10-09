@@ -427,6 +427,9 @@ function TimePanel({ manager, admin }: { manager: boolean; admin: boolean }) {
 }
 function SafetyPanel({ manager, admin }: { manager: boolean; admin: boolean }) {
   const { areas, staff } = useOptions();
+  const badgeEligibleStaff = staff.filter(
+    (person) => person.active === true && person.formerEmployee === false,
+  );
   const badges = useOperations<Badge[]>("/badges"),
     incidents = useOperations<Incident[]>("/incidents");
   const action = useAction();
@@ -507,10 +510,9 @@ function SafetyPanel({ manager, admin }: { manager: boolean; admin: boolean }) {
                 onChange={(e) => setStaff(e.target.value)}
               >
                 <option value="">Choose employee</option>
-                {staff.map((s) => (
+                {badgeEligibleStaff.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name}
-                    {!s.active || s.formerEmployee ? " (former/inactive)" : ""}
                   </option>
                 ))}
               </select>
