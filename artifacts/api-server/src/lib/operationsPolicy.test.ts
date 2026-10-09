@@ -15,12 +15,16 @@ import {
   validDate,
 } from "./operationsPolicy";
 
-test("Airport badge visibility requires an explicitly active, non-former employee", () => {
-  assert.equal(isCurrentEmployee({ active: true, formerEmployee: false }), true);
-  assert.equal(isCurrentEmployee({ active: false, formerEmployee: false }), false);
-  assert.equal(isCurrentEmployee({ active: true, formerEmployee: true }), false);
-  assert.equal(isCurrentEmployee({ active: true }), false);
-  assert.equal(isCurrentEmployee({ formerEmployee: false }), false);
+test("Airport badge visibility excludes inspectors and requires current employee flags", () => {
+  assert.equal(isCurrentEmployee({ active: true, formerEmployee: false, role: "staff" }), true);
+  assert.equal(isCurrentEmployee({ active: true, formerEmployee: false, role: "supervisor" }), true);
+  assert.equal(isCurrentEmployee({ active: true, formerEmployee: false, role: "admin" }), true);
+  assert.equal(isCurrentEmployee({ active: true, formerEmployee: false, role: "inspector" }), false);
+  assert.equal(isCurrentEmployee({ active: true, formerEmployee: false, role: "unknown" }), false);
+  assert.equal(isCurrentEmployee({ active: false, formerEmployee: false, role: "staff" }), false);
+  assert.equal(isCurrentEmployee({ active: true, formerEmployee: true, role: "staff" }), false);
+  assert.equal(isCurrentEmployee({ active: true, role: "staff" }), false);
+  assert.equal(isCurrentEmployee({ active: true, formerEmployee: false }), false);
 });
 
 test("Orlando work dates respect midnight and DST independently of host timezone", () => {

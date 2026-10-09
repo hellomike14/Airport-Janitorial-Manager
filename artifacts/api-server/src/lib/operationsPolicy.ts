@@ -19,8 +19,13 @@ export const INSPECTION_CHECKS = [
 export function isCurrentEmployee(employee: {
   active?: unknown;
   formerEmployee?: unknown;
+  role?: unknown;
 }): boolean {
-  return employee.active === true && employee.formerEmployee === false;
+  return employee.active === true &&
+    employee.formerEmployee === false &&
+    (employee.role === "staff" ||
+      employee.role === "supervisor" ||
+      employee.role === "admin");
 }
 
 export function orlandoDate(now = new Date()): string {

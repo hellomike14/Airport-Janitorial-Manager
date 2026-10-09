@@ -428,7 +428,12 @@ function TimePanel({ manager, admin }: { manager: boolean; admin: boolean }) {
 function SafetyPanel({ manager, admin }: { manager: boolean; admin: boolean }) {
   const { areas, staff } = useOptions();
   const badgeEligibleStaff = staff.filter(
-    (person) => person.active === true && person.formerEmployee === false,
+    (person) =>
+      person.active === true &&
+      person.formerEmployee === false &&
+      (person.role === "staff" ||
+        person.role === "supervisor" ||
+        person.role === "admin"),
   );
   const badges = useOperations<Badge[]>("/badges"),
     incidents = useOperations<Incident[]>("/incidents");
