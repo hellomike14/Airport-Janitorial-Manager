@@ -884,7 +884,7 @@ export default function Messages() {
     senderRole === "admin" || senderRole === "supervisor" || senderRole === "staff";
 
   return (
-    <div className="p-4 md:p-6 h-[calc(100vh-4rem)] flex flex-col">
+    <div className="p-3 md:p-4 h-[calc(100vh-4rem)] flex flex-col">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-slate-800 flex items-center gap-2">
@@ -918,10 +918,10 @@ export default function Messages() {
         </div>
       )}
 
-      <div className="flex-1 min-h-0 flex gap-4">
+      <div className="flex-1 min-h-0 flex gap-3 md:gap-4">
         {/* Conversation list */}
         <div
-          className={`${selectedId !== null ? "hidden md:flex" : "flex"} flex-col w-full md:w-80 shrink-0 bg-white rounded-2xl border border-slate-200 overflow-hidden`}
+          className={`${selectedId !== null ? "hidden md:flex" : "flex"} flex-col w-full md:w-64 xl:w-72 shrink-0 bg-white rounded-2xl border border-slate-200 overflow-hidden`}
         >
           <div className="border-b border-slate-100 px-3 py-2 flex items-center justify-between gap-2">
             <span className="text-xs font-semibold text-slate-500">
@@ -1126,20 +1126,8 @@ export default function Messages() {
                     {t("messages.oldMessageCleanupDone", cleanupResult)}
                   </p>
                 )}
-                {isSharedInspectorThread && (
-                  <div className="mx-4 mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                    <div className="flex items-center gap-1 font-semibold">
-                      <Mail className="w-3.5 h-3.5" />
-                      {t("messages.inspectorEmailIdentity")}
-                    </div>
-                    <p className="mt-0.5">
-                      {t("messages.inspectorDeliveryNote")}
-                    </p>
-                  </div>
-                )}
-
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50">
+              <div className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden p-4 md:p-5 space-y-4 bg-slate-50/50">
                 {messagesLoading && (
                   <div className="text-center text-slate-400 text-sm py-8">{t("common.loading")}</div>
                 )}
@@ -1187,10 +1175,10 @@ export default function Messages() {
                     </div>
                   );
                   return (
-                    <div key={m.id} className={`flex items-end gap-1.5 group ${mine ? "justify-end" : "justify-start"}`}>
+                    <div key={m.id} className={`flex min-w-0 items-end gap-1.5 group ${mine ? "justify-end" : "justify-start"}`}>
                       {mine && messageActions}
                       <div
-                        className={`max-w-[75%] rounded-2xl px-4 py-2.5 ${
+                        className={`min-w-0 max-w-[calc(100%-2rem)] sm:max-w-[92%] xl:max-w-[88%] rounded-2xl px-5 py-4 md:px-6 md:py-5 ${
                           mine
                             ? "bg-emerald-600 text-white rounded-br-md"
                             : urgentInspectorReply
@@ -1255,7 +1243,7 @@ export default function Messages() {
                             </div>
                           </div>
                         ) : (
-                          <p className="text-sm whitespace-pre-wrap break-words">{m.body}</p>
+                          <p className="text-base leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere]">{m.body}</p>
                         )}
                         {(m.beforeImagePath || m.afterImagePath) && (
                           <div className="mt-2 flex flex-wrap gap-2">
@@ -1274,7 +1262,7 @@ export default function Messages() {
                           </div>
                         )}
                         {(mine || isSharedInspectorThread) && m.inspectorEmailRecipients.length > 0 && (
-                          <div className="mt-2 text-[11px] text-emerald-100 break-all">
+                          <div className="mt-3 text-xs leading-relaxed text-emerald-100 [overflow-wrap:anywhere]">
                             {t("messages.emailRecipient")}: {m.inspectorEmailRecipients.length === 1
                               ? m.inspectorEmailRecipients[0]
                               : t("messages.allInspectorRecipients", { count: m.inspectorEmailRecipients.length })}
@@ -1427,12 +1415,10 @@ export default function Messages() {
                         void handleSend();
                       }
                     }}
-                    rows={selectedConvo.otherStaffRole === "inspector" ? 4 : 1}
+                    rows={3}
                     maxLength={2000}
                     placeholder={t("messages.typeMessage")}
-                    className={`flex-1 min-w-0 rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 ${
-                      selectedConvo.otherStaffRole === "inspector" ? "resize-y min-h-24 max-h-48" : "resize-none max-h-32"
-                    }`}
+                    className="flex-1 min-w-0 resize-y min-h-28 max-h-40 md:max-h-56 rounded-xl border border-slate-200 px-4 py-3 text-base leading-relaxed focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   />
                   <button
                     onClick={handleSend}

@@ -573,6 +573,7 @@ function SendAlertModal({ staffId, staffRole, onClose }: { staffId: number; staf
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { t, i18n } = useTranslation();
   const [location] = useLocation();
+  const isMessagesPage = location === "/messages";
   const [mobileOpen, setMobileOpen] = useState(false);
   const [viewDropdownOpen, setViewDropdownOpen] = useState(false);
   const [showSendAlert, setShowSendAlert] = useState(false);
@@ -779,9 +780,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-8 relative">
+        <main className={`flex-1 overflow-y-auto relative ${isMessagesPage ? "px-3 py-4 sm:px-5 sm:py-6 lg:px-6" : "p-4 sm:p-8"}`}>
           <div className="absolute top-0 left-1/4 w-96 h-96 bg-accent/5 rounded-full blur-3xl pointer-events-none -z-10" />
-          <div className="max-w-7xl mx-auto">
+          <div className={isMessagesPage ? "w-full max-w-none" : "max-w-7xl mx-auto"}>
             {children}
           </div>
         </main>
