@@ -1,15 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import express from "express";
+import { clerkMiddleware } from "@clerk/express";
 import { once } from "node:events";
 import { ConfidentialError, type ConfidentialIdentity } from "../lib/confidentialAccess";
-import { createConfidentialAreasMiddleware } from "./confidentialAreas";
+import { createConfidentialAreasMiddleware, isEmployeeAdministratorRequest } from "./confidentialAreas";
 
 const applicationObject = "/objects/uploads/completed/fixture-photo";
 
 test("blank templates and applicant submission stay public; all completed submission data needs an Admin grant", async () => {
   const app = express();
   app.use(express.json());
+  app.use(clerkMiddleware());
   app.use(createConfidentialAreasMiddleware({
     // Deliberately injected only in this test; production derives role/session from verified Clerk.
     resolveIdentity: async req => {
@@ -29,6 +31,7 @@ test("blank templates and applicant submission stay public; all completed submis
   app.get("/applications/:id", (_req, res) => res.json({ i9Employee: { private: true }, documents: [applicationObject] }));
   app.patch("/applications/:id", (_req, res) => res.json({ private: true }));
   app.get("/employment-form-submissions", (_req, res) => res.json([{ firstName: "Private", emailStatus: "sent" }]));
+  app.patch("/employment-form-submissions/:id/review", (_req, res) => res.json({ success: true }));
   app.get("/employment-form-submissions/:id", (_req, res) => res.json({ completedPdfPath: applicationObject }));
   app.post("/employment-form-submissions", (_req, res) => res.status(201).json({ success: true, emailSent: true }));
   app.get("/storage/objects/uploads/completed/fixture-photo", (_req, res) => res.send("private photo"));
@@ -78,6 +81,34 @@ test("blank templates and applicant submission stay public; all completed submis
         if (method === "GET") assert.equal(response.headers.get("cache-control"), "private, no-store");
       }
     }
+    assert.equal((await get("/employment-form-submissions", "employee_administrator")).status, 200,
+      "employee administrators can read the metadata-only list without an Admin code");
+    for (const path of [
+      "/employment-form-submissions/17",
+      "/employment-form-submissions/17/resend-email",
+      "/applications",
+      "/storage/objects/uploads/completed/fixture-photo",
+    ]) {
+      assert.equal((await get(path, "employee_administrator")).status, 403, path);
+    }
+    assert.equal((await fetch(`${base}/employment-form-submissions/17/review`, {
+      method: "PATCH",
+      headers: {
+        "x-test-role": "employee_administrator",
+        "content-type": "application/json",
+        origin: base,
+      },
+      body: JSON.stringify({ reviewStatus: "reviewed" }),
+    })).status, 200, "employee administrators may update review metadata from the app origin");
+    assert.equal((await fetch(`${base}/employment-form-submissions/17/review`, {
+      method: "PATCH",
+      headers: {
+        "x-test-role": "employee_administrator",
+        "content-type": "application/json",
+        origin: "https://invalid.example",
+      },
+      body: JSON.stringify({ reviewStatus: "reviewed" }),
+    })).status, 403, "review writes still enforce same-origin protection");
     assert.equal((await get("/applications", "admin")).status, 423, "an Admin still needs an access-code grant");
     for (const path of [
       "/applications", "/applications/17",
@@ -91,4 +122,15 @@ test("blank templates and applicant submission stay public; all completed submis
   } finally {
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
   }
+});
+
+test("employee-administrator confidential bypass is limited to review metadata and ordinary-staff management routes", () => {
+  assert.equal(isEmployeeAdministratorRequest("/employment-form-submissions", "GET"), true);
+  assert.equal(isEmployeeAdministratorRequest("/employment-form-submissions/17/review", "PATCH"), true);
+  assert.equal(isEmployeeAdministratorRequest("/staff", "POST"), true);
+  assert.equal(isEmployeeAdministratorRequest("/staff/17", "PUT"), true);
+  assert.equal(isEmployeeAdministratorRequest("/employment-form-submissions/17", "GET"), false);
+  assert.equal(isEmployeeAdministratorRequest("/employment-form-submissions/17/resend-email", "POST"), false);
+  assert.equal(isEmployeeAdministratorRequest("/staff/17", "DELETE"), false);
+  assert.equal(isEmployeeAdministratorRequest("/staff/confidential", "GET"), false);
 });

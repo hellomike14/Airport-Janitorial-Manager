@@ -11,6 +11,7 @@ import {
   text,
   timestamp,
   uniqueIndex,
+  uuid,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { staffTable } from "./staff";
@@ -41,6 +42,8 @@ export const pettyCashRecordsTable = pgTable(
       .notNull()
       .defaultNow(),
     cashOnHandCents: integer("cash_on_hand_cents").notNull(),
+    minimumReserveCents: integer("minimum_reserve_cents"),
+    targetFloatCents: integer("target_float_cents"),
     status: text("status").notNull().default("draft"),
     custodianAcknowledgedAt: timestamp("custodian_acknowledged_at", {
       withTimezone: true,
@@ -57,6 +60,7 @@ export const pettyCashRecordsTable = pgTable(
     reimbursementStatus: text("reimbursement_status")
       .notNull()
       .default("not_submitted"),
+    reimbursementPaidConfirmed: boolean("reimbursement_paid_confirmed"),
     reimbursementAmountCents: integer("reimbursement_amount_cents"),
     reimbursementReference: text("reimbursement_reference"),
     reimbursementSubmittedOn: date("reimbursement_submitted_on", {
@@ -113,6 +117,42 @@ export const pettyCashRecordsTable = pgTable(
   ],
 );
 
+export const pettyCashReceiptUploadsTable = pgTable(
+  "petty_cash_receipt_uploads",
+  {
+    id: uuid("id").primaryKey(),
+    actorId: integer("actor_id").notNull().references(() => staffTable.id),
+    sessionHash: text("session_hash").notNull(),
+    objectPath: text("object_path").notNull().unique(),
+    stagingPath: text("staging_path").notNull().unique(),
+    fileName: text("file_name").notNull(),
+    contentType: text("content_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    status: text("status").notNull().default("reserved"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    check("petty_cash_receipt_upload_size_positive", sql`${table.sizeBytes} > 0 AND ${table.sizeBytes} <= 8388608`),
+    check("petty_cash_receipt_upload_status_valid", sql`${table.status} IN ('reserved', 'uploaded', 'attached')`),
+    index("petty_cash_receipt_upload_actor_idx").on(table.actorId, table.createdAt),
+  ],
+);
+
+export const pettyCashReceiptAttachmentsTable = pgTable(
+  "petty_cash_receipt_attachments",
+  {
+    id: uuid("id").primaryKey().references(() => pettyCashReceiptUploadsTable.id),
+    recordId: integer("record_id").notNull().references(() => pettyCashRecordsTable.id),
+    createdById: integer("created_by_id").notNull().references(() => staffTable.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("petty_cash_receipt_attachment_record_id_unique").on(table.recordId, table.id),
+    index("petty_cash_receipt_attachment_record_idx").on(table.recordId, table.createdAt),
+  ],
+);
+
 export const pettyCashExpensesTable = pgTable(
   "petty_cash_expenses",
   {
@@ -125,6 +165,9 @@ export const pettyCashExpensesTable = pgTable(
     description: text("description").notNull(),
     amountCents: integer("amount_cents").notNull(),
     receiptReceived: boolean("receipt_received").notNull().default(false),
+    voucherNumber: text("voucher_number"),
+    receiptAttachmentId: uuid("receipt_attachment_id")
+      .references(() => pettyCashReceiptAttachmentsTable.id),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -179,7 +222,7 @@ export const uniformStockItemsTable = pgTable(
     description: text("description"),
     size: text("size").notNull(),
     currentQuantity: integer("current_quantity").notNull(),
-    reorderLevel: integer("reorder_level").notNull(),
+    reorderLevel: integer("reorder_level").notNull().default(6),
     lastOrderDate: date("last_order_date", { mode: "string" }),
     active: boolean("active").notNull().default(true),
     version: integer("version").notNull().default(1),

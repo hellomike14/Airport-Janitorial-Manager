@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import { actorStaffFromRequest } from "../lib/actorSession";
 
-type StaffRole = "admin" | "supervisor" | "inspector" | "staff";
+type StaffRole = "admin" | "supervisor" | "inspector" | "staff" | "employee_administrator";
 
 /** Requires a verified Clerk session linked to a staff member in an allowed role. */
 export function requireStaffRole(...allowedRoles: StaffRole[]) {

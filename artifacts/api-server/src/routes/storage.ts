@@ -49,6 +49,10 @@ router.post("/storage/uploads/request-url", async (req: Request, res: Response) 
     res.status(401).json({ error: "Login session required" });
     return;
   }
+  if (actor?.role === "employee_administrator" && parsed.data.purpose !== "application_document") {
+    res.status(403).json({ error: "Employee administrators cannot upload operational files" });
+    return;
+  }
 
   try {
     const { name, size, contentType, purpose, taskId, conversationId, issueId, areaId } = parsed.data;
@@ -164,6 +168,11 @@ router.get("/storage/objects/*path", async (req: Request, res: Response) => {
     // downloaded through the dedicated manager-authorized operations route.
     if (objectPath === "/objects/operations-workbooks" ||
         objectPath.startsWith("/objects/operations-workbooks/")) {
+      res.status(404).json({ error: "Object not found" });
+      return;
+    }
+    if (objectPath.startsWith("/objects/petty-cash/receipts/") ||
+        objectPath.startsWith("/objects/petty-cash/receipts-staging/")) {
       res.status(404).json({ error: "Object not found" });
       return;
     }

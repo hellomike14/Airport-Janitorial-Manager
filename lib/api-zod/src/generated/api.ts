@@ -116,7 +116,13 @@ export const LockOperationsConfidentialAccessResponse = zod.object({
 export const ListConfidentialStaffResponseItem = zod.object({
   id: zod.number(),
   name: zod.string(),
-  role: zod.enum(["staff", "supervisor", "admin", "inspector"]),
+  role: zod.enum([
+    "staff",
+    "supervisor",
+    "admin",
+    "inspector",
+    "employee_administrator",
+  ]),
   hasEmail: zod
     .boolean()
     .describe("Whether the staff member has a configured sign-in email."),
@@ -350,7 +356,13 @@ export const HealthCheckResponse = zod.object({
 export const ListStaffResponseItem = zod.object({
   id: zod.number(),
   name: zod.string(),
-  role: zod.enum(["staff", "supervisor", "admin", "inspector"]),
+  role: zod.enum([
+    "staff",
+    "supervisor",
+    "admin",
+    "inspector",
+    "employee_administrator",
+  ]),
   hasEmail: zod
     .boolean()
     .describe("Whether the staff member has a configured sign-in email."),
@@ -384,7 +396,13 @@ export const ListStaffResponse = zod.array(ListStaffResponseItem);
  */
 export const CreateStaffMemberBody = zod.object({
   name: zod.string(),
-  role: zod.enum(["staff", "supervisor", "admin", "inspector"]),
+  role: zod.enum([
+    "staff",
+    "supervisor",
+    "admin",
+    "inspector",
+    "employee_administrator",
+  ]),
   phone: zod.string().nullish(),
   email: zod.string().nullish(),
 });
@@ -395,7 +413,13 @@ export const CreateStaffMemberBody = zod.object({
 export const GetCurrentStaffMemberResponse = zod.object({
   id: zod.number(),
   name: zod.string(),
-  role: zod.enum(["staff", "supervisor", "admin", "inspector"]),
+  role: zod.enum([
+    "staff",
+    "supervisor",
+    "admin",
+    "inspector",
+    "employee_administrator",
+  ]),
   hasEmail: zod
     .boolean()
     .describe("Whether the staff member has a configured sign-in email."),
@@ -429,7 +453,13 @@ export const GetCurrentStaffMemberResponse = zod.object({
 export const ListFormerStaffResponseItem = zod.object({
   id: zod.number(),
   name: zod.string(),
-  role: zod.enum(["staff", "supervisor", "admin", "inspector"]),
+  role: zod.enum([
+    "staff",
+    "supervisor",
+    "admin",
+    "inspector",
+    "employee_administrator",
+  ]),
   hasEmail: zod
     .boolean()
     .describe("Whether the staff member has a configured sign-in email."),
@@ -468,7 +498,13 @@ export const RehireStaffMemberParams = zod.object({
 export const RehireStaffMemberResponse = zod.object({
   id: zod.number(),
   name: zod.string(),
-  role: zod.enum(["staff", "supervisor", "admin", "inspector"]),
+  role: zod.enum([
+    "staff",
+    "supervisor",
+    "admin",
+    "inspector",
+    "employee_administrator",
+  ]),
   hasEmail: zod
     .boolean()
     .describe("Whether the staff member has a configured sign-in email."),
@@ -505,7 +541,15 @@ export const UpdateStaffMemberParams = zod.object({
 
 export const UpdateStaffMemberBody = zod.object({
   name: zod.string().optional(),
-  role: zod.enum(["staff", "supervisor", "admin", "inspector"]).optional(),
+  role: zod
+    .enum([
+      "staff",
+      "supervisor",
+      "admin",
+      "inspector",
+      "employee_administrator",
+    ])
+    .optional(),
   phone: zod.string().nullish(),
   email: zod.string().nullish(),
   active: zod.boolean().optional(),
@@ -514,7 +558,13 @@ export const UpdateStaffMemberBody = zod.object({
 export const UpdateStaffMemberResponse = zod.object({
   id: zod.number(),
   name: zod.string(),
-  role: zod.enum(["staff", "supervisor", "admin", "inspector"]),
+  role: zod.enum([
+    "staff",
+    "supervisor",
+    "admin",
+    "inspector",
+    "employee_administrator",
+  ]),
   hasEmail: zod
     .boolean()
     .describe("Whether the staff member has a configured sign-in email."),
@@ -1863,7 +1913,8 @@ export const UpdateApplicationResponse = zod.object({
 });
 
 /**
- * @summary List standalone employment form submissions (Admin plus confidential code only)
+ * Admin and employee administrators may read the summary. Only Admin can access submitted files.
+ * @summary List standalone employment form review metadata
  */
 export const ListEmploymentFormSubmissionsResponseItem = zod.object({
   id: zod.number(),
@@ -1907,6 +1958,9 @@ export const ListEmploymentFormSubmissionsResponseItem = zod.object({
   email: zod.string(),
   phone: zod.string().nullish(),
   emailStatus: zod.enum(["pending", "sent", "failed"]),
+  reviewStatus: zod.enum(["pending", "reviewed", "needs_follow_up"]),
+  reviewedAt: zod.date().nullable(),
+  reviewedByName: zod.string().nullable(),
   submittedAt: zod.date(),
 });
 export const ListEmploymentFormSubmissionsResponse = zod.array(
@@ -2046,6 +2100,9 @@ export const GetEmploymentFormSubmissionResponse = zod
     email: zod.string(),
     phone: zod.string().nullish(),
     emailStatus: zod.enum(["pending", "sent", "failed"]),
+    reviewStatus: zod.enum(["pending", "reviewed", "needs_follow_up"]),
+    reviewedAt: zod.date().nullable(),
+    reviewedByName: zod.string().nullable(),
     submittedAt: zod.date(),
   })
   .and(
@@ -2060,6 +2117,65 @@ export const GetEmploymentFormSubmissionResponse = zod
       ),
     }),
   );
+
+/**
+ * @summary Update review status without returning submitted files
+ */
+export const UpdateEmploymentFormSubmissionReviewParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateEmploymentFormSubmissionReviewBody = zod.object({
+  reviewStatus: zod.enum(["pending", "reviewed", "needs_follow_up"]),
+});
+
+export const UpdateEmploymentFormSubmissionReviewResponse = zod.object({
+  id: zod.number(),
+  formId: zod.enum([
+    "job-application",
+    "i-9",
+    "w-4",
+    "onboarding-cover",
+    "administrative-checklist",
+    "conditional-offer",
+    "offer-acceptance",
+    "acceptance-receipt",
+    "start-confirmation",
+    "offer-tracking",
+    "emergency-contact",
+    "payroll-setup",
+    "language-accessibility",
+    "uniform-equipment-issue",
+    "site-orientation",
+    "orientation-acknowledgment",
+    "training-attendance",
+    "video-attestation",
+    "knowledge-check",
+    "knowledge-check-guide",
+    "practical-assessment",
+    "buddy-shift",
+    "independent-work-release",
+    "day-7-review",
+    "day-30-review",
+    "day-60-review",
+    "day-90-review",
+    "exception-correction",
+    "badging-checklist",
+    "badge-rules-acknowledgment",
+    "badge-control",
+    "i9-everify-tracker",
+    "training-matrix",
+  ]),
+  firstName: zod.string(),
+  lastName: zod.string(),
+  email: zod.string(),
+  phone: zod.string().nullish(),
+  emailStatus: zod.enum(["pending", "sent", "failed"]),
+  reviewStatus: zod.enum(["pending", "reviewed", "needs_follow_up"]),
+  reviewedAt: zod.date().nullable(),
+  reviewedByName: zod.string().nullable(),
+  submittedAt: zod.date(),
+});
 
 /**
  * @summary Retry email delivery for a standalone form (Admin plus confidential code only)
@@ -2447,6 +2563,10 @@ export const ListInspectorAssignmentsResponse = zod.array(
  */
 export const listPettyCashRecordsResponseExpensesItemOneDescriptionMax = 500;
 
+export const listPettyCashRecordsResponseExpensesItemOneVoucherNumberMax = 100;
+
+export const listPettyCashRecordsResponseExpensesItemTwoReceiptAttachmentOneSizeBytesMax = 8388608;
+
 export const ListPettyCashRecordsResponseItem = zod.object({
   id: zod.number(),
   location: zod.string(),
@@ -2457,6 +2577,15 @@ export const ListPettyCashRecordsResponseItem = zod.object({
   openingFloatApprovedByName: zod.string(),
   openingFloatApprovedAt: zod.date(),
   cashOnHandCents: zod.number(),
+  minimumReserveCents: zod.number().nullish(),
+  targetFloatCents: zod.number().nullish(),
+  reserveStatus: zod
+    .union([
+      zod.enum(["replenishment_required", "minimum_reached", "above_minimum"]),
+      zod.null(),
+    ])
+    .optional(),
+  suggestedTopUpCents: zod.number().nullish(),
   expenses: zod.array(
     zod
       .object({
@@ -2467,10 +2596,36 @@ export const ListPettyCashRecordsResponseItem = zod.object({
           .max(listPettyCashRecordsResponseExpensesItemOneDescriptionMax),
         amountCents: zod.number().min(1),
         receiptReceived: zod.boolean(),
+        voucherNumber: zod
+          .string()
+          .max(listPettyCashRecordsResponseExpensesItemOneVoucherNumberMax)
+          .nullish(),
+        receiptAttachmentId: zod.string().uuid().nullish(),
+        receiptUploadId: zod.string().uuid().nullish(),
       })
       .and(
         zod.object({
           id: zod.number(),
+          receiptAttachment: zod
+            .union([
+              zod.object({
+                id: zod.string().uuid(),
+                fileName: zod.string(),
+                contentType: zod.enum([
+                  "image/jpeg",
+                  "image/png",
+                  "image/webp",
+                ]),
+                sizeBytes: zod
+                  .number()
+                  .min(1)
+                  .max(
+                    listPettyCashRecordsResponseExpensesItemTwoReceiptAttachmentOneSizeBytesMax,
+                  ),
+              }),
+              zod.null(),
+            ])
+            .optional(),
         }),
       ),
   ),
@@ -2483,6 +2638,7 @@ export const ListPettyCashRecordsResponseItem = zod.object({
   managerAcknowledgedByName: zod.string().nullable(),
   managerAcknowledgedAt: zod.date().nullable(),
   reimbursementStatus: zod.enum(["not_submitted", "submitted", "paid"]),
+  reimbursementPaidConfirmed: zod.boolean().nullish(),
   reimbursementAmountCents: zod.number().nullable(),
   reimbursementReference: zod.string().nullable(),
   reimbursementSubmittedOn: zod.date().nullable(),
@@ -2513,6 +2669,8 @@ export const createPettyCashRecordBodyAccountingNotesMax = 2000;
 
 export const createPettyCashRecordBodyExpensesItemDescriptionMax = 500;
 
+export const createPettyCashRecordBodyExpensesItemVoucherNumberMax = 100;
+
 export const CreatePettyCashRecordBody = zod.object({
   location: zod.string().min(1).max(createPettyCashRecordBodyLocationMax),
   custodianId: zod.number().min(1),
@@ -2527,6 +2685,7 @@ export const CreatePettyCashRecordBody = zod.object({
   custodianAcknowledged: zod.boolean(),
   managerAcknowledged: zod.boolean(),
   reimbursementStatus: zod.enum(["not_submitted", "submitted", "paid"]),
+  reimbursementPaidConfirmed: zod.boolean(),
   reimbursementAmountCents: zod
     .number()
     .min(createPettyCashRecordBodyReimbursementAmountCentsMin)
@@ -2550,8 +2709,135 @@ export const CreatePettyCashRecordBody = zod.object({
         .max(createPettyCashRecordBodyExpensesItemDescriptionMax),
       amountCents: zod.number().min(1),
       receiptReceived: zod.boolean(),
+      voucherNumber: zod
+        .string()
+        .max(createPettyCashRecordBodyExpensesItemVoucherNumberMax)
+        .nullish(),
+      receiptAttachmentId: zod.string().uuid().nullish(),
+      receiptUploadId: zod.string().uuid().nullish(),
     }),
   ),
+});
+
+/**
+ * @summary Summarize Petty Cash records grouped by reconciliation record month
+ */
+export const getPettyCashMonthlyReportQueryMonthRegExp = new RegExp(
+  "^[0-9]{4}-(0[1-9]|1[0-2])$",
+);
+
+export const GetPettyCashMonthlyReportQueryParams = zod.object({
+  month: zod.coerce.string().regex(getPettyCashMonthlyReportQueryMonthRegExp),
+});
+
+export const getPettyCashMonthlyReportResponseMonthRegExp = new RegExp(
+  "^[0-9]{4}-(0[1-9]|1[0-2])$",
+);
+export const getPettyCashMonthlyReportResponseRecordCountMin = 0;
+
+export const getPettyCashMonthlyReportResponseExpenseTotalCentsMin = 0;
+
+export const getPettyCashMonthlyReportResponseConfirmedPaidReimbursementsCentsMin = 0;
+
+export const getPettyCashMonthlyReportResponseCashOnHandCentsMin = 0;
+
+export const getPettyCashMonthlyReportResponseMinimumReserveCentsMin = 0;
+
+export const getPettyCashMonthlyReportResponseTargetFloatCentsMin = 0;
+
+export const getPettyCashMonthlyReportResponseSuggestedTopUpCentsMin = 0;
+
+export const GetPettyCashMonthlyReportResponse = zod.object({
+  month: zod.string().regex(getPettyCashMonthlyReportResponseMonthRegExp),
+  recordCount: zod
+    .number()
+    .min(getPettyCashMonthlyReportResponseRecordCountMin),
+  expenseTotalCents: zod
+    .number()
+    .min(getPettyCashMonthlyReportResponseExpenseTotalCentsMin),
+  confirmedPaidReimbursementsCents: zod
+    .number()
+    .min(getPettyCashMonthlyReportResponseConfirmedPaidReimbursementsCentsMin),
+  latestRecordDate: zod.date().nullable(),
+  cashOnHandCents: zod
+    .number()
+    .min(getPettyCashMonthlyReportResponseCashOnHandCentsMin)
+    .nullable(),
+  minimumReserveCents: zod
+    .number()
+    .min(getPettyCashMonthlyReportResponseMinimumReserveCentsMin)
+    .nullable(),
+  targetFloatCents: zod
+    .number()
+    .min(getPettyCashMonthlyReportResponseTargetFloatCentsMin)
+    .nullable(),
+  reserveStatus: zod.union([
+    zod.enum(["replenishment_required", "minimum_reached", "above_minimum"]),
+    zod.null(),
+  ]),
+  suggestedTopUpCents: zod
+    .number()
+    .min(getPettyCashMonthlyReportResponseSuggestedTopUpCentsMin)
+    .nullable(),
+});
+
+/**
+ * @summary Create a short-lived private receipt-photo upload reservation
+ */
+export const reservePettyCashReceiptUploadBodyFileNameMax = 180;
+
+export const reservePettyCashReceiptUploadBodySizeBytesMax = 8388608;
+
+export const ReservePettyCashReceiptUploadBody = zod.object({
+  fileName: zod
+    .string()
+    .min(1)
+    .max(reservePettyCashReceiptUploadBodyFileNameMax),
+  contentType: zod.enum(["image/jpeg", "image/png", "image/webp"]),
+  sizeBytes: zod
+    .number()
+    .min(1)
+    .max(reservePettyCashReceiptUploadBodySizeBytesMax),
+});
+
+/**
+ * @summary Remove a draft receipt image that has not been attached to a reconciliation
+ */
+export const DeletePettyCashReceiptDraftParams = zod.object({
+  uploadId: zod.coerce.string().uuid(),
+});
+
+/**
+ * @summary Validate and finalize a private receipt image
+ */
+export const CompletePettyCashReceiptUploadParams = zod.object({
+  uploadId: zod.coerce.string().uuid(),
+});
+
+export const completePettyCashReceiptUploadResponseSizeBytesMax = 8388608;
+
+export const CompletePettyCashReceiptUploadResponse = zod.object({
+  id: zod.string().uuid(),
+  fileName: zod.string(),
+  contentType: zod.enum(["image/jpeg", "image/png", "image/webp"]),
+  sizeBytes: zod
+    .number()
+    .min(1)
+    .max(completePettyCashReceiptUploadResponseSizeBytesMax),
+});
+
+/**
+ * @summary View a private receipt attached to a protected reconciliation
+ */
+export const PreviewPettyCashReceiptParams = zod.object({
+  attachmentId: zod.coerce.string().uuid(),
+});
+
+/**
+ * @summary Download a private receipt attached to a protected reconciliation
+ */
+export const DownloadPettyCashReceiptParams = zod.object({
+  attachmentId: zod.coerce.string().uuid(),
 });
 
 /**
@@ -2576,6 +2862,8 @@ export const updatePettyCashRecordBodyOneAccountingNotesMax = 2000;
 
 export const updatePettyCashRecordBodyOneExpensesItemDescriptionMax = 500;
 
+export const updatePettyCashRecordBodyOneExpensesItemVoucherNumberMax = 100;
+
 export const UpdatePettyCashRecordBody = zod
   .object({
     location: zod.string().min(1).max(updatePettyCashRecordBodyOneLocationMax),
@@ -2591,6 +2879,7 @@ export const UpdatePettyCashRecordBody = zod
     custodianAcknowledged: zod.boolean(),
     managerAcknowledged: zod.boolean(),
     reimbursementStatus: zod.enum(["not_submitted", "submitted", "paid"]),
+    reimbursementPaidConfirmed: zod.boolean(),
     reimbursementAmountCents: zod
       .number()
       .min(updatePettyCashRecordBodyOneReimbursementAmountCentsMin)
@@ -2614,6 +2903,12 @@ export const UpdatePettyCashRecordBody = zod
           .max(updatePettyCashRecordBodyOneExpensesItemDescriptionMax),
         amountCents: zod.number().min(1),
         receiptReceived: zod.boolean(),
+        voucherNumber: zod
+          .string()
+          .max(updatePettyCashRecordBodyOneExpensesItemVoucherNumberMax)
+          .nullish(),
+        receiptAttachmentId: zod.string().uuid().nullish(),
+        receiptUploadId: zod.string().uuid().nullish(),
       }),
     ),
   })
@@ -2625,6 +2920,10 @@ export const UpdatePettyCashRecordBody = zod
 
 export const updatePettyCashRecordResponseExpensesItemOneDescriptionMax = 500;
 
+export const updatePettyCashRecordResponseExpensesItemOneVoucherNumberMax = 100;
+
+export const updatePettyCashRecordResponseExpensesItemTwoReceiptAttachmentOneSizeBytesMax = 8388608;
+
 export const UpdatePettyCashRecordResponse = zod.object({
   id: zod.number(),
   location: zod.string(),
@@ -2635,6 +2934,15 @@ export const UpdatePettyCashRecordResponse = zod.object({
   openingFloatApprovedByName: zod.string(),
   openingFloatApprovedAt: zod.date(),
   cashOnHandCents: zod.number(),
+  minimumReserveCents: zod.number().nullish(),
+  targetFloatCents: zod.number().nullish(),
+  reserveStatus: zod
+    .union([
+      zod.enum(["replenishment_required", "minimum_reached", "above_minimum"]),
+      zod.null(),
+    ])
+    .optional(),
+  suggestedTopUpCents: zod.number().nullish(),
   expenses: zod.array(
     zod
       .object({
@@ -2645,10 +2953,36 @@ export const UpdatePettyCashRecordResponse = zod.object({
           .max(updatePettyCashRecordResponseExpensesItemOneDescriptionMax),
         amountCents: zod.number().min(1),
         receiptReceived: zod.boolean(),
+        voucherNumber: zod
+          .string()
+          .max(updatePettyCashRecordResponseExpensesItemOneVoucherNumberMax)
+          .nullish(),
+        receiptAttachmentId: zod.string().uuid().nullish(),
+        receiptUploadId: zod.string().uuid().nullish(),
       })
       .and(
         zod.object({
           id: zod.number(),
+          receiptAttachment: zod
+            .union([
+              zod.object({
+                id: zod.string().uuid(),
+                fileName: zod.string(),
+                contentType: zod.enum([
+                  "image/jpeg",
+                  "image/png",
+                  "image/webp",
+                ]),
+                sizeBytes: zod
+                  .number()
+                  .min(1)
+                  .max(
+                    updatePettyCashRecordResponseExpensesItemTwoReceiptAttachmentOneSizeBytesMax,
+                  ),
+              }),
+              zod.null(),
+            ])
+            .optional(),
         }),
       ),
   ),
@@ -2661,6 +2995,7 @@ export const UpdatePettyCashRecordResponse = zod.object({
   managerAcknowledgedByName: zod.string().nullable(),
   managerAcknowledgedAt: zod.date().nullable(),
   reimbursementStatus: zod.enum(["not_submitted", "submitted", "paid"]),
+  reimbursementPaidConfirmed: zod.boolean().nullish(),
   reimbursementAmountCents: zod.number().nullable(),
   reimbursementReference: zod.string().nullable(),
   reimbursementSubmittedOn: zod.date().nullable(),
@@ -2737,6 +3072,7 @@ export const createUniformStockItemBodyOpeningQuantityMin = 0;
 
 export const createUniformStockItemBodyOpeningReasonMax = 1000;
 
+export const createUniformStockItemBodyReorderLevelDefault = 6;
 export const createUniformStockItemBodyReorderLevelMin = 0;
 
 export const CreateUniformStockItemBody = zod.object({
@@ -2754,7 +3090,10 @@ export const CreateUniformStockItemBody = zod.object({
     .string()
     .min(1)
     .max(createUniformStockItemBodyOpeningReasonMax),
-  reorderLevel: zod.number().min(createUniformStockItemBodyReorderLevelMin),
+  reorderLevel: zod
+    .number()
+    .min(createUniformStockItemBodyReorderLevelMin)
+    .default(createUniformStockItemBodyReorderLevelDefault),
   lastOrderDate: zod.date().nullish(),
 });
 

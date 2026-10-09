@@ -40,8 +40,8 @@ function recordEmailOutcome(
 
 export function createOnboardingProtocolRouter(
   storage: OnboardingProtocolStorage = new ObjectStorageService(),
-  authorize: RequestHandler = requireStaffRole("admin", "supervisor", "staff", "inspector"),
-  authorizeEmail: RequestHandler = requireStaffRole("admin", "supervisor", "staff", "inspector"),
+  authorize: RequestHandler = requireStaffRole("admin", "supervisor", "staff", "inspector", "employee_administrator"),
+  authorizeEmail: RequestHandler = requireStaffRole("admin", "supervisor", "staff", "inspector", "employee_administrator"),
   sendEmail: EmploymentEmailSender = sendEmploymentFormEmail,
 ): IRouter {
   const router = Router();

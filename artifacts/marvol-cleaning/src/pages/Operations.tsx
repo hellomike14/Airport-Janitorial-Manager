@@ -99,6 +99,9 @@ function useAction() {
 }
 function useOptions() {
   const { currentUser, effectiveRole } = useAuth();
+  const access = useOperations<{
+    managerOperations: boolean;
+  }>("/access");
   const fetchList = async <T,>(url: string): Promise<T[]> => {
     const r = await fetch(url, { credentials: "same-origin" });
     if (!r.ok) throw new Error("Unable to load options");
@@ -111,7 +114,8 @@ function useOptions() {
   const staff = useQuery({
     queryKey: ["operations-options", currentUser?.id, "staff"],
     queryFn: () => fetchList<StaffOption>("/api/operations/staff-options"),
-    enabled: effectiveRole === "admin" || effectiveRole === "supervisor",
+    enabled: access.data?.managerOperations === true &&
+      (effectiveRole === "admin" || effectiveRole === "supervisor"),
   });
   return { areas: areas.data ?? [], staff: staff.data ?? [] };
 }
@@ -1634,25 +1638,35 @@ function WorkbookDownloadPanel({ kind }: { kind: "petty-cash" | "uniform" }) {
 }
 
 export default function Operations() {
-  const { effectiveRole } = useAuth();
-  const manager = effectiveRole === "admin" || effectiveRole === "supervisor",
-    admin = effectiveRole === "admin";
+  const { currentUser, effectiveRole } = useAuth();
+  const access = useOperations<{
+    admin: boolean;
+    managerOperations: boolean;
+    selfTime: boolean;
+    allTimesheets: boolean;
+  }>("/access");
+  const admin = access.data?.admin ?? currentUser?.role === "admin";
+  const manager = access.data?.managerOperations ?? admin;
   const tabs = manager
     ? [
-        "Time & payroll",
-        "Safety",
-        "Supplies",
-        "Quality",
-        "Readiness",
-        "Monthly report",
-        "Petty Cash",
-        "Uniform Stock",
+        { id: "time", label: admin ? "Time & payroll" : "My time" },
+        { id: "safety", label: "Safety" },
+        { id: "supplies", label: "Supplies" },
+        { id: "quality", label: "Quality" },
+        { id: "readiness", label: "Readiness" },
+        ...(admin ? [{ id: "monthly", label: "Monthly report" }] : []),
+        { id: "petty-cash", label: "Petty Cash" },
+        { id: "uniform-stock", label: "Uniform Stock" },
       ]
-    : ["My time", "Safety", "Supplies"];
-  const [tab, setTab] = useState(0);
+    : [
+        { id: "time", label: "My time" },
+        { id: "safety", label: "Safety" },
+        { id: "supplies", label: "Supplies" },
+      ];
+  const [tab, setTab] = useState("time");
   useEffect(() => {
-    setTab(0);
-  }, [effectiveRole]);
+    setTab("time");
+  }, [effectiveRole, manager]);
   return (
     <div className="space-y-6">
       <div className="print:hidden">
@@ -1666,32 +1680,32 @@ export default function Operations() {
         role="tablist"
         aria-label="Operations sections"
       >
-        {tabs.map((label, i) => (
+        {tabs.map((item) => (
           <Button
-            key={label}
+            key={item.id}
             role="tab"
-            aria-selected={tab === i}
-            variant={tab === i ? "default" : "outline"}
-            onClick={() => setTab(i)}
+            aria-selected={tab === item.id}
+            variant={tab === item.id ? "default" : "outline"}
+            onClick={() => setTab(item.id)}
           >
-            {label}
+            {item.label}
           </Button>
         ))}
       </div>
       <div role="tabpanel">
-        {tab === 0 && <TimePanel manager={manager} admin={admin} />}
-        {tab === 1 && <SafetyPanel manager={manager} admin={admin} />}
-        {tab === 2 && <SuppliesPanel manager={manager} />}
-        {manager && tab === 3 && <QualityPanel admin={admin} />}
-        {manager && tab === 4 && <ReadinessPanel admin={admin} />}
-        {manager && tab === 5 && <MonthlyPanel admin={admin} />}
-        {manager && tab === 6 && (
+        {tab === "time" && <TimePanel manager={admin} admin={admin} />}
+        {tab === "safety" && <SafetyPanel manager={manager} admin={admin} />}
+        {tab === "supplies" && <SuppliesPanel manager={manager} />}
+        {manager && tab === "quality" && <QualityPanel admin={admin} />}
+        {manager && tab === "readiness" && <ReadinessPanel admin={admin} />}
+        {admin && tab === "monthly" && <MonthlyPanel admin={admin} />}
+        {manager && tab === "petty-cash" && (
           <OperationsConfidentialBoundary>
             <PettyCashPanel />
             <WorkbookDownloadPanel kind="petty-cash" />
           </OperationsConfidentialBoundary>
         )}
-        {manager && tab === 7 && (
+        {manager && tab === "uniform-stock" && (
           <OperationsConfidentialBoundary>
             <UniformStockPanel />
             <WorkbookDownloadPanel kind="uniform" />

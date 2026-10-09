@@ -8,6 +8,7 @@ import { FormsTab } from "./employment/FormsTab";
 import { useAuth } from "@/contexts/AuthContext";
 import { ConfidentialBoundary } from "@/components/confidential/ConfidentialBoundary";
 import { EmploymentFormSubmissionsTab } from "./employment/EmploymentFormSubmissionsTab";
+import { EmploymentFormReviewMetadataTab } from "./employment/EmploymentFormReviewMetadataTab";
 import IdentityDocuments from "./employment/IdentityDocuments";
 
 type Tab = "applications" | "onboarding" | "forms" | "submitted-forms" | "quickbooks";
@@ -24,7 +25,9 @@ export default function Employment() {
   const { effectiveRole } = useAuth();
   const allowedTabs: Tab[] = effectiveRole === "admin"
     ? ["applications", "onboarding", "forms", "submitted-forms", "quickbooks"]
-    : effectiveRole ? ["onboarding", "forms"] : ["onboarding"];
+    : effectiveRole === "employee_administrator"
+      ? ["onboarding", "forms", "submitted-forms"]
+      : effectiveRole ? ["onboarding", "forms"] : ["onboarding"];
   const [tab, setTab] = useState<Tab>(() => getInitialTab());
   const activeTab = allowedTabs.includes(tab) ? tab : "onboarding";
 
@@ -86,6 +89,9 @@ export default function Employment() {
             <IdentityDocuments />
           </div>
         </ConfidentialBoundary>
+      )}
+      {effectiveRole === "employee_administrator" && activeTab === "submitted-forms" && (
+        <EmploymentFormReviewMetadataTab />
       )}
       {effectiveRole === "admin" && activeTab === "quickbooks" && <QuickBooksTab />}
     </div>

@@ -176,7 +176,7 @@ function ProtectedRoutes() {
     <AppLayout>
       {effectiveRole === "staff" && <OfflineBanner />}
       <Switch>
-        {effectiveRole !== "inspector" && <Route path="/operations" component={Operations} />}
+        {effectiveRole !== "inspector" && effectiveRole !== "employee_administrator" && <Route path="/operations" component={Operations} />}
         {/* Admin-only routes */}
         {effectiveRole === "admin" && (
           <>
@@ -215,6 +215,16 @@ function ProtectedRoutes() {
             <Route path="/staff" component={Staff} />
             <Route path="/employment" component={Employment} />
             <Route path="/messages" component={Messages} />
+          </>
+        )}
+
+        {/* Employee administrators can manage ordinary staff and employment records only. */}
+        {effectiveRole === "employee_administrator" && (
+          <>
+            <Route path="/staff" component={Staff} />
+            <Route path="/employment" component={Employment} />
+            <Route path="/"><Redirect to="/staff" /></Route>
+            <Route><Redirect to="/staff" /></Route>
           </>
         )}
 

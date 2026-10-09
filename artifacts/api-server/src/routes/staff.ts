@@ -11,6 +11,7 @@ import {
 import { actorStaffFromRequest, resolveStaffIdentity } from "../lib/actorSession";
 import { requireStaffRole } from "../middlewares/requireStaffRole";
 import { loginEnabledAfterAdminUpdate } from "../lib/staffLoginPolicy";
+import { employeeAdministratorCanCreateRole, employeeAdministratorCanUpdateTarget } from "../lib/employeeAdministratorPolicy";
 import { getAuth } from "@clerk/express";
 import {
   accessChangeValues,
@@ -34,16 +35,22 @@ function toPublicStaff(staff: typeof staffTable.$inferSelect) {
   };
 }
 
-router.get("/", async (req, res) => {
+router.get("/", requireStaffRole("admin", "supervisor", "staff", "inspector", "employee_administrator"), async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
+  const actor = await actorStaffFromRequest(req);
   const staff = await db
     .select()
     .from(staffTable)
     .where(eq(staffTable.active, true))
     .orderBy(staffTable.role, staffTable.name);
+  if (actor?.role === "employee_administrator") {
+    return res.json(staff
+      .filter(person => person.role === "staff" && !person.formerEmployee)
+      .map(person => ({ ...toPublicStaff(person), email: person.email, phone: person.phone })));
+  }
   // Operational selectors never need private contact details, even when an
   // administrator happens to be unlocked in another part of the app.
-  res.json(staff.map(toPublicStaff));
+  return res.json(staff.map(toPublicStaff));
 });
 
 router.get("/confidential", requireStaffRole("admin"), async (_req, res) => {
@@ -98,10 +105,13 @@ async function emailTakenByOther(email: string, excludeId?: number): Promise<boo
   return !!existing;
 }
 
-router.post("/", requireStaffRole("admin"), async (req, res) => {
+router.post("/", requireStaffRole("admin", "employee_administrator"), async (req, res) => {
   const actor = await actorStaffFromRequest(req);
   if (!actor) return res.status(401).json({ error: "Login session required" });
   const body = CreateStaffMemberBody.parse(req.body);
+  if (actor.role === "employee_administrator" && !employeeAdministratorCanCreateRole(body.role)) {
+    return res.status(403).json({ error: "Employee administrators may create ordinary staff only" });
+  }
   const email = body.email?.trim();
   if (!email) {
     res.status(400).json({ error: "Email is required — staff sign in with their email account" });
@@ -131,16 +141,23 @@ router.post("/", requireStaffRole("admin"), async (req, res) => {
   return res.status(201).json(toPublicStaff(created));
 });
 
-router.put("/:id", requireStaffRole("admin"), async (req, res) => {
+router.put("/:id", requireStaffRole("admin", "employee_administrator"), async (req, res) => {
   const actor = await actorStaffFromRequest(req);
   if (!actor) return res.status(401).json({ error: "Login session required" });
   const { id } = UpdateStaffMemberParams.parse({ id: req.params.id });
   const body = UpdateStaffMemberBody.parse(req.body);
+  if (actor.role === "employee_administrator" && (actor.id === id || body.role !== undefined)) {
+    return res.status(403).json({ error: "Employee administrators cannot change their own access or assign roles" });
+  }
   const result = await db.transaction(async tx => {
     const [before] = await tx.select().from(staffTable)
       .where(eq(staffTable.id, id))
       .for("update");
     if (!before) return { status: "not_found" as const };
+    if (actor.role === "employee_administrator" &&
+        !employeeAdministratorCanUpdateTarget(actor.id, before, body.role)) {
+      return { status: "forbidden" as const };
+    }
     if (before.formerEmployee && (body.active === true || (body.name !== undefined && body.name !== before.name))) {
       return { status: "former" as const };
     }
@@ -182,6 +199,7 @@ router.put("/:id", requireStaffRole("admin"), async (req, res) => {
     return { status: "updated" as const, staff };
   });
   if (result.status === "not_found") return res.status(404).json({ error: "Staff member not found" });
+  if (result.status === "forbidden") return res.status(403).json({ error: "Employee administrators may update ordinary staff only" });
   if (result.status === "former") return res.status(403).json({ error: "Former staff records cannot be renamed or reactivated" });
   if (result.status === "email_taken") return res.status(409).json({ error: "Another active staff member already uses this email" });
   return res.json(toPublicStaff(result.staff));

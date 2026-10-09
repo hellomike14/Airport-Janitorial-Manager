@@ -1,5 +1,6 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { Router, type IRouter, type Request, type RequestHandler, type Response } from "express";
+import { z } from "zod";
 import {
   EmailEmploymentFormSubmissionPdfBody,
   EmailEmploymentFormSubmissionPdfParams,
@@ -12,10 +13,12 @@ import { db } from "@workspace/db";
 import {
   employmentFormSubmissionsTable,
   objectUploadsTable,
+  staffTable,
   type EmploymentFormId,
   type EmploymentFormAttachment,
 } from "@workspace/db/schema";
 import { requireStaffRole } from "../middlewares/requireStaffRole";
+import { actorStaffFromRequest } from "../lib/actorSession";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { getOnboardingFormTemplate } from "../lib/onboardingFormAssets";
 import {
@@ -38,6 +41,7 @@ type RouterDependencies = {
   readObjectBytes: (path: string, maxBytes: number) => Promise<{ bytes: Buffer; sizeBytes: number; contentType: string }>;
   sendEmail: EmploymentEmailSender;
   authorizeAdmin: RequestHandler;
+  authorizeReview: RequestHandler;
 };
 
 const defaultDependencies: RouterDependencies = {
@@ -46,6 +50,7 @@ const defaultDependencies: RouterDependencies = {
   readObjectBytes: (path, maxBytes) => storage.readObjectEntityBytes(path, maxBytes),
   sendEmail: sendEmploymentFormEmail,
   authorizeAdmin: requireStaffRole("admin"),
+  authorizeReview: requireStaffRole("admin", "employee_administrator"),
 };
 
 function formLabel(formId: EmploymentFormId): string {
@@ -269,7 +274,7 @@ export function createEmploymentFormSubmissionsRouter(
     res.status(201).json({ success: true, emailSent });
   });
 
-  router.get("/", deps.authorizeAdmin, async (req: Request, res: Response): Promise<void> => {
+  router.get("/", deps.authorizeReview, async (req: Request, res: Response): Promise<void> => {
     res.setHeader("Cache-Control", "private, no-store");
     const rows = await db.select({
       id: employmentFormSubmissionsTable.id,
@@ -279,9 +284,58 @@ export function createEmploymentFormSubmissionsRouter(
       email: employmentFormSubmissionsTable.email,
       phone: employmentFormSubmissionsTable.phone,
       emailStatus: employmentFormSubmissionsTable.emailStatus,
+      reviewStatus: employmentFormSubmissionsTable.reviewStatus,
+      reviewedAt: employmentFormSubmissionsTable.reviewedAt,
+      reviewedByName: staffTable.name,
       submittedAt: employmentFormSubmissionsTable.submittedAt,
-    }).from(employmentFormSubmissionsTable).orderBy(desc(employmentFormSubmissionsTable.submittedAt));
+    }).from(employmentFormSubmissionsTable)
+      .leftJoin(staffTable, eq(employmentFormSubmissionsTable.reviewedById, staffTable.id))
+      .orderBy(desc(employmentFormSubmissionsTable.submittedAt));
     res.json(ListEmploymentFormSubmissionsResponse.parse(rows));
+  });
+
+  router.patch("/:id/review", deps.authorizeReview, async (req: Request, res: Response): Promise<void> => {
+    res.setHeader("Cache-Control", "private, no-store");
+    const id = Number(req.params.id);
+    const body = z.object({
+      reviewStatus: z.enum(["pending", "reviewed", "needs_follow_up"]),
+    }).strict().safeParse(req.body);
+    if (!Number.isSafeInteger(id) || id <= 0 || !body.success) {
+      res.status(400).json({ error: "Invalid submission id or review status" });
+      return;
+    }
+    const actor = await actorStaffFromRequest(req);
+    if (!actor) {
+      res.status(401).json({ error: "Login session required" });
+      return;
+    }
+    const [updated] = await db.update(employmentFormSubmissionsTable).set({
+      reviewStatus: body.data.reviewStatus,
+      reviewedById: body.data.reviewStatus === "pending" ? null : actor.id,
+      reviewedAt: body.data.reviewStatus === "pending" ? null : new Date(),
+    }).where(eq(employmentFormSubmissionsTable.id, id))
+      .returning({ id: employmentFormSubmissionsTable.id });
+    if (!updated) {
+      res.status(404).json({ error: "Submission not found" });
+      return;
+    }
+    const [summary] = await db.select({
+      id: employmentFormSubmissionsTable.id,
+      formId: employmentFormSubmissionsTable.formId,
+      firstName: employmentFormSubmissionsTable.firstName,
+      lastName: employmentFormSubmissionsTable.lastName,
+      email: employmentFormSubmissionsTable.email,
+      phone: employmentFormSubmissionsTable.phone,
+      emailStatus: employmentFormSubmissionsTable.emailStatus,
+      reviewStatus: employmentFormSubmissionsTable.reviewStatus,
+      reviewedAt: employmentFormSubmissionsTable.reviewedAt,
+      reviewedByName: staffTable.name,
+      submittedAt: employmentFormSubmissionsTable.submittedAt,
+    }).from(employmentFormSubmissionsTable)
+      .leftJoin(staffTable, eq(employmentFormSubmissionsTable.reviewedById, staffTable.id))
+      .where(eq(employmentFormSubmissionsTable.id, id))
+      .limit(1);
+    res.json(ListEmploymentFormSubmissionsResponse.parse([summary])[0]);
   });
 
   router.get("/:id", deps.authorizeAdmin, async (req: Request, res: Response): Promise<void> => {

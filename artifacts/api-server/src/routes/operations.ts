@@ -38,9 +38,11 @@ import {
 import { getEffectiveTasksForArea } from "../lib/ensureTasksForDate";
 import { buildMonthlyReport } from "../lib/monthlyOperationsReport";
 import { lockScheduleWrites } from "../lib/scheduleLocks";
+import { isOperationsManager, confidentialIdentity } from "../lib/confidentialAccess";
+import { requireOperationsManager } from "../middlewares/requireOperationsManager";
 
 const router: IRouter = Router();
-const manager = requireStaffRole("admin", "supervisor");
+const manager = requireOperationsManager;
 const admin = requireStaffRole("admin");
 const date = z.string().refine(validDate, "Invalid calendar date");
 const id = z.coerce.number().int().positive();
@@ -57,7 +59,6 @@ const range = z
       d.from <= d.to && Date.parse(d.to) - Date.parse(d.from) <= 93 * 86400000,
     "Use a date range of at most 93 days",
   );
-const isManager = (role: string) => role === "admin" || role === "supervisor";
 
 router.use(requireStaffRole("admin", "supervisor", "staff"));
 router.use((_req, res, next) => {
@@ -78,6 +79,17 @@ router.get("/staff-options", manager, async (_req, res) => {
       .from(staffTable)
       .orderBy(staffTable.name),
   );
+});
+
+router.get("/access", async (req, res) => {
+  const identity = await confidentialIdentity(req);
+  const admin = identity?.role === "admin";
+  res.json({
+    admin,
+    managerOperations: identity ? isOperationsManager(identity) : false,
+    selfTime: Boolean(identity),
+    allTimesheets: admin,
+  });
 });
 
 router.get("/settings", async (_req, res) => {
@@ -134,7 +146,7 @@ router.get("/time", async (req, res) => {
       and(
         gte(timeEntriesTable.workDate, dates.data.from),
         lte(timeEntriesTable.workDate, dates.data.to),
-        isManager(actor.role)
+        actor.role === "admin"
           ? undefined
           : eq(timeEntriesTable.staffId, actor.id),
       ),
@@ -261,7 +273,7 @@ router.post("/time/clock-out", async (req, res) => {
     return res.status(400).json({ error: "Unpaid break exceeds time worked" });
   return res.json(entry);
 });
-router.patch("/time/:id/correct", manager, async (req, res) => {
+router.patch("/time/:id/correct", admin, async (req, res) => {
   const entryId = id.safeParse(req.params.id);
   const body = z
     .object({
@@ -342,7 +354,7 @@ router.patch("/time/:id/correct", manager, async (req, res) => {
       .json({ error: "Correction overlaps another time entry" });
   return res.json(result);
 });
-router.post("/time/:id/approve", manager, async (req, res) => {
+router.post("/time/:id/approve", admin, async (req, res) => {
   const entryId = id.safeParse(req.params.id);
   if (!entryId.success)
     return res.status(400).json({ error: "Invalid entry id" });
@@ -448,7 +460,7 @@ router.get("/badges", async (req, res) => {
     .from(staffBadgesTable)
     .innerJoin(staffTable, eq(staffBadgesTable.staffId, staffTable.id))
     .where(
-      isManager(actor.role)
+      isOperationsManager({ role: actor.role, staffId: actor.id })
         ? undefined
         : eq(staffBadgesTable.staffId, actor.id),
     );
@@ -508,7 +520,7 @@ router.get("/incidents", async (req, res) => {
     .innerJoin(staffTable, eq(incidentsTable.reportedById, staffTable.id))
     .innerJoin(areasTable, eq(incidentsTable.areaId, areasTable.id))
     .where(
-      isManager(actor.role)
+      isOperationsManager({ role: actor.role, staffId: actor.id })
         ? undefined
         : eq(incidentsTable.reportedById, actor.id),
     )
@@ -693,7 +705,7 @@ router.get("/supply-requests", async (req, res) => {
     )
     .innerJoin(staffTable, eq(supplyRequestsTable.staffId, staffTable.id))
     .where(
-      isManager(actor.role)
+      isOperationsManager({ role: actor.role, staffId: actor.id })
         ? undefined
         : eq(supplyRequestsTable.staffId, actor.id),
     )
@@ -908,7 +920,7 @@ router.post("/inspections", manager, async (req, res) => {
   return res.status(201).json(inspection);
 });
 
-router.get("/monthly-report/:month", manager, async (req, res) => {
+router.get("/monthly-report/:month", admin, async (req, res) => {
   const month = z
     .string()
     .regex(/^\d{4}-(0[1-9]|1[0-2])$/)

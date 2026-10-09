@@ -22,6 +22,9 @@ vi.mock("./employment/QuickBooksTab", () => ({
 vi.mock("./employment/EmploymentFormSubmissionsTab", () => ({
   EmploymentFormSubmissionsTab: () => <div data-testid="submitted-forms-panel" />,
 }));
+vi.mock("./employment/EmploymentFormReviewMetadataTab", () => ({
+  EmploymentFormReviewMetadataTab: () => <div data-testid="employee-form-review-metadata" />,
+}));
 
 beforeEach(() => {
   actor.effectiveRole = "admin";
@@ -67,8 +70,8 @@ test("all signed-in roles can open blank Forms without seeing Admin submissions 
   }
 });
 
-test("all active staff roles, including inspectors, can open Onboarding and see their own training", () => {
-  for (const role of ["admin", "supervisor", "staff", "inspector"]) {
+test("all active staff roles, including inspectors and employee administrators, can open Onboarding and see their own training", () => {
+  for (const role of ["admin", "supervisor", "staff", "inspector", "employee_administrator"]) {
     cleanup();
     actor.effectiveRole = role;
     window.history.replaceState(null, "", "/employment?tab=onboarding");
@@ -78,6 +81,17 @@ test("all active staff roles, including inspectors, can open Onboarding and see 
     expect(screen.getByTestId("onboarding-panel")).toBeTruthy();
     expect(screen.getByTestId("employee-training-panel")).toBeTruthy();
   }
+});
+
+test("employee administrators see review metadata only, not submitted files or identity documents", () => {
+  actor.effectiveRole = "employee_administrator";
+  window.history.replaceState(null, "", "/employment?tab=submitted-forms");
+  render(<Employment />);
+  expect(screen.getByTestId("employee-form-review-metadata")).toBeTruthy();
+  expect(screen.queryByTestId("submitted-forms-panel")).toBeNull();
+  expect(screen.queryByTestId("identity-documents")).toBeNull();
+  expect(screen.queryByTestId("employment-tab-applications")).toBeNull();
+  expect(screen.queryByTestId("employment-tab-quickbooks")).toBeNull();
 });
 
 test("admins keep completed-form review and identity photos in a separate confidential tab", () => {

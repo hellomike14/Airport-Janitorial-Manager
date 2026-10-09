@@ -7,8 +7,10 @@ import {
   UpdateOnboardingItemBody,
 } from "@workspace/api-zod";
 import { eq, asc, desc } from "drizzle-orm";
+import { requireStaffRole } from "../middlewares/requireStaffRole";
 
 const router: IRouter = Router();
+router.use(requireStaffRole("admin", "supervisor", "employee_administrator"));
 
 type DefaultItem = {
   category: "step" | "document" | "training" | "walkthrough";

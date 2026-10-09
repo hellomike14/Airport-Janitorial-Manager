@@ -8,7 +8,7 @@ export const staffTable = pgTable(
   {
     id: serial("id").primaryKey(),
     name: text("name").notNull(),
-    role: text("role", { enum: ["staff", "supervisor", "admin", "inspector"] }).notNull().default("staff"),
+    role: text("role", { enum: ["staff", "supervisor", "admin", "inspector", "employee_administrator"] }).notNull().default("staff"),
     phone: text("phone"),
     // Join key between the Clerk account and the staff record — must be
     // unique (case-insensitive) among active staff; see partial index below.

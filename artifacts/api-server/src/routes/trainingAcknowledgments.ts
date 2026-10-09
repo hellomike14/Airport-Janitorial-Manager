@@ -19,7 +19,7 @@ import {
 } from "../lib/trainingPolicy";
 
 const router: IRouter = Router();
-router.use(requireStaffRole("admin", "supervisor", "staff", "inspector"));
+router.use(requireStaffRole("admin", "supervisor", "staff", "inspector", "employee_administrator"));
 const target = (staffId: number) => and(eq(trainingProgressTable.staffId, staffId),
   eq(trainingProgressTable.version, employeeTraining.version));
 const publicTraining = {
@@ -131,7 +131,7 @@ router.post("/acknowledgment", async (req, res) => {
   res.json(await ownStatus(actor.id, actor.name));
 });
 
-router.get("/review", requireStaffRole("admin", "supervisor"), async (_req, res) => {
+router.get("/review", requireStaffRole("admin", "supervisor", "employee_administrator"), async (_req, res) => {
   const [people, progress, history] = await Promise.all([
     db.select({ staffId: staffTable.id, name: staffTable.name, active: staffTable.active,
       formerEmployee: staffTable.formerEmployee }).from(staffTable).where(

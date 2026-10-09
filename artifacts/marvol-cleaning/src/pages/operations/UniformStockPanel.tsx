@@ -81,7 +81,7 @@ const emptyItem = (): ItemDraft => ({
   size: "",
   openingQuantity: "",
   openingReason: "",
-  reorderLevel: "",
+  reorderLevel: "6",
   lastOrderDate: "",
 });
 function count(value: string, label: string, allowZero = false) {
@@ -126,7 +126,7 @@ function StockPrintView({ data }: { data: PrintData }) {
               <td className="border-b border-slate-200 p-2">{item.currentQuantity}</td>
               <td className="border-b border-slate-200 p-2">{item.outstandingIssued}</td>
               <td className="border-b border-slate-200 p-2">{item.reorderLevel}</td>
-              <td className="border-b border-slate-200 p-2">{item.active ? item.lowStock ? "Low stock" : "Active" : "Archived"}</td>
+              <td className="border-b border-slate-200 p-2">{!item.active ? "Archived" : item.lowStock ? "REORDER REQUIRED" : "No alert"}</td>
             </tr>
           ))}</tbody>
         </table>
@@ -207,7 +207,7 @@ export default function UniformStockPanel() {
         size: newItem.size.trim(),
         openingQuantity: count(newItem.openingQuantity, "opening quantity", true),
         openingReason: newItem.openingReason.trim(),
-        reorderLevel: count(newItem.reorderLevel, "reorder level", true),
+        reorderLevel: 6,
         lastOrderDate: newItem.lastOrderDate || null,
       });
       setNewItem(emptyItem());
@@ -233,7 +233,7 @@ export default function UniformStockPanel() {
         itemName: editing.itemName.trim(),
         description: editing.description.trim() || null,
         size: editing.size.trim(),
-        reorderLevel: count(editing.reorderLevel, "reorder level", true),
+        reorderLevel: 6,
         lastOrderDate: editing.lastOrderDate || null,
         active: editing.active,
       });
@@ -337,7 +337,7 @@ export default function UniformStockPanel() {
             <label className="space-y-1 text-sm"><span>Size</span><input className={field} value={newItem.size} onChange={(e) => setNewItem({ ...newItem, size: e.target.value })} required /></label>
             <label className="space-y-1 text-sm"><span>Description</span><input className={field} value={newItem.description} onChange={(e) => setNewItem({ ...newItem, description: e.target.value })} /></label>
             <label className="space-y-1 text-sm"><span>Opening quantity</span><input type="number" min="0" step="1" className={field} value={newItem.openingQuantity} onChange={(e) => setNewItem({ ...newItem, openingQuantity: e.target.value })} required /></label>
-            <label className="space-y-1 text-sm"><span>Reorder threshold</span><input type="number" min="0" step="1" className={field} value={newItem.reorderLevel} onChange={(e) => setNewItem({ ...newItem, reorderLevel: e.target.value })} required /></label>
+            <label className="space-y-1 text-sm"><span>Reorder threshold (per item-size)</span><span className={`${field} block bg-slate-50`}>6 units</span></label>
             <label className="space-y-1 text-sm"><span>Last order date (optional)</span><input type="date" className={field} value={newItem.lastOrderDate} onChange={(e) => setNewItem({ ...newItem, lastOrderDate: e.target.value })} /></label>
             <label className="space-y-1 text-sm"><span>Opening balance reason</span><input className={field} value={newItem.openingReason} onChange={(e) => setNewItem({ ...newItem, openingReason: e.target.value })} required /></label>
           </div>
@@ -443,7 +443,7 @@ export default function UniformStockPanel() {
               <label className="space-y-1 text-sm"><span>Item code</span><input className={field} value={editing.itemCode} onChange={(e) => setEditing({ ...editing, itemCode: e.target.value })} /></label>
               <label className="space-y-1 text-sm"><span>Size</span><input className={field} value={editing.size} onChange={(e) => setEditing({ ...editing, size: e.target.value })} required /></label>
               <label className="space-y-1 text-sm"><span>Description</span><input className={field} value={editing.description} onChange={(e) => setEditing({ ...editing, description: e.target.value })} /></label>
-              <label className="space-y-1 text-sm"><span>Reorder threshold</span><input type="number" min="0" step="1" className={field} value={editing.reorderLevel} onChange={(e) => setEditing({ ...editing, reorderLevel: e.target.value })} required /></label>
+              <label className="space-y-1 text-sm"><span>Reorder threshold (per item-size)</span><span className={`${field} block bg-slate-50`}>6 units</span></label>
               <label className="space-y-1 text-sm"><span>Last order date</span><input type="date" className={field} value={editing.lastOrderDate} onChange={(e) => setEditing({ ...editing, lastOrderDate: e.target.value })} /></label>
               <label className="flex items-center gap-2 self-end pb-2 text-sm">
                 <input type="checkbox" checked={editing.active} onChange={(e) => setEditing({ ...editing, active: e.target.checked })} />
@@ -475,7 +475,12 @@ export default function UniformStockPanel() {
           {items.isLoading ? <p className="text-sm text-slate-500">Loading inventory…</p> :
             items.error ? <p role="alert" className="text-sm text-rose-700">Unable to load Uniform Stock.</p> :
               !items.data?.length ? <p className="text-sm text-slate-500">No stock items yet. Add the first item using a manager-verified opening count.</p> :
-                <div className="overflow-x-auto">
+                <div className="space-y-3 overflow-x-auto">
+                  {(items.data ?? []).filter((item) => item.active && item.lowStock).length > 0 && (
+                    <p role="status" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-800">
+                      Reorder required for {(items.data ?? []).filter((item) => item.active && item.lowStock).length} item-size record(s). Each size is checked independently; reorder level is 6.
+                    </p>
+                  )}
                   <table className="w-full min-w-[850px] text-left text-sm">
                     <thead><tr className="border-b text-slate-500">{["Item", "Size", "On hand", "With staff", "Reorder at", "Status", "Actions"].map((label) => <th key={label} className="p-2">{label}</th>)}</tr></thead>
                     <tbody>{items.data.map((item) => (
@@ -487,7 +492,7 @@ export default function UniformStockPanel() {
                         <td className="p-2">{item.reorderLevel}</td>
                         <td className="p-2">
                           {!item.active ? <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700">Archived</span> :
-                            item.lowStock ? <span className="rounded-full bg-rose-100 px-2 py-1 text-xs font-semibold text-rose-800">Low stock</span> :
+                            item.lowStock ? <span className="rounded-full bg-rose-100 px-2 py-1 text-xs font-semibold text-rose-800">Reorder required</span> :
                               <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs text-emerald-800">In stock</span>}
                         </td>
                         <td className="p-2">

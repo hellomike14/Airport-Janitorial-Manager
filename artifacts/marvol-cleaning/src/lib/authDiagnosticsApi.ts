@@ -1,12 +1,5 @@
 export type AuthDiagnosticCode = "AUTH_SERVICE_UNAVAILABLE" | "STAFF_LOOKUP_TIMEOUT";
 
-export type AuthDiagnosticEvent = {
-  diagnosticId: string;
-  code: string;
-  source: "server" | "client";
-  createdAt: string;
-};
-
 export type AccessState = {
   active: boolean;
   loginEnabled: boolean;
@@ -22,12 +15,6 @@ export type AccessChange = {
   createdAt: string;
   before: AccessState;
   after: AccessState;
-};
-
-export type AuthDiagnostics = {
-  events: AuthDiagnosticEvent[];
-  summary: Array<{ code: string; count: number }>;
-  accessChanges: AccessChange[];
 };
 
 const BASE = import.meta.env.BASE_URL;
@@ -49,12 +36,12 @@ export async function reportAuthDiagnostic(code: AuthDiagnosticCode): Promise<st
   return typeof result.diagnosticId === "string" ? result.diagnosticId : undefined;
 }
 
-export async function getAuthDiagnostics(signal?: AbortSignal): Promise<AuthDiagnostics> {
-  const response = await fetch(`${BASE}api/auth-diagnostics`, {
+export async function getAccessAudit(signal?: AbortSignal): Promise<AccessChange[]> {
+  const response = await fetch(`${BASE}api/auth-diagnostics/access-audit`, {
     credentials: "same-origin",
     cache: "no-store",
     headers: { Accept: "application/json" },
     signal,
   });
-  return parseJson<AuthDiagnostics>(response);
+  return parseJson<AccessChange[]>(response);
 }

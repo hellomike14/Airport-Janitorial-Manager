@@ -46,6 +46,7 @@ describe("management menu grouping", () => {
     expect(shouldGroupManagementMenu("supervisor")).toBe(true);
     expect(shouldGroupManagementMenu("staff")).toBe(false);
     expect(shouldGroupManagementMenu("inspector")).toBe(false);
+  expect(shouldGroupManagementMenu("employee_administrator")).toBe(false);
   });
 
   it("fails explicitly if a management route has no section", () => {

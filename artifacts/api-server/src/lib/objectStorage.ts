@@ -106,7 +106,9 @@ export class ObjectStorageService {
     return new Response(webStream, { headers });
   }
 
-  async getObjectEntityUploadURL(namespace: "uploads" | "hr-identity/staging" = "uploads"): Promise<string> {
+  async getObjectEntityUploadURL(
+    namespace: "uploads" | "hr-identity/staging" | "petty-cash/receipts-staging" = "uploads",
+  ): Promise<string> {
     const privateObjectDir = this.getPrivateObjectDir();
     if (!privateObjectDir) {
       throw new Error(
@@ -180,6 +182,39 @@ export class ObjectStorageService {
       sizeBytes: bytes.byteLength,
       contentType: typeof metadata.contentType === "string" ? metadata.contentType : "application/octet-stream",
     };
+  }
+
+  async savePrivateObject(
+    namespace: "petty-cash/receipts",
+    objectId: string,
+    bytes: Buffer,
+    contentType: string,
+  ) {
+    if (!/^[a-f0-9-]{36}$/i.test(objectId)) throw new Error("Invalid private object ID");
+    const privateObjectDir = this.getPrivateObjectDir().replace(/\/$/, "");
+    const objectPath = `/objects/${namespace}/${objectId}`;
+    const { bucketName, objectName } = parseObjectPath(`${privateObjectDir}/${namespace}/${objectId}`);
+    const file = objectStorageClient.bucket(bucketName).file(objectName);
+    try {
+      await file.save(bytes, {
+        resumable: false,
+        preconditionOpts: { ifGenerationMatch: 0 },
+        metadata: { contentType, cacheControl: "private, no-store" },
+      });
+    } catch (error) {
+      if ((error as { code?: number }).code !== 412) throw error;
+      const [existing] = await file.download();
+      if (!Buffer.from(existing).equals(bytes)) throw new Error("Private receipt object already exists with different bytes");
+    }
+    return objectPath;
+  }
+
+  async removePrivateObject(objectPath: string) {
+    try {
+      await (await this.getObjectEntityFile(objectPath)).delete({ ignoreNotFound: true });
+    } catch (error) {
+      if (!(error instanceof ObjectNotFoundError)) throw error;
+    }
   }
 
   /** Snapshot an applicant's temporary signed-upload object to a fresh private key. */

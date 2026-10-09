@@ -4,7 +4,7 @@ import { resolveStaffSession } from "./resolveStaffSession";
 
 const options = () => ({ url: "https://marvol.test/api/staff/me", signal: new AbortController().signal, timeoutMs: 200 });
 test("all four staff roles resolve with cookie transport and an uncached request", async () => {
-  for (const role of ["admin", "supervisor", "staff", "inspector"]) {
+  for (const role of ["admin", "supervisor", "staff", "inspector", "employee_administrator"]) {
     const user = { id: 42, name: "Team member", role };
     const fetcher: typeof fetch = async (_url, init) => {
       assert.equal(init?.cache, "no-store");
