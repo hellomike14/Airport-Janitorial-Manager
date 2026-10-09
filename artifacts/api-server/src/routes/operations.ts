@@ -27,6 +27,7 @@ import {
   csvCell,
   gpsProblem,
   INSPECTION_CHECKS,
+  isCurrentEmployee,
   inspectionScore,
   orlandoDate,
   paidMinutes,
@@ -449,7 +450,7 @@ router.get("/badges", async (req, res) => {
     );
   const today = orlandoDate();
   res.json(
-    rows.map((r) => ({
+    rows.filter(isCurrentEmployee).map((r) => ({
       ...r.badge,
       staffName: r.name,
       active: r.active,

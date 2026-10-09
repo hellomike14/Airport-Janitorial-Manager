@@ -6,6 +6,7 @@ import {
   distanceMeters,
   gpsProblem,
   inspectionScore,
+  isCurrentEmployee,
   monthRange,
   orlandoDate,
   overlaps,
@@ -13,6 +14,14 @@ import {
   previousMonth,
   validDate,
 } from "./operationsPolicy";
+
+test("Airport badge visibility requires an explicitly active, non-former employee", () => {
+  assert.equal(isCurrentEmployee({ active: true, formerEmployee: false }), true);
+  assert.equal(isCurrentEmployee({ active: false, formerEmployee: false }), false);
+  assert.equal(isCurrentEmployee({ active: true, formerEmployee: true }), false);
+  assert.equal(isCurrentEmployee({ active: true }), false);
+  assert.equal(isCurrentEmployee({ formerEmployee: false }), false);
+});
 
 test("Orlando work dates respect midnight and DST independently of host timezone", () => {
   assert.equal(orlandoDate(new Date("2026-10-05T02:00:00Z")), "2026-10-04");
