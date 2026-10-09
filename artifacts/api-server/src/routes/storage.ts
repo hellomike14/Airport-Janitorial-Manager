@@ -157,10 +157,17 @@ router.get("/storage/public-objects/*filePath", async (req: Request, res: Respon
  */
 router.get("/storage/objects/*path", async (req: Request, res: Response) => {
   try {
-    const actor = await actorStaffFromRequest(req);
     const raw = req.params.path;
     const wildcardPath = Array.isArray(raw) ? raw.join("/") : raw;
     const objectPath = `/objects/${wildcardPath}`;
+    // Uniform workbooks contain employee issuance information and may only be
+    // downloaded through the dedicated manager-authorized operations route.
+    if (objectPath === "/objects/operations-workbooks" ||
+        objectPath.startsWith("/objects/operations-workbooks/")) {
+      res.status(404).json({ error: "Object not found" });
+      return;
+    }
+    const actor = await actorStaffFromRequest(req);
     const blankTemplate = isEmploymentFormObjectPath(objectPath);
     if (!actor) {
       if (!blankTemplate) {

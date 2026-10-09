@@ -240,6 +240,7 @@ async function buildSummary(convo: ConversationRow, viewerId: number, sharedThre
 
     return {
       id: convo.id,
+      conversationIds: [convo.id],
       isGroup: true,
       groupName: convo.groupName ?? null,
       participantCount: parts.length,
@@ -291,6 +292,7 @@ async function buildSummary(convo: ConversationRow, viewerId: number, sharedThre
   }
   return {
     id: convo.id,
+    conversationIds: sharedThreadIds?.length ? sharedThreadIds : [convo.id],
     isGroup: false,
     groupName: null as string | null,
     participantCount: 2,

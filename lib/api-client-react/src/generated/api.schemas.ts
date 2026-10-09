@@ -5,6 +5,120 @@
  * Marvol Facility Cleaning Management API
  * OpenAPI spec version: 0.1.0
  */
+export type InspectorAssignmentHistoryItemEvent =
+  (typeof InspectorAssignmentHistoryItemEvent)[keyof typeof InspectorAssignmentHistoryItemEvent];
+
+export const InspectorAssignmentHistoryItemEvent = {
+  assigned: "assigned",
+  reassigned: "reassigned",
+} as const;
+
+export type InspectorAssignmentHistoryItemMethod =
+  (typeof InspectorAssignmentHistoryItemMethod)[keyof typeof InspectorAssignmentHistoryItemMethod];
+
+export const InspectorAssignmentHistoryItemMethod = {
+  fresh_gps: "fresh_gps",
+  area_roster_workload: "area_roster_workload",
+} as const;
+
+export interface InspectorAssignmentHistoryItem {
+  assignedStaffId: number;
+  /** @nullable */
+  assignedById: number | null;
+  event: InspectorAssignmentHistoryItemEvent;
+  method: InspectorAssignmentHistoryItemMethod;
+  /** @nullable */
+  distanceMeters: number | null;
+  provenance: string;
+  createdAt: string;
+}
+
+export type InspectorAssignmentReportSource = {
+  conversationId: number;
+  messageId: number;
+};
+
+export type InspectorAssignmentReportSourceEmail = {
+  /** @nullable */
+  senderEmail: string | null;
+  /** @nullable */
+  subject: string | null;
+  /** @nullable */
+  body: string | null;
+  storedMessageBody: string;
+  receivedAt: string;
+};
+
+export type InspectorAssignmentReportTask = {
+  id: number;
+  name: string;
+  /** Scheduled task date in YYYY-MM-DD form. */
+  taskDate: string;
+  completed: boolean;
+  /** @nullable */
+  completedAt: string | null;
+  /** @nullable */
+  completedById: number | null;
+  /** @nullable */
+  taskNotes: string | null;
+  /** @nullable */
+  beforeImagePath: string | null;
+  /** @nullable */
+  afterImagePath: string | null;
+  createdAt: string;
+};
+
+export type InspectorAssignmentReportArea = {
+  id: number;
+  name: string;
+  terminal: string;
+};
+
+/**
+ * @nullable
+ */
+export type InspectorAssignmentReportAssignedStaff = {
+  id: number;
+  name: string;
+} | null;
+
+export type InspectorAssignmentReportAssignmentMethod =
+  (typeof InspectorAssignmentReportAssignmentMethod)[keyof typeof InspectorAssignmentReportAssignmentMethod];
+
+export const InspectorAssignmentReportAssignmentMethod = {
+  fresh_gps: "fresh_gps",
+  area_roster_workload: "area_roster_workload",
+} as const;
+
+export type InspectorAssignmentReportStatus =
+  (typeof InspectorAssignmentReportStatus)[keyof typeof InspectorAssignmentReportStatus];
+
+export const InspectorAssignmentReportStatus = {
+  assigned: "assigned",
+  overdue: "overdue",
+  escalated: "escalated",
+  completed: "completed",
+} as const;
+
+export interface InspectorAssignmentReport {
+  source: InspectorAssignmentReportSource;
+  sourceEmail: InspectorAssignmentReportSourceEmail;
+  task: InspectorAssignmentReportTask;
+  area: InspectorAssignmentReportArea;
+  /** @nullable */
+  assignedStaff: InspectorAssignmentReportAssignedStaff;
+  assignmentMethod: InspectorAssignmentReportAssignmentMethod;
+  /** @nullable */
+  assignmentDistanceMeters: number | null;
+  dueAt: string;
+  /** @minimum 0 */
+  remainingSeconds: number;
+  status: InspectorAssignmentReportStatus;
+  /** @nullable */
+  escalatedAt: string | null;
+  history: InspectorAssignmentHistoryItem[];
+}
+
 export interface TrainingVersion {
   version: string;
   title: string;
@@ -649,6 +763,7 @@ export interface Notification {
 
 export interface ConversationSummary {
   id: number;
+  conversationIds: number[];
   isGroup: boolean;
   /** @nullable */
   groupName: string | null;
@@ -1774,6 +1889,17 @@ export type GetInspectorWorkflow200 = {
   history: GetInspectorWorkflow200HistoryItem[];
   /** @nullable */
   completionEmailDeliveryStatus?: GetInspectorWorkflow200CompletionEmailDeliveryStatus;
+};
+
+export type ListInspectorAssignmentsParams = {
+  /**
+   * Inclusive start date for the source email's received date.
+   */
+  from?: string;
+  /**
+   * Inclusive end date for the source email's received date.
+   */
+  to?: string;
 };
 
 export type GetEmploymentFormTemplateParams = {

@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { format } from "date-fns";
+import { Link } from "wouter";
 import {
   MessageSquare,
   Plus,
@@ -45,6 +46,14 @@ import {
   requestUploadUrl,
   type ConversationSummary,
 } from "@workspace/api-client-react";
+import {
+  findVisibleConversation,
+  inspectorAssignmentHref,
+  inspectorReportHref,
+  parseMessagesSourceLink,
+  sourceMessageMatches,
+  type MessagesSourceLink,
+} from "@/lib/inspectorAssignmentLinks";
 
 const CONVERSATIONS_KEY = "/api/conversations";
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
@@ -514,6 +523,9 @@ export default function Messages() {
   });
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [requestedSourceLink] = useState(() => parseMessagesSourceLink(window.location.search));
+  const [sourceMessageLink, setSourceMessageLink] = useState<MessagesSourceLink | null>(null);
+  const [sourceLinkResolved, setSourceLinkResolved] = useState(!requestedSourceLink);
   const [showNewConvo, setShowNewConvo] = useState(false);
   const [draft, setDraft] = useState("");
   const [beforePhoto, setBeforePhoto] = useState<File | null>(null);
@@ -534,6 +546,7 @@ export default function Messages() {
   const [cleanupDate, setCleanupDate] = useState("");
   const [cleanupResult, setCleanupResult] = useState<{ id: number; deleted: number; retained: number } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrolledSourceMessageIdRef = useRef<number | null>(null);
   const selectedConversationIdRef = useRef<number | null>(selectedId);
   selectedConversationIdRef.current = selectedId;
   const photoUploadIdRef = useRef(0);
@@ -578,6 +591,36 @@ export default function Messages() {
   });
 
   const selectedConvo = visibleConversations.find((c) => c.id === selectedId) ?? null;
+  useEffect(() => {
+    if (!requestedSourceLink || sourceLinkResolved || staffId <= 0 || convosLoading) return;
+    const active = findVisibleConversation(conversations, requestedSourceLink.conversationId);
+    if (active) {
+      setSelectedId(active.id);
+      setSourceMessageLink(requestedSourceLink);
+      setSourceLinkResolved(true);
+      return;
+    }
+    if (!showArchived) {
+      setShowArchived(true);
+      return;
+    }
+    if (archivedLoading) return;
+    const archived = findVisibleConversation(archivedConversations, requestedSourceLink.conversationId);
+    if (archived) {
+      setSelectedId(archived.id);
+      setSourceMessageLink(requestedSourceLink);
+    }
+    setSourceLinkResolved(true);
+  }, [
+    requestedSourceLink,
+    sourceLinkResolved,
+    staffId,
+    convosLoading,
+    conversations,
+    showArchived,
+    archivedLoading,
+    archivedConversations,
+  ]);
   const photoDraftMatchesConversation = photoDraftConversationId === selectedId;
   const activeBeforePhoto = photoDraftMatchesConversation ? beforePhoto : null;
   const activeAfterPhoto = photoDraftMatchesConversation ? afterPhoto : null;
@@ -609,8 +652,22 @@ export default function Messages() {
   }, [selectedId, unreadInSelected, hasNewGroupMessages, staffId, qc]);
 
   useEffect(() => {
+    if (selectedId === null || messagesLoading) return;
+    if (sourceMessageLink && selectedConvo) {
+      const targetMessage = messages.find((message) =>
+        sourceMessageMatches(sourceMessageLink, selectedConvo, message),
+      );
+      if (targetMessage) {
+        if (scrolledSourceMessageIdRef.current !== targetMessage.id) {
+          document.getElementById(`source-message-${targetMessage.id}`)
+            ?.scrollIntoView({ behavior: "smooth", block: "center" });
+          scrolledSourceMessageIdRef.current = targetMessage.id;
+        }
+        return;
+      }
+    }
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length, selectedId]);
+  }, [messages.length, selectedId, messagesLoading, sourceMessageLink, selectedConvo, messages]);
 
   useLayoutEffect(() => {
     photoUploadIdRef.current += 1;
@@ -1143,6 +1200,8 @@ export default function Messages() {
                 )}
                 {!messagesError && messages.map((m) => {
                   const mine = m.senderId === staffId;
+                  const isSourceMessage = sourceMessageLink !== null && selectedConvo !== null &&
+                    sourceMessageMatches(sourceMessageLink, selectedConvo, m);
                   const urgentInspectorReply = m.senderId === selectedConvo.otherStaffId && selectedConvo.otherStaffRole === "inspector";
                   const isEditing = editingMessageId === m.id;
                   const canDelete = senderRole === "admin";
@@ -1178,8 +1237,12 @@ export default function Messages() {
                     <div key={m.id} className={`flex min-w-0 items-end gap-1.5 group ${mine ? "justify-end" : "justify-start"}`}>
                       {mine && messageActions}
                       <div
+                        id={isSourceMessage ? `source-message-${m.id}` : undefined}
+                        data-testid={isSourceMessage ? `highlighted-source-message-${m.id}` : undefined}
                         className={`min-w-0 max-w-[calc(100%-2rem)] sm:max-w-[92%] xl:max-w-[88%] rounded-2xl px-5 py-4 md:px-6 md:py-5 ${
-                          mine
+                          isSourceMessage
+                            ? "bg-amber-100 text-slate-900 ring-2 ring-amber-500 shadow-lg"
+                            : mine
                             ? "bg-emerald-600 text-white rounded-br-md"
                             : urgentInspectorReply
                               ? "bg-amber-50 border-2 border-amber-400 text-slate-800 rounded-bl-md"
@@ -1323,7 +1386,22 @@ export default function Messages() {
                           </p>
                         )}
                         {m.inspectorWorkflowTaskId && (
-                          <InspectorWorkflowCard taskId={m.inspectorWorkflowTaskId} />
+                          <>
+                            <InspectorWorkflowCard taskId={m.inspectorWorkflowTaskId} />
+                            <div className={`mt-2 flex flex-wrap gap-3 text-xs font-semibold ${mine ? "text-emerald-100" : "text-amber-800"}`}>
+                              <Link href={inspectorAssignmentHref(m.inspectorWorkflowTaskId)} className="hover:underline">
+                                {t("inspectorAssignments.viewAssignment")}
+                              </Link>
+                              {canEmailInspector && m.inboundEmailReceivedAt && inspectorReportHref(m.inspectorWorkflowTaskId, m.inboundEmailReceivedAt) && (
+                                <Link
+                                  href={inspectorReportHref(m.inspectorWorkflowTaskId, m.inboundEmailReceivedAt)!}
+                                  className="hover:underline"
+                                >
+                                  {t("inspectorAssignments.viewReport")}
+                                </Link>
+                              )}
+                            </div>
+                          </>
                         )}
                       </div>
                       {!mine && messageActions}
