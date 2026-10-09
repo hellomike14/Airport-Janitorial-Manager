@@ -707,7 +707,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                       ...current,
                       [group.id]: !current[group.id],
                     }))}
-                    className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-xs font-bold uppercase tracking-wider text-sidebar-foreground/90 transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                    className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-xs font-bold uppercase tracking-wider text-[#FFD700] transition-colors hover:bg-sidebar-accent/60 hover:text-[#FFD700] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
                   >
                     <span>{managementSectionLabels[group.id]}</span>
                     <ChevronDown
