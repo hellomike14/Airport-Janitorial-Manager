@@ -54,6 +54,9 @@
   "nav": {
     "myWork": "My Work",
     "managementMenu": "Management Menu",
+    "managementOperation": "Operation",
+    "managementQuality": "Quality",
+    "managementBusiness": "Business",
     "dashboard": "Dashboard",
     "taskManagement": "Task Management",
     "taskTypeInventory": "Task Type Inventory",
