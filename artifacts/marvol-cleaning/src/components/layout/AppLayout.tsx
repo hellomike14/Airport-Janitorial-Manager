@@ -45,6 +45,12 @@ import {
   listConversations,
 } from "@workspace/api-client-react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
+import {
+  groupManagementNavItems,
+  openActiveManagementSection,
+  shouldGroupManagementMenu,
+  type ManagementMenuSectionId,
+} from "./managementMenu";
 
 interface NavItemProps {
   href: string;
@@ -53,13 +59,14 @@ interface NavItemProps {
   isActive: boolean;
   onClick?: () => void;
   badgeCount?: number;
+  compact?: boolean;
 }
 
-const NavItem = ({ href, icon: Icon, label, isActive, onClick, badgeCount }: NavItemProps) => (
+const NavItem = ({ href, icon: Icon, label, isActive, onClick, badgeCount, compact = false }: NavItemProps) => (
   <Link
     href={href}
     onClick={onClick}
-    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group relative overflow-hidden
+    className={`flex items-center gap-3 ${compact ? "px-3 py-2.5" : "px-4 py-3"} rounded-xl transition-all duration-200 group relative overflow-hidden
     ${isActive
       ? "bg-accent text-accent-foreground shadow-md shadow-accent/20 font-medium"
       : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
@@ -575,6 +582,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const isMessagesPage = location === "/messages";
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [openManagementSections, setOpenManagementSections] = useState<Record<ManagementMenuSectionId, boolean>>({
+    operation: true,
+    quality: true,
+    business: true,
+  });
   const [viewDropdownOpen, setViewDropdownOpen] = useState(false);
   const [showSendAlert, setShowSendAlert] = useState(false);
   const { currentUser, viewMode, setViewMode, logout } = useAuth();
@@ -601,6 +613,24 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     if (href === "/" && location !== "/") return false;
     return location.startsWith(href);
   };
+
+  const isManagementMenu = shouldGroupManagementMenu(viewMode);
+  const managementMenuGroups = isManagementMenu ? groupManagementNavItems(navItems) : [];
+  const activeManagementSection = managementMenuGroups.find((group) =>
+    group.items.some((item) => getIsActive(item.href)),
+  )?.id ?? null;
+  const managementSectionLabels: Record<ManagementMenuSectionId, string> = {
+    operation: t("nav.managementOperation"),
+    quality: t("nav.managementQuality"),
+    business: t("nav.managementBusiness"),
+  };
+
+  useEffect(() => {
+    if (activeManagementSection === null) return;
+    setOpenManagementSections((current) =>
+      openActiveManagementSection(current, activeManagementSection),
+    );
+  }, [activeManagementSection, location, viewMode]);
 
   const closeMobile = () => setMobileOpen(false);
 
@@ -661,7 +691,46 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="px-2 mb-2 text-xs font-semibold text-sidebar-foreground/40 uppercase tracking-wider">
             {viewMode === "staff" ? t("nav.myWork") : t("nav.managementMenu")}
           </div>
-          {navItems.map((item) => (
+          {isManagementMenu ? managementMenuGroups.map((group) => {
+            const isOpen = openManagementSections[group.id];
+            const toggleId = `management-nav-${group.id}-toggle`;
+            const contentId = `management-nav-${group.id}-links`;
+            return (
+              <section key={group.id} className="space-y-1">
+                <h2>
+                  <button
+                    id={toggleId}
+                    type="button"
+                    aria-expanded={isOpen}
+                    aria-controls={contentId}
+                    onClick={() => setOpenManagementSections((current) => ({
+                      ...current,
+                      [group.id]: !current[group.id],
+                    }))}
+                    className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/50 transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                  >
+                    <span>{managementSectionLabels[group.id]}</span>
+                    <ChevronDown
+                      aria-hidden="true"
+                      className={`h-4 w-4 transition-transform ${isOpen ? "" : "-rotate-90"}`}
+                    />
+                  </button>
+                </h2>
+                <div id={contentId} aria-labelledby={toggleId} hidden={!isOpen} className="space-y-1">
+                  {group.items.map((item) => (
+                    <NavItem
+                      key={item.href}
+                      {...item}
+                      compact
+                      isActive={getIsActive(item.href)}
+                      onClick={closeMobile}
+                      badgeCount={item.href === "/messages" ? unreadMessages : undefined}
+                    />
+                  ))}
+                </div>
+              </section>
+            );
+          }) : navItems.map((item) => (
             <NavItem
               key={item.href}
               {...item}

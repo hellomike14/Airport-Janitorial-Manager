@@ -54,6 +54,9 @@
   "nav": {
     "myWork": "Mon Travail",
     "managementMenu": "Menu de Gestion",
+    "managementOperation": "Opérations",
+    "managementQuality": "Qualité",
+    "managementBusiness": "Entreprise",
     "dashboard": "Tableau de Bord",
     "taskManagement": "Gestion des Tâches",
     "taskTypeInventory": "Inventaire des Types de Tâches",
