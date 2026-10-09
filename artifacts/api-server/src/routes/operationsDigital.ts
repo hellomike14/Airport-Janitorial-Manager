@@ -12,9 +12,11 @@ import { pettyCashService, type PettyCashInput } from "../lib/pettyCash";
 import { uniformStockService } from "../lib/uniformStock";
 import { validDate } from "../lib/operationsPolicy";
 import { requireStaffRole } from "../middlewares/requireStaffRole";
+import { requireOperationsManager } from "../middlewares/requireOperationsManager";
+import { confidentialIdentity, digest } from "../lib/confidentialAccess";
 
 const router: IRouter = Router();
-router.use(requireStaffRole("admin", "supervisor"));
+router.use(requireStaffRole("admin", "supervisor"), requireOperationsManager);
 
 function normalizedDate(value: unknown) {
   if (typeof value !== "string" || !validDate(value)) return value;
@@ -69,6 +71,14 @@ async function actorId(req: Request) {
   return actor.id;
 }
 
+async function actorSessionHash(req: Request) {
+  const identity = await confidentialIdentity(req);
+  if (!identity) {
+    throw new DigitalOperationsError(401, "SESSION_REQUIRED", "Sign in again.");
+  }
+  return digest(identity.sessionId);
+}
+
 function action(
   handler: (req: Request, res: Response) => Promise<void>,
 ) {
@@ -109,6 +119,7 @@ function pettyInput(value: unknown, schema: typeof CreatePettyCashRecordBody | t
     managerAcknowledged: body.managerAcknowledged as boolean,
     reimbursementStatus:
       body.reimbursementStatus as PettyCashInput["reimbursementStatus"],
+    reimbursementPaidConfirmed: body.reimbursementPaidConfirmed as boolean,
     reimbursementAmountCents:
       body.reimbursementAmountCents as number | null | undefined,
     reimbursementReference:
@@ -129,6 +140,9 @@ function pettyInput(value: unknown, schema: typeof CreatePettyCashRecordBody | t
       description: expense.description as string,
       amountCents: expense.amountCents as number,
       receiptReceived: expense.receiptReceived as boolean,
+      voucherNumber: expense.voucherNumber as string | null | undefined,
+      receiptAttachmentId: expense.receiptAttachmentId as string | null | undefined,
+      receiptUploadId: expense.receiptUploadId as string | null | undefined,
     })),
   };
   return {
@@ -146,7 +160,7 @@ router.get("/petty-cash", action(async (_req, res) => {
 router.post("/petty-cash", action(async (req, res) => {
   const actor = await actorId(req);
   const { input } = pettyInput(req.body, CreatePettyCashRecordBody);
-  res.status(201).json(await pettyCashService.create(input, actor));
+  res.status(201).json(await pettyCashService.create(input, actor, await actorSessionHash(req)));
 }));
 
 router.patch("/petty-cash/:recordId", action(async (req, res) => {
@@ -154,7 +168,13 @@ router.patch("/petty-cash/:recordId", action(async (req, res) => {
   const recordId = requirePositiveId(req.params.recordId, "Record ID");
   const { input, expectedVersion } = pettyInput(req.body, UpdatePettyCashRecordBody);
   if (expectedVersion == null) throw badBody();
-  res.json(await pettyCashService.update(recordId, expectedVersion, input, actor));
+  res.json(await pettyCashService.update(recordId, expectedVersion, input, actor, await actorSessionHash(req)));
+}));
+
+router.get("/petty-cash/monthly-report", action(async (req, res) => {
+  if (typeof req.query.month !== "string") throw badBody();
+  res.setHeader("Cache-Control", "private, no-store");
+  res.json(await pettyCashService.monthlyReport(req.query.month));
 }));
 
 router.get("/petty-cash/:recordId/history", action(async (req, res) => {

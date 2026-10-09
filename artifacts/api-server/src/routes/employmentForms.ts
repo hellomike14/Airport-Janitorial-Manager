@@ -18,6 +18,8 @@ import {
   sendEmploymentFormEmail,
   type EmploymentEmailSender,
 } from "../lib/employmentFormEmail";
+import { actorStaffFromRequest, promotedCandidateFromRequest } from "../lib/actorSession";
+import { PUBLIC_APPLICANT_FORM_IDS, isPromotedCandidateFormId } from "../lib/onboardingCandidatePolicy";
 
 type EmploymentTemplate = {
   filename: string;
@@ -114,24 +116,49 @@ export function isPublicBlankEmploymentTemplate(path: string, method: string): b
   let decoded: string;
   try { decoded = decodeURIComponent(path); } catch { return false; }
   const id = getTemplateIdFromPath(decoded, "template");
-  if (id && forms.get(id)?.restricted === false) return true;
-  const prefix = "/storage/objects/";
-  if (!decoded.toLowerCase().startsWith(prefix)) return false;
-  const objectPath = `/objects/${decoded.slice(prefix.length)}`;
-  return isEmploymentFormObjectPath(objectPath);
+  return id !== null && PUBLIC_APPLICANT_FORM_IDS.has(id);
 }
 
 export function isPublicBlankEmploymentEmail(path: string, method: string): boolean {
-  if (method !== "POST") return false;
+  void path;
+  void method;
+  return false;
+}
+
+export function isRestrictedEmploymentTemplatePath(path: string, method: string): boolean {
   let decoded: string;
-  try { decoded = decodeURIComponent(path); } catch { return false; }
-  const id = getTemplateIdFromPath(decoded, "email");
-  return id !== null && forms.get(id)?.restricted === false;
+  try { decoded = decodeURIComponent(path); } catch { return true; }
+  const id = getTemplateIdFromPath(decoded, method === "POST" ? "email" : "template");
+  return id !== null && forms.get(id)?.restricted === true;
+}
+
+export function createEmploymentFormAuthorization(
+  resolveStaff: typeof actorStaffFromRequest = actorStaffFromRequest,
+  resolveCandidate: typeof promotedCandidateFromRequest = promotedCandidateFromRequest,
+): RequestHandler {
+  return async (req, res, next) => {
+    const id = getTemplateIdFromPath(req.path, req.method === "POST" ? "email" : "template");
+    const publicInlineRead = req.method === "GET" && id !== null &&
+      PUBLIC_APPLICANT_FORM_IDS.has(id) && req.query.download === undefined;
+    if (publicInlineRead) { next(); return; }
+    try {
+      if (await resolveStaff(req)) { next(); return; }
+      const candidate = await resolveCandidate(req);
+      if (candidate && req.method === "GET" && id !== null &&
+          req.query.download === undefined && isPromotedCandidateFormId(id)) {
+        next();
+        return;
+      }
+      res.status(401).json({ error: "Login session required" });
+    } catch {
+      res.status(503).json({ error: "Identity verification is temporarily unavailable" });
+    }
+  };
 }
 
 export function createEmploymentFormsRouter(
   storage: EmploymentFormsStorage = new ObjectStorageService(),
-  authorize: RequestHandler = (_req, _res, next) => next(),
+  authorize: RequestHandler = createEmploymentFormAuthorization(),
   sendEmail: EmploymentEmailSender = sendEmploymentFormEmail,
 ): IRouter {
   const router: IRouter = Router();

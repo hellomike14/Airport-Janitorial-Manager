@@ -7,9 +7,11 @@ import {
   ConfidentialError,
   assertAdmin,
   assertOperationsManager,
+  assertOperationsSupervisor,
   confidentialCookie,
   confidentialIdentity,
   confidentialService,
+  personalOperationsAccessService,
 } from "../lib/confidentialAccess";
 const numericCode = z.string().regex(/^\d{8,12}$/);
 const configureBody = z.object({ code: numericCode, confirmation: numericCode, currentCode: numericCode.optional() }).strict()
@@ -39,6 +41,7 @@ const cookieOptions = (req: Request) => ({
 const router = Router();
 router.use("/confidential-access", (_req, res, next) => { res.setHeader("Cache-Control", "private, no-store"); res.setHeader("X-Content-Type-Options", "nosniff"); next(); });
 router.use("/operations/confidential-access", (_req, res, next) => { res.setHeader("Cache-Control", "private, no-store"); res.setHeader("X-Content-Type-Options", "nosniff"); next(); });
+router.use("/operations/personal-access", (_req, res, next) => { res.setHeader("Cache-Control", "private, no-store"); res.setHeader("X-Content-Type-Options", "nosniff"); next(); });
 const action = (fn: (req: Request, res: Response) => Promise<void>) => async (req: Request, res: Response, _next: NextFunction) => {
   try { await fn(req, res); } catch (error) { confidentialFailure(error, res); }
 };
@@ -68,12 +71,12 @@ router.post("/confidential-access/lock", action(async (req, res) => {
 }));
 router.get("/operations/confidential-access/status", action(async (req, res) => {
   const identity = await confidentialIdentity(req);
-  assertOperationsManager(identity);
+  assertAdmin(identity);
   res.json(await confidentialService.status(identity, confidentialCookie(req), true));
 }));
 router.post("/operations/confidential-access/unlock", action(async (req, res) => {
   const identity = await confidentialIdentity(req);
-  assertOperationsManager(identity);
+  assertAdmin(identity);
   confidentialSameOrigin(req);
   const { code } = z.object({ code: numericCode }).strict().parse(req.body);
   const result = await confidentialService.unlock(identity, code, true);
@@ -82,10 +85,41 @@ router.post("/operations/confidential-access/unlock", action(async (req, res) =>
 }));
 router.post("/operations/confidential-access/lock", action(async (req, res) => {
   const identity = await confidentialIdentity(req);
-  assertOperationsManager(identity);
+  assertAdmin(identity);
   confidentialSameOrigin(req);
   await confidentialService.lock(identity, confidentialCookie(req), true);
   res.clearCookie(CONFIDENTIAL_COOKIE, { ...cookieOptions(req), maxAge: undefined });
   res.json(await confidentialService.status(identity, "", true));
+}));
+router.get("/operations/personal-access/status", action(async (req, res) => {
+  const identity = await confidentialIdentity(req);
+  assertOperationsSupervisor(identity);
+  res.json(await personalOperationsAccessService.status(identity, confidentialCookie(req), true));
+}));
+router.post("/operations/personal-access/configure", action(async (req, res) => {
+  const identity = await confidentialIdentity(req);
+  assertOperationsSupervisor(identity);
+  confidentialSameOrigin(req);
+  const body = configureBody.parse(req.body);
+  const result = await personalOperationsAccessService.configure(identity, confidentialCookie(req), body.code, body.currentCode);
+  res.cookie(CONFIDENTIAL_COOKIE, result.token, cookieOptions(req));
+  res.json(await personalOperationsAccessService.status(identity, result.token, true));
+}));
+router.post("/operations/personal-access/unlock", action(async (req, res) => {
+  const identity = await confidentialIdentity(req);
+  assertOperationsSupervisor(identity);
+  confidentialSameOrigin(req);
+  const { code } = z.object({ code: numericCode }).strict().parse(req.body);
+  const result = await personalOperationsAccessService.unlock(identity, code, true);
+  res.cookie(CONFIDENTIAL_COOKIE, result.token, cookieOptions(req));
+  res.json(await personalOperationsAccessService.status(identity, result.token, true));
+}));
+router.post("/operations/personal-access/lock", action(async (req, res) => {
+  const identity = await confidentialIdentity(req);
+  assertOperationsSupervisor(identity);
+  confidentialSameOrigin(req);
+  await personalOperationsAccessService.lock(identity, confidentialCookie(req), true);
+  res.clearCookie(CONFIDENTIAL_COOKIE, { ...cookieOptions(req), maxAge: undefined });
+  res.json(await personalOperationsAccessService.status(identity, "", true));
 }));
 export default router;

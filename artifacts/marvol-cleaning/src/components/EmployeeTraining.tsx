@@ -585,7 +585,7 @@ export default function EmployeeTraining() {
   const { currentUser, effectiveRole } = useAuth();
   const userId = currentUser?.id;
   const statusKey = ["employee-training", "status", userId] as const;
-  const isManager = effectiveRole === "admin" || effectiveRole === "supervisor";
+  const isManager = effectiveRole === "admin" || effectiveRole === "supervisor" || effectiveRole === "employee_administrator";
   const q = useQuery({
     queryKey: statusKey,
     queryFn: ({ signal }) => getEmployeeTrainingStatus({ signal }),

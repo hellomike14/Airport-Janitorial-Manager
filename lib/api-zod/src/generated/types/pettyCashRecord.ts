@@ -19,6 +19,17 @@ export interface PettyCashRecord {
   openingFloatApprovedByName: string;
   openingFloatApprovedAt: Date;
   cashOnHandCents: number;
+  /** @nullable */
+  minimumReserveCents?: number | null;
+  /** @nullable */
+  targetFloatCents?: number | null;
+  reserveStatus?:
+    | "replenishment_required"
+    | "minimum_reached"
+    | "above_minimum"
+    | null;
+  /** @nullable */
+  suggestedTopUpCents?: number | null;
   expenses: PettyCashExpense[];
   totalExpensesCents: number;
   expectedBalanceCents: number;
@@ -33,6 +44,8 @@ export interface PettyCashRecord {
   /** @nullable */
   managerAcknowledgedAt: Date | null;
   reimbursementStatus: PettyCashRecordReimbursementStatus;
+  /** @nullable */
+  reimbursementPaidConfirmed?: boolean | null;
   /** @nullable */
   reimbursementAmountCents: number | null;
   /** @nullable */

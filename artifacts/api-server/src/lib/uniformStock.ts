@@ -8,6 +8,7 @@ import {
 import { csvCell, isEligibleOperationsEmployee } from "./operationsPolicy";
 import { DigitalOperationsError } from "./digitalOperationsErrors";
 
+export const UNIFORM_STOCK_REORDER_LEVEL = 6;
 type DigitalDb = typeof db;
 type ItemInput = {
   itemCode?: string | null;
@@ -199,7 +200,7 @@ export function createUniformStockService(database: DigitalDb = db) {
               description: input.description?.trim() || null,
               size: requiredText(input.size, "Size"),
               currentQuantity: input.openingQuantity,
-              reorderLevel: input.reorderLevel,
+              reorderLevel: UNIFORM_STOCK_REORDER_LEVEL,
               lastOrderDate: input.lastOrderDate ?? null,
               active: true,
               version: 1,
@@ -268,7 +269,7 @@ export function createUniformStockService(database: DigitalDb = db) {
               itemName: requiredText(input.itemName, "Item name"),
               description: input.description?.trim() || null,
               size: requiredText(input.size, "Size"),
-              reorderLevel: input.reorderLevel,
+              reorderLevel: UNIFORM_STOCK_REORDER_LEVEL,
               lastOrderDate: input.lastOrderDate ?? null,
               active: input.active,
               version: current.version + 1,
@@ -496,7 +497,7 @@ export function createUniformStockService(database: DigitalDb = db) {
           "Outstanding with staff",
           "Reorder level",
           "Last order date",
-          "Low stock",
+          "Reorder alert (per item-size)",
           "Status",
         ]);
         for (const item of await listItems()) {
@@ -509,7 +510,7 @@ export function createUniformStockService(database: DigitalDb = db) {
             item.outstandingIssued,
             item.reorderLevel,
             item.lastOrderDate ?? "",
-            item.lowStock ? "Yes" : "No",
+            item.lowStock ? "Reorder required" : "No alert",
             item.active ? "Active" : "Archived",
           ]);
         }

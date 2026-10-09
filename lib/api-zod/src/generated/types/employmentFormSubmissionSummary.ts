@@ -7,6 +7,7 @@
  */
 import type { EmploymentFormId } from "./employmentFormId";
 import type { EmploymentFormSubmissionSummaryEmailStatus } from "./employmentFormSubmissionSummaryEmailStatus";
+import type { EmploymentFormSubmissionSummaryReviewStatus } from "./employmentFormSubmissionSummaryReviewStatus";
 
 export interface EmploymentFormSubmissionSummary {
   id: number;
@@ -17,5 +18,10 @@ export interface EmploymentFormSubmissionSummary {
   /** @nullable */
   phone?: string | null;
   emailStatus: EmploymentFormSubmissionSummaryEmailStatus;
+  reviewStatus: EmploymentFormSubmissionSummaryReviewStatus;
+  /** @nullable */
+  reviewedAt: Date | null;
+  /** @nullable */
+  reviewedByName: string | null;
   submittedAt: Date;
 }

@@ -1,14 +1,15 @@
-import { Router, type IRouter, type Request, type Response } from "express";
+import { Router, type IRouter, type Request, type RequestHandler, type Response } from "express";
 import { db } from "@workspace/db";
-import { onboardingHiresTable, onboardingItemsTable } from "@workspace/db/schema";
+import { jobApplicationsTable, onboardingHiresTable, onboardingItemsTable } from "@workspace/db/schema";
 import {
   CreateOnboardingHireBody,
   CreateOnboardingItemBody,
   UpdateOnboardingItemBody,
 } from "@workspace/api-zod";
 import { eq, asc, desc } from "drizzle-orm";
+import { requireStaffRole } from "../middlewares/requireStaffRole";
 
-const router: IRouter = Router();
+export const ONBOARDING_ACCESS_ROLES = ["admin", "supervisor", "employee_administrator"] as const;
 
 type DefaultItem = {
   category: "step" | "document" | "training" | "walkthrough";
@@ -29,6 +30,12 @@ const DEFAULT_ITEMS: DefaultItem[] = [
   { category: "walkthrough", title: "In-app walkthrough: My Tasks & schedule" },
   { category: "walkthrough", title: "In-app walkthrough: reporting issues & photos" },
 ];
+
+export function createOnboardingRouter(
+  authorize: RequestHandler = requireStaffRole(...ONBOARDING_ACCESS_ROLES),
+): IRouter {
+const router: IRouter = Router();
+router.use(authorize);
 
 async function loadHireWithItems(id: number) {
   const [hire] = await db
@@ -113,6 +120,62 @@ router.post("/", async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /onboarding/applications/:id/promote — explicitly link an application
+ * to a new-hire record and set its manager-controlled status atomically.
+ */
+router.post("/applications/:applicationId/promote", requireStaffRole("admin"), async (req, res) => {
+  const applicationId = Number(req.params.applicationId);
+  if (!Number.isSafeInteger(applicationId) || applicationId <= 0) {
+    res.status(400).json({ error: "Invalid application id" });
+    return;
+  }
+  try {
+    const result = await db.transaction(async tx => {
+      const [application] = await tx.select().from(jobApplicationsTable)
+        .where(eq(jobApplicationsTable.id, applicationId)).for("update").limit(1);
+      if (!application) return { status: 404 as const };
+      if (application.status === "rejected") return { status: 409 as const, error: "Rejected applications cannot be promoted" };
+      if (!application.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(application.email.trim())) {
+        return { status: 409 as const, error: "A valid application email is required for new-hire access" };
+      }
+
+      const [linkedHire] = await tx.select().from(onboardingHiresTable)
+        .where(eq(onboardingHiresTable.applicationId, applicationId)).limit(1);
+      if (linkedHire?.staffId !== null && linkedHire?.staffId !== undefined) {
+        return { status: 409 as const, error: "This application is already linked to a staff record" };
+      }
+      let hire = linkedHire;
+      if (!hire) {
+        [hire] = await tx.insert(onboardingHiresTable).values({
+          name: `${application.firstName} ${application.lastName}`.trim(),
+          position: application.positionApplied,
+          applicationId,
+        }).returning();
+        if (!hire) throw new Error("ONBOARDING_HIRE_INSERT_FAILED");
+        await tx.insert(onboardingItemsTable).values(DEFAULT_ITEMS.map((item, index) => ({
+          hireId: hire!.id,
+          category: item.category,
+          title: item.title,
+          sortOrder: index,
+        })));
+      }
+      await tx.update(jobApplicationsTable)
+        .set({ status: "hired", updatedAt: new Date() })
+        .where(eq(jobApplicationsTable.id, applicationId));
+      return { status: linkedHire ? 200 as const : 201 as const, hireId: hire.id };
+    });
+    if (!("hireId" in result)) {
+      res.status(result.status).json({ error: "error" in result ? result.error : "Application not found" });
+      return;
+    }
+    res.status(result.status).json({ hireId: result.hireId, applicationId, status: "hired" });
+  } catch (error) {
+    console.error("Error promoting employment application to new hire");
+    res.status(500).json({ error: "Failed to promote application" });
+  }
+});
+
+/**
  * GET /onboarding/:id — hire with checklist items.
  */
 router.get("/:id", async (req: Request, res: Response) => {
@@ -144,6 +207,12 @@ router.delete("/:id", async (req: Request, res: Response) => {
     return;
   }
   try {
+    const [existing] = await db.select({ applicationId: onboardingHiresTable.applicationId })
+      .from(onboardingHiresTable).where(eq(onboardingHiresTable.id, id)).limit(1);
+    if (existing?.applicationId !== null && existing?.applicationId !== undefined) {
+      res.status(409).json({ error: "Application-linked onboarding history cannot be deleted" });
+      return;
+    }
     const [deleted] = await db
       .delete(onboardingHiresTable)
       .where(eq(onboardingHiresTable.id, id))
@@ -255,4 +324,8 @@ router.delete("/items/:itemId", async (req: Request, res: Response) => {
   }
 });
 
+return router;
+}
+
+const router = createOnboardingRouter();
 export default router;

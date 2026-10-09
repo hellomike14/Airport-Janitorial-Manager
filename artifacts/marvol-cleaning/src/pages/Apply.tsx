@@ -147,6 +147,9 @@ export default function Apply() {
             </div>
           </div>
           <LanguageSwitcher />
+          <a href={`${BASE_URL}/new-hire`} className="shrink-0 text-sm font-medium text-emerald-100 underline underline-offset-2">
+            Already hired? Sign in
+          </a>
         </div>
       </header>
 

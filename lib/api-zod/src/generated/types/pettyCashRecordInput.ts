@@ -26,6 +26,7 @@ export interface PettyCashRecordInput {
   custodianAcknowledged: boolean;
   managerAcknowledged: boolean;
   reimbursementStatus: PettyCashRecordInputReimbursementStatus;
+  reimbursementPaidConfirmed: boolean;
   /**
    * @minimum 0
    * @nullable

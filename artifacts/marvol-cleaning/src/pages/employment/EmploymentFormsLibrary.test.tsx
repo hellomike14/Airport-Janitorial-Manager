@@ -8,26 +8,36 @@ vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ effectiveRole: "sta
 
 afterEach(cleanup);
 
-test("the public applicant form library offers the original forms and every unrestricted onboarding PDF", () => {
+test("anonymous applicants see only the three allowlisted forms without export or email actions", () => {
   render(<EmploymentFormsLibrary variant="applicant" />);
   expect(screen.getByText("employment.apply.blankTemplates")).toBeTruthy();
-  expect(screen.getByText("employment.forms.emailDestination")).toBeTruthy();
-  const unrestrictedForms = onboardingForms.filter(form => !form.restricted);
-  for (const id of ["job-application", "i-9", "w-4", ...unrestrictedForms.map(form => form.id)]) {
+  expect(screen.queryByText("employment.forms.emailDestination")).toBeNull();
+  for (const id of ["job-application", "i-9", "w-4"]) {
     expect(screen.getByTestId(`fill-online-${id}`)).toBeTruthy();
-    expect(screen.getByTestId(`open-${id}`).getAttribute("href")).toBe(`/api/employment-forms/${id}`);
-    expect(screen.getByTestId(`download-${id}`).getAttribute("href")).toBe(`/api/employment-forms/${id}?download=1`);
-    expect(screen.getByTestId(`blank-form-${id}-email`)).toBeTruthy();
-    expect(screen.getByTestId(`blank-form-${id}-print-open`)).toBeTruthy();
+    expect(screen.queryByTestId(`open-${id}`)).toBeNull();
+    expect(screen.queryByTestId(`download-${id}`)).toBeNull();
+    expect(screen.queryByTestId(`blank-form-${id}-email`)).toBeNull();
+    expect(screen.queryByTestId(`blank-form-${id}-print-open`)).toBeNull();
   }
+  for (const form of onboardingForms) {
+    expect(screen.queryByTestId(`form-card-${form.id}`)).toBeNull();
+  }
+  expect(screen.queryByTestId(`fill-online-${onboardingIndex.id}`)).toBeNull();
+});
+
+test("promoted new hires see only candidate onboarding forms, not the applicant packet or restricted templates", () => {
+  render(<EmploymentFormsLibrary variant="new-hire" candidate={{
+    firstName: "Candidate", lastName: "Example", email: "candidate@example.invalid", phone: null,
+  }} />);
+  for (const id of [
+    "i-9", "w-4", "offer-acceptance", "emergency-contact", "language-accessibility",
+    "orientation-acknowledgment", "video-attestation", "knowledge-check", "badge-rules-acknowledgment",
+  ]) {
+    expect(screen.getByTestId(`fill-online-${id}`)).toBeTruthy();
+  }
+  expect(screen.queryByTestId("fill-online-job-application")).toBeNull();
+  expect(screen.queryByTestId(`form-card-${onboardingIndex.id}`)).toBeNull();
   for (const form of onboardingForms.filter(candidate => candidate.restricted)) {
     expect(screen.queryByTestId(`form-card-${form.id}`)).toBeNull();
   }
-  expect(screen.getByTestId(`open-${onboardingIndex.id}`).getAttribute("href"))
-    .toBe(`/api/employment-forms/${onboardingIndex.id}`);
-  expect(screen.getByTestId(`download-${onboardingIndex.id}`).getAttribute("href"))
-    .toBe(`/api/employment-forms/${onboardingIndex.id}?download=1`);
-  expect(screen.getByTestId(`blank-form-${onboardingIndex.id}-email`)).toBeTruthy();
-  expect(screen.getByTestId(`blank-form-${onboardingIndex.id}-print-open`)).toBeTruthy();
-  expect(screen.queryByTestId(`fill-online-${onboardingIndex.id}`)).toBeNull();
 });

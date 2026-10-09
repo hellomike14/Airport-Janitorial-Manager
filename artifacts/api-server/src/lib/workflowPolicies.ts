@@ -1,6 +1,7 @@
-export type ActorPolicy = { id: number; role: "staff" | "supervisor" | "admin" | "inspector" };
+export type ActorPolicy = { id: number; role: "staff" | "supervisor" | "admin" | "inspector" | "employee_administrator" };
 
 export function canMutateTask(actor: ActorPolicy, assignedToId: number | null, inspectorLinked: boolean, assignedToArea = false): boolean {
+  if (actor.role === "employee_administrator") return false;
   if (inspectorLinked) return assignedToId === actor.id;
   return assignedToId === actor.id || actor.role === "supervisor" || actor.role === "admin" ||
     (assignedToId === null && assignedToArea);
@@ -20,6 +21,7 @@ export function canReadPrivateObject(input: {
   assignedTaskStaffId?: number | null;
   conversationParticipantIds?: readonly number[];
 }): boolean {
+  if (input.actor.role === "employee_administrator") return false;
   return input.actor.role === "admin" ||
     input.ownerStaffId === input.actor.id ||
     input.assignedTaskStaffId === input.actor.id ||

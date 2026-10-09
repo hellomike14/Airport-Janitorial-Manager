@@ -57,6 +57,7 @@ import type {
   EmployeeTrainingStatus,
   EmploymentFormSubmission,
   EmploymentFormSubmissionRequest,
+  EmploymentFormSubmissionReviewRequest,
   EmploymentFormSubmissionSummary,
   EmploymentFormTemplateId,
   EmploymentPdfEmailInput,
@@ -71,6 +72,7 @@ import type {
   GetIdentityDocumentContext200,
   GetInspectorWorkflow200,
   GetOperationsConfidentialAccessStatus200,
+  GetPettyCashMonthlyReportParams,
   HealthStatus,
   InspectorAssignmentReport,
   InspectorEmailRecipientsResponse,
@@ -101,6 +103,10 @@ import type {
   OnboardingProtocolEmailInput,
   OnboardingProtocolEmailResponse,
   PettyCashHistoryEntry,
+  PettyCashMonthlyReport,
+  PettyCashReceiptUploadComplete,
+  PettyCashReceiptUploadInput,
+  PettyCashReceiptUploadReservation,
   PettyCashRecord,
   PettyCashRecordInput,
   PettyCashRecordUpdate,
@@ -6681,7 +6687,8 @@ export const useUpdateApplication = <
 };
 
 /**
- * @summary List standalone employment form submissions (Admin plus confidential code only)
+ * Admin and employee administrators may read the summary. Only Admin can access submitted files.
+ * @summary List standalone employment form review metadata
  */
 export const getListEmploymentFormSubmissionsUrl = () => {
   return `/api/employment-form-submissions`;
@@ -6737,7 +6744,7 @@ export type ListEmploymentFormSubmissionsQueryResult = NonNullable<
 export type ListEmploymentFormSubmissionsQueryError = ErrorType<unknown>;
 
 /**
- * @summary List standalone employment form submissions (Admin plus confidential code only)
+ * @summary List standalone employment form review metadata
  */
 
 export function useListEmploymentFormSubmissions<
@@ -6939,6 +6946,99 @@ export function useGetEmploymentFormSubmission<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Update review status without returning submitted files
+ */
+export const getUpdateEmploymentFormSubmissionReviewUrl = (id: number) => {
+  return `/api/employment-form-submissions/${id}/review`;
+};
+
+export const updateEmploymentFormSubmissionReview = async (
+  id: number,
+  employmentFormSubmissionReviewRequest: EmploymentFormSubmissionReviewRequest,
+  options?: RequestInit,
+): Promise<EmploymentFormSubmissionSummary> => {
+  return customFetch<EmploymentFormSubmissionSummary>(
+    getUpdateEmploymentFormSubmissionReviewUrl(id),
+    {
+      ...options,
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(employmentFormSubmissionReviewRequest),
+    },
+  );
+};
+
+export const getUpdateEmploymentFormSubmissionReviewMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateEmploymentFormSubmissionReview>>,
+    TError,
+    { id: number; data: BodyType<EmploymentFormSubmissionReviewRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateEmploymentFormSubmissionReview>>,
+  TError,
+  { id: number; data: BodyType<EmploymentFormSubmissionReviewRequest> },
+  TContext
+> => {
+  const mutationKey = ["updateEmploymentFormSubmissionReview"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateEmploymentFormSubmissionReview>>,
+    { id: number; data: BodyType<EmploymentFormSubmissionReviewRequest> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateEmploymentFormSubmissionReview(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateEmploymentFormSubmissionReviewMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateEmploymentFormSubmissionReview>>
+>;
+export type UpdateEmploymentFormSubmissionReviewMutationBody =
+  BodyType<EmploymentFormSubmissionReviewRequest>;
+export type UpdateEmploymentFormSubmissionReviewMutationError = ErrorType<void>;
+
+/**
+ * @summary Update review status without returning submitted files
+ */
+export const useUpdateEmploymentFormSubmissionReview = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateEmploymentFormSubmissionReview>>,
+    TError,
+    { id: number; data: BodyType<EmploymentFormSubmissionReviewRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateEmploymentFormSubmissionReview>>,
+  TError,
+  { id: number; data: BodyType<EmploymentFormSubmissionReviewRequest> },
+  TContext
+> => {
+  return useMutation(
+    getUpdateEmploymentFormSubmissionReviewMutationOptions(options),
+  );
+};
 
 /**
  * @summary Retry email delivery for a standalone form (Admin plus confidential code only)
@@ -8649,6 +8749,564 @@ export const useCreatePettyCashRecord = <
 > => {
   return useMutation(getCreatePettyCashRecordMutationOptions(options));
 };
+
+/**
+ * @summary Summarize Petty Cash records grouped by reconciliation record month
+ */
+export const getGetPettyCashMonthlyReportUrl = (
+  params: GetPettyCashMonthlyReportParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/operations/petty-cash/monthly-report?${stringifiedParams}`
+    : `/api/operations/petty-cash/monthly-report`;
+};
+
+export const getPettyCashMonthlyReport = async (
+  params: GetPettyCashMonthlyReportParams,
+  options?: RequestInit,
+): Promise<PettyCashMonthlyReport> => {
+  return customFetch<PettyCashMonthlyReport>(
+    getGetPettyCashMonthlyReportUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetPettyCashMonthlyReportQueryKey = (
+  params?: GetPettyCashMonthlyReportParams,
+) => {
+  return [
+    `/api/operations/petty-cash/monthly-report`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetPettyCashMonthlyReportQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPettyCashMonthlyReport>>,
+  TError = ErrorType<void>,
+>(
+  params: GetPettyCashMonthlyReportParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPettyCashMonthlyReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetPettyCashMonthlyReportQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getPettyCashMonthlyReport>>
+  > = ({ signal }) =>
+    getPettyCashMonthlyReport(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPettyCashMonthlyReport>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPettyCashMonthlyReportQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPettyCashMonthlyReport>>
+>;
+export type GetPettyCashMonthlyReportQueryError = ErrorType<void>;
+
+/**
+ * @summary Summarize Petty Cash records grouped by reconciliation record month
+ */
+
+export function useGetPettyCashMonthlyReport<
+  TData = Awaited<ReturnType<typeof getPettyCashMonthlyReport>>,
+  TError = ErrorType<void>,
+>(
+  params: GetPettyCashMonthlyReportParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPettyCashMonthlyReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPettyCashMonthlyReportQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a short-lived private receipt-photo upload reservation
+ */
+export const getReservePettyCashReceiptUploadUrl = () => {
+  return `/api/operations/petty-cash/receipts/uploads`;
+};
+
+export const reservePettyCashReceiptUpload = async (
+  pettyCashReceiptUploadInput: PettyCashReceiptUploadInput,
+  options?: RequestInit,
+): Promise<PettyCashReceiptUploadReservation> => {
+  return customFetch<PettyCashReceiptUploadReservation>(
+    getReservePettyCashReceiptUploadUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(pettyCashReceiptUploadInput),
+    },
+  );
+};
+
+export const getReservePettyCashReceiptUploadMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reservePettyCashReceiptUpload>>,
+    TError,
+    { data: BodyType<PettyCashReceiptUploadInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof reservePettyCashReceiptUpload>>,
+  TError,
+  { data: BodyType<PettyCashReceiptUploadInput> },
+  TContext
+> => {
+  const mutationKey = ["reservePettyCashReceiptUpload"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof reservePettyCashReceiptUpload>>,
+    { data: BodyType<PettyCashReceiptUploadInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return reservePettyCashReceiptUpload(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReservePettyCashReceiptUploadMutationResult = NonNullable<
+  Awaited<ReturnType<typeof reservePettyCashReceiptUpload>>
+>;
+export type ReservePettyCashReceiptUploadMutationBody =
+  BodyType<PettyCashReceiptUploadInput>;
+export type ReservePettyCashReceiptUploadMutationError = ErrorType<void>;
+
+/**
+ * @summary Create a short-lived private receipt-photo upload reservation
+ */
+export const useReservePettyCashReceiptUpload = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reservePettyCashReceiptUpload>>,
+    TError,
+    { data: BodyType<PettyCashReceiptUploadInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof reservePettyCashReceiptUpload>>,
+  TError,
+  { data: BodyType<PettyCashReceiptUploadInput> },
+  TContext
+> => {
+  return useMutation(getReservePettyCashReceiptUploadMutationOptions(options));
+};
+
+/**
+ * @summary Remove a draft receipt image that has not been attached to a reconciliation
+ */
+export const getDeletePettyCashReceiptDraftUrl = (uploadId: string) => {
+  return `/api/operations/petty-cash/receipts/uploads/${uploadId}`;
+};
+
+export const deletePettyCashReceiptDraft = async (
+  uploadId: string,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeletePettyCashReceiptDraftUrl(uploadId), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeletePettyCashReceiptDraftMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deletePettyCashReceiptDraft>>,
+    TError,
+    { uploadId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deletePettyCashReceiptDraft>>,
+  TError,
+  { uploadId: string },
+  TContext
+> => {
+  const mutationKey = ["deletePettyCashReceiptDraft"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deletePettyCashReceiptDraft>>,
+    { uploadId: string }
+  > = (props) => {
+    const { uploadId } = props ?? {};
+
+    return deletePettyCashReceiptDraft(uploadId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeletePettyCashReceiptDraftMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deletePettyCashReceiptDraft>>
+>;
+
+export type DeletePettyCashReceiptDraftMutationError = ErrorType<void>;
+
+/**
+ * @summary Remove a draft receipt image that has not been attached to a reconciliation
+ */
+export const useDeletePettyCashReceiptDraft = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deletePettyCashReceiptDraft>>,
+    TError,
+    { uploadId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deletePettyCashReceiptDraft>>,
+  TError,
+  { uploadId: string },
+  TContext
+> => {
+  return useMutation(getDeletePettyCashReceiptDraftMutationOptions(options));
+};
+
+/**
+ * @summary Validate and finalize a private receipt image
+ */
+export const getCompletePettyCashReceiptUploadUrl = (uploadId: string) => {
+  return `/api/operations/petty-cash/receipts/uploads/${uploadId}/complete`;
+};
+
+export const completePettyCashReceiptUpload = async (
+  uploadId: string,
+  options?: RequestInit,
+): Promise<PettyCashReceiptUploadComplete> => {
+  return customFetch<PettyCashReceiptUploadComplete>(
+    getCompletePettyCashReceiptUploadUrl(uploadId),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getCompletePettyCashReceiptUploadMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof completePettyCashReceiptUpload>>,
+    TError,
+    { uploadId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof completePettyCashReceiptUpload>>,
+  TError,
+  { uploadId: string },
+  TContext
+> => {
+  const mutationKey = ["completePettyCashReceiptUpload"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof completePettyCashReceiptUpload>>,
+    { uploadId: string }
+  > = (props) => {
+    const { uploadId } = props ?? {};
+
+    return completePettyCashReceiptUpload(uploadId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CompletePettyCashReceiptUploadMutationResult = NonNullable<
+  Awaited<ReturnType<typeof completePettyCashReceiptUpload>>
+>;
+
+export type CompletePettyCashReceiptUploadMutationError = ErrorType<void>;
+
+/**
+ * @summary Validate and finalize a private receipt image
+ */
+export const useCompletePettyCashReceiptUpload = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof completePettyCashReceiptUpload>>,
+    TError,
+    { uploadId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof completePettyCashReceiptUpload>>,
+  TError,
+  { uploadId: string },
+  TContext
+> => {
+  return useMutation(getCompletePettyCashReceiptUploadMutationOptions(options));
+};
+
+/**
+ * @summary View a private receipt attached to a protected reconciliation
+ */
+export const getPreviewPettyCashReceiptUrl = (attachmentId: string) => {
+  return `/api/operations/petty-cash/receipts/${attachmentId}/preview`;
+};
+
+export const previewPettyCashReceipt = async (
+  attachmentId: string,
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getPreviewPettyCashReceiptUrl(attachmentId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getPreviewPettyCashReceiptQueryKey = (attachmentId: string) => {
+  return [
+    `/api/operations/petty-cash/receipts/${attachmentId}/preview`,
+  ] as const;
+};
+
+export const getPreviewPettyCashReceiptQueryOptions = <
+  TData = Awaited<ReturnType<typeof previewPettyCashReceipt>>,
+  TError = ErrorType<void>,
+>(
+  attachmentId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof previewPettyCashReceipt>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getPreviewPettyCashReceiptQueryKey(attachmentId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof previewPettyCashReceipt>>
+  > = ({ signal }) =>
+    previewPettyCashReceipt(attachmentId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!attachmentId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof previewPettyCashReceipt>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type PreviewPettyCashReceiptQueryResult = NonNullable<
+  Awaited<ReturnType<typeof previewPettyCashReceipt>>
+>;
+export type PreviewPettyCashReceiptQueryError = ErrorType<void>;
+
+/**
+ * @summary View a private receipt attached to a protected reconciliation
+ */
+
+export function usePreviewPettyCashReceipt<
+  TData = Awaited<ReturnType<typeof previewPettyCashReceipt>>,
+  TError = ErrorType<void>,
+>(
+  attachmentId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof previewPettyCashReceipt>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getPreviewPettyCashReceiptQueryOptions(
+    attachmentId,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Download a private receipt attached to a protected reconciliation
+ */
+export const getDownloadPettyCashReceiptUrl = (attachmentId: string) => {
+  return `/api/operations/petty-cash/receipts/${attachmentId}/download`;
+};
+
+export const downloadPettyCashReceipt = async (
+  attachmentId: string,
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getDownloadPettyCashReceiptUrl(attachmentId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getDownloadPettyCashReceiptQueryKey = (attachmentId: string) => {
+  return [
+    `/api/operations/petty-cash/receipts/${attachmentId}/download`,
+  ] as const;
+};
+
+export const getDownloadPettyCashReceiptQueryOptions = <
+  TData = Awaited<ReturnType<typeof downloadPettyCashReceipt>>,
+  TError = ErrorType<void>,
+>(
+  attachmentId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof downloadPettyCashReceipt>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getDownloadPettyCashReceiptQueryKey(attachmentId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof downloadPettyCashReceipt>>
+  > = ({ signal }) =>
+    downloadPettyCashReceipt(attachmentId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!attachmentId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof downloadPettyCashReceipt>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type DownloadPettyCashReceiptQueryResult = NonNullable<
+  Awaited<ReturnType<typeof downloadPettyCashReceipt>>
+>;
+export type DownloadPettyCashReceiptQueryError = ErrorType<void>;
+
+/**
+ * @summary Download a private receipt attached to a protected reconciliation
+ */
+
+export function useDownloadPettyCashReceipt<
+  TData = Awaited<ReturnType<typeof downloadPettyCashReceipt>>,
+  TError = ErrorType<void>,
+>(
+  attachmentId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof downloadPettyCashReceipt>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getDownloadPettyCashReceiptQueryOptions(
+    attachmentId,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Update a reconciliation with optimistic version checking

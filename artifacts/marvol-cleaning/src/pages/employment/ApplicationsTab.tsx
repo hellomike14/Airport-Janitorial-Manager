@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, Download, Loader2, Save, FileText, Mail, RefreshCw } from "lucide-react";
+import { ChevronLeft, Download, Loader2, Save, FileText, Mail, RefreshCw, UserRoundCheck } from "lucide-react";
 import {
   useListApplications,
   useGetApplication,
@@ -15,6 +15,7 @@ import { EMPLOYER_SECTIONS, PUBLIC_SECTIONS } from "./formConfig";
 import { FieldGrid } from "./FormField";
 import { PdfDocumentActions } from "./PdfDocumentActions";
 
+const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 const STATUSES: UpdateApplicationRequestStatus[] = ["new", "reviewing", "hired", "rejected"];
 
 const STATUS_STYLE: Record<string, string> = {
@@ -46,6 +47,9 @@ function ApplicationDetail({ id, onBack }: { id: number; onBack: () => void }) {
     w4Employer: {},
   });
   const [saved, setSaved] = useState(false);
+  const [promoting, setPromoting] = useState(false);
+  const [promotedHireId, setPromotedHireId] = useState<number | null>(null);
+  const [promotionError, setPromotionError] = useState<string | null>(null);
   const [emailNotice, setEmailNotice] = useState<"sent" | "failed" | null>(null);
   useEffect(() => {
     if (app) {
@@ -82,6 +86,29 @@ function ApplicationDetail({ id, onBack }: { id: number; onBack: () => void }) {
       ]);
     } catch {
       setEmailNotice("failed");
+    }
+  };
+
+  const handlePromote = async () => {
+    setPromoting(true);
+    setPromotionError(null);
+    try {
+      const response = await fetch(`${BASE_URL}/api/onboarding/applications/${id}/promote`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!response.ok) throw new Error("Promotion failed");
+      const result = await response.json() as { hireId: number };
+      setPromotedHireId(result.hireId);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: getGetApplicationQueryKey(id) }),
+        queryClient.invalidateQueries({ queryKey: getListApplicationsQueryKey() }),
+      ]);
+    } catch {
+      setPromotionError("Could not promote this application. Check that it has a valid email and is not rejected.");
+    } finally {
+      setPromoting(false);
     }
   };
 
@@ -153,6 +180,7 @@ function ApplicationDetail({ id, onBack }: { id: number; onBack: () => void }) {
           {t(emailNotice === "sent" ? "employment.submittedForms.retrySent" : "employment.submittedForms.retryFailed")}
         </p>
       )}
+      {promotionError && <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800">{promotionError}</p>}
 
       {/* Applicant header */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
@@ -182,6 +210,15 @@ function ApplicationDetail({ id, onBack }: { id: number; onBack: () => void }) {
                 </option>
               ))}
             </select>
+            {promotedHireId !== null ? (
+              <p role="status" className="text-xs font-medium text-emerald-700">Linked New Hire #{promotedHireId}</p>
+            ) : app.status !== "rejected" ? (
+              <button type="button" onClick={handlePromote} disabled={promoting}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-800 disabled:opacity-50">
+                {promoting ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserRoundCheck className="h-4 w-4" />}
+                {app.status === "hired" ? "Link New Hire" : "Promote to New Hire"}
+              </button>
+            ) : null}
           </div>
         </div>
       </div>

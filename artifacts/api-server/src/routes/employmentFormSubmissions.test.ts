@@ -8,6 +8,7 @@ import { db, pool } from "@workspace/db";
 import { employmentFormSubmissionsTable, objectUploadsTable } from "@workspace/db/schema";
 import { createEmploymentFormSubmissionsRouter } from "./employmentFormSubmissions";
 import type { EmploymentEmail } from "../lib/employmentFormEmail";
+import type { PromotedCandidateIdentity } from "../lib/actorSession";
 
 const testAdminGate: RequestHandler = (req, res, next) => {
   const role = req.headers["x-test-role"];
@@ -20,25 +21,32 @@ test("standalone PDF and ID photos are snapshotted privately, emailed, and reduc
   const firstName = `Standalone${nonce.slice(0, 8)}`;
   const lastName = "PrivacyRegression";
   const email = `${nonce}@example.invalid`;
+  const candidateFirstName = `Promoted${nonce.slice(0, 8)}`;
+  const candidateLastName = "VerifiedCandidate";
+  const candidateEmail = `verified-${nonce}@example.invalid`;
   const inputs = [
     { path: `/objects/uploads/form-${nonce}`, token: randomUUID(), name: "completed.pdf", type: "application/pdf", bytes: Buffer.from("%PDF-synthetic") },
     { path: `/objects/uploads/front-${nonce}`, token: randomUUID(), name: "front.jpg", type: "image/jpeg", bytes: Buffer.from("synthetic-front-photo") },
     { path: `/objects/uploads/back-${nonce}`, token: randomUUID(), name: "back.png", type: "image/png", bytes: Buffer.from("synthetic-back-photo") },
   ];
-  const snapshots = inputs.map((_, index) => `/objects/uploads/completed-${nonce}-${index}`);
+  const candidateInputs = [
+    { path: `/objects/uploads/candidate-form-${nonce}`, token: randomUUID(), name: "candidate-completed.pdf", type: "application/pdf", bytes: Buffer.from("%PDF-candidate") },
+  ];
+  const allInputs = [...inputs, ...candidateInputs];
+  const snapshots = allInputs.map((_, index) => `/objects/uploads/completed-${nonce}-${index}`);
   const fileData = new Map<string, { bytes: Buffer; contentType: string }>();
-  inputs.forEach((input, index) => fileData.set(snapshots[index]!, { bytes: input.bytes, contentType: input.type }));
+  allInputs.forEach((input, index) => fileData.set(snapshots[index]!, { bytes: input.bytes, contentType: input.type }));
   const sentEmails: EmploymentEmail[] = [];
   const router = createEmploymentFormSubmissionsRouter({
     getObjectMetadata: async path => {
-      const input = inputs.find(item => item.path === path);
+      const input = allInputs.find(item => item.path === path);
       if (input) return { sizeBytes: input.bytes.byteLength, contentType: input.type };
       const snapshot = fileData.get(path);
       assert.ok(snapshot, `Unexpected object metadata path: ${path}`);
       return { sizeBytes: snapshot.bytes.byteLength, contentType: snapshot.contentType };
     },
     copyApplicantSubmissionObject: async path => {
-      const index = inputs.findIndex(item => item.path === path);
+      const index = allInputs.findIndex(item => item.path === path);
       assert.notEqual(index, -1);
       return snapshots[index]!;
     },
@@ -49,6 +57,17 @@ test("standalone PDF and ID photos are snapshotted privately, emailed, and reduc
     },
     sendEmail: async message => { sentEmails.push(message); },
     authorizeAdmin: testAdminGate,
+    resolveStaffActor: async () => null,
+    resolvePromotedCandidate: async req => req.header("x-test-candidate") === "yes" ? {
+      clerkUserId: "verified-clerk-user",
+      hireId: 721,
+      applicationId: 1721,
+      firstName: candidateFirstName,
+      lastName: candidateLastName,
+      email: candidateEmail,
+      phone: "server-verified-phone",
+      position: "Cleaner",
+    } satisfies PromotedCandidateIdentity : null,
   });
   const app = express();
   app.use(express.json());
@@ -57,7 +76,7 @@ test("standalone PDF and ID photos are snapshotted privately, emailed, and reduc
   await once(server, "listening");
   const base = `http://127.0.0.1:${(server.address() as { port: number }).port}/employment-form-submissions`;
   try {
-    await db.insert(objectUploadsTable).values(inputs.map(input => ({
+    await db.insert(objectUploadsTable).values(allInputs.map(input => ({
       objectPath: input.path,
       ownerStaffId: null,
       purpose: "application_document" as const,
@@ -69,18 +88,26 @@ test("standalone PDF and ID photos are snapshotted privately, emailed, and reduc
       mimeType: input.type,
       sizeBytes: input.bytes.byteLength,
     })));
+    const publicPayload = {
+      formId: "i-9",
+      firstName,
+      lastName,
+      email,
+      phone: "synthetic-only",
+      completedPdf: { name: inputs[0]!.name, path: inputs[0]!.path, contentType: inputs[0]!.type, uploadToken: inputs[0]!.token },
+      idPhotos: inputs.slice(1).map(input => ({ name: input.name, path: input.path, contentType: input.type, uploadToken: input.token })),
+    };
+    const blockedInternal = await fetch(base, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ...publicPayload, formId: "offer-tracking" }),
+    });
+    assert.equal(blockedInternal.status, 403, "unpromoted applicants cannot submit internal forms");
+
     const response = await fetch(base, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        formId: "i-9",
-        firstName,
-        lastName,
-        email,
-        phone: "synthetic-only",
-        completedPdf: { name: inputs[0]!.name, path: inputs[0]!.path, contentType: inputs[0]!.type, uploadToken: inputs[0]!.token },
-        idPhotos: inputs.slice(1).map(input => ({ name: input.name, path: input.path, contentType: input.type, uploadToken: input.token })),
-      }),
+      body: JSON.stringify(publicPayload),
     });
     assert.equal(response.status, 201);
     assert.equal(response.headers.get("cache-control"), "no-store");
@@ -101,7 +128,38 @@ test("standalone PDF and ID photos are snapshotted privately, emailed, and reduc
     assert.equal(saved.email, email);
     assert.equal(saved.emailStatus, "sent");
     assert.equal(saved.completedPdfPath, snapshots[0]);
-    assert.deepEqual(saved.idPhotos.map(photo => photo.path), snapshots.slice(1));
+    assert.deepEqual(saved.idPhotos.map(photo => photo.path), snapshots.slice(1, inputs.length));
+
+    const promotedResponse = await fetch(base, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-test-candidate": "yes" },
+      body: JSON.stringify({
+        formId: "offer-acceptance",
+        firstName: "Spoofed",
+        lastName: "Browser",
+        email: "spoofed@example.invalid",
+        phone: "spoofed",
+        completedPdf: {
+          name: candidateInputs[0]!.name,
+          path: candidateInputs[0]!.path,
+          contentType: candidateInputs[0]!.type,
+          uploadToken: candidateInputs[0]!.token,
+        },
+      }),
+    });
+    assert.equal(promotedResponse.status, 201);
+    const [promotedSubmission] = await db.select().from(employmentFormSubmissionsTable).where(and(
+      eq(employmentFormSubmissionsTable.firstName, candidateFirstName),
+      eq(employmentFormSubmissionsTable.lastName, candidateLastName),
+    ));
+    assert.ok(promotedSubmission);
+    assert.equal(promotedSubmission.formId, "offer-acceptance");
+    assert.equal(promotedSubmission.email, candidateEmail, "verified application email replaces client input");
+    assert.equal(promotedSubmission.phone, "server-verified-phone");
+    assert.equal(sentEmails.length, 2);
+    assert.match(sentEmails[1]?.text ?? "", new RegExp(candidateFirstName));
+    assert.match(sentEmails[1]?.text ?? "", new RegExp(candidateEmail));
+    assert.doesNotMatch(sentEmails[1]?.text ?? "", /spoofed@example\.invalid/);
 
     const emailEndpoint = `${base}/${saved.id}/email-pdf`;
     const postPdfEmail = (role: string | null, body: unknown) => fetch(emailEndpoint, {
@@ -118,18 +176,18 @@ test("standalone PDF and ID photos are snapshotted privately, emailed, and reduc
       recipientEmail: "recipient@example.invalid",
       attachments: ["client-supplied"],
     })).status, 400);
-    assert.equal(sentEmails.length, 1, "rejected callers and extra attachment data never send");
+    assert.equal(sentEmails.length, 2, "rejected callers and extra attachment data never send");
 
     const emailedPdf = await postPdfEmail("admin", { recipientEmail: "recipient@example.invalid" });
     const emailReceipt = await emailedPdf.text();
     assert.equal(emailedPdf.status, 202, emailReceipt);
     assert.deepEqual(JSON.parse(emailReceipt), { accepted: true });
     assert.equal(emailedPdf.headers.get("cache-control"), "private, no-store");
-    assert.equal(sentEmails.length, 2);
-    assert.equal(sentEmails[1]?.to, "recipient@example.invalid");
-    assert.equal(sentEmails[1]?.attachments.length, 1, "ID photos are never included in manual PDF email");
-    assert.equal(sentEmails[1]?.attachments[0]?.contentType, "application/pdf");
-    assert.deepEqual(sentEmails[1]?.attachments[0]?.bytes, inputs[0]!.bytes);
+    assert.equal(sentEmails.length, 3);
+    assert.equal(sentEmails[2]?.to, "recipient@example.invalid");
+    assert.equal(sentEmails[2]?.attachments.length, 1, "ID photos are never included in manual PDF email");
+    assert.equal(sentEmails[2]?.attachments[0]?.contentType, "application/pdf");
+    assert.deepEqual(sentEmails[2]?.attachments[0]?.bytes, inputs[0]!.bytes);
     for (let index = 0; index < inputs.length; index++) {
       const [draft] = await db.select().from(objectUploadsTable).where(eq(objectUploadsTable.objectPath, inputs[index]!.path));
       const [snapshot] = await db.select().from(objectUploadsTable).where(eq(objectUploadsTable.objectPath, snapshots[index]!));
@@ -143,7 +201,11 @@ test("standalone PDF and ID photos are snapshotted privately, emailed, and reduc
       eq(employmentFormSubmissionsTable.firstName, firstName),
       eq(employmentFormSubmissionsTable.lastName, lastName),
     ));
-    for (const path of [...inputs.map(input => input.path), ...snapshots]) {
+    await db.delete(employmentFormSubmissionsTable).where(and(
+      eq(employmentFormSubmissionsTable.firstName, candidateFirstName),
+      eq(employmentFormSubmissionsTable.lastName, candidateLastName),
+    ));
+    for (const path of [...allInputs.map(input => input.path), ...snapshots]) {
       await db.delete(objectUploadsTable).where(eq(objectUploadsTable.objectPath, path));
     }
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));

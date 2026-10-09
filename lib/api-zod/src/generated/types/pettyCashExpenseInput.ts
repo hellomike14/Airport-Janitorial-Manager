@@ -16,4 +16,13 @@ export interface PettyCashExpenseInput {
   /** @minimum 1 */
   amountCents: number;
   receiptReceived: boolean;
+  /**
+   * @maxLength 100
+   * @nullable
+   */
+  voucherNumber?: string | null;
+  /** @nullable */
+  receiptAttachmentId?: string | null;
+  /** @nullable */
+  receiptUploadId?: string | null;
 }

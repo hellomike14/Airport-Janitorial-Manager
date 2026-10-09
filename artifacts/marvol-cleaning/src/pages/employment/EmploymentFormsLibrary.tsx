@@ -10,6 +10,19 @@ import { PdfDocumentActions } from "./PdfDocumentActions";
 const EmploymentFormEditor = lazy(() => import("./formEditor/EmploymentFormEditor"));
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 const FORM_EMAIL_RECIPIENT = "admin@marvolenterprises.com";
+const promotedCandidateFormIds = new Set([
+  "i-9",
+  "w-4",
+  "offer-acceptance",
+  "emergency-contact",
+  "language-accessibility",
+  "orientation-acknowledgment",
+  "video-attestation",
+  "knowledge-check",
+  "badge-rules-acknowledgment",
+]);
+type LibraryVariant = "employment" | "applicant" | "new-hire";
+type CandidateIdentity = { firstName: string; lastName: string; email: string; phone: string | null };
 
 type FormItem = {
   id: EmploymentTemplateId;
@@ -43,11 +56,13 @@ function FormCard({
   title,
   description,
   onFill,
+  variant,
 }: {
   form: FormItem;
   title: string;
   description: string;
   onFill: (id: EmploymentFormId) => void;
+  variant: LibraryVariant;
 }) {
   const { t } = useTranslation();
   const url = `${BASE_URL}/api/employment-forms/${form.id}`;
@@ -83,38 +98,42 @@ function FormCard({
             {t("employment.forms.fillOnline")}
           </button>
         )}
-        <a href={url} target="_blank" rel="noopener noreferrer" data-testid={`open-${form.id}`}
-          className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700">
-          <ExternalLink className="h-4 w-4" aria-hidden="true" />
-          {t("employment.forms.open")}
-        </a>
-        <a href={`${url}?download=1`} data-testid={`download-${form.id}`}
-          className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-          <Download className="h-4 w-4" aria-hidden="true" />
-          {t("employment.forms.download")}
-        </a>
-        <PdfDocumentActions
-          title={title}
-          pdfUrl={url}
-          emailEndpoint={`${url}/email`}
-          testId={`blank-form-${form.id}`}
-        />
+        {variant === "employment" && (
+          <>
+            <a href={url} target="_blank" rel="noopener noreferrer" data-testid={`open-${form.id}`}
+              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700">
+              <ExternalLink className="h-4 w-4" aria-hidden="true" />
+              {t("employment.forms.open")}
+            </a>
+            <a href={`${url}?download=1`} data-testid={`download-${form.id}`}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+              <Download className="h-4 w-4" aria-hidden="true" />
+              {t("employment.forms.download")}
+            </a>
+            <PdfDocumentActions title={title} pdfUrl={url} emailEndpoint={`${url}/email`}
+              testId={`blank-form-${form.id}`} />
+          </>
+        )}
       </div>
     </article>
   );
 }
 
-type Props = { variant?: "employment" | "applicant" };
+type Props = { variant?: LibraryVariant; candidate?: CandidateIdentity };
 
-export function EmploymentFormsLibrary({ variant = "employment" }: Props) {
+export function EmploymentFormsLibrary({ variant = "employment", candidate }: Props) {
   const { t } = useTranslation();
   const { effectiveRole } = useAuth();
   const [editing, setEditing] = useState<EmploymentFormId | null>(null);
   const [delivery, setDelivery] = useState<"sent" | "failed" | null>(null);
-  const visibleForms = [
-    ...originalForms,
-    ...companyForms.filter(form => !form.restricted),
-  ];
+  const visibleForms = variant === "applicant"
+    ? originalForms
+    : variant === "new-hire"
+      ? [
+          ...originalForms.filter(form => form.id === "i-9" || form.id === "w-4"),
+          ...companyForms.filter(form => promotedCandidateFormIds.has(form.id) && !form.restricted),
+        ]
+      : [...originalForms, ...companyForms.filter(form => !form.restricted)];
   const indexTitle = indexForm.title;
 
   return (
@@ -126,9 +145,11 @@ export function EmploymentFormsLibrary({ variant = "employment" }: Props) {
       <h2 id="employment-forms-title" className="text-lg font-semibold text-slate-900">
         {t(variant === "applicant" ? "employment.apply.blankTemplates" : "employment.tabs.forms")}
       </h2>
-      <p className="mt-2 text-sm text-slate-600">
-        {t("employment.forms.emailDestination", { address: FORM_EMAIL_RECIPIENT })}
-      </p>
+      {variant === "employment" && (
+        <p className="mt-2 text-sm text-slate-600">
+          {t("employment.forms.emailDestination", { address: FORM_EMAIL_RECIPIENT })}
+        </p>
+      )}
       {delivery && (
         <p role={delivery === "failed" ? "alert" : "status"}
           className={`mt-3 rounded-lg px-3 py-2 text-sm ${delivery === "sent" ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-900"}`}>
@@ -143,7 +164,7 @@ export function EmploymentFormsLibrary({ variant = "employment" }: Props) {
           ? t(`employment.forms.${form.description}`)
           : form.description;
         return (
-          <FormCard key={form.id} form={form} title={title} description={description}
+          <FormCard key={form.id} form={form} title={title} description={description} variant={variant}
             onFill={id => { setDelivery(null); setEditing(id); }} />
         );
       })}
@@ -157,19 +178,19 @@ export function EmploymentFormsLibrary({ variant = "employment" }: Props) {
           </p>
           <ConfidentialBoundary>
             {companyForms.filter(form => form.restricted).map(form => (
-              <FormCard key={form.id} form={form} title={form.title} description={form.description}
+              <FormCard key={form.id} form={form} title={form.title} description={form.description} variant={variant}
                 onFill={id => { setDelivery(null); setEditing(id); }} />
             ))}
           </ConfidentialBoundary>
         </section>
       )}
-      <section className="mt-8 border-t border-slate-200 pt-4" aria-labelledby="onboarding-index-title">
+      {variant === "employment" && <section className="mt-8 border-t border-slate-200 pt-4" aria-labelledby="onboarding-index-title">
         <h3 id="onboarding-index-title" className="text-sm font-semibold uppercase tracking-wide text-slate-600">
           Packet index
         </h3>
-        <FormCard form={indexForm} title={indexTitle} description={indexForm.description}
+        <FormCard form={indexForm} title={indexTitle} description={indexForm.description} variant={variant}
           onFill={() => {}} />
-      </section>
+      </section>}
       <p className="mt-5 text-sm text-slate-500">{t("employment.forms.fillableHelp")}</p>
       {editing && (
         <Suspense fallback={null}>
@@ -179,6 +200,9 @@ export function EmploymentFormsLibrary({ variant = "employment" }: Props) {
             title={originalForms.some(form => form.id === editing)
               ? t(`employment.forms.${originalForms.find(form => form.id === editing)!.title}`)
               : companyForms.find(form => form.id === editing)!.title}
+            allowExport={variant !== "applicant"}
+            showDestination={variant === "employment"}
+            candidate={variant === "new-hire" ? candidate : undefined}
             onClose={() => setEditing(null)}
             onSubmitted={(emailSent) => {
               setEditing(null);

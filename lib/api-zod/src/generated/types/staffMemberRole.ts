@@ -14,4 +14,5 @@ export const StaffMemberRole = {
   supervisor: "supervisor",
   admin: "admin",
   inspector: "inspector",
+  employee_administrator: "employee_administrator",
 } as const;

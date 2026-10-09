@@ -2,18 +2,27 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@workspace/db";
 import {
   pettyCashExpensesTable,
+  pettyCashReceiptAttachmentsTable,
+  pettyCashReceiptUploadsTable,
   pettyCashRecordHistoryTable,
   pettyCashRecordsTable,
   staffTable,
 } from "@workspace/db/schema";
 import { csvCell } from "./operationsPolicy";
 import { DigitalOperationsError } from "./digitalOperationsErrors";
+import { digest } from "./confidentialAccess";
+
+export const PETTY_CASH_MINIMUM_RESERVE_CENTS = 3_000;
+export const PETTY_CASH_TARGET_FLOAT_CENTS = 10_000;
 
 export type PettyCashExpenseInput = {
   expenseDate: string;
   description: string;
   amountCents: number;
   receiptReceived: boolean;
+  voucherNumber?: string | null;
+  receiptAttachmentId?: string | null;
+  receiptUploadId?: string | null;
 };
 
 export type PettyCashInput = {
@@ -26,6 +35,7 @@ export type PettyCashInput = {
   custodianAcknowledged: boolean;
   managerAcknowledged: boolean;
   reimbursementStatus: "not_submitted" | "submitted" | "paid";
+  reimbursementPaidConfirmed?: boolean;
   reimbursementAmountCents?: number | null;
   reimbursementReference?: string | null;
   reimbursementSubmittedOn?: string | null;
@@ -37,6 +47,17 @@ export type PettyCashInput = {
 type DigitalDb = typeof db;
 const normalizeOptionalText = (value: string | null | undefined) =>
   value?.trim() || null;
+const isDuplicatePaidReference = (error: unknown) => {
+  let current = error;
+  for (let depth = 0; depth < 4 && typeof current === "object" && current !== null; depth += 1) {
+    const candidate = current as { code?: unknown; constraint?: unknown; cause?: unknown };
+    if (candidate.code === "23505" && candidate.constraint === "petty_cash_paid_reference_unique") {
+      return true;
+    }
+    current = candidate.cause;
+  }
+  return false;
+};
 
 function validatePettyCash(input: PettyCashInput) {
   if (input.status === "completed" &&
@@ -67,12 +88,15 @@ function validatePettyCash(input: PettyCashInput) {
   }
   if (
     input.reimbursementStatus === "paid" &&
-    (!input.reimbursementPaidOn || input.reimbursementAmountCents == null)
+    (!input.reimbursementPaidOn || input.reimbursementAmountCents == null ||
+      input.reimbursementAmountCents <= 0 ||
+      !normalizeOptionalText(input.reimbursementReference) ||
+      input.reimbursementPaidConfirmed !== true)
   ) {
     throw new DigitalOperationsError(
       400,
       "REIMBURSEMENT_PAYMENT_DETAILS_REQUIRED",
-      "Enter the reimbursement amount and payment date.",
+      "Enter the confirmed payment amount, date and reference.",
     );
   }
   const total = input.expenses.reduce((sum, expense) => {
@@ -91,10 +115,98 @@ function validatePettyCash(input: PettyCashInput) {
     expectedBalanceCents: input.openingFloatCents - total,
     overShortCents:
       input.cashOnHandCents - (input.openingFloatCents - total),
+    minimumReserveCents: PETTY_CASH_MINIMUM_RESERVE_CENTS,
+    targetFloatCents: PETTY_CASH_TARGET_FLOAT_CENTS,
+    reserveStatus: input.cashOnHandCents < PETTY_CASH_MINIMUM_RESERVE_CENTS
+      ? "replenishment_required"
+      : input.cashOnHandCents === PETTY_CASH_MINIMUM_RESERVE_CENTS
+        ? "minimum_reached"
+        : "above_minimum",
+    suggestedTopUpCents: Math.max(
+      0,
+      PETTY_CASH_TARGET_FLOAT_CENTS - input.cashOnHandCents,
+    ),
   };
 }
 
-function makeSnapshot(input: PettyCashInput, calculations: ReturnType<typeof validatePettyCash>) {
+type ExpenseConnection = Pick<typeof db, "select" | "insert" | "update">;
+async function writeExpenses(
+  conn: ExpenseConnection,
+  recordId: number,
+  recordVersion: number,
+  inputs: PettyCashExpenseInput[],
+  actorId: number,
+  sessionHash: string,
+) {
+  const values = [];
+  for (const expense of inputs) {
+    if (expense.receiptAttachmentId && expense.receiptUploadId) {
+      throw new DigitalOperationsError(400, "RECEIPT_SELECTION_INVALID", "Choose one receipt photo for each expense.");
+    }
+    let receiptAttachmentId: string | null = null;
+    if (expense.receiptUploadId) {
+      if (!sessionHash) {
+        throw new DigitalOperationsError(401, "SESSION_REQUIRED", "Sign in again before saving receipt photos.");
+      }
+      const [upload] = await conn.select().from(pettyCashReceiptUploadsTable)
+        .where(eq(pettyCashReceiptUploadsTable.id, expense.receiptUploadId))
+        .for("update").limit(1);
+      if (!upload || upload.actorId !== actorId ||
+          upload.sessionHash !== sessionHash || upload.status !== "uploaded") {
+        throw new DigitalOperationsError(403, "RECEIPT_UPLOAD_INVALID", "This receipt photo is no longer available. Upload it again.");
+      }
+      if (upload.expiresAt <= new Date()) {
+        throw new DigitalOperationsError(410, "RECEIPT_UPLOAD_EXPIRED", "This receipt photo expired. Upload it again.");
+      }
+      receiptAttachmentId = upload.id;
+      await conn.insert(pettyCashReceiptAttachmentsTable).values({
+        id: upload.id,
+        recordId,
+        createdById: actorId,
+      });
+      await conn.update(pettyCashReceiptUploadsTable)
+        .set({ status: "attached" })
+        .where(eq(pettyCashReceiptUploadsTable.id, upload.id));
+    } else if (expense.receiptAttachmentId) {
+      const [attachment] = await conn.select({ id: pettyCashReceiptAttachmentsTable.id })
+        .from(pettyCashReceiptAttachmentsTable)
+        .where(and(
+          eq(pettyCashReceiptAttachmentsTable.id, expense.receiptAttachmentId),
+          eq(pettyCashReceiptAttachmentsTable.recordId, recordId),
+        )).limit(1);
+      if (!attachment) {
+        throw new DigitalOperationsError(403, "RECEIPT_ATTACHMENT_INVALID", "A receipt photo must belong to this reconciliation.");
+      }
+      receiptAttachmentId = attachment.id;
+    }
+    values.push({
+      recordId,
+      recordVersion,
+      expenseDate: expense.expenseDate,
+      description: expense.description.trim(),
+      amountCents: expense.amountCents,
+      receiptReceived: expense.receiptReceived || receiptAttachmentId !== null,
+      voucherNumber: normalizeOptionalText(expense.voucherNumber)?.slice(0, 100) ?? null,
+      receiptAttachmentId,
+    });
+  }
+  if (!values.length) return [];
+  const rows = await conn.insert(pettyCashExpensesTable).values(values).returning();
+  return rows.map((expense) => ({
+    expenseDate: expense.expenseDate,
+    description: expense.description,
+    amountCents: expense.amountCents,
+    receiptReceived: expense.receiptReceived,
+    voucherNumber: expense.voucherNumber,
+    receiptAttachmentId: expense.receiptAttachmentId,
+  }));
+}
+
+function makeSnapshot(
+  input: PettyCashInput,
+  calculations: ReturnType<typeof validatePettyCash>,
+  expenses: Awaited<ReturnType<typeof writeExpenses>>,
+) {
   return {
     location: input.location,
     custodianId: input.custodianId,
@@ -105,12 +217,13 @@ function makeSnapshot(input: PettyCashInput, calculations: ReturnType<typeof val
     custodianAcknowledged: input.custodianAcknowledged,
     managerAcknowledged: input.managerAcknowledged,
     reimbursementStatus: input.reimbursementStatus,
+    reimbursementPaidConfirmed: input.reimbursementPaidConfirmed === true,
     reimbursementAmountCents: input.reimbursementAmountCents ?? null,
     reimbursementReference: normalizeOptionalText(input.reimbursementReference),
     reimbursementSubmittedOn: input.reimbursementSubmittedOn ?? null,
     reimbursementPaidOn: input.reimbursementPaidOn ?? null,
     accountingNotes: normalizeOptionalText(input.accountingNotes),
-    expenses: input.expenses.map((expense) => ({ ...expense })),
+    expenses,
     ...calculations,
   };
 }
@@ -129,6 +242,28 @@ export function createPettyCashService(database: DigitalDb = db) {
       .from(pettyCashExpensesTable)
       .where(inArray(pettyCashExpensesTable.recordId, recordIds))
       .orderBy(pettyCashExpensesTable.id);
+    const attachmentIds = [...new Set(expenseRows
+      .map((expense) => expense.receiptAttachmentId)
+      .filter((value): value is string => value != null))];
+    const attachments = attachmentIds.length
+      ? await conn.select({
+          id: pettyCashReceiptAttachmentsTable.id,
+          recordId: pettyCashReceiptAttachmentsTable.recordId,
+          fileName: pettyCashReceiptUploadsTable.fileName,
+          contentType: pettyCashReceiptUploadsTable.contentType,
+          sizeBytes: pettyCashReceiptUploadsTable.sizeBytes,
+        })
+        .from(pettyCashReceiptAttachmentsTable)
+        .innerJoin(pettyCashReceiptUploadsTable, eq(
+          pettyCashReceiptAttachmentsTable.id,
+          pettyCashReceiptUploadsTable.id,
+        ))
+        .where(inArray(pettyCashReceiptAttachmentsTable.id, attachmentIds))
+      : [];
+    const attachmentMap = new Map(attachments.map((attachment) => [
+      attachment.id,
+      attachment,
+    ]));
     const staffIds = [...new Set(rows.flatMap((row) => [
       row.custodianId,
       row.openingFloatApprovedById,
@@ -155,6 +290,20 @@ export function createPettyCashService(database: DigitalDb = db) {
           description: expense.description,
           amountCents: expense.amountCents,
           receiptReceived: expense.receiptReceived,
+          voucherNumber: expense.voucherNumber,
+          receiptAttachment: expense.receiptAttachmentId
+            ? (() => {
+                const attachment = attachmentMap.get(expense.receiptAttachmentId!);
+                return attachment?.recordId === row.id
+                  ? {
+                      id: attachment.id,
+                      fileName: attachment.fileName,
+                      contentType: attachment.contentType,
+                      sizeBytes: attachment.sizeBytes,
+                    }
+                  : null;
+              })()
+            : null,
         }));
       const totalExpensesCents = expenses.reduce(
         (sum, expense) => sum + expense.amountCents,
@@ -177,6 +326,18 @@ export function createPettyCashService(database: DigitalDb = db) {
         totalExpensesCents,
         expectedBalanceCents,
         overShortCents: row.cashOnHandCents - expectedBalanceCents,
+        minimumReserveCents: row.minimumReserveCents,
+        targetFloatCents: row.targetFloatCents,
+        reserveStatus: row.minimumReserveCents == null || row.targetFloatCents == null
+          ? null
+          : row.cashOnHandCents < row.minimumReserveCents
+            ? "replenishment_required"
+            : row.cashOnHandCents === row.minimumReserveCents
+              ? "minimum_reached"
+              : "above_minimum",
+        suggestedTopUpCents: row.minimumReserveCents == null || row.targetFloatCents == null
+          ? null
+          : Math.max(0, row.targetFloatCents - row.cashOnHandCents),
         status: row.status,
         custodianAcknowledgedAt: row.custodianAcknowledgedAt,
         custodianAcknowledgedRecordedByName:
@@ -189,6 +350,7 @@ export function createPettyCashService(database: DigitalDb = db) {
             : names.get(row.managerAcknowledgedById) ?? "Unknown manager",
         managerAcknowledgedAt: row.managerAcknowledgedAt,
         reimbursementStatus: row.reimbursementStatus,
+        reimbursementPaidConfirmed: row.reimbursementPaidConfirmed,
         reimbursementAmountCents: row.reimbursementAmountCents,
         reimbursementReference: row.reimbursementReference,
         reimbursementSubmittedOn: row.reimbursementSubmittedOn,
@@ -215,9 +377,11 @@ export function createPettyCashService(database: DigitalDb = db) {
       return listRecords();
     },
 
-    async create(input: PettyCashInput, actorId: number) {
+    async create(input: PettyCashInput, actorId: number, sessionHash = "") {
       const calculations = validatePettyCash(input);
-      const id = await database.transaction(async (tx) => {
+      let id: number;
+      try {
+        id = await database.transaction(async (tx) => {
         const [custodian] = await tx
           .select({ id: staffTable.id })
           .from(staffTable)
@@ -241,6 +405,8 @@ export function createPettyCashService(database: DigitalDb = db) {
             openingFloatApprovedById: actorId,
             openingFloatApprovedAt: now,
             cashOnHandCents: input.cashOnHandCents,
+            minimumReserveCents: PETTY_CASH_MINIMUM_RESERVE_CENTS,
+            targetFloatCents: PETTY_CASH_TARGET_FLOAT_CENTS,
             status: input.status,
             custodianAcknowledgedAt: input.custodianAcknowledged ? now : null,
             custodianAcknowledgedRecordedById:
@@ -250,6 +416,7 @@ export function createPettyCashService(database: DigitalDb = db) {
             managerAcknowledgedAt:
               input.status === "completed" ? now : null,
             reimbursementStatus: input.reimbursementStatus,
+            reimbursementPaidConfirmed: input.reimbursementPaidConfirmed === true,
             reimbursementAmountCents:
               input.reimbursementAmountCents ?? null,
             reimbursementReference: normalizeOptionalText(
@@ -266,28 +433,30 @@ export function createPettyCashService(database: DigitalDb = db) {
             updatedAt: now,
           })
           .returning({ id: pettyCashRecordsTable.id });
-        if (input.expenses.length) {
-          await tx.insert(pettyCashExpensesTable).values(
-            input.expenses.map((expense) => ({
-              recordId: record.id,
-              recordVersion: 1,
-              expenseDate: expense.expenseDate,
-              description: expense.description.trim(),
-              amountCents: expense.amountCents,
-              receiptReceived: expense.receiptReceived,
-            })),
-          );
-        }
+        const expenses = await writeExpenses(
+          tx,
+          record.id,
+          1,
+          input.expenses,
+          actorId,
+          sessionHash,
+        );
         await tx.insert(pettyCashRecordHistoryTable).values({
           recordId: record.id,
           actorId,
           event: input.status === "completed" ? "completed" : "created",
           version: 1,
-          snapshot: makeSnapshot(input, calculations),
+          snapshot: makeSnapshot(input, calculations, expenses),
           createdAt: now,
         });
         return record.id;
-      });
+        });
+      } catch (error) {
+        if (isDuplicatePaidReference(error)) {
+          throw new DigitalOperationsError(409, "REIMBURSEMENT_REFERENCE_USED", "That payment reference is already recorded as paid.");
+        }
+        throw error;
+      }
       return (await listRecords()).find((record) => record.id === id)!;
     },
 
@@ -296,9 +465,11 @@ export function createPettyCashService(database: DigitalDb = db) {
       expectedVersion: number,
       input: PettyCashInput,
       actorId: number,
+      sessionHash = "",
     ) {
       const calculations = validatePettyCash(input);
-      await database.transaction(async (tx) => {
+      try {
+        await database.transaction(async (tx) => {
         const [current] = await tx
           .select()
           .from(pettyCashRecordsTable)
@@ -318,6 +489,16 @@ export function createPettyCashService(database: DigitalDb = db) {
             "PETTY_CASH_VERSION_CONFLICT",
             "This record changed. Reload it before saving.",
           );
+        }
+        if (current.reimbursementStatus === "paid" && (
+          input.reimbursementStatus !== "paid" ||
+          input.reimbursementPaidConfirmed !== true ||
+          input.reimbursementAmountCents !== current.reimbursementAmountCents ||
+          input.reimbursementPaidOn !== current.reimbursementPaidOn ||
+          normalizeOptionalText(input.reimbursementReference)?.toLowerCase() !==
+            normalizeOptionalText(current.reimbursementReference)?.toLowerCase()
+        )) {
+          throw new DigitalOperationsError(409, "PAID_REIMBURSEMENT_IMMUTABLE", "A confirmed paid reimbursement cannot be changed or counted again.");
         }
         const [custodian] = await tx
           .select({ id: staffTable.id })
@@ -343,6 +524,8 @@ export function createPettyCashService(database: DigitalDb = db) {
             openingFloatApprovedById: actorId,
             openingFloatApprovedAt: now,
             cashOnHandCents: input.cashOnHandCents,
+            minimumReserveCents: PETTY_CASH_MINIMUM_RESERVE_CENTS,
+            targetFloatCents: PETTY_CASH_TARGET_FLOAT_CENTS,
             status: input.status,
             custodianAcknowledgedAt: input.custodianAcknowledged ? now : null,
             custodianAcknowledgedRecordedById:
@@ -352,6 +535,7 @@ export function createPettyCashService(database: DigitalDb = db) {
             managerAcknowledgedAt:
               input.status === "completed" ? now : null,
             reimbursementStatus: input.reimbursementStatus,
+            reimbursementPaidConfirmed: input.reimbursementPaidConfirmed === true,
             reimbursementAmountCents:
               input.reimbursementAmountCents ?? null,
             reimbursementReference: normalizeOptionalText(
@@ -369,27 +553,29 @@ export function createPettyCashService(database: DigitalDb = db) {
             eq(pettyCashRecordsTable.id, recordId),
             eq(pettyCashRecordsTable.version, expectedVersion),
           ));
-        if (input.expenses.length) {
-          await tx.insert(pettyCashExpensesTable).values(
-            input.expenses.map((expense) => ({
-              recordId,
-              recordVersion: version,
-              expenseDate: expense.expenseDate,
-              description: expense.description.trim(),
-              amountCents: expense.amountCents,
-              receiptReceived: expense.receiptReceived,
-            })),
-          );
-        }
+        const expenses = await writeExpenses(
+          tx,
+          recordId,
+          version,
+          input.expenses,
+          actorId,
+          sessionHash,
+        );
         await tx.insert(pettyCashRecordHistoryTable).values({
           recordId,
           actorId,
           event: input.status === "completed" ? "completed" : "updated",
           version,
-          snapshot: makeSnapshot(input, calculations),
+          snapshot: makeSnapshot(input, calculations, expenses),
           createdAt: now,
         });
-      });
+        });
+      } catch (error) {
+        if (isDuplicatePaidReference(error)) {
+          throw new DigitalOperationsError(409, "REIMBURSEMENT_REFERENCE_USED", "That payment reference is already recorded as paid.");
+        }
+        throw error;
+      }
       return (await listRecords()).find((record) => record.id === recordId)!;
     },
 
@@ -423,6 +609,36 @@ export function createPettyCashService(database: DigitalDb = db) {
       }));
     },
 
+    async monthlyReport(month: string) {
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
+        throw new DigitalOperationsError(400, "INVALID_MONTH", "Use YYYY-MM.");
+      }
+      const records = (await listRecords()).filter((record) =>
+        record.recordDate.startsWith(month),
+      );
+      const latest = records[0];
+      return {
+        month,
+        recordCount: records.length,
+        expenseTotalCents: records.reduce(
+          (sum, record) => sum + record.totalExpensesCents,
+          0,
+        ),
+        confirmedPaidReimbursementsCents: records.reduce(
+          (sum, record) => sum + (record.reimbursementStatus === "paid" && record.reimbursementPaidConfirmed === true
+            ? record.reimbursementAmountCents ?? 0
+            : 0),
+          0,
+        ),
+        latestRecordDate: latest?.recordDate ?? null,
+        cashOnHandCents: latest?.cashOnHandCents ?? null,
+        minimumReserveCents: latest?.minimumReserveCents ?? null,
+        targetFloatCents: latest?.targetFloatCents ?? null,
+        reserveStatus: latest?.reserveStatus ?? null,
+        suggestedTopUpCents: latest?.suggestedTopUpCents ?? null,
+      };
+    },
+
     async exportCsv(recordId: number) {
       const record = (await listRecords()).find((row) => row.id === recordId);
       if (!record) {
@@ -449,19 +665,25 @@ export function createPettyCashService(database: DigitalDb = db) {
         ["Expected balance", (record.expectedBalanceCents / 100).toFixed(2)],
         ["Actual cash on hand", (record.cashOnHandCents / 100).toFixed(2)],
         ["Over / (short)", (record.overShortCents / 100).toFixed(2)],
+        ["Minimum reserve", record.minimumReserveCents == null ? "" : (record.minimumReserveCents / 100).toFixed(2)],
+        ["Reserve status", record.reserveStatus ?? "Not stored for this historical record"],
+        ["Suggested top-up to target", record.suggestedTopUpCents == null ? "" : (record.suggestedTopUpCents / 100).toFixed(2)],
         ["Custodian acknowledged", record.custodianAcknowledgedAt?.toISOString() ?? ""],
         ["Manager approved by", record.managerAcknowledgedByName ?? ""],
         ["Manager approved at", record.managerAcknowledgedAt?.toISOString() ?? ""],
         [],
-        ["Expense date", "Description", "Amount", "Receipt received"],
+        ["Expense date", "Voucher number", "Description", "Amount", "Receipt received", "Receipt photo"],
         ...record.expenses.map((expense) => [
           expense.expenseDate,
+          expense.voucherNumber ?? "",
           expense.description,
           (expense.amountCents / 100).toFixed(2),
           expense.receiptReceived ? "Yes" : "No",
+          expense.receiptAttachment ? "Attached" : "",
         ]),
         [],
         ["Reimbursement status", record.reimbursementStatus],
+        ["Paid payment confirmed", record.reimbursementPaidConfirmed === true ? "Yes" : "No"],
         ["Reimbursement amount", record.reimbursementAmountCents == null ? "" : (record.reimbursementAmountCents / 100).toFixed(2)],
         ["Reimbursement reference", record.reimbursementReference ?? ""],
         ["Submitted on", record.reimbursementSubmittedOn ?? ""],

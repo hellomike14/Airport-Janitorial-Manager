@@ -1,6 +1,7 @@
-import { pgTable, text, serial, jsonb, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, jsonb, timestamp, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { staffTable } from "./staff";
 
 export type EmploymentFormId =
   | "job-application"
@@ -37,6 +38,7 @@ export type EmploymentFormId =
   | "i9-everify-tracker"
   | "training-matrix";
 export type EmploymentFormEmailStatus = "pending" | "sent" | "failed";
+export type EmploymentFormReviewStatus = "pending" | "reviewed" | "needs_follow_up";
 
 export type EmploymentFormAttachment = {
   name: string;
@@ -66,6 +68,9 @@ export const employmentFormSubmissionsTable = pgTable("employment_form_submissio
   completedPdfPath: text("completed_pdf_path").notNull(),
   idPhotos: jsonb("id_photos").$type<EmploymentFormAttachment[]>().notNull().default([]),
   emailStatus: text("email_status", { enum: ["pending", "sent", "failed"] }).notNull().default("pending"),
+  reviewStatus: text("review_status", { enum: ["pending", "reviewed", "needs_follow_up"] }).notNull().default("pending"),
+  reviewedById: integer("reviewed_by_id").references(() => staffTable.id, { onDelete: "set null" }),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
   submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

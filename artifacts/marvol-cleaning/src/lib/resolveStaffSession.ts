@@ -1,4 +1,4 @@
-export type StaffIdentity = { id: number; name: string; role: "admin" | "supervisor" | "staff" | "inspector" };
+export type StaffIdentity = { id: number; name: string; role: "admin" | "supervisor" | "staff" | "inspector" | "employee_administrator" };
 export type StaffResolution =
   | { status: "ok"; user: StaffIdentity }
   | { status: "nomatch" | "expired" | "disabled" | "error"; diagnosticId?: string }
@@ -8,7 +8,7 @@ export function isStaffIdentity(value: unknown): value is StaffIdentity {
   if (!value || typeof value !== "object") return false;
   const person = value as Record<string, unknown>;
   return Number.isInteger(person.id) && Number(person.id) > 0 && typeof person.name === "string" &&
-    ["admin", "supervisor", "staff", "inspector"].includes(String(person.role));
+    ["admin", "supervisor", "staff", "inspector", "employee_administrator"].includes(String(person.role));
 }
 
 type ErrorPayload = { error?: unknown; diagnosticId?: unknown };

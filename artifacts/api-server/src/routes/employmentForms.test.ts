@@ -1,12 +1,19 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import express from "express";
+import type { RequestHandler } from "express";
 import { once } from "node:events";
 import {
   createEmploymentFormsRouter,
+  createEmploymentFormAuthorization,
   isPublicBlankEmploymentEmail,
   isPublicBlankEmploymentTemplate,
 } from "./employmentForms";
+
+const testStaffGate: RequestHandler = (req, res, next) => {
+  if (req.header("x-test-staff") === "yes") next();
+  else res.sendStatus(401);
+};
 import {
   getOnboardingCompanyForms,
   getOnboardingFormTemplate,
@@ -103,7 +110,10 @@ test("blank fillable templates are available without a staff identity or Admin a
     },
   };
   const app = express();
-  app.use(createEmploymentFormsRouter(storage));
+  app.use(createEmploymentFormsRouter(
+    storage,
+    createEmploymentFormAuthorization(async () => null, async () => null),
+  ));
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
   const base = `http://127.0.0.1:${(server.address() as { port: number }).port}/employment-forms`;
@@ -113,13 +123,16 @@ test("blank fillable templates are available without a staff identity or Admin a
       assert.equal(response.status, 200);
       assert.equal(response.headers.get("content-type"), "application/pdf");
       assert.deepEqual(Buffer.from(await response.arrayBuffer()), Buffer.from("%PDF-blank-fillable"));
+      assert.equal((await fetch(`${base}/${id}?download=1`)).status, 401, `${id} download requires a session`);
+      assert.equal((await fetch(`${base}/${id}/email`, { method: "POST" })).status, 401, `${id} email requires a session`);
     }
+    assert.equal((await fetch(`${base}/conditional-offer`)).status, 401, "internal blank forms require a session");
   } finally {
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
   }
 });
 
-test("email sends only each allowlisted blank PDF and rejects client-supplied attachment data", async () => {
+test("applicants cannot email blank forms; staff sends only allowlisted PDFs and client attachments are rejected", async () => {
   const pdf = Buffer.from("%PDF-1.7\nsynthetic blank template");
   const forms = [
     ["job-application", "/objects/uploads/354716d4-2967-439f-a9f3-ac4bf6ad01e8", "Marvol_Fillable_Job_Application_April_2026.pdf"],
@@ -144,7 +157,7 @@ test("email sends only each allowlisted blank PDF and rejects client-supplied at
   };
   const app = express();
   app.use(express.json());
-  app.use(createEmploymentFormsRouter(storage, undefined, async message => { emails.push(message); }));
+  app.use(createEmploymentFormsRouter(storage, testStaffGate, async message => { emails.push(message); }));
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
   const base = `http://127.0.0.1:${(server.address() as { port: number }).port}/employment-forms`;
@@ -153,7 +166,7 @@ test("email sends only each allowlisted blank PDF and rejects client-supplied at
       expectedPath = path;
       const response = await fetch(`${base}/${id}/email`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", "x-test-staff": "yes" },
         body: JSON.stringify({ recipientEmail: "sample@example.invalid" }),
       });
       assert.equal(response.status, 202);
@@ -163,9 +176,15 @@ test("email sends only each allowlisted blank PDF and rejects client-supplied at
       assert.equal(emails.at(-1)?.attachments[0]?.filename, filename);
       assert.deepEqual(emails.at(-1)?.attachments[0]?.bytes, pdf);
     }
-    const rejected = await fetch(`${base}/job-application/email`, {
+    const anonymousEmail = await fetch(`${base}/i-9/email`, {
       method: "POST",
       headers: { "content-type": "application/json" },
+      body: JSON.stringify({ recipientEmail: "sample@example.invalid" }),
+    });
+    assert.equal(anonymousEmail.status, 401);
+    const rejected = await fetch(`${base}/job-application/email`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-test-staff": "yes" },
       body: JSON.stringify({
         recipientEmail: "sample@example.invalid",
         url: "https://attacker.invalid/private.pdf",
@@ -179,7 +198,7 @@ test("email sends only each allowlisted blank PDF and rejects client-supplied at
   }
 });
 
-test("public blank form email endpoint limits requests per router and IP", async () => {
+test("staff blank form email is limited per router and IP", async () => {
   const pdf = Buffer.from("%PDF-1.7\nsynthetic blank");
   const storage: Pick<ObjectStorageService, "getObjectEntityFile" | "getObjectEntityMetadata" | "readObjectEntityBytes"> = {
     async getObjectEntityFile() {
@@ -195,7 +214,7 @@ test("public blank form email endpoint limits requests per router and IP", async
   let sends = 0;
   const app = express();
   app.use(express.json());
-  app.use(createEmploymentFormsRouter(storage, undefined, async () => { sends++; }));
+  app.use(createEmploymentFormsRouter(storage, testStaffGate, async () => { sends++; }));
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
   const endpoint = `http://127.0.0.1:${(server.address() as { port: number }).port}/employment-forms/i-9/email`;
@@ -203,14 +222,14 @@ test("public blank form email endpoint limits requests per router and IP", async
     for (let i = 0; i < 5; i++) {
       const response = await fetch(endpoint, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", "x-test-staff": "yes" },
         body: JSON.stringify({ recipientEmail: `sample${i}@example.invalid` }),
       });
       assert.equal(response.status, 202);
     }
     const limited = await fetch(endpoint, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", "x-test-staff": "yes" },
       body: JSON.stringify({ recipientEmail: "sixth@example.invalid" }),
     });
     assert.equal(limited.status, 429);
@@ -221,7 +240,7 @@ test("public blank form email endpoint limits requests per router and IP", async
   }
 });
 
-test("all unrestricted onboarding templates and the three-page index can be downloaded and emailed", async () => {
+test("authorized staff can download and email unrestricted onboarding templates and the index", async () => {
   const companyForms = getOnboardingCompanyForms();
   const restrictedForms = companyForms.filter(form => form.restricted);
   assert.equal(companyForms.length, 30);
@@ -230,17 +249,20 @@ test("all unrestricted onboarding templates and the three-page index can be down
   for (const form of companyForms) {
     assert.equal(
       isPublicBlankEmploymentTemplate(`/employment-forms/${form.id}`, "GET"),
-      !form.restricted,
+      false,
       `${form.id} GET privacy`,
     );
     assert.equal(
       isPublicBlankEmploymentEmail(`/employment-forms/${form.id}/email`, "POST"),
-      !form.restricted,
+      false,
       `${form.id} email privacy`,
     );
   }
-  assert.equal(isPublicBlankEmploymentTemplate(`/employment-forms/${ONBOARDING_INDEX_ID}`, "GET"), true);
-  assert.equal(isPublicBlankEmploymentEmail(`/employment-forms/${ONBOARDING_INDEX_ID}/email`, "POST"), true);
+  for (const id of ["job-application", "i-9", "w-4"]) {
+    assert.equal(isPublicBlankEmploymentTemplate(`/employment-forms/${id}`, "GET"), true, `${id} public template`);
+  }
+  assert.equal(isPublicBlankEmploymentTemplate(`/employment-forms/${ONBOARDING_INDEX_ID}`, "GET"), false);
+  assert.equal(isPublicBlankEmploymentEmail(`/employment-forms/${ONBOARDING_INDEX_ID}/email`, "POST"), false);
 
   const publicTemplates = [
     ...companyForms.filter(form => !form.restricted),
@@ -249,27 +271,27 @@ test("all unrestricted onboarding templates and the three-page index can be down
   const sentEmails: EmploymentEmail[] = [];
   const app = express();
   app.use(express.json());
-  app.use(createEmploymentFormsRouter(undefined, undefined, async message => { sentEmails.push(message); }));
+  app.use(createEmploymentFormsRouter(undefined, testStaffGate, async message => { sentEmails.push(message); }));
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
   const base = `http://127.0.0.1:${(server.address() as { port: number }).port}/employment-forms`;
   try {
     for (const template of publicTemplates) {
       const expected = await readOnboardingFormTemplate(template.id);
-      const opened = await fetch(`${base}/${template.id}`);
+      const opened = await fetch(`${base}/${template.id}`, { headers: { "x-test-staff": "yes" } });
       assert.equal(opened.status, 200, `${template.id} opens`);
       assert.equal(opened.headers.get("content-type"), "application/pdf");
       assert.equal(opened.headers.get("content-disposition"), `inline; filename="${template.filename}"`);
       assert.deepEqual(Buffer.from(await opened.arrayBuffer()), expected);
 
-      const downloaded = await fetch(`${base}/${template.id}?download=1`);
+      const downloaded = await fetch(`${base}/${template.id}?download=1`, { headers: { "x-test-staff": "yes" } });
       assert.equal(downloaded.status, 200, `${template.id} downloads`);
       assert.equal(downloaded.headers.get("content-disposition"), `attachment; filename="${template.filename}"`);
     }
 
     const email = await fetch(`${base}/conditional-offer/email`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", "x-test-staff": "yes" },
       body: JSON.stringify({ recipientEmail: "onboarding@example.invalid" }),
     });
     assert.equal(email.status, 202);

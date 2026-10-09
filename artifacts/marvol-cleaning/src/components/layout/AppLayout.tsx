@@ -150,6 +150,10 @@ function useNavConfig() {
       { href: "/photo-share", icon: Camera, label: t("nav.photoShare") },
       { href: "/special-requests", icon: Star, label: t("nav.specialRequests") },
     ],
+    employee_administrator: [
+      { href: "/staff", icon: Users, label: t("nav.staffDirectory") },
+      { href: "/employment", icon: Briefcase, label: t("nav.employment") },
+    ],
   };
 
   const ROLE_BADGE: Record<ViewMode, { label: string; cls: string }> = {
@@ -157,6 +161,7 @@ function useNavConfig() {
     inspector: { label: t("roles.inspector"), cls: "bg-blue-500/20 text-blue-300 border border-blue-500/30" },
     supervisor: { label: t("roles.supervisor"), cls: "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" },
     staff: { label: t("roles.staff"), cls: "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" },
+    employee_administrator: { label: t("roles.employeeAdministrator", "Employee administrator"), cls: "bg-cyan-500/20 text-cyan-200 border border-cyan-500/30" },
   };
 
   return { VIEW_MODES, NAV_BY_ROLE, ROLE_BADGE };
@@ -606,7 +611,27 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   useLocationTracker();
 
-  const navItems = NAV_BY_ROLE[viewMode];
+  const operationsAccess = useQuery<{ managerOperations: boolean; selfTime: boolean }>({
+    queryKey: ["operations-access", currentUser?.id],
+    queryFn: async () => {
+      const response = await fetch("/api/operations/access", {
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      if (!response.ok) throw new Error("Unable to check Operations access.");
+      return response.json();
+    },
+    enabled: !!currentUser && currentUser.role !== "inspector" && currentUser.role !== "employee_administrator",
+    refetchOnWindowFocus: true,
+  });
+  const navItems = NAV_BY_ROLE[viewMode].flatMap((item) => {
+    if (item.href !== "/operations") return [item];
+    if (!currentUser || (currentUser.role !== "admin" && !operationsAccess.data?.selfTime)) return [];
+    return [{
+      ...item,
+      label: operationsAccess.data?.managerOperations ? "Operations" : "My time",
+    }];
+  });
   const badge = ROLE_BADGE[viewMode];
 
   // Unread direct-message count for the Messages nav badge; polls like the
@@ -614,7 +639,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const { data: conversationList = [] } = useQuery({
     queryKey: ["/api/conversations", currentUser?.id ?? 0],
     queryFn: () => listConversations({ staffId: currentUser!.id }),
-    enabled: !!currentUser && viewMode !== "inspector",
+    enabled: !!currentUser && viewMode !== "inspector" && viewMode !== "employee_administrator",
     refetchInterval: 15000,
   });
   const unreadMessages = conversationList.reduce((sum, c) => sum + c.unreadCount, 0);
@@ -855,7 +880,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <Megaphone className="w-5 h-5" />
               </Button>
             )}
-            {currentUser && <NotificationBell staffId={currentUser.id} />}
+            {currentUser && currentUser.role !== "employee_administrator" && <NotificationBell staffId={currentUser.id} />}
           </div>
         </header>
 

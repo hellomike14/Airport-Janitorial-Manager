@@ -19,7 +19,8 @@ export default function Staff() {
 function StaffPage({ confidential }: { confidential: boolean }) {
   const { t } = useTranslation();
   const { effectiveRole } = useAuth();
-  const readOnly = effectiveRole === "supervisor";
+  const readOnly = effectiveRole !== "admin" && effectiveRole !== "employee_administrator";
+  const canAssignRoles = effectiveRole === "admin";
   const publicStaff = useListStaff({ query: { queryKey: ["/api/staff"], enabled: !confidential } });
   const secureStaff = useQuery({
     queryKey: ["/api/staff/confidential"],
@@ -105,7 +106,13 @@ function StaffPage({ confidential }: { confidential: boolean }) {
 
   const handleToggleRole = (person: any) => {
     const newRole = person.role === "staff" ? "supervisor" : "staff";
-    const label = newRole === "supervisor" ? t("roles.supervisor") : t("roles.staff");
+    handleSetRole(person, newRole);
+  };
+
+  const handleSetRole = (person: any, newRole: "staff" | "supervisor" | "employee_administrator") => {
+    const label = newRole === "employee_administrator"
+      ? t("roles.employeeAdministrator", "Employee administrator")
+      : newRole === "supervisor" ? t("roles.supervisor") : t("roles.staff");
     if (confirm(t("staff.switchRole", { name: person.name, role: label }))) {
       updateMutation.mutate({ id: person.id, data: { role: newRole } });
     }
@@ -117,6 +124,7 @@ function StaffPage({ confidential }: { confidential: boolean }) {
   if (isLoading) return <div className="p-8 animate-pulse text-slate-500">{t("staff.loadingDirectory")}</div>;
 
   const admins = staff?.filter((s) => s.role === "admin") || [];
+  const employeeAdministrators = staff?.filter((s) => s.role === "employee_administrator") || [];
   const supervisors = staff?.filter((s) => s.role === "supervisor") || [];
   const regularStaff = staff?.filter((s) => s.role === "staff") || [];
   const loginDisabledCount = (staff ?? []).filter((person) => {
@@ -130,7 +138,7 @@ function StaffPage({ confidential }: { confidential: boolean }) {
         <div>
           <h1 className="text-3xl font-display font-bold text-slate-900">{t("staff.staffDirectory")}</h1>
           <p className="text-slate-500 mt-1 font-medium">
-            {t("staff.subtitle", { admins: admins.length, supervisors: supervisors.length, staff: regularStaff.length })}
+            {t("staff.subtitle", { admins: admins.length, employeeAdministrators: employeeAdministrators.length, supervisors: supervisors.length, staff: regularStaff.length })}
           </p>
         </div>
         {!readOnly && (
@@ -155,7 +163,7 @@ function StaffPage({ confidential }: { confidential: boolean }) {
             <p className="mt-1 text-amber-700">
               {t(
                 "staff.migrationHint",
-                "An admin must edit and save each eligible active staff member's email to enable sign-in."
+                "An administrator or employee administrator can edit and save an eligible active staff member's email to enable sign-in."
               )}
             </p>
           </div>
@@ -176,7 +184,7 @@ function StaffPage({ confidential }: { confidential: boolean }) {
                 placeholder={t("staff.fullNamePlaceholder")}
               />
             </div>
-            <div>
+            {effectiveRole === "admin" ? <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1">{t("staff.role")}</label>
               <select
                 value={formData.role}
@@ -186,8 +194,14 @@ function StaffPage({ confidential }: { confidential: boolean }) {
                 <option value="staff">{t("roles.cleaningStaff")}</option>
                 <option value="supervisor">{t("roles.supervisor")}</option>
                 <option value="admin">{t("roles.administrator")}</option>
+                <option value="employee_administrator">{t("roles.employeeAdministrator", "Employee administrator")}</option>
               </select>
-            </div>
+            </div> : <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">{t("staff.role")}</label>
+              <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700">
+                {t("roles.cleaningStaff")}
+              </p>
+            </div>}
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1">{t("staff.phoneOptional")}</label>
               <input
@@ -232,10 +246,30 @@ function StaffPage({ confidential }: { confidential: boolean }) {
               <StaffCard
                 key={person.id}
                 person={person}
-                onDelete={readOnly ? undefined : () => handleDelete(person.id)}
+                onDelete={!canAssignRoles ? undefined : () => handleDelete(person.id)}
                 onSetEmail={readOnly ? undefined : () => handleSetEmail(person)}
                 roleType="admin"
                 onLogout={currentUser?.id === person.id ? logout : undefined}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {employeeAdministrators.length > 0 && (
+        <div>
+          <h2 className="text-xl font-display font-bold text-slate-800 mb-4 flex items-center gap-2 border-b border-slate-200 pb-2">
+            <Shield className="w-5 h-5 text-cyan-600" /> {t("roles.employeeAdministrator", "Employee administrators")} ({employeeAdministrators.length})
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {employeeAdministrators.map((person) => (
+              <StaffCard
+                key={person.id}
+                person={person}
+                onDelete={canAssignRoles ? () => handleDelete(person.id) : undefined}
+                onToggleRole={canAssignRoles ? () => handleSetRole(person, "staff") : undefined}
+                onSetEmail={readOnly ? undefined : () => handleSetEmail(person)}
+                roleType="employee_administrator"
               />
             ))}
           </div>
@@ -251,8 +285,8 @@ function StaffPage({ confidential }: { confidential: boolean }) {
             <StaffCard
               key={person.id}
               person={person}
-              onDelete={readOnly ? undefined : () => handleDelete(person.id)}
-              onToggleRole={readOnly ? undefined : () => handleToggleRole(person)}
+              onDelete={canAssignRoles ? () => handleDelete(person.id) : undefined}
+              onToggleRole={canAssignRoles ? () => handleToggleRole(person) : undefined}
               onSetEmail={readOnly ? undefined : () => handleSetEmail(person)}
               roleType="supervisor"
               onLogout={currentUser?.id === person.id ? logout : undefined}
@@ -270,8 +304,9 @@ function StaffPage({ confidential }: { confidential: boolean }) {
             <StaffCard
               key={person.id}
               person={person}
-              onDelete={readOnly ? undefined : () => handleDelete(person.id)}
-              onToggleRole={readOnly ? undefined : () => handleToggleRole(person)}
+              onDelete={canAssignRoles ? () => handleDelete(person.id) : undefined}
+              onToggleRole={canAssignRoles ? () => handleToggleRole(person) : undefined}
+              onAssignEmployeeAdministrator={canAssignRoles ? () => handleSetRole(person, "employee_administrator") : undefined}
               onSetEmail={readOnly ? undefined : () => handleSetEmail(person)}
               roleType="staff"
               onLogout={currentUser?.id === person.id ? logout : undefined}
@@ -313,6 +348,12 @@ const ROLE_STYLES = {
     avatar: "bg-indigo-100 text-indigo-700",
     badge: "info" as const,
   },
+  employee_administrator: {
+    border: "border-cyan-100 shadow-cyan-500/5",
+    bar: "from-cyan-500 to-teal-500",
+    avatar: "bg-cyan-100 text-cyan-700",
+    badge: "info" as const,
+  },
   staff: {
     border: "border-slate-200",
     bar: "from-emerald-400 to-teal-500",
@@ -321,7 +362,7 @@ const ROLE_STYLES = {
   },
 };
 
-function StaffCard({ person, onDelete, onToggleRole, roleType, onLogout, onSetEmail }: { person: any; onDelete?: () => void; onToggleRole?: () => void; roleType: "admin" | "supervisor" | "staff"; onLogout?: () => void; onSetEmail?: () => void }) {
+function StaffCard({ person, onDelete, onToggleRole, onAssignEmployeeAdministrator, roleType, onLogout, onSetEmail }: { person: any; onDelete?: () => void; onToggleRole?: () => void; onAssignEmployeeAdministrator?: () => void; roleType: "admin" | "supervisor" | "staff" | "employee_administrator"; onLogout?: () => void; onSetEmail?: () => void }) {
   const { t } = useTranslation();
   const style = ROLE_STYLES[roleType];
   const initials = person.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
@@ -425,6 +466,16 @@ function StaffCard({ person, onDelete, onToggleRole, roleType, onLogout, onSetEm
         >
           <ArrowUpDown className="w-4 h-4" />
           {roleType === "staff" ? t("staff.switchToSupervisor") : t("staff.switchToStaff")}
+        </button>
+      )}
+      {onAssignEmployeeAdministrator && (
+        <button
+          type="button"
+          onClick={onAssignEmployeeAdministrator}
+          className="mt-2 w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-cyan-50 hover:bg-cyan-100 text-cyan-800 font-semibold text-sm border border-cyan-200 transition-colors touch-manipulation"
+        >
+          <Shield className="w-4 h-4" />
+          {t("staff.makeEmployeeAdministrator", "Make employee administrator")}
         </button>
       )}
       {onLogout && (

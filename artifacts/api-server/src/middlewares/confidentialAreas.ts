@@ -5,11 +5,12 @@ import {
   confidentialCookie,
   confidentialIdentity,
   confidentialService,
+  personalOperationsAccessService,
 } from "../lib/confidentialAccess";
 import { confidentialFailure, confidentialSameOrigin } from "../routes/confidentialAccess";
 import {
   isEmploymentFormObjectPath,
-  isPublicBlankEmploymentEmail,
+  isRestrictedEmploymentTemplatePath,
   isPublicBlankEmploymentTemplate,
 } from "../routes/employmentForms";
 import { db } from "@workspace/db";
@@ -29,7 +30,9 @@ type GateDependencies = {
 const defaults: GateDependencies = {
   resolveIdentity: confidentialIdentity,
   requireUnlocked: (identity, token, operationsScope) =>
-    confidentialService.require(identity, token, operationsScope),
+    operationsScope && identity.role === "supervisor"
+      ? personalOperationsAccessService.require(identity, token, true)
+      : confidentialService.require(identity, token, operationsScope),
   isApplicationDocument: async objectPath => {
     const [upload] = await db.select({ purpose: objectUploadsTable.purpose })
       .from(objectUploadsTable).where(eq(objectUploadsTable.objectPath, objectPath)).limit(1);
@@ -42,22 +45,32 @@ export function isConfidentialRequest(path: string, method: string) {
   // Classify the same canonical path so encoded object URLs cannot skip the lock.
   try { path = decodeURIComponent(path); } catch { return true; }
   if (isPublicBlankEmploymentTemplate(path, method)) return false;
-  if (isPublicBlankEmploymentEmail(path, method)) return false;
   if (isOperationsConfidentialRequest(path)) return true;
   if (/^\/applications(?:\/|$)/i.test(path)) return method !== "POST" || path.toLowerCase() !== "/applications";
   if (/^\/employment-form-submissions(?:\/|$)/i.test(path)) {
     return method !== "POST" || path.toLowerCase() !== "/employment-form-submissions";
   }
   if (/^\/(?:identity-documents|quickbooks|auth-diagnostics)(?:\/|$)/i.test(path)) return true;
-  if (/^\/employment-forms(?:\/|$)/i.test(path)) return true;
+  if (isRestrictedEmploymentTemplatePath(path, method)) return true;
   if (/^\/staff\/(?:confidential|former)(?:\/|$)/i.test(path)) return true;
   if (/^\/staff(?:\/|$)/i.test(path) && !["GET", "HEAD", "OPTIONS"].includes(method)) return true;
   const prefix = "/storage/objects/";
   if (path.toLowerCase().startsWith(prefix)) {
     const objectPath = `/objects/${path.slice(prefix.length)}`;
-    return objectPath.startsWith("/objects/hr-identity/") || isEmploymentFormObjectPath(objectPath);
+     return objectPath.startsWith("/objects/hr-identity/") ||
+       objectPath.startsWith("/objects/petty-cash/receipts/") ||
+       objectPath.startsWith("/objects/petty-cash/receipts-staging/") ||
+       isEmploymentFormObjectPath(objectPath);
   }
   return false;
+}
+export function isEmployeeAdministratorRequest(path: string, method: string) {
+  try { path = decodeURIComponent(path); } catch { return false; }
+  const upperMethod = method.toUpperCase();
+  return (upperMethod === "GET" && /^\/employment-form-submissions\/?$/i.test(path)) ||
+    (upperMethod === "PATCH" && /^\/employment-form-submissions\/\d+\/review\/?$/i.test(path)) ||
+    (upperMethod === "POST" && /^\/staff\/?$/i.test(path)) ||
+    (upperMethod === "PUT" && /^\/staff\/\d+\/?$/i.test(path));
 }
 export function isOperationsConfidentialRequest(path: string) {
   try {
@@ -84,6 +97,12 @@ export function createConfidentialAreasMiddleware(overrides: Partial<GateDepende
     try {
       const operationsScope = isOperationsConfidentialRequest(req.path);
       const identity = await deps.resolveIdentity(req);
+      if (identity?.role === "employee_administrator" &&
+          isEmployeeAdministratorRequest(req.path, req.method)) {
+        if (!["GET", "HEAD", "OPTIONS"].includes(req.method)) confidentialSameOrigin(req);
+        next();
+        return;
+      }
       if (operationsScope) assertOperationsManager(identity);
       else assertAdmin(identity);
       if (!["GET", "HEAD", "OPTIONS"].includes(req.method)) confidentialSameOrigin(req);

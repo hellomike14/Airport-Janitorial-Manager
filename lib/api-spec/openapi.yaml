@@ -1373,7 +1373,8 @@ paths:
     get:
       operationId: listEmploymentFormSubmissions
       tags: [employment]
-      summary: List standalone employment form submissions (Admin plus confidential code only)
+      summary: List standalone employment form review metadata
+      description: Admin and employee administrators may read the summary. Only Admin can access submitted files.
       responses:
         "200":
           description: Private submission summaries without file paths
@@ -1432,6 +1433,35 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/EmploymentFormSubmission"
+        "404":
+          description: Submission not found
+
+  /employment-form-submissions/{id}/review:
+    patch:
+      operationId: updateEmploymentFormSubmissionReview
+      tags: [employment]
+      summary: Update review status without returning submitted files
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmploymentFormSubmissionReviewRequest"
+      responses:
+        "200":
+          description: Updated review metadata only
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmploymentFormSubmissionSummary"
+        "400":
+          description: Invalid submission id or review status
         "404":
           description: Submission not found
 
@@ -1889,6 +1919,134 @@ paths:
         "400": { description: Invalid record or acknowledgement data }
         "401": { description: Login session required }
         "403": { description: Manager access required }
+        "423": { description: Protected Operations access is locked }
+
+  /operations/petty-cash/monthly-report:
+    get:
+      operationId: getPettyCashMonthlyReport
+      tags: [operations]
+      summary: Summarize Petty Cash records grouped by reconciliation record month
+      parameters:
+        - name: month
+          in: query
+          required: true
+          schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" }
+      responses:
+        "200":
+          description: Current record-date month totals and latest reserve status.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PettyCashMonthlyReport" }
+        "400": { description: Invalid month }
+        "401": { description: Login session required }
+        "403": { description: Manager access required }
+        "423": { description: Protected Operations access is locked }
+
+  /operations/petty-cash/receipts/uploads:
+    post:
+      operationId: reservePettyCashReceiptUpload
+      tags: [operations]
+      summary: Create a short-lived private receipt-photo upload reservation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PettyCashReceiptUploadInput" }
+      responses:
+        "201":
+          description: Private signed upload URL and short-lived upload identifier.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PettyCashReceiptUploadReservation" }
+        "400": { description: Unsupported or oversized receipt image }
+        "401": { description: Login session required }
+        "403": { description: Manager access required }
+        "429": { description: Upload rate limit reached }
+        "423": { description: Protected Operations access is locked }
+
+  /operations/petty-cash/receipts/uploads/{uploadId}:
+    parameters:
+      - name: uploadId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    delete:
+      operationId: deletePettyCashReceiptDraft
+      tags: [operations]
+      summary: Remove a draft receipt image that has not been attached to a reconciliation
+      responses:
+        "204": { description: Draft image removed }
+        "401": { description: Login session required }
+        "403": { description: Manager access required }
+        "404": { description: Upload not found }
+        "409": { description: Attached receipt cannot be deleted because history refers to it }
+        "423": { description: Protected Operations access is locked }
+
+  /operations/petty-cash/receipts/uploads/{uploadId}/complete:
+    parameters:
+      - name: uploadId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: completePettyCashReceiptUpload
+      tags: [operations]
+      summary: Validate and finalize a private receipt image
+      responses:
+        "200":
+          description: Verified uploaded receipt metadata.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PettyCashReceiptUploadComplete" }
+        "400": { description: Invalid receipt image }
+        "401": { description: Login session required }
+        "403": { description: Manager access required }
+        "404": { description: Upload not found }
+        "409": { description: Upload is incomplete or already attached }
+        "410": { description: Upload reservation expired }
+        "423": { description: Protected Operations access is locked }
+  /operations/petty-cash/receipts/{attachmentId}/preview:
+    get:
+      operationId: previewPettyCashReceipt
+      tags: [operations]
+      summary: View a private receipt attached to a protected reconciliation
+      parameters:
+        - name: attachmentId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Private image bytes.
+          content:
+            image/jpeg: { schema: { type: string, format: binary } }
+            image/png: { schema: { type: string, format: binary } }
+            image/webp: { schema: { type: string, format: binary } }
+        "401": { description: Login session required }
+        "403": { description: Manager access required }
+        "404": { description: Receipt not found }
+        "423": { description: Protected Operations access is locked }
+
+  /operations/petty-cash/receipts/{attachmentId}/download:
+    get:
+      operationId: downloadPettyCashReceipt
+      tags: [operations]
+      summary: Download a private receipt attached to a protected reconciliation
+      parameters:
+        - name: attachmentId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Private image bytes as a download.
+          content:
+            image/jpeg: { schema: { type: string, format: binary } }
+            image/png: { schema: { type: string, format: binary } }
+            image/webp: { schema: { type: string, format: binary } }
+        "401": { description: Login session required }
+        "403": { description: Manager access required }
+        "404": { description: Receipt not found }
         "423": { description: Protected Operations access is locked }
 
   /operations/petty-cash/{recordId}:
@@ -2796,7 +2954,7 @@ components:
           type: string
         role:
           type: string
-          enum: [staff, supervisor, admin, inspector]
+          enum: [staff, supervisor, admin, inspector, employee_administrator]
         hasEmail:
           type: boolean
           description: Whether the staff member has a configured sign-in email.
@@ -2837,7 +2995,7 @@ components:
           type: string
         role:
           type: string
-          enum: [staff, supervisor, admin, inspector]
+          enum: [staff, supervisor, admin, inspector, employee_administrator]
         phone:
           type: string
           nullable: true
@@ -2855,7 +3013,7 @@ components:
           type: string
         role:
           type: string
-          enum: [staff, supervisor, admin, inspector]
+          enum: [staff, supervisor, admin, inspector, employee_administrator]
         phone:
           type: string
           nullable: true
@@ -4062,10 +4220,27 @@ components:
         emailStatus:
           type: string
           enum: [pending, sent, failed]
+        reviewStatus:
+          type: string
+          enum: [pending, reviewed, needs_follow_up]
+        reviewedAt:
+          type: ["string", "null"]
+          format: date-time
+        reviewedByName:
+          type: ["string", "null"]
         submittedAt:
           type: string
           format: date-time
-      required: [id, formId, firstName, lastName, email, emailStatus, submittedAt]
+      required: [id, formId, firstName, lastName, email, emailStatus, reviewStatus, reviewedAt, reviewedByName, submittedAt]
+
+    EmploymentFormSubmissionReviewRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        reviewStatus:
+          type: string
+          enum: [pending, reviewed, needs_follow_up]
+      required: [reviewStatus]
 
     EmploymentFormSubmission:
       allOf:
@@ -4295,6 +4470,15 @@ components:
           minimum: 1
         receiptReceived:
           type: boolean
+        voucherNumber:
+          type: [string, "null"]
+          maxLength: 100
+        receiptAttachmentId:
+          type: [string, "null"]
+          format: uuid
+        receiptUploadId:
+          type: [string, "null"]
+          format: uuid
       required: [expenseDate, description, amountCents, receiptReceived]
 
     PettyCashExpense:
@@ -4304,6 +4488,10 @@ components:
           properties:
             id:
               type: integer
+            receiptAttachment:
+              anyOf:
+                - $ref: "#/components/schemas/PettyCashReceiptAttachment"
+                - type: "null"
           required: [id]
 
     PettyCashRecordInput:
@@ -4335,6 +4523,8 @@ components:
         reimbursementStatus:
           type: string
           enum: [not_submitted, submitted, paid]
+        reimbursementPaidConfirmed:
+          type: boolean
         reimbursementAmountCents:
           type: [integer, "null"]
           minimum: 0
@@ -4363,6 +4553,7 @@ components:
         - custodianAcknowledged
         - managerAcknowledged
         - reimbursementStatus
+        - reimbursementPaidConfirmed
         - expenses
 
     PettyCashRecordUpdate:
@@ -4387,6 +4578,14 @@ components:
         openingFloatApprovedByName: { type: string }
         openingFloatApprovedAt: { type: string, format: date-time }
         cashOnHandCents: { type: integer }
+        minimumReserveCents: { type: [integer, "null"] }
+        targetFloatCents: { type: [integer, "null"] }
+        reserveStatus:
+          anyOf:
+            - type: string
+              enum: [replenishment_required, minimum_reached, above_minimum]
+            - type: "null"
+        suggestedTopUpCents: { type: [integer, "null"] }
         expenses:
           type: array
           items: { $ref: "#/components/schemas/PettyCashExpense" }
@@ -4401,6 +4600,7 @@ components:
         reimbursementStatus:
           type: string
           enum: [not_submitted, submitted, paid]
+        reimbursementPaidConfirmed: { type: [boolean, "null"] }
         reimbursementAmountCents: { type: [integer, "null"] }
         reimbursementReference: { type: [string, "null"] }
         reimbursementSubmittedOn: { type: [string, "null"], format: date }
@@ -4451,6 +4651,69 @@ components:
         createdAt: { type: string, format: date-time }
       required: [id, event, version, actorName, snapshot, createdAt]
 
+    PettyCashReceiptAttachment:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        fileName: { type: string }
+        contentType: { type: string, enum: [image/jpeg, image/png, image/webp] }
+        sizeBytes: { type: integer, minimum: 1, maximum: 8388608 }
+      required: [id, fileName, contentType, sizeBytes]
+
+    PettyCashReceiptUploadInput:
+      type: object
+      properties:
+        fileName: { type: string, minLength: 1, maxLength: 180 }
+        contentType: { type: string, enum: [image/jpeg, image/png, image/webp] }
+        sizeBytes: { type: integer, minimum: 1, maximum: 8388608 }
+      required: [fileName, contentType, sizeBytes]
+
+    PettyCashReceiptUploadReservation:
+      type: object
+      properties:
+        uploadId: { type: string, format: uuid }
+        uploadUrl: { type: string, format: uri }
+        expiresAt: { type: string, format: date-time }
+      required: [uploadId, uploadUrl, expiresAt]
+
+    PettyCashReceiptUploadComplete:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        fileName: { type: string }
+        contentType: { type: string, enum: [image/jpeg, image/png, image/webp] }
+        sizeBytes: { type: integer, minimum: 1, maximum: 8388608 }
+      required: [id, fileName, contentType, sizeBytes]
+
+    PettyCashMonthlyReport:
+      type: object
+      properties:
+        month: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" }
+        recordCount: { type: integer, minimum: 0 }
+        expenseTotalCents: { type: integer, minimum: 0 }
+        confirmedPaidReimbursementsCents: { type: integer, minimum: 0 }
+        latestRecordDate: { type: [string, "null"], format: date }
+        cashOnHandCents: { type: [integer, "null"], minimum: 0 }
+        minimumReserveCents: { type: [integer, "null"], minimum: 0 }
+        targetFloatCents: { type: [integer, "null"], minimum: 0 }
+        reserveStatus:
+          anyOf:
+            - type: string
+              enum: [replenishment_required, minimum_reached, above_minimum]
+            - type: "null"
+        suggestedTopUpCents: { type: [integer, "null"], minimum: 0 }
+      required:
+        - month
+        - recordCount
+        - expenseTotalCents
+        - confirmedPaidReimbursementsCents
+        - latestRecordDate
+        - cashOnHandCents
+        - minimumReserveCents
+        - targetFloatCents
+        - reserveStatus
+        - suggestedTopUpCents
+
     UniformStockItemInput:
       type: object
       properties:
@@ -4460,7 +4723,7 @@ components:
         size: { type: string, minLength: 1, maxLength: 80 }
         openingQuantity: { type: integer, minimum: 0 }
         openingReason: { type: string, minLength: 1, maxLength: 1000 }
-        reorderLevel: { type: integer, minimum: 0 }
+        reorderLevel: { type: integer, minimum: 0, default: 6 }
         lastOrderDate: { type: [string, "null"], format: date }
       required: [itemName, size, openingQuantity, openingReason, reorderLevel]
 

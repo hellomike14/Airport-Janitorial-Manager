@@ -408,6 +408,7 @@ export const StaffMemberRole = {
   supervisor: "supervisor",
   admin: "admin",
   inspector: "inspector",
+  employee_administrator: "employee_administrator",
 } as const;
 
 export interface StaffMember {
@@ -442,6 +443,7 @@ export const CreateStaffMemberRequestRole = {
   supervisor: "supervisor",
   admin: "admin",
   inspector: "inspector",
+  employee_administrator: "employee_administrator",
 } as const;
 
 export interface CreateStaffMemberRequest {
@@ -459,6 +461,7 @@ export const UpdateStaffMemberRequestRole = {
   supervisor: "supervisor",
   admin: "admin",
   inspector: "inspector",
+  employee_administrator: "employee_administrator",
 } as const;
 
 export interface UpdateStaffMemberRequest {
@@ -1252,6 +1255,15 @@ export const EmploymentFormSubmissionSummaryEmailStatus = {
   failed: "failed",
 } as const;
 
+export type EmploymentFormSubmissionSummaryReviewStatus =
+  (typeof EmploymentFormSubmissionSummaryReviewStatus)[keyof typeof EmploymentFormSubmissionSummaryReviewStatus];
+
+export const EmploymentFormSubmissionSummaryReviewStatus = {
+  pending: "pending",
+  reviewed: "reviewed",
+  needs_follow_up: "needs_follow_up",
+} as const;
+
 export interface EmploymentFormSubmissionSummary {
   id: number;
   formId: EmploymentFormId;
@@ -1261,7 +1273,25 @@ export interface EmploymentFormSubmissionSummary {
   /** @nullable */
   phone?: string | null;
   emailStatus: EmploymentFormSubmissionSummaryEmailStatus;
+  reviewStatus: EmploymentFormSubmissionSummaryReviewStatus;
+  /** @nullable */
+  reviewedAt: string | null;
+  /** @nullable */
+  reviewedByName: string | null;
   submittedAt: string;
+}
+
+export type EmploymentFormSubmissionReviewRequestReviewStatus =
+  (typeof EmploymentFormSubmissionReviewRequestReviewStatus)[keyof typeof EmploymentFormSubmissionReviewRequestReviewStatus];
+
+export const EmploymentFormSubmissionReviewRequestReviewStatus = {
+  pending: "pending",
+  reviewed: "reviewed",
+  needs_follow_up: "needs_follow_up",
+} as const;
+
+export interface EmploymentFormSubmissionReviewRequest {
+  reviewStatus: EmploymentFormSubmissionReviewRequestReviewStatus;
 }
 
 export type EmploymentFormSubmission = EmploymentFormSubmissionSummary & {
@@ -1391,10 +1421,40 @@ export interface PettyCashExpenseInput {
   /** @minimum 1 */
   amountCents: number;
   receiptReceived: boolean;
+  /**
+   * @maxLength 100
+   * @nullable
+   */
+  voucherNumber?: string | null;
+  /** @nullable */
+  receiptAttachmentId?: string | null;
+  /** @nullable */
+  receiptUploadId?: string | null;
+}
+
+export type PettyCashReceiptAttachmentContentType =
+  (typeof PettyCashReceiptAttachmentContentType)[keyof typeof PettyCashReceiptAttachmentContentType];
+
+export const PettyCashReceiptAttachmentContentType = {
+  "image/jpeg": "image/jpeg",
+  "image/png": "image/png",
+  "image/webp": "image/webp",
+} as const;
+
+export interface PettyCashReceiptAttachment {
+  id: string;
+  fileName: string;
+  contentType: PettyCashReceiptAttachmentContentType;
+  /**
+   * @minimum 1
+   * @maximum 8388608
+   */
+  sizeBytes: number;
 }
 
 export type PettyCashExpense = PettyCashExpenseInput & {
   id: number;
+  receiptAttachment?: PettyCashReceiptAttachment | null;
 };
 
 export type PettyCashRecordInputStatus =
@@ -1431,6 +1491,7 @@ export interface PettyCashRecordInput {
   custodianAcknowledged: boolean;
   managerAcknowledged: boolean;
   reimbursementStatus: PettyCashRecordInputReimbursementStatus;
+  reimbursementPaidConfirmed: boolean;
   /**
    * @minimum 0
    * @nullable
@@ -1485,6 +1546,17 @@ export interface PettyCashRecord {
   openingFloatApprovedByName: string;
   openingFloatApprovedAt: string;
   cashOnHandCents: number;
+  /** @nullable */
+  minimumReserveCents?: number | null;
+  /** @nullable */
+  targetFloatCents?: number | null;
+  reserveStatus?:
+    | "replenishment_required"
+    | "minimum_reached"
+    | "above_minimum"
+    | null;
+  /** @nullable */
+  suggestedTopUpCents?: number | null;
   expenses: PettyCashExpense[];
   totalExpensesCents: number;
   expectedBalanceCents: number;
@@ -1499,6 +1571,8 @@ export interface PettyCashRecord {
   /** @nullable */
   managerAcknowledgedAt: string | null;
   reimbursementStatus: PettyCashRecordReimbursementStatus;
+  /** @nullable */
+  reimbursementPaidConfirmed?: boolean | null;
   /** @nullable */
   reimbursementAmountCents: number | null;
   /** @nullable */
@@ -1532,6 +1606,93 @@ export interface PettyCashHistoryEntry {
   actorName: string;
   snapshot: PettyCashHistoryEntrySnapshot;
   createdAt: string;
+}
+
+export type PettyCashReceiptUploadInputContentType =
+  (typeof PettyCashReceiptUploadInputContentType)[keyof typeof PettyCashReceiptUploadInputContentType];
+
+export const PettyCashReceiptUploadInputContentType = {
+  "image/jpeg": "image/jpeg",
+  "image/png": "image/png",
+  "image/webp": "image/webp",
+} as const;
+
+export interface PettyCashReceiptUploadInput {
+  /**
+   * @minLength 1
+   * @maxLength 180
+   */
+  fileName: string;
+  contentType: PettyCashReceiptUploadInputContentType;
+  /**
+   * @minimum 1
+   * @maximum 8388608
+   */
+  sizeBytes: number;
+}
+
+export interface PettyCashReceiptUploadReservation {
+  uploadId: string;
+  uploadUrl: string;
+  expiresAt: string;
+}
+
+export type PettyCashReceiptUploadCompleteContentType =
+  (typeof PettyCashReceiptUploadCompleteContentType)[keyof typeof PettyCashReceiptUploadCompleteContentType];
+
+export const PettyCashReceiptUploadCompleteContentType = {
+  "image/jpeg": "image/jpeg",
+  "image/png": "image/png",
+  "image/webp": "image/webp",
+} as const;
+
+export interface PettyCashReceiptUploadComplete {
+  id: string;
+  fileName: string;
+  contentType: PettyCashReceiptUploadCompleteContentType;
+  /**
+   * @minimum 1
+   * @maximum 8388608
+   */
+  sizeBytes: number;
+}
+
+export interface PettyCashMonthlyReport {
+  /** @pattern ^[0-9]{4}-(0[1-9]|1[0-2])$ */
+  month: string;
+  /** @minimum 0 */
+  recordCount: number;
+  /** @minimum 0 */
+  expenseTotalCents: number;
+  /** @minimum 0 */
+  confirmedPaidReimbursementsCents: number;
+  /** @nullable */
+  latestRecordDate: string | null;
+  /**
+   * @minimum 0
+   * @nullable
+   */
+  cashOnHandCents: number | null;
+  /**
+   * @minimum 0
+   * @nullable
+   */
+  minimumReserveCents: number | null;
+  /**
+   * @minimum 0
+   * @nullable
+   */
+  targetFloatCents: number | null;
+  reserveStatus:
+    | "replenishment_required"
+    | "minimum_reached"
+    | "above_minimum"
+    | null;
+  /**
+   * @minimum 0
+   * @nullable
+   */
+  suggestedTopUpCents: number | null;
 }
 
 export interface UniformStockItemInput {
@@ -2265,6 +2426,13 @@ export type ListInspectorAssignmentsParams = {
    * Inclusive end date for the source email's received date.
    */
   to?: string;
+};
+
+export type GetPettyCashMonthlyReportParams = {
+  /**
+   * @pattern ^[0-9]{4}-(0[1-9]|1[0-2])$
+   */
+  month: string;
 };
 
 export type ExportUniformStockCsvParams = {

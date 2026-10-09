@@ -15,6 +15,31 @@ const router: IRouter = Router();
 // tokens, email addresses, or any other client identifier.
 const clientEventLimiter = new FixedWindowRateLimiter(30, 60_000);
 
+async function recentAccessChanges() {
+  const changes = await db.select().from(staffAccessChangesTable)
+    .orderBy(desc(staffAccessChangesTable.createdAt))
+    .limit(100);
+  return changes.map(change => ({
+    id: change.id,
+    actorName: change.actorName,
+    staffName: change.staffName,
+    action: change.action,
+    createdAt: change.createdAt.toISOString(),
+    before: {
+      active: change.beforeActive,
+      loginEnabled: change.beforeLoginEnabled,
+      formerEmployee: change.beforeFormerEmployee,
+      hasEmail: change.beforeHasEmail,
+    },
+    after: {
+      active: change.afterActive,
+      loginEnabled: change.afterLoginEnabled,
+      formerEmployee: change.afterFormerEmployee,
+      hasEmail: change.afterHasEmail,
+    },
+  }));
+}
+
 router.post("/events", async (req, res) => {
   if (!clientEventLimiter.take()) {
     res.setHeader("Retry-After", "60");
@@ -36,6 +61,10 @@ router.post("/events", async (req, res) => {
   res.status(201).json({ diagnosticId });
 });
 
+router.get("/access-audit", requireStaffRole("admin"), async (_req, res) => {
+  res.json(await recentAccessChanges());
+});
+
 router.get("/", requireStaffRole("admin"), async (_req, res) => {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const [events, summary, changes] = await Promise.all([
@@ -53,32 +82,12 @@ router.get("/", requireStaffRole("admin"), async (_req, res) => {
     }).from(authDiagnosticEventsTable)
       .where(gte(authDiagnosticEventsTable.createdAt, since))
       .groupBy(authDiagnosticEventsTable.code),
-    db.select().from(staffAccessChangesTable)
-      .orderBy(desc(staffAccessChangesTable.createdAt))
-      .limit(100),
+    recentAccessChanges(),
   ]);
   res.json({
     events: events.map(event => ({ ...event, createdAt: event.createdAt.toISOString() })),
     summary,
-    accessChanges: changes.map(change => ({
-      id: change.id,
-      actorName: change.actorName,
-      staffName: change.staffName,
-      action: change.action,
-      createdAt: change.createdAt.toISOString(),
-      before: {
-        active: change.beforeActive,
-        loginEnabled: change.beforeLoginEnabled,
-        formerEmployee: change.beforeFormerEmployee,
-        hasEmail: change.beforeHasEmail,
-      },
-      after: {
-        active: change.afterActive,
-        loginEnabled: change.afterLoginEnabled,
-        formerEmployee: change.afterFormerEmployee,
-        hasEmail: change.afterHasEmail,
-      },
-    })),
+    accessChanges: changes,
   });
 });
 

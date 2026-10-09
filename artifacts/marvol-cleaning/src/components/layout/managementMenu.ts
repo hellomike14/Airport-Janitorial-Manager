@@ -1,5 +1,5 @@
 export type ManagementMenuSectionId = "operation" | "quality" | "business";
-export type ManagementMenuViewMode = "admin" | "supervisor" | "staff" | "inspector";
+export type ManagementMenuViewMode = "admin" | "supervisor" | "staff" | "inspector" | "employee_administrator";
 
 export const MANAGEMENT_MENU_SECTIONS: readonly {
   id: ManagementMenuSectionId;

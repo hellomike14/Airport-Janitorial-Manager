@@ -32,6 +32,7 @@ const WeeklyReport = lazy(() => import("./pages/WeeklyReport"));
 const SpecialRequests = lazy(() => import("./pages/SpecialRequests"));
 const Employment = lazy(() => import("./pages/Employment"));
 const Apply = lazy(() => import("./pages/Apply"));
+const NewHirePortal = lazy(() => import("./pages/NewHirePortal"));
 const Operations = lazy(() => import("./pages/Operations"));
 const Messages = lazy(() => import("./pages/Messages"));
 import { LoginRecovery } from "./components/LoginRecovery";
@@ -145,6 +146,7 @@ function AppRoutes() {
           wildcard also matches Clerk's OAuth/verification sub-paths. */}
       <Route path="/sign-in/*?" component={SignInPage} />
       <Route path="/sign-up/*?" component={SignUpPage} />
+      <Route path="/new-hire" component={NewHirePortal} />
       <Route>
         <ProtectedRoutes />
       </Route>
@@ -176,7 +178,7 @@ function ProtectedRoutes() {
     <AppLayout>
       {effectiveRole === "staff" && <OfflineBanner />}
       <Switch>
-        {effectiveRole !== "inspector" && <Route path="/operations" component={Operations} />}
+        {effectiveRole !== "inspector" && effectiveRole !== "employee_administrator" && <Route path="/operations" component={Operations} />}
         {/* Admin-only routes */}
         {effectiveRole === "admin" && (
           <>
@@ -215,6 +217,16 @@ function ProtectedRoutes() {
             <Route path="/staff" component={Staff} />
             <Route path="/employment" component={Employment} />
             <Route path="/messages" component={Messages} />
+          </>
+        )}
+
+        {/* Employee administrators can manage ordinary staff and employment records only. */}
+        {effectiveRole === "employee_administrator" && (
+          <>
+            <Route path="/staff" component={Staff} />
+            <Route path="/employment" component={Employment} />
+            <Route path="/"><Redirect to="/staff" /></Route>
+            <Route><Redirect to="/staff" /></Route>
           </>
         )}
 

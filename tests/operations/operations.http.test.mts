@@ -6,6 +6,8 @@ import { PGlite } from "@electric-sql/pglite";
 import * as schema from "../../lib/db/src/schema/index.ts";
 import { orlandoDate } from "../../artifacts/api-server/src/lib/operationsPolicy.ts";
 
+process.env.NODE_ENV = "development";
+
 // Exercise the real routes, Drizzle queries and additive SQL migration against
 // an isolated PostgreSQL engine. Only the verified Clerk identity is controlled.
 // This harness is never imported by the production app.
@@ -66,6 +68,14 @@ const staff = [
     id: 6,
     name: "Inspector",
     role: "inspector",
+    active: true,
+    loginEnabled: true,
+    formerEmployee: false,
+  },
+  {
+    id: 18,
+    name: "Verified Operations Supervisor",
+    role: "supervisor",
     active: true,
     loginEnabled: true,
     formerEmployee: false,
@@ -188,6 +198,10 @@ before(async () => {
   );
   const app = express();
   app.use(express.json());
+  app.use((req: any, _res: any, next: any) => {
+    req.auth = { sessionId: `test-session-${req.header("x-test-actor")}` };
+    next();
+  });
   // schedules/tasks normally sit behind requireStaffSession in the application.
   app.use(async (req: any, res: any, next: any) => {
     if (
@@ -222,6 +236,11 @@ test("additive migration is repeatable and denies missing/ineligible/inspector a
   assert.equal(
     (await request("/operations/settings", 3, "PUT", {})).status,
     403,
+  );
+  assert.equal(
+    (await request("/operations/settings", 18, "PUT", {})).status,
+    403,
+    "the designated Operations manager cannot change GPS/security settings",
   );
 });
 test("area assignments are idempotent and never create recurring shifts", async () => {
@@ -320,7 +339,7 @@ test("GPS clock-in, duplicate protection, break validation, approval and CSV use
     409,
   );
   assert.equal(
-    (await request(`/operations/time/${clocked.data.id}/approve`, 2, "POST"))
+    (await request(`/operations/time/${clocked.data.id}/approve`, 1, "POST"))
       .status,
     409,
   );
@@ -354,6 +373,18 @@ test("GPS clock-in, duplicate protection, break validation, approval and CSV use
   assert.equal(
     (await request(`/operations/time/${clocked.data.id}/approve`, 2, "POST"))
       .status,
+    403,
+    "a supervisor cannot approve time entries",
+  );
+  assert.equal(
+    (await request(`/operations/time/${clocked.data.id}/approve`, 18, "POST"))
+      .status,
+    403,
+    "the designated Operations manager cannot approve payroll time",
+  );
+  assert.equal(
+    (await request(`/operations/time/${clocked.data.id}/approve`, 1, "POST"))
+      .status,
     200,
   );
   const dates = `from=${orlandoDate(new Date(Date.now() - 86400000))}&to=${orlandoDate()}`;
@@ -364,10 +395,15 @@ test("GPS clock-in, duplicate protection, break validation, approval and CSV use
     (await request(`/operations/payroll.csv?${dates}`, 3)).status,
     403,
   );
+  assert.equal(
+    (await request(`/operations/payroll.csv?${dates}`, 18)).status,
+    403,
+    "payroll exports remain administrator-only",
+  );
   assert.equal((await request(`/operations/time?${dates}`, 4)).data.length, 0);
   const corrected = await request(
     `/operations/time/${clocked.data.id}/correct`,
-    2,
+    1,
     "PATCH",
     {
       clockIn: new Date(Date.now() - 7 * 3600000).toISOString(),
@@ -388,13 +424,13 @@ test("GPS clock-in, duplicate protection, break validation, approval and CSV use
   );
 });
 test("supply fulfillment is atomic and repeat attempts cannot deduct twice", async () => {
-  const item = await request("/operations/supplies", 2, "POST", {
+  const item = await request("/operations/supplies", 18, "POST", {
     name: "Liners",
     unit: "boxes",
     stock: 10,
     reorderLevel: 5,
   });
-  assert.equal(item.status, 201);
+  assert.equal(item.status, 201, JSON.stringify(item.data));
   const req = await request("/operations/supply-requests", 3, "POST", {
     itemId: item.data.id,
     quantity: 3,
@@ -415,7 +451,7 @@ test("supply fulfillment is atomic and repeat attempts cannot deduct twice", asy
     (
       await request(
         `/operations/supply-requests/${req.data.id}/handle`,
-        2,
+        18,
         "POST",
         { status: "fulfilled" },
       )
@@ -426,7 +462,7 @@ test("supply fulfillment is atomic and repeat attempts cannot deduct twice", asy
     (
       await request(
         `/operations/supply-requests/${req.data.id}/handle`,
-        2,
+        18,
         "POST",
         { status: "fulfilled" },
       )
@@ -442,7 +478,7 @@ test("supply fulfillment is atomic and repeat attempts cannot deduct twice", asy
     (
       await request(
         `/operations/supply-requests/${tooMany.data.id}/handle`,
-        2,
+        18,
         "POST",
         { status: "fulfilled" },
       )
@@ -461,9 +497,26 @@ test("badges and incidents preserve staff privacy and record manager resolution"
     (await request("/operations/badges/5", 1, "PUT", badge)).status,
     200,
   );
-  const visibleBadges = await request("/operations/badges", 2);
+  assert.equal(
+    (await request("/operations/badges/4", 2, "PUT", badge)).status,
+    403,
+    "an unverified supervisor cannot update badges",
+  );
+  const managerBadge = await request(
+    "/operations/badges/4",
+    18,
+    "PUT",
+    { ...badge, badgeNumber: "MCO-MANAGER" },
+  );
+  assert.equal(managerBadge.status, 200, JSON.stringify(managerBadge.data));
+  assert.equal(managerBadge.data.updatedById, 18);
+  const visibleBadges = await request("/operations/badges", 18);
   assert.equal(visibleBadges.status, 200);
-  assert.equal(visibleBadges.data.length, 0);
+  assert.deepEqual(
+    visibleBadges.data.map((entry: { staffId: number }) => entry.staffId),
+    [4],
+    "the manager sees current employee badges but former employee history stays hidden",
+  );
   assert.equal(
     (await q("SELECT count(*)::int AS n FROM staff_badges WHERE staff_id=5"))
       .rows[0].n,
@@ -480,7 +533,7 @@ test("badges and incidents preserve staff privacy and record manager resolution"
     occurredAt: new Date().toISOString(),
     reportedById: 4,
   });
-  assert.equal(incident.status, 201);
+  assert.equal(incident.status, 201, JSON.stringify(incident.data));
   assert.equal(incident.data.reportedById, 3);
   assert.equal((await request("/operations/incidents", 4)).data.length, 0);
   assert.equal(
@@ -498,7 +551,7 @@ test("badges and incidents preserve staff privacy and record manager resolution"
     (
       await request(
         `/operations/incidents/${incident.data.id}/close`,
-        2,
+        18,
         "POST",
         { resolution: "Cleaned and inspected" },
       )
@@ -523,6 +576,25 @@ test("short checklists require evidence, preserve history and allow assigned-are
     (await request("/operations/checklists/1", 1, "PUT", { items })).status,
     200,
   );
+  assert.equal(
+    (
+      await request("/operations/checklists/1", 2, "PUT", { items })
+    ).status,
+    403,
+    "an unverified supervisor cannot edit area checklists",
+  );
+  const managerChecklist = await request(
+    "/operations/checklists/1",
+    18,
+    "PUT",
+    { items: items.map((item) => ({ ...item, taskName: item.taskName + " manager" })) },
+  );
+  assert.equal(
+    managerChecklist.status,
+    200,
+    JSON.stringify(managerChecklist.data),
+  );
+  assert.equal(managerChecklist.data.updatedById, 18);
   const listed = await request(`/tasks?areaId=1&date=${orlandoDate()}`, 3);
   assert.equal(listed.status, 200, JSON.stringify(listed.data));
   assert.equal(listed.data.length, 6);
@@ -589,7 +661,7 @@ test("readiness reports missing coverage; inspection scores and monthly report u
   );
   let audit;
   try {
-    audit = await request(`/operations/audit?date=${auditDate}`, 2);
+    audit = await request(`/operations/audit?date=${auditDate}`, 18);
   } finally {
     await q("DELETE FROM schedules WHERE notes='readiness-filter-test'");
     await q(
@@ -597,7 +669,7 @@ test("readiness reports missing coverage; inspection scores and monthly report u
       [auditDate],
     );
   }
-  assert.equal(audit.status, 200);
+  assert.equal(audit.status, 200, JSON.stringify(audit.data));
   assert.equal(audit.data.uncoveredAreas[0].id, 2);
   assert.deepEqual(
     audit.data.duplicateShifts.map((shift: { staffId: number }) => shift.staffId),
@@ -605,11 +677,23 @@ test("readiness reports missing coverage; inspection scores and monthly report u
     "former employees and inspector-role accounts must not affect duplicate schedule checks",
   );
   assert.deepEqual(
-    audit.data.missingStaffEmails.map((person: { id: number }) => person.id).sort(),
-    [1, 2, 3, 4],
+    audit.data.missingStaffEmails.map((person: { id: number }) => person.id).sort((a: number, b: number) => a - b),
+    [1, 2, 3, 4, 18],
     "former employees and inspector-role accounts must not appear in the missing-email check",
   );
-  const inspection = await request("/operations/inspections", 2, "POST", {
+  assert.deepEqual(
+    Object.keys(audit.data).sort(),
+    [
+      "archivedAreas",
+      "date",
+      "duplicateShifts",
+      "duplicateTasks",
+      "missingStaffEmails",
+      "uncoveredAreas",
+    ],
+    "the readiness audit remains operational and does not expose payroll fields",
+  );
+  const inspection = await request("/operations/inspections", 18, "POST", {
     areaId: 1,
     inspectionDate: orlandoDate(),
     checks: Array.from({ length: 15 }, (_, i) => i < 14),
@@ -618,7 +702,12 @@ test("readiness reports missing coverage; inspection scores and monthly report u
   assert.equal(inspection.status, 201);
   assert.equal(inspection.data.score, 93);
   const month = orlandoDate().slice(0, 7);
-  const report = await request(`/operations/monthly-report/${month}`, 2);
+  assert.equal(
+    (await request(`/operations/monthly-report/${month}`, 18)).status,
+    403,
+    "monthly reports containing payroll summaries remain administrator-only",
+  );
+  const report = await request(`/operations/monthly-report/${month}`, 1);
   assert.equal(report.status, 200, JSON.stringify(report.data));
   assert.equal(report.data.completedTasks, 1);
   assert.equal(report.data.inspections.passed, 1);
@@ -627,6 +716,13 @@ test("readiness reports missing coverage; inspection scores and monthly report u
     (await request(`/operations/monthly-report/${month}/refresh`, 1, "POST"))
       .status,
     200,
+  );
+  assert.equal(
+    (
+      await request(`/operations/monthly-report/${month}/refresh`, 18, "POST")
+    ).status,
+    403,
+    "the designated Operations manager cannot refresh payroll reports",
   );
   assert.equal(
     (await q("SELECT count(*)::int AS n FROM monthly_reports")).rows[0].n,

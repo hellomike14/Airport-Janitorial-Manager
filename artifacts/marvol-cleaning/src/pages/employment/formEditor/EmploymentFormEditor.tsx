@@ -14,6 +14,9 @@ interface Props {
   title: string;
   onClose: () => void;
   onSubmitted: (emailSent: boolean) => void;
+  allowExport?: boolean;
+  showDestination?: boolean;
+  candidate?: { firstName: string; lastName: string; email: string; phone: string | null };
 }
 
 const BTN = "inline-flex min-h-[40px] items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-50";
@@ -21,7 +24,9 @@ const MAX_PHOTO_FILES = 3;
 const MAX_TOTAL_UPLOAD_BYTES = 20 * 1024 * 1024;
 const MAX_UPLOAD_FILE_BYTES = 10 * 1024 * 1024;
 
-export default function EmploymentFormEditor({ formId, title, onClose, onSubmitted }: Props) {
+export default function EmploymentFormEditor({
+  formId, title, onClose, onSubmitted, allowExport = true, showDestination = true, candidate,
+}: Props) {
   const { t } = useTranslation();
   const submitForm = useSubmitEmploymentForm();
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null);
@@ -35,10 +40,10 @@ export default function EmploymentFormEditor({ formId, title, onClose, onSubmitt
   const [busy, setBusy] = useState<"save" | "submit" | null>(null);
   const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
+  const [firstName, setFirstName] = useState(candidate?.firstName ?? "");
+  const [lastName, setLastName] = useState(candidate?.lastName ?? "");
+  const [email, setEmail] = useState(candidate?.email ?? "");
+  const [phone, setPhone] = useState(candidate?.phone ?? "");
   const [idPhotoFiles, setIdPhotoFiles] = useState<File[]>([]);
   const supportsIdPhotoAttachments = ["job-application", "i-9", "w-4"].includes(formId);
   const [current, setCurrent] = useState(1);
@@ -204,16 +209,20 @@ export default function EmploymentFormEditor({ formId, title, onClose, onSubmitt
             {dirty ? t("employment.forms.editor.unexported") : t("employment.forms.editor.memoryNote")}
           </p>
         </div>
-        <button type="button" className={`${BTN} bg-emerald-600 text-white hover:bg-emerald-700`}
-          onClick={onSave} disabled={!doc || busy !== null} data-testid="form-editor-save">
-          {busy === "save" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Download className="h-4 w-4" aria-hidden="true" />}
-          {t("employment.forms.editor.save")}
-        </button>
-        <button type="button" className={`${BTN} border border-slate-300 text-slate-700 hover:bg-slate-50`}
-          onClick={onPrint} disabled={!doc || busy !== null} data-testid="form-editor-print">
-          <Printer className="h-4 w-4" aria-hidden="true" />
-          {t("employment.forms.editor.print")}
-        </button>
+        {allowExport && (
+          <>
+            <button type="button" className={`${BTN} bg-emerald-600 text-white hover:bg-emerald-700`}
+              onClick={onSave} disabled={!doc || busy !== null} data-testid="form-editor-save">
+              {busy === "save" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Download className="h-4 w-4" aria-hidden="true" />}
+              {t("employment.forms.editor.save")}
+            </button>
+            <button type="button" className={`${BTN} border border-slate-300 text-slate-700 hover:bg-slate-50`}
+              onClick={onPrint} disabled={!doc || busy !== null} data-testid="form-editor-print">
+              <Printer className="h-4 w-4" aria-hidden="true" />
+              {t("employment.forms.editor.print")}
+            </button>
+          </>
+        )}
         <button type="button" className={`${BTN} text-slate-700 hover:bg-slate-100`}
           onClick={requestClose} data-testid="form-editor-close">
           <X className="h-4 w-4" aria-hidden="true" />
@@ -306,27 +315,31 @@ export default function EmploymentFormEditor({ formId, title, onClose, onSubmitt
         <form onSubmit={onSubmit} className="mx-auto max-w-5xl space-y-3">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <h3 className="text-sm font-semibold text-slate-900">{t("employment.forms.editor.submitHeading")}</h3>
-            <p className="text-xs text-slate-500">{t("employment.forms.editor.emailDestination", { address: "admin@marvolenterprises.com" })}</p>
+            {showDestination && (
+              <p className="text-xs text-slate-500">
+                {t("employment.forms.editor.emailDestination", { address: "admin@marvolenterprises.com" })}
+              </p>
+            )}
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <label className="text-xs font-medium text-slate-600">
               {t("employment.fields.firstName")} *
-              <input value={firstName} onChange={event => setFirstName(event.target.value)} required maxLength={100}
+              <input value={firstName} onChange={event => setFirstName(event.target.value)} readOnly={Boolean(candidate)} required maxLength={100}
                 autoComplete="given-name" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900" />
             </label>
             <label className="text-xs font-medium text-slate-600">
               {t("employment.fields.lastName")} *
-              <input value={lastName} onChange={event => setLastName(event.target.value)} required maxLength={100}
+              <input value={lastName} onChange={event => setLastName(event.target.value)} readOnly={Boolean(candidate)} required maxLength={100}
                 autoComplete="family-name" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900" />
             </label>
             <label className="text-xs font-medium text-slate-600">
               {t("employment.fields.email")} *
-              <input type="email" value={email} onChange={event => setEmail(event.target.value)} required maxLength={320}
+              <input type="email" value={email} onChange={event => setEmail(event.target.value)} readOnly={Boolean(candidate)} required maxLength={320}
                 autoComplete="email" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900" />
             </label>
             <label className="text-xs font-medium text-slate-600">
               {t("employment.fields.phone")}
-              <input type="tel" value={phone} onChange={event => setPhone(event.target.value)} maxLength={50}
+              <input type="tel" value={phone} onChange={event => setPhone(event.target.value)} readOnly={Boolean(candidate)} maxLength={50}
                 autoComplete="tel" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900" />
             </label>
           </div>

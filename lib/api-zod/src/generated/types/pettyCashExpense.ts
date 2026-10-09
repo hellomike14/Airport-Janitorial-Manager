@@ -6,7 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { PettyCashExpenseInput } from "./pettyCashExpenseInput";
+import type { PettyCashReceiptAttachment } from "./pettyCashReceiptAttachment";
 
 export type PettyCashExpense = PettyCashExpenseInput & {
   id: number;
+  receiptAttachment?: PettyCashReceiptAttachment | null;
 };

@@ -14,4 +14,5 @@ export const UpdateStaffMemberRequestRole = {
   supervisor: "supervisor",
   admin: "admin",
   inspector: "inspector",
+  employee_administrator: "employee_administrator",
 } as const;

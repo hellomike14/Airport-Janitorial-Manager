@@ -110,8 +110,8 @@ function HireCard({ hire }: { hire: OnboardingHire }) {
 
 export function OnboardingTab({ onOpenForms }: { onOpenForms?: () => void } = {}) {
   const { effectiveRole } = useAuth();
-  const canManage = effectiveRole === "admin" || effectiveRole === "supervisor";
-  const canEmailProtocol = ["admin", "supervisor", "staff", "inspector"].includes(effectiveRole);
+  const canManage = effectiveRole === "admin" || effectiveRole === "supervisor" || effectiveRole === "employee_administrator";
+  const canEmailProtocol = ["admin", "supervisor", "staff", "inspector", "employee_administrator"].includes(effectiveRole);
   return (
     <div className="space-y-6">
       <OnboardingProtocolCard canEmailProtocol={canEmailProtocol} onOpenForms={onOpenForms} />

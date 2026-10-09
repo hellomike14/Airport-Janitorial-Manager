@@ -10,6 +10,10 @@ export const CONFIDENTIAL_COOKIE = "marvol_confidential";
 export const UNLOCK_MS = 30 * 60_000;
 const WINDOW_MS = 15 * 60_000;
 export type ConfidentialIdentity = { staffId: number; sessionId: string; role: string };
+const OPERATIONS_SUPERVISOR_STAFF_ID: Readonly<Record<string, number>> = {
+  development: 18,
+  production: 1,
+};
 export class ConfidentialError extends Error {
   constructor(public status: number, public code: string, message: string) { super(message); }
 }
@@ -28,7 +32,11 @@ export async function matchesConfidentialCode(code: string, encoded: string) {
 }
 export async function confidentialIdentity(req: Request): Promise<ConfidentialIdentity | null> {
   const actor = await actorStaffFromRequest(req);
-  const sessionId = getAuth(req)?.sessionId;
+  // clerkMiddleware populates req.auth from the verified Clerk session. Read
+  // its session id directly so this identity helper shares the same
+  // server-derived session bridge as the route middleware.
+  const serverAuth = (req as Request & { auth?: { sessionId?: string | null } }).auth;
+  const sessionId = serverAuth?.sessionId ?? getAuth(req)?.sessionId;
   return actor && sessionId ? { staffId: actor.id, role: actor.role, sessionId } : null;
 }
 export function confidentialCookie(req: Request) {
@@ -40,16 +48,33 @@ export function assertAdmin(identity: ConfidentialIdentity | null): asserts iden
   if (!identity) throw new ConfidentialError(401, "SESSION_REQUIRED", "Sign in again.");
   if (identity.role !== "admin") throw new ConfidentialError(403, "ADMIN_REQUIRED", "Only administrators may access confidential areas.");
 }
+export function isOperationsSupervisor(identity: Pick<ConfidentialIdentity, "staffId" | "role">, environment = process.env.NODE_ENV) {
+  return identity.role === "supervisor" &&
+    OPERATIONS_SUPERVISOR_STAFF_ID[environment ?? ""] === identity.staffId;
+}
+export function isOperationsManager(identity: Pick<ConfidentialIdentity, "staffId" | "role">, environment = process.env.NODE_ENV) {
+  return identity.role === "admin" || isOperationsSupervisor(identity, environment);
+}
+export function assertOperationsSupervisor(identity: ConfidentialIdentity | null): asserts identity is ConfidentialIdentity {
+  if (!identity) throw new ConfidentialError(401, "SESSION_REQUIRED", "Sign in again.");
+  if (!isOperationsSupervisor(identity)) {
+    throw new ConfidentialError(403, "OPERATIONS_SUPERVISOR_REQUIRED", "This personal Operations access is limited to the verified Operations supervisor.");
+  }
+}
 export function assertOperationsManager(identity: ConfidentialIdentity | null): asserts identity is ConfidentialIdentity {
   if (!identity) throw new ConfidentialError(401, "SESSION_REQUIRED", "Sign in again.");
-  if (identity.role !== "admin" && identity.role !== "supervisor") {
-    throw new ConfidentialError(403, "MANAGER_REQUIRED", "Only administrators and supervisors may access protected Operations records.");
+  if (!isOperationsManager(identity)) {
+    throw new ConfidentialError(403, "MANAGER_REQUIRED", "Only administrators and the verified Operations supervisor may access protected Operations records.");
   }
 }
 type QueryDb = Pick<typeof db, "select" | "insert" | "update" | "delete" | "execute">;
-export function createConfidentialService(settingsId = 1) {
+export function createConfidentialService(settingsId = 1, personalSupervisorOnly = false) {
   const attemptWhere = (identity: ConfidentialIdentity) => and(eq(attempts.settingsId, settingsId), eq(attempts.staffId, identity.staffId));
   const config = async (conn: QueryDb = db) => (await conn.select().from(settings).where(eq(settings.id, settingsId)))[0];
+  const assertCredentialOwner = (identity: ConfidentialIdentity | null) => {
+    if (personalSupervisorOnly) assertOperationsSupervisor(identity);
+    else assertAdmin(identity);
+  };
   const grant = async (identity: ConfidentialIdentity, token: string, version: number, conn: QueryDb = db) => {
     if (!token) return undefined;
     return (await conn.select().from(grants).where(and(
@@ -106,12 +131,13 @@ export function createConfidentialService(settingsId = 1) {
       return active;
     },
     async configure(identity: ConfidentialIdentity, token: string, code: string, currentCode?: string) {
-      assertAdmin(identity);
+      assertCredentialOwner(identity);
       if (!/^\d{8,12}$/.test(code)) throw new ConfidentialError(400, "CONFIDENTIAL_CODE_INVALID", "Use an 8–12 digit access code.");
       if (/^(\d)\1+$/.test(code) || ["12345678", "87654321", "01234567", "76543210"].includes(code)) {
         throw new ConfidentialError(400, "CONFIDENTIAL_CODE_WEAK", "Choose a less predictable 8–12 digit code.");
       }
       const result = await db.transaction(async tx => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(913503, 0)`);
         await tx.execute(sql`SELECT pg_advisory_xact_lock(913503, ${settingsId})`);
         await tx.insert(settings).values({ id: settingsId }).onConflictDoNothing();
         const current = (await config(tx))!;
@@ -120,6 +146,11 @@ export function createConfidentialService(settingsId = 1) {
           if (!currentCode || !/^\d{8,12}$/.test(currentCode)) return new ConfidentialError(400, "CURRENT_CODE_REQUIRED", "Enter the current access code.");
           const error = await check(tx, identity, currentCode, current.codeHash);
           if (error) return error;
+        }
+        const [otherSettings] = await tx.select().from(settings)
+          .where(eq(settings.id, settingsId === 1 ? 2 : 1));
+        if (otherSettings?.codeHash && await matchesConfidentialCode(code, otherSettings.codeHash)) {
+          return new ConfidentialError(409, "CONFIDENTIAL_CODE_REUSED", "The administrator and personal Operations codes must be different.");
         }
         const version = current.version + 1;
         await tx.update(settings).set({ codeHash: await hashConfidentialCode(code), version, updatedAt: new Date() }).where(eq(settings.id, settingsId));
@@ -132,7 +163,7 @@ export function createConfidentialService(settingsId = 1) {
     },
     async unlock(identity: ConfidentialIdentity, code: string, operationsScope = false) {
       if (operationsScope) assertOperationsManager(identity);
-      else assertAdmin(identity);
+      else assertCredentialOwner(identity);
       if (!/^\d{8,12}$/.test(code)) throw new ConfidentialError(400, "CONFIDENTIAL_CODE_INVALID", "Use an 8–12 digit access code.");
       const result = await db.transaction(async tx => {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(913503, ${settingsId})`);
@@ -148,7 +179,7 @@ export function createConfidentialService(settingsId = 1) {
     },
     async lock(identity: ConfidentialIdentity, token: string, operationsScope = false) {
       if (operationsScope) assertOperationsManager(identity);
-      else assertAdmin(identity);
+      else assertCredentialOwner(identity);
       // Bind revocation to this actor/session, not just a supplied token.
       await db.delete(grants).where(and(eq(grants.settingsId, settingsId), eq(grants.staffId, identity.staffId), eq(grants.sessionHash, digest(identity.sessionId))));
       if (await config()) await db.insert(events).values(event(identity, "locked"));
@@ -167,3 +198,4 @@ export function createConfidentialService(settingsId = 1) {
   };
 }
 export const confidentialService = createConfidentialService();
+export const personalOperationsAccessService = createConfidentialService(2, true);
