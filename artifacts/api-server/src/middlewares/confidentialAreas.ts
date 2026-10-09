@@ -10,7 +10,7 @@ import {
 import { confidentialFailure, confidentialSameOrigin } from "../routes/confidentialAccess";
 import {
   isEmploymentFormObjectPath,
-  isPublicBlankEmploymentEmail,
+  isRestrictedEmploymentTemplatePath,
   isPublicBlankEmploymentTemplate,
 } from "../routes/employmentForms";
 import { db } from "@workspace/db";
@@ -45,14 +45,13 @@ export function isConfidentialRequest(path: string, method: string) {
   // Classify the same canonical path so encoded object URLs cannot skip the lock.
   try { path = decodeURIComponent(path); } catch { return true; }
   if (isPublicBlankEmploymentTemplate(path, method)) return false;
-  if (isPublicBlankEmploymentEmail(path, method)) return false;
   if (isOperationsConfidentialRequest(path)) return true;
   if (/^\/applications(?:\/|$)/i.test(path)) return method !== "POST" || path.toLowerCase() !== "/applications";
   if (/^\/employment-form-submissions(?:\/|$)/i.test(path)) {
     return method !== "POST" || path.toLowerCase() !== "/employment-form-submissions";
   }
   if (/^\/(?:identity-documents|quickbooks|auth-diagnostics)(?:\/|$)/i.test(path)) return true;
-  if (/^\/employment-forms(?:\/|$)/i.test(path)) return true;
+  if (isRestrictedEmploymentTemplatePath(path, method)) return true;
   if (/^\/staff\/(?:confidential|former)(?:\/|$)/i.test(path)) return true;
   if (/^\/staff(?:\/|$)/i.test(path) && !["GET", "HEAD", "OPTIONS"].includes(method)) return true;
   const prefix = "/storage/objects/";

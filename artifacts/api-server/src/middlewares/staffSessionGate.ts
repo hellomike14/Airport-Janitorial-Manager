@@ -1,7 +1,12 @@
 import type { Request, Response, NextFunction } from "express";
 import { isPublicBlankEmploymentEmail, isPublicBlankEmploymentTemplate } from "../routes/employmentForms";
+import { isPromotedCandidateRequest } from "../lib/onboardingCandidatePolicy";
 
-export function createStaffSessionGate(hasSession: (req: Request) => boolean, resolveActor: (req: Request) => Promise<unknown>) {
+export function createStaffSessionGate(
+  hasSession: (req: Request) => boolean,
+  resolveActor: (req: Request) => Promise<unknown>,
+  resolveCandidate: (req: Request) => Promise<unknown> = async () => null,
+) {
   return async (req: Request, res: Response, next: NextFunction) => {
     const path = req.path.toLowerCase();
     if (["GET", "HEAD"].includes(req.method) &&
@@ -11,7 +16,7 @@ export function createStaffSessionGate(hasSession: (req: Request) => boolean, re
     }
     const publicRequest = req.path === "/health" || req.path === "/healthz" ||
       (req.method === "POST" && ["/applications", "/employment-form-submissions", "/storage/uploads/request-url"].includes(req.path)) ||
-      isPublicBlankEmploymentTemplate(req.path, req.method) ||
+      (req.query.download === undefined && isPublicBlankEmploymentTemplate(req.path, req.method)) ||
       isPublicBlankEmploymentEmail(req.path, req.method) ||
       (req.method === "GET" && req.path.startsWith("/storage/public-objects/"));
     if (publicRequest) { next(); return; }
@@ -19,7 +24,14 @@ export function createStaffSessionGate(hasSession: (req: Request) => boolean, re
     // an absent/expired verified session and its durable diagnostic id.
     if (req.method === "GET" && req.path === "/staff/me") { next(); return; }
     if (req.method === "POST" && req.path === "/auth-diagnostics/events") { next(); return; }
-    if (!(await resolveActor(req))) { res.status(401).json({ error: "Login session required" }); return; }
+    if (!(await resolveActor(req))) {
+      if (isPromotedCandidateRequest(req.path, req.method, req.query) && await resolveCandidate(req)) {
+        next();
+        return;
+      }
+      res.status(401).json({ error: "Login session required" });
+      return;
+    }
     next();
   };
 }

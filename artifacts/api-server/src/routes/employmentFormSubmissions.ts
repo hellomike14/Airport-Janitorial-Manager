@@ -18,7 +18,8 @@ import {
   type EmploymentFormAttachment,
 } from "@workspace/db/schema";
 import { requireStaffRole } from "../middlewares/requireStaffRole";
-import { actorStaffFromRequest } from "../lib/actorSession";
+import { actorStaffFromRequest, promotedCandidateFromRequest } from "../lib/actorSession";
+import { PUBLIC_APPLICANT_FORM_IDS, isPromotedCandidateFormId } from "../lib/onboardingCandidatePolicy";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { getOnboardingFormTemplate } from "../lib/onboardingFormAssets";
 import {
@@ -42,6 +43,8 @@ type RouterDependencies = {
   sendEmail: EmploymentEmailSender;
   authorizeAdmin: RequestHandler;
   authorizeReview: RequestHandler;
+  resolveStaffActor: typeof actorStaffFromRequest;
+  resolvePromotedCandidate: typeof promotedCandidateFromRequest;
 };
 
 const defaultDependencies: RouterDependencies = {
@@ -51,6 +54,8 @@ const defaultDependencies: RouterDependencies = {
   sendEmail: sendEmploymentFormEmail,
   authorizeAdmin: requireStaffRole("admin"),
   authorizeReview: requireStaffRole("admin", "employee_administrator"),
+  resolveStaffActor: actorStaffFromRequest,
+  resolvePromotedCandidate: promotedCandidateFromRequest,
 };
 
 function formLabel(formId: EmploymentFormId): string {
@@ -156,7 +161,29 @@ export function createEmploymentFormSubmissionsRouter(
       res.status(400).json({ error: "Invalid employment form submission" });
       return;
     }
-    const data = parsed.data;
+    const submitted = parsed.data;
+    let actor: Awaited<ReturnType<typeof actorStaffFromRequest>>;
+    let candidate: Awaited<ReturnType<typeof promotedCandidateFromRequest>> = null;
+    try {
+      actor = await deps.resolveStaffActor(req);
+      if (!actor) candidate = await deps.resolvePromotedCandidate(req);
+    } catch {
+      res.status(503).json({ error: "Identity verification is temporarily unavailable" });
+      return;
+    }
+    if (!actor && !(candidate
+      ? isPromotedCandidateFormId(submitted.formId)
+      : PUBLIC_APPLICANT_FORM_IDS.has(submitted.formId))) {
+      res.status(403).json({ error: "This form is not available to applicants" });
+      return;
+    }
+    const data = candidate ? {
+      ...submitted,
+      firstName: candidate.firstName,
+      lastName: candidate.lastName,
+      email: candidate.email,
+      phone: candidate.phone,
+    } : submitted;
     const parts = [data.completedPdf, ...(data.idPhotos ?? [])];
     if (data.completedPdf.contentType !== "application/pdf" ||
         (data.idPhotos ?? []).some(photo => !photo.contentType || !SUPPORTED_PHOTO_TYPES.has(photo.contentType))) {

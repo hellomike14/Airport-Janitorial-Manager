@@ -432,7 +432,7 @@ function TimePanel({ manager, admin }: { manager: boolean; admin: boolean }) {
     </div>
   );
 }
-function SafetyPanel({ manager, admin }: { manager: boolean; admin: boolean }) {
+function SafetyPanel({ manager }: { manager: boolean }) {
   const { areas, staff } = useOptions();
   const badgeEligibleStaff = staff.filter(
     (person) =>
@@ -478,7 +478,7 @@ function SafetyPanel({ manager, admin }: { manager: boolean; admin: boolean }) {
                       : `${b.daysUntilExpiry} days remaining`}
                   {b.returnRequired && " · Return required"}
                 </p>
-                {admin && (
+                {manager && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -498,7 +498,7 @@ function SafetyPanel({ manager, admin }: { manager: boolean; admin: boolean }) {
         ) : (
           <Empty />
         )}
-        {admin && (
+        {manager && (
           <form
             className="grid sm:grid-cols-2 gap-3"
             onSubmit={(e) => {
@@ -1017,7 +1017,7 @@ const recommended: ChecklistItem[] = [
     photoRequired: false,
   },
 ];
-function QualityPanel({ admin }: { admin: boolean }) {
+function QualityPanel({ manager }: { manager: boolean }) {
   const { areas } = useOptions();
   const [area, setArea] = useState("");
   const [items, setItems] = useState<ChecklistItem[]>(recommended);
@@ -1040,7 +1040,7 @@ function QualityPanel({ admin }: { admin: boolean }) {
   const action = useAction();
   return (
     <div className="space-y-5">
-      {admin && (
+      {manager && (
         <Panel title="Area checklist · 5–7 tasks">
           <p className="text-sm text-slate-500">
             Review this suggested checklist against the contract before saving.
@@ -1694,9 +1694,9 @@ export default function Operations() {
       </div>
       <div role="tabpanel">
         {tab === "time" && <TimePanel manager={admin} admin={admin} />}
-        {tab === "safety" && <SafetyPanel manager={manager} admin={admin} />}
+        {tab === "safety" && <SafetyPanel manager={manager} />}
         {tab === "supplies" && <SuppliesPanel manager={manager} />}
-        {manager && tab === "quality" && <QualityPanel admin={admin} />}
+        {manager && tab === "quality" && <QualityPanel manager={manager} />}
         {manager && tab === "readiness" && <ReadinessPanel admin={admin} />}
         {admin && tab === "monthly" && <MonthlyPanel admin={admin} />}
         {manager && tab === "petty-cash" && (

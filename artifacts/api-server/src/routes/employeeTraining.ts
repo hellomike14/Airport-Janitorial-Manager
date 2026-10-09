@@ -4,6 +4,7 @@ import { requireStaffRole } from "../middlewares/requireStaffRole";
 import { parseVideoRange } from "../lib/videoRange";
 import { employeeTraining } from "../lib/employeeTrainingConfig";
 import acknowledgmentsRouter from "./trainingAcknowledgments";
+import { actorStaffFromRequest, promotedCandidateFromRequest } from "../lib/actorSession";
 
 // Logical private-object path, not a signed URL or a deployment-local file.
 export const EMPLOYEE_TRAINING_OBJECT = employeeTraining.objectPath;
@@ -12,9 +13,24 @@ const router: IRouter = Router();
 const storage = new ObjectStorageService();
 router.use("/employee-training", acknowledgmentsRouter);
 
+async function authorizeTrainingVideo(req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) {
+  const actor = await actorStaffFromRequest(req);
+  if (actor && ["admin", "supervisor", "staff", "inspector"].includes(actor.role)) {
+    next();
+    return;
+  }
+  try {
+    if (await promotedCandidateFromRequest(req)) { next(); return; }
+  } catch {
+    res.status(503).json({ error: "Identity verification is temporarily unavailable" });
+    return;
+  }
+  res.status(403).json({ error: "Authorized employee or promoted new hire required" });
+}
+
 // Every active staff role may view the shared training media; personal progress
 // and attestations remain bound to the actor resolved from the verified session.
-router.get("/employee-training/video", requireStaffRole("admin", "supervisor", "staff", "inspector"), async (req, res) => {
+router.get("/employee-training/video", authorizeTrainingVideo, async (req, res) => {
   res.setHeader("Cache-Control", "private, no-store");
   res.setHeader("X-Content-Type-Options", "nosniff");
   if (req.query.format !== undefined && req.query.format !== "webm" && req.query.format !== "mp4") {

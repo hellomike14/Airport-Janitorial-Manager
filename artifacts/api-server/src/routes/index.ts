@@ -18,7 +18,8 @@ import sharedPhotosRouter from "./sharedPhotos";
 import weeklyReportRouter from "./weeklyReport";
 import applicationsRouter from "./applications";
 import employmentFormSubmissionsRouter from "./employmentFormSubmissions";
-import onboardingRouter from "./onboarding";
+import onboardingRouter, { ONBOARDING_ACCESS_ROLES } from "./onboarding";
+import newHireRouter from "./newHire";
 import quickbooksRouter from "./quickbooks";
 import authDiagnosticsRouter from "./authDiagnostics";
 import operationsRouter from "./operations";
@@ -34,6 +35,15 @@ import confidentialAccessRouter from "./confidentialAccess";
 import { confidentialAreas } from "../middlewares/confidentialAreas";
 
 const router: IRouter = Router();
+export const ONBOARDING_MOUNT_ROLES = ONBOARDING_ACCESS_ROLES;
+
+export function mountOnboardingRouter(
+  target: IRouter,
+  child: IRouter = onboardingRouter,
+  roleGate: typeof requireStaffRole = requireStaffRole,
+) {
+  target.use("/onboarding", roleGate(...ONBOARDING_MOUNT_ROLES), child);
+}
 
 router.use(requireStaffSession);
 router.use(confidentialAccessRouter);
@@ -58,6 +68,7 @@ router.use("/operations", operationsRouter);
 router.use("/operations", pettyCashReceiptsRouter);
 router.use("/operations", operationsDigitalRouter);
 router.use(employeeTrainingRouter);
+router.use(newHireRouter);
 router.use(employmentFormsRouter);
 router.use(onboardingProtocolRouter);
 router.use(identityDocumentsRouter);
@@ -65,7 +76,7 @@ router.use("/shared-photos", sharedPhotosRouter);
 router.use("/weekly-report", requireStaffRole("admin"), weeklyReportRouter);
 router.use("/applications", applicationsRouter);
 router.use("/employment-form-submissions", employmentFormSubmissionsRouter);
-router.use("/onboarding", requireStaffRole("admin", "supervisor"), onboardingRouter);
+mountOnboardingRouter(router);
 router.use("/quickbooks", requireStaffRole("admin"), quickbooksRouter);
 
 export default router;

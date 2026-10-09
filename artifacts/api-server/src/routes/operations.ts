@@ -478,7 +478,7 @@ router.get("/badges", async (req, res) => {
     })),
   );
 });
-router.put("/badges/:staffId", admin, async (req, res) => {
+router.put("/badges/:staffId", manager, async (req, res) => {
   const staffId = id.safeParse(req.params.staffId);
   const body = z
     .object({
@@ -814,7 +814,7 @@ router.get("/checklists/:areaId", manager, async (req, res) => {
     isCustom: false,
   });
 });
-router.put("/checklists/:areaId", admin, async (req, res) => {
+router.put("/checklists/:areaId", manager, async (req, res) => {
   const areaId = id.safeParse(req.params.areaId);
   const body = z
     .object({
