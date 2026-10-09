@@ -10,6 +10,12 @@ export { GetEmploymentFormTemplateParams as GetEmploymentFormTemplateParamsSchem
 export {
   ConfigureAdminConfidentialCodeBody,
   UnlockAdminConfidentialAccessBody,
+  UnlockOperationsConfidentialAccessBody,
+  CreatePettyCashRecordBody,
+  UpdatePettyCashRecordBody,
+  CreateUniformStockItemBody,
+  UpdateUniformStockItemBody,
+  CreateUniformStockTransactionBody,
   LinkIdentityDocumentEmployeeBody,
   ReserveIdentityDocumentUploadBody,
   ReviewIdentityDocumentPhotoBody,

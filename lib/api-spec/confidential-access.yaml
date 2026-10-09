@@ -32,6 +32,42 @@ lock:
     responses:
       "200": { description: Locked status, content: { application/json: { schema: { $ref: "#/schemas/ConfidentialAccessState" } } } }
       default: { description: Access denied or unavailable }
+operationsStatus:
+  get:
+    operationId: getOperationsConfidentialAccessStatus
+    summary: Verified manager access-code status for protected Operations records
+    responses:
+      "200":
+        description: Access status.
+        content:
+          application/json:
+            schema: { $ref: "#/schemas/ConfidentialAccessState" }
+      default: { description: Access denied or service unavailable }
+operationsUnlock:
+  post:
+    operationId: unlockOperationsConfidentialAccess
+    summary: Manager code check for protected Operations records
+    requestBody:
+      required: true
+      content: { application/json: { schema: { $ref: "#/schemas/ConfidentialUnlockInput" } } }
+    responses:
+      "200":
+        description: Session-bound 30-minute Operations unlock.
+        content:
+          application/json:
+            schema: { $ref: "#/schemas/ConfidentialAccessState" }
+      default: { description: "Access denied, invalid code, throttled or unavailable" }
+operationsLock:
+  post:
+    operationId: lockOperationsConfidentialAccess
+    summary: Revoke this manager browser's Operations unlock immediately
+    responses:
+      "200":
+        description: Locked status.
+        content:
+          application/json:
+            schema: { $ref: "#/schemas/ConfidentialAccessState" }
+      default: { description: Access denied or unavailable }
 schemas:
   ConfidentialAccessState:
     type: object

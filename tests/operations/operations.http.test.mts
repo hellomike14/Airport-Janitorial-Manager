@@ -149,8 +149,16 @@ before(async () => {
     );
     const definitions = columns.map((c: any) => {
       let def = `${quote(c.name)} ${c.getSQLType()}${c.notNull ? " NOT NULL" : ""}${c.primary ? " PRIMARY KEY" : ""}`;
-      if (c.default !== undefined)
-        def += ` DEFAULT ${is(c.default, SQL) ? dialect.sqlToQuery(c.default).sql : typeof c.default === "string" ? `'${c.default.replaceAll("'", "''")}'` : JSON.stringify(c.default)}`;
+      if (c.default !== undefined) {
+        const defaultValue = is(c.default, SQL)
+          ? dialect.sqlToQuery(c.default).sql
+          : c.getSQLType() === "jsonb"
+            ? `'${JSON.stringify(c.default).replaceAll("'", "''")}'::jsonb`
+            : typeof c.default === "string"
+              ? `'${c.default.replaceAll("'", "''")}'`
+              : JSON.stringify(c.default);
+        def += ` DEFAULT ${defaultValue}`;
+      }
       return def;
     });
     await pg.exec(
@@ -453,9 +461,14 @@ test("badges and incidents preserve staff privacy and record manager resolution"
     (await request("/operations/badges/5", 1, "PUT", badge)).status,
     200,
   );
+  const visibleBadges = await request("/operations/badges", 2);
+  assert.equal(visibleBadges.status, 200);
+  assert.equal(visibleBadges.data.length, 0);
   assert.equal(
-    (await request("/operations/badges", 2)).data[0].returnRequired,
-    true,
+    (await q("SELECT count(*)::int AS n FROM staff_badges WHERE staff_id=5"))
+      .rows[0].n,
+    1,
+    "hiding former employees must not delete their badge history",
   );
   assert.equal((await request("/operations/badges", 3)).data.length, 0);
   const incident = await request("/operations/incidents", 3, "POST", {
@@ -566,9 +579,36 @@ test("short checklists require evidence, preserve history and allow assigned-are
   );
 });
 test("readiness reports missing coverage; inspection scores and monthly report use saved facts", async () => {
-  const audit = await request(`/operations/audit?date=${orlandoDate()}`, 2);
+  const auditDate = orlandoDate();
+  await q(
+    "INSERT INTO assignments (staff_id, area_id, assignment_date, assigned_by_id, is_special) VALUES (5,2,$1,1,false),(6,2,$1,1,false)",
+    [auditDate],
+  );
+  await q(
+    "INSERT INTO schedules (staff_id, area_id, day_of_week, start_time, end_time, notes) VALUES (4,1,2,'08:00','09:00','readiness-filter-test'),(4,2,2,'08:00','09:00','readiness-filter-test'),(5,1,3,'08:00','09:00','readiness-filter-test'),(5,2,3,'08:00','09:00','readiness-filter-test'),(6,1,4,'08:00','09:00','readiness-filter-test'),(6,2,4,'08:00','09:00','readiness-filter-test')",
+  );
+  let audit;
+  try {
+    audit = await request(`/operations/audit?date=${auditDate}`, 2);
+  } finally {
+    await q("DELETE FROM schedules WHERE notes='readiness-filter-test'");
+    await q(
+      "DELETE FROM assignments WHERE staff_id IN (5,6) AND area_id=2 AND assignment_date=$1",
+      [auditDate],
+    );
+  }
   assert.equal(audit.status, 200);
   assert.equal(audit.data.uncoveredAreas[0].id, 2);
+  assert.deepEqual(
+    audit.data.duplicateShifts.map((shift: { staffId: number }) => shift.staffId),
+    [4],
+    "former employees and inspector-role accounts must not affect duplicate schedule checks",
+  );
+  assert.deepEqual(
+    audit.data.missingStaffEmails.map((person: { id: number }) => person.id).sort(),
+    [1, 2, 3, 4],
+    "former employees and inspector-role accounts must not appear in the missing-email check",
+  );
   const inspection = await request("/operations/inspections", 2, "POST", {
     areaId: 1,
     inspectionDate: orlandoDate(),
@@ -582,7 +622,7 @@ test("readiness reports missing coverage; inspection scores and monthly report u
   assert.equal(report.status, 200, JSON.stringify(report.data));
   assert.equal(report.data.completedTasks, 1);
   assert.equal(report.data.inspections.passed, 1);
-  assert.equal(report.data.incidents.total, 1);
+  assert.equal(report.data.incidents.total, 1, JSON.stringify(report.data));
   assert.equal(
     (await request(`/operations/monthly-report/${month}/refresh`, 1, "POST"))
       .status,

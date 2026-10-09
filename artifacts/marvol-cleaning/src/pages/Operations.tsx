@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
+import { OperationsConfidentialBoundary } from "@/components/operations/OperationsConfidentialBoundary";
 import {
   operationsApi,
   useOperations,
@@ -20,6 +21,8 @@ import {
   type Audit,
   type MonthlyReport,
 } from "@/lib/operationsApi";
+import PettyCashPanel from "./operations/PettyCashPanel";
+import UniformStockPanel from "./operations/UniformStockPanel";
 
 const inputClass =
   "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900";
@@ -1301,34 +1304,6 @@ function ReadinessPanel({ admin }: { admin: boolean }) {
                 </Empty>
               )}
               <h3 className="font-semibold">
-                Former / inactive staff on recurring schedules (
-                {audit.data.ineligibleSchedules.length})
-              </h3>
-              {audit.data.ineligibleSchedules.map((s) => (
-                <div key={s.id} className="flex gap-3 items-center text-sm">
-                  <span>
-                    {s.staffName} · shift #{s.id}
-                  </span>
-                  {admin && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={action.busy}
-                      onClick={() =>
-                        action.run(async () => {
-                          const r = await fetch(`/api/schedules/${s.id}`, {
-                            method: "DELETE",
-                          });
-                          if (!r.ok) throw new Error("Unable to remove shift");
-                        }, "Inactive shift removed.")
-                      }
-                    >
-                      Remove shift
-                    </Button>
-                  )}
-                </div>
-              ))}
-              <h3 className="font-semibold">
                 Duplicate shift groups ({audit.data.duplicateShifts.length})
               </h3>
               {audit.data.duplicateShifts.map((s, i) => (
@@ -1683,7 +1658,7 @@ export default function Operations() {
       <div className="print:hidden">
         <h1 className="text-2xl font-bold text-slate-900">Operations</h1>
         <p className="text-sm text-slate-500 mt-1">
-          Timekeeping, safety, supplies, service records and manager workbooks.
+          Timekeeping, safety, supplies, service records and manager operations.
         </p>
       </div>
       <div
@@ -1710,8 +1685,18 @@ export default function Operations() {
         {manager && tab === 3 && <QualityPanel admin={admin} />}
         {manager && tab === 4 && <ReadinessPanel admin={admin} />}
         {manager && tab === 5 && <MonthlyPanel admin={admin} />}
-        {manager && tab === 6 && <WorkbookDownloadPanel kind="petty-cash" />}
-        {manager && tab === 7 && <WorkbookDownloadPanel kind="uniform" />}
+        {manager && tab === 6 && (
+          <OperationsConfidentialBoundary>
+            <PettyCashPanel />
+            <WorkbookDownloadPanel kind="petty-cash" />
+          </OperationsConfidentialBoundary>
+        )}
+        {manager && tab === 7 && (
+          <OperationsConfidentialBoundary>
+            <UniformStockPanel />
+            <WorkbookDownloadPanel kind="uniform" />
+          </OperationsConfidentialBoundary>
+        )}
       </div>
     </div>
   );

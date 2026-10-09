@@ -1381,6 +1381,336 @@ export interface QuickbooksConnectUrl {
   authorizeUrl: string;
 }
 
+export interface PettyCashExpenseInput {
+  expenseDate: string;
+  /**
+   * @minLength 1
+   * @maxLength 500
+   */
+  description: string;
+  /** @minimum 1 */
+  amountCents: number;
+  receiptReceived: boolean;
+}
+
+export type PettyCashExpense = PettyCashExpenseInput & {
+  id: number;
+};
+
+export type PettyCashRecordInputStatus =
+  (typeof PettyCashRecordInputStatus)[keyof typeof PettyCashRecordInputStatus];
+
+export const PettyCashRecordInputStatus = {
+  draft: "draft",
+  completed: "completed",
+} as const;
+
+export type PettyCashRecordInputReimbursementStatus =
+  (typeof PettyCashRecordInputReimbursementStatus)[keyof typeof PettyCashRecordInputReimbursementStatus];
+
+export const PettyCashRecordInputReimbursementStatus = {
+  not_submitted: "not_submitted",
+  submitted: "submitted",
+  paid: "paid",
+} as const;
+
+export interface PettyCashRecordInput {
+  /**
+   * @minLength 1
+   * @maxLength 200
+   */
+  location: string;
+  /** @minimum 1 */
+  custodianId: number;
+  recordDate: string;
+  /** @minimum 0 */
+  openingFloatCents: number;
+  /** @minimum 0 */
+  cashOnHandCents: number;
+  status: PettyCashRecordInputStatus;
+  custodianAcknowledged: boolean;
+  managerAcknowledged: boolean;
+  reimbursementStatus: PettyCashRecordInputReimbursementStatus;
+  /**
+   * @minimum 0
+   * @nullable
+   */
+  reimbursementAmountCents?: number | null;
+  /**
+   * @maxLength 200
+   * @nullable
+   */
+  reimbursementReference?: string | null;
+  /** @nullable */
+  reimbursementSubmittedOn?: string | null;
+  /** @nullable */
+  reimbursementPaidOn?: string | null;
+  /**
+   * @maxLength 2000
+   * @nullable
+   */
+  accountingNotes?: string | null;
+  expenses: PettyCashExpenseInput[];
+}
+
+export type PettyCashRecordUpdate = PettyCashRecordInput & {
+  /** @minimum 1 */
+  expectedVersion: number;
+};
+
+export type PettyCashRecordStatus =
+  (typeof PettyCashRecordStatus)[keyof typeof PettyCashRecordStatus];
+
+export const PettyCashRecordStatus = {
+  draft: "draft",
+  completed: "completed",
+} as const;
+
+export type PettyCashRecordReimbursementStatus =
+  (typeof PettyCashRecordReimbursementStatus)[keyof typeof PettyCashRecordReimbursementStatus];
+
+export const PettyCashRecordReimbursementStatus = {
+  not_submitted: "not_submitted",
+  submitted: "submitted",
+  paid: "paid",
+} as const;
+
+export interface PettyCashRecord {
+  id: number;
+  location: string;
+  custodianId: number;
+  custodianName: string;
+  recordDate: string;
+  openingFloatCents: number;
+  openingFloatApprovedByName: string;
+  openingFloatApprovedAt: string;
+  cashOnHandCents: number;
+  expenses: PettyCashExpense[];
+  totalExpensesCents: number;
+  expectedBalanceCents: number;
+  overShortCents: number;
+  status: PettyCashRecordStatus;
+  /** @nullable */
+  custodianAcknowledgedAt: string | null;
+  /** @nullable */
+  custodianAcknowledgedRecordedByName: string | null;
+  /** @nullable */
+  managerAcknowledgedByName: string | null;
+  /** @nullable */
+  managerAcknowledgedAt: string | null;
+  reimbursementStatus: PettyCashRecordReimbursementStatus;
+  /** @nullable */
+  reimbursementAmountCents: number | null;
+  /** @nullable */
+  reimbursementReference: string | null;
+  /** @nullable */
+  reimbursementSubmittedOn: string | null;
+  /** @nullable */
+  reimbursementPaidOn: string | null;
+  /** @nullable */
+  accountingNotes: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type PettyCashHistoryEntryEvent =
+  (typeof PettyCashHistoryEntryEvent)[keyof typeof PettyCashHistoryEntryEvent];
+
+export const PettyCashHistoryEntryEvent = {
+  created: "created",
+  updated: "updated",
+  completed: "completed",
+} as const;
+
+export type PettyCashHistoryEntrySnapshot = { [key: string]: unknown };
+
+export interface PettyCashHistoryEntry {
+  id: number;
+  event: PettyCashHistoryEntryEvent;
+  version: number;
+  actorName: string;
+  snapshot: PettyCashHistoryEntrySnapshot;
+  createdAt: string;
+}
+
+export interface UniformStockItemInput {
+  /**
+   * @maxLength 100
+   * @nullable
+   */
+  itemCode?: string | null;
+  /**
+   * @minLength 1
+   * @maxLength 200
+   */
+  itemName: string;
+  /**
+   * @maxLength 1000
+   * @nullable
+   */
+  description?: string | null;
+  /**
+   * @minLength 1
+   * @maxLength 80
+   */
+  size: string;
+  /** @minimum 0 */
+  openingQuantity: number;
+  /**
+   * @minLength 1
+   * @maxLength 1000
+   */
+  openingReason: string;
+  /** @minimum 0 */
+  reorderLevel: number;
+  /** @nullable */
+  lastOrderDate?: string | null;
+}
+
+export interface UniformStockItemUpdate {
+  /** @minimum 1 */
+  expectedVersion: number;
+  /**
+   * @maxLength 100
+   * @nullable
+   */
+  itemCode?: string | null;
+  /**
+   * @minLength 1
+   * @maxLength 200
+   */
+  itemName: string;
+  /**
+   * @maxLength 1000
+   * @nullable
+   */
+  description?: string | null;
+  /**
+   * @minLength 1
+   * @maxLength 80
+   */
+  size: string;
+  /** @minimum 0 */
+  reorderLevel: number;
+  /** @nullable */
+  lastOrderDate?: string | null;
+  active: boolean;
+}
+
+export interface UniformStockItem {
+  id: number;
+  /** @nullable */
+  itemCode: string | null;
+  itemName: string;
+  /** @nullable */
+  description: string | null;
+  size: string;
+  currentQuantity: number;
+  outstandingIssued: number;
+  reorderLevel: number;
+  /** @nullable */
+  lastOrderDate: string | null;
+  active: boolean;
+  lowStock: boolean;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type UniformStockTransactionInputType =
+  (typeof UniformStockTransactionInputType)[keyof typeof UniformStockTransactionInputType];
+
+export const UniformStockTransactionInputType = {
+  receipt: "receipt",
+  issue: "issue",
+  return: "return",
+  adjustment: "adjustment",
+} as const;
+
+export type UniformStockTransactionInputAdjustmentDirection =
+  (typeof UniformStockTransactionInputAdjustmentDirection)[keyof typeof UniformStockTransactionInputAdjustmentDirection];
+
+export const UniformStockTransactionInputAdjustmentDirection = {
+  increase: "increase",
+  decrease: "decrease",
+} as const;
+
+export type UniformStockTransactionInputConditionReturned =
+  (typeof UniformStockTransactionInputConditionReturned)[keyof typeof UniformStockTransactionInputConditionReturned];
+
+export const UniformStockTransactionInputConditionReturned = {
+  serviceable: "serviceable",
+  damaged: "damaged",
+} as const;
+
+export interface UniformStockTransactionInput {
+  type: UniformStockTransactionInputType;
+  /** @minimum 1 */
+  itemId?: number;
+  /** @minimum 1 */
+  staffId?: number;
+  /** @minimum 1 */
+  quantity: number;
+  adjustmentDirection?: UniformStockTransactionInputAdjustmentDirection;
+  /** @minimum 1 */
+  relatedIssueId?: number;
+  conditionReturned?: UniformStockTransactionInputConditionReturned;
+  replacementIssued?: boolean;
+  /**
+   * @minLength 1
+   * @maxLength 1000
+   */
+  reason: string;
+}
+
+export type UniformStockTransactionType =
+  (typeof UniformStockTransactionType)[keyof typeof UniformStockTransactionType];
+
+export const UniformStockTransactionType = {
+  opening_balance: "opening_balance",
+  receipt: "receipt",
+  issue: "issue",
+  return: "return",
+  adjustment: "adjustment",
+} as const;
+
+/**
+ * @nullable
+ */
+export type UniformStockTransactionConditionReturned =
+  | (typeof UniformStockTransactionConditionReturned)[keyof typeof UniformStockTransactionConditionReturned]
+  | null;
+
+export const UniformStockTransactionConditionReturned = {
+  serviceable: "serviceable",
+  damaged: "damaged",
+} as const;
+
+export interface UniformStockTransaction {
+  id: number;
+  itemId: number;
+  itemName: string;
+  size: string;
+  /** @nullable */
+  staffId: number | null;
+  /** @nullable */
+  staffName: string | null;
+  actorId: number;
+  actorName: string;
+  type: UniformStockTransactionType;
+  quantity: number;
+  stockDelta: number;
+  /** @nullable */
+  relatedIssueId: number | null;
+  /** @nullable */
+  conditionReturned: UniformStockTransactionConditionReturned;
+  replacementIssued: boolean;
+  reason: string;
+  occurredAt: string;
+  remainingReturnQuantity: number;
+}
+
 export type GetAdminConfidentialAccessStatus200 = {
   configured: boolean;
   unlocked: boolean;
@@ -1424,6 +1754,41 @@ export type UnlockAdminConfidentialAccess200 = {
 };
 
 export type LockAdminConfidentialAccess200 = {
+  configured: boolean;
+  unlocked: boolean;
+  /** @nullable */
+  expiresAt: string | null;
+  /** @nullable */
+  lockedUntil: string | null;
+  serverTime: string;
+};
+
+export type GetOperationsConfidentialAccessStatus200 = {
+  configured: boolean;
+  unlocked: boolean;
+  /** @nullable */
+  expiresAt: string | null;
+  /** @nullable */
+  lockedUntil: string | null;
+  serverTime: string;
+};
+
+export type UnlockOperationsConfidentialAccessBody = {
+  /** @pattern ^[0-9]{8,12}$ */
+  code: string;
+};
+
+export type UnlockOperationsConfidentialAccess200 = {
+  configured: boolean;
+  unlocked: boolean;
+  /** @nullable */
+  expiresAt: string | null;
+  /** @nullable */
+  lockedUntil: string | null;
+  serverTime: string;
+};
+
+export type LockOperationsConfidentialAccess200 = {
   configured: boolean;
   unlocked: boolean;
   /** @nullable */
@@ -1901,6 +2266,18 @@ export type ListInspectorAssignmentsParams = {
    */
   to?: string;
 };
+
+export type ExportUniformStockCsvParams = {
+  view: ExportUniformStockCsvView;
+};
+
+export type ExportUniformStockCsvView =
+  (typeof ExportUniformStockCsvView)[keyof typeof ExportUniformStockCsvView];
+
+export const ExportUniformStockCsvView = {
+  stock: "stock",
+  history: "history",
+} as const;
 
 export type GetEmploymentFormTemplateParams = {
   /**

@@ -130,7 +130,6 @@ export type Inspection = {
 };
 export type Audit = {
   uncoveredAreas: AreaOption[];
-  ineligibleSchedules: { id: number; staffName: string }[];
   duplicateShifts: {
     staffName: string;
     dayOfWeek: number;

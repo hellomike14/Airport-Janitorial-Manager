@@ -40,6 +40,12 @@ export function assertAdmin(identity: ConfidentialIdentity | null): asserts iden
   if (!identity) throw new ConfidentialError(401, "SESSION_REQUIRED", "Sign in again.");
   if (identity.role !== "admin") throw new ConfidentialError(403, "ADMIN_REQUIRED", "Only administrators may access confidential areas.");
 }
+export function assertOperationsManager(identity: ConfidentialIdentity | null): asserts identity is ConfidentialIdentity {
+  if (!identity) throw new ConfidentialError(401, "SESSION_REQUIRED", "Sign in again.");
+  if (identity.role !== "admin" && identity.role !== "supervisor") {
+    throw new ConfidentialError(403, "MANAGER_REQUIRED", "Only administrators and supervisors may access protected Operations records.");
+  }
+}
 type QueryDb = Pick<typeof db, "select" | "insert" | "update" | "delete" | "execute">;
 export function createConfidentialService(settingsId = 1) {
   const attemptWhere = (identity: ConfidentialIdentity) => and(eq(attempts.settingsId, settingsId), eq(attempts.staffId, identity.staffId));
@@ -76,19 +82,27 @@ export function createConfidentialService(settingsId = 1) {
       lockedUntil ? "Too many incorrect attempts. Wait 15 minutes before trying again." : "The access code is incorrect.");
   };
   return {
-    async status(identity: ConfidentialIdentity, token: string) {
-      assertAdmin(identity);
+    async status(identity: ConfidentialIdentity, token: string, operationsScope = false) {
+      if (operationsScope) assertOperationsManager(identity);
+      else assertAdmin(identity);
       const current = await config();
       const active = current?.codeHash ? await grant(identity, token, current.version) : undefined;
       const [attempt] = await db.select().from(attempts).where(attemptWhere(identity));
       return { configured: !!current?.codeHash, unlocked: !!active, expiresAt: active?.expiresAt.toISOString() ?? null,
         lockedUntil: attempt?.lockedUntil && attempt.lockedUntil > new Date() ? attempt.lockedUntil.toISOString() : null, serverTime: new Date().toISOString() };
     },
-    async require(identity: ConfidentialIdentity, token: string) {
-      assertAdmin(identity);
+    async require(identity: ConfidentialIdentity, token: string, operationsScope = false) {
+      if (operationsScope) assertOperationsManager(identity);
+      else assertAdmin(identity);
       const current = await config();
       const active = current?.codeHash ? await grant(identity, token, current.version) : undefined;
-      if (!active) throw new ConfidentialError(423, "CONFIDENTIAL_LOCKED", "Unlock confidential areas with the administrator access code.");
+      if (!active) throw new ConfidentialError(
+        423,
+        "CONFIDENTIAL_LOCKED",
+        operationsScope
+          ? "Unlock protected Operations records with the confidential access code."
+          : "Unlock confidential areas with the administrator access code.",
+      );
       return active;
     },
     async configure(identity: ConfidentialIdentity, token: string, code: string, currentCode?: string) {
@@ -116,8 +130,9 @@ export function createConfidentialService(settingsId = 1) {
       if (result instanceof ConfidentialError) throw result;
       return result;
     },
-    async unlock(identity: ConfidentialIdentity, code: string) {
-      assertAdmin(identity);
+    async unlock(identity: ConfidentialIdentity, code: string, operationsScope = false) {
+      if (operationsScope) assertOperationsManager(identity);
+      else assertAdmin(identity);
       if (!/^\d{8,12}$/.test(code)) throw new ConfidentialError(400, "CONFIDENTIAL_CODE_INVALID", "Use an 8–12 digit access code.");
       const result = await db.transaction(async tx => {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(913503, ${settingsId})`);
@@ -131,8 +146,9 @@ export function createConfidentialService(settingsId = 1) {
       if (result instanceof ConfidentialError) throw result;
       return result;
     },
-    async lock(identity: ConfidentialIdentity, token: string) {
-      assertAdmin(identity);
+    async lock(identity: ConfidentialIdentity, token: string, operationsScope = false) {
+      if (operationsScope) assertOperationsManager(identity);
+      else assertAdmin(identity);
       // Bind revocation to this actor/session, not just a supplied token.
       await db.delete(grants).where(and(eq(grants.settingsId, settingsId), eq(grants.staffId, identity.staffId), eq(grants.sessionHash, digest(identity.sessionId))));
       if (await config()) await db.insert(events).values(event(identity, "locked"));

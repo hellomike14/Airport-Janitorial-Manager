@@ -61,6 +61,7 @@ import type {
   EmploymentFormTemplateId,
   EmploymentPdfEmailInput,
   ErrorEnvelope,
+  ExportUniformStockCsvParams,
   GetAdminConfidentialAccessStatus200,
   GetDashboardParams,
   GetEmploymentFormTemplateParams,
@@ -69,6 +70,7 @@ import type {
   GetEmploymentW4FormParams,
   GetIdentityDocumentContext200,
   GetInspectorWorkflow200,
+  GetOperationsConfidentialAccessStatus200,
   HealthStatus,
   InspectorAssignmentReport,
   InspectorEmailRecipientsResponse,
@@ -89,6 +91,7 @@ import type {
   ListSpecialTasksParams,
   ListTasksParams,
   LockAdminConfidentialAccess200,
+  LockOperationsConfidentialAccess200,
   MarkAllReadRequest,
   MessageReceiptConfirmationResponse,
   NoStaffMatchError,
@@ -97,6 +100,10 @@ import type {
   OnboardingItem,
   OnboardingProtocolEmailInput,
   OnboardingProtocolEmailResponse,
+  PettyCashHistoryEntry,
+  PettyCashRecord,
+  PettyCashRecordInput,
+  PettyCashRecordUpdate,
   PreviewTerminalGroupScheduleMoveParams,
   QuickbooksConnectUrl,
   QuickbooksStatus,
@@ -127,8 +134,15 @@ import type {
   TrainingReview,
   TrainingSession,
   TrainingWatchStatus,
+  UniformStockItem,
+  UniformStockItemInput,
+  UniformStockItemUpdate,
+  UniformStockTransaction,
+  UniformStockTransactionInput,
   UnlockAdminConfidentialAccess200,
   UnlockAdminConfidentialAccessBody,
+  UnlockOperationsConfidentialAccess200,
+  UnlockOperationsConfidentialAccessBody,
   UpdateApplicationRequest,
   UpdateIssueImagesRequest,
   UpdateOnboardingItemRequest,
@@ -489,6 +503,266 @@ export const useLockAdminConfidentialAccess = <
   TContext
 > => {
   return useMutation(getLockAdminConfidentialAccessMutationOptions(options));
+};
+
+/**
+ * @summary Verified manager access-code status for protected Operations records
+ */
+export const getGetOperationsConfidentialAccessStatusUrl = () => {
+  return `/api/operations/confidential-access/status`;
+};
+
+export const getOperationsConfidentialAccessStatus = async (
+  options?: RequestInit,
+): Promise<GetOperationsConfidentialAccessStatus200> => {
+  return customFetch<GetOperationsConfidentialAccessStatus200>(
+    getGetOperationsConfidentialAccessStatusUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetOperationsConfidentialAccessStatusQueryKey = () => {
+  return [`/api/operations/confidential-access/status`] as const;
+};
+
+export const getGetOperationsConfidentialAccessStatusQueryOptions = <
+  TData = Awaited<ReturnType<typeof getOperationsConfidentialAccessStatus>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getOperationsConfidentialAccessStatus>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetOperationsConfidentialAccessStatusQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getOperationsConfidentialAccessStatus>>
+  > = ({ signal }) =>
+    getOperationsConfidentialAccessStatus({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getOperationsConfidentialAccessStatus>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetOperationsConfidentialAccessStatusQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getOperationsConfidentialAccessStatus>>
+>;
+export type GetOperationsConfidentialAccessStatusQueryError = ErrorType<void>;
+
+/**
+ * @summary Verified manager access-code status for protected Operations records
+ */
+
+export function useGetOperationsConfidentialAccessStatus<
+  TData = Awaited<ReturnType<typeof getOperationsConfidentialAccessStatus>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getOperationsConfidentialAccessStatus>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions =
+    getGetOperationsConfidentialAccessStatusQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Manager code check for protected Operations records
+ */
+export const getUnlockOperationsConfidentialAccessUrl = () => {
+  return `/api/operations/confidential-access/unlock`;
+};
+
+export const unlockOperationsConfidentialAccess = async (
+  unlockOperationsConfidentialAccessBody: UnlockOperationsConfidentialAccessBody,
+  options?: RequestInit,
+): Promise<UnlockOperationsConfidentialAccess200> => {
+  return customFetch<UnlockOperationsConfidentialAccess200>(
+    getUnlockOperationsConfidentialAccessUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(unlockOperationsConfidentialAccessBody),
+    },
+  );
+};
+
+export const getUnlockOperationsConfidentialAccessMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof unlockOperationsConfidentialAccess>>,
+    TError,
+    { data: BodyType<UnlockOperationsConfidentialAccessBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof unlockOperationsConfidentialAccess>>,
+  TError,
+  { data: BodyType<UnlockOperationsConfidentialAccessBody> },
+  TContext
+> => {
+  const mutationKey = ["unlockOperationsConfidentialAccess"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof unlockOperationsConfidentialAccess>>,
+    { data: BodyType<UnlockOperationsConfidentialAccessBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return unlockOperationsConfidentialAccess(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UnlockOperationsConfidentialAccessMutationResult = NonNullable<
+  Awaited<ReturnType<typeof unlockOperationsConfidentialAccess>>
+>;
+export type UnlockOperationsConfidentialAccessMutationBody =
+  BodyType<UnlockOperationsConfidentialAccessBody>;
+export type UnlockOperationsConfidentialAccessMutationError = ErrorType<void>;
+
+/**
+ * @summary Manager code check for protected Operations records
+ */
+export const useUnlockOperationsConfidentialAccess = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof unlockOperationsConfidentialAccess>>,
+    TError,
+    { data: BodyType<UnlockOperationsConfidentialAccessBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof unlockOperationsConfidentialAccess>>,
+  TError,
+  { data: BodyType<UnlockOperationsConfidentialAccessBody> },
+  TContext
+> => {
+  return useMutation(
+    getUnlockOperationsConfidentialAccessMutationOptions(options),
+  );
+};
+
+/**
+ * @summary Revoke this manager browser's Operations unlock immediately
+ */
+export const getLockOperationsConfidentialAccessUrl = () => {
+  return `/api/operations/confidential-access/lock`;
+};
+
+export const lockOperationsConfidentialAccess = async (
+  options?: RequestInit,
+): Promise<LockOperationsConfidentialAccess200> => {
+  return customFetch<LockOperationsConfidentialAccess200>(
+    getLockOperationsConfidentialAccessUrl(),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getLockOperationsConfidentialAccessMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof lockOperationsConfidentialAccess>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof lockOperationsConfidentialAccess>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["lockOperationsConfidentialAccess"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof lockOperationsConfidentialAccess>>,
+    void
+  > = () => {
+    return lockOperationsConfidentialAccess(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type LockOperationsConfidentialAccessMutationResult = NonNullable<
+  Awaited<ReturnType<typeof lockOperationsConfidentialAccess>>
+>;
+
+export type LockOperationsConfidentialAccessMutationError = ErrorType<void>;
+
+/**
+ * @summary Revoke this manager browser's Operations unlock immediately
+ */
+export const useLockOperationsConfidentialAccess = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof lockOperationsConfidentialAccess>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof lockOperationsConfidentialAccess>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(
+    getLockOperationsConfidentialAccessMutationOptions(options),
+  );
 };
 
 /**
@@ -8139,8 +8413,8 @@ export function useListInspectorAssignments<
 }
 
 /**
- * Employee issuance data is streamed only after the authenticated actor is verified as an administrator or supervisor.
- * @summary Download the private uniform workbook for managers
+ * Employee issuance data is streamed only after an administrator or supervisor is verified and protected Operations access is unlocked.
+ * @summary Download the private uniform workbook for code-unlocked managers
  */
 export const getDownloadUniformWorkbookUrl = () => {
   return `/api/operations/workbooks/uniform`;
@@ -8192,7 +8466,7 @@ export type DownloadUniformWorkbookQueryResult = NonNullable<
 export type DownloadUniformWorkbookQueryError = ErrorType<void>;
 
 /**
- * @summary Download the private uniform workbook for managers
+ * @summary Download the private uniform workbook for code-unlocked managers
  */
 
 export function useDownloadUniformWorkbook<
@@ -8207,6 +8481,966 @@ export function useDownloadUniformWorkbook<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getDownloadUniformWorkbookQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List manager Petty Cash reconciliations
+ */
+export const getListPettyCashRecordsUrl = () => {
+  return `/api/operations/petty-cash`;
+};
+
+export const listPettyCashRecords = async (
+  options?: RequestInit,
+): Promise<PettyCashRecord[]> => {
+  return customFetch<PettyCashRecord[]>(getListPettyCashRecordsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListPettyCashRecordsQueryKey = () => {
+  return [`/api/operations/petty-cash`] as const;
+};
+
+export const getListPettyCashRecordsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listPettyCashRecords>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listPettyCashRecords>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListPettyCashRecordsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listPettyCashRecords>>
+  > = ({ signal }) => listPettyCashRecords({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listPettyCashRecords>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListPettyCashRecordsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listPettyCashRecords>>
+>;
+export type ListPettyCashRecordsQueryError = ErrorType<void>;
+
+/**
+ * @summary List manager Petty Cash reconciliations
+ */
+
+export function useListPettyCashRecords<
+  TData = Awaited<ReturnType<typeof listPettyCashRecords>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listPettyCashRecords>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListPettyCashRecordsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a Petty Cash record with an explicitly manager-approved opening float
+ */
+export const getCreatePettyCashRecordUrl = () => {
+  return `/api/operations/petty-cash`;
+};
+
+export const createPettyCashRecord = async (
+  pettyCashRecordInput: PettyCashRecordInput,
+  options?: RequestInit,
+): Promise<PettyCashRecord> => {
+  return customFetch<PettyCashRecord>(getCreatePettyCashRecordUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(pettyCashRecordInput),
+  });
+};
+
+export const getCreatePettyCashRecordMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createPettyCashRecord>>,
+    TError,
+    { data: BodyType<PettyCashRecordInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createPettyCashRecord>>,
+  TError,
+  { data: BodyType<PettyCashRecordInput> },
+  TContext
+> => {
+  const mutationKey = ["createPettyCashRecord"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createPettyCashRecord>>,
+    { data: BodyType<PettyCashRecordInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createPettyCashRecord(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreatePettyCashRecordMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createPettyCashRecord>>
+>;
+export type CreatePettyCashRecordMutationBody = BodyType<PettyCashRecordInput>;
+export type CreatePettyCashRecordMutationError = ErrorType<void>;
+
+/**
+ * @summary Create a Petty Cash record with an explicitly manager-approved opening float
+ */
+export const useCreatePettyCashRecord = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createPettyCashRecord>>,
+    TError,
+    { data: BodyType<PettyCashRecordInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createPettyCashRecord>>,
+  TError,
+  { data: BodyType<PettyCashRecordInput> },
+  TContext
+> => {
+  return useMutation(getCreatePettyCashRecordMutationOptions(options));
+};
+
+/**
+ * @summary Update a reconciliation with optimistic version checking
+ */
+export const getUpdatePettyCashRecordUrl = (recordId: number) => {
+  return `/api/operations/petty-cash/${recordId}`;
+};
+
+export const updatePettyCashRecord = async (
+  recordId: number,
+  pettyCashRecordUpdate: PettyCashRecordUpdate,
+  options?: RequestInit,
+): Promise<PettyCashRecord> => {
+  return customFetch<PettyCashRecord>(getUpdatePettyCashRecordUrl(recordId), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(pettyCashRecordUpdate),
+  });
+};
+
+export const getUpdatePettyCashRecordMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updatePettyCashRecord>>,
+    TError,
+    { recordId: number; data: BodyType<PettyCashRecordUpdate> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updatePettyCashRecord>>,
+  TError,
+  { recordId: number; data: BodyType<PettyCashRecordUpdate> },
+  TContext
+> => {
+  const mutationKey = ["updatePettyCashRecord"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updatePettyCashRecord>>,
+    { recordId: number; data: BodyType<PettyCashRecordUpdate> }
+  > = (props) => {
+    const { recordId, data } = props ?? {};
+
+    return updatePettyCashRecord(recordId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdatePettyCashRecordMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updatePettyCashRecord>>
+>;
+export type UpdatePettyCashRecordMutationBody = BodyType<PettyCashRecordUpdate>;
+export type UpdatePettyCashRecordMutationError = ErrorType<void>;
+
+/**
+ * @summary Update a reconciliation with optimistic version checking
+ */
+export const useUpdatePettyCashRecord = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updatePettyCashRecord>>,
+    TError,
+    { recordId: number; data: BodyType<PettyCashRecordUpdate> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updatePettyCashRecord>>,
+  TError,
+  { recordId: number; data: BodyType<PettyCashRecordUpdate> },
+  TContext
+> => {
+  return useMutation(getUpdatePettyCashRecordMutationOptions(options));
+};
+
+/**
+ * @summary List immutable Petty Cash change history
+ */
+export const getListPettyCashRecordHistoryUrl = (recordId: number) => {
+  return `/api/operations/petty-cash/${recordId}/history`;
+};
+
+export const listPettyCashRecordHistory = async (
+  recordId: number,
+  options?: RequestInit,
+): Promise<PettyCashHistoryEntry[]> => {
+  return customFetch<PettyCashHistoryEntry[]>(
+    getListPettyCashRecordHistoryUrl(recordId),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListPettyCashRecordHistoryQueryKey = (recordId: number) => {
+  return [`/api/operations/petty-cash/${recordId}/history`] as const;
+};
+
+export const getListPettyCashRecordHistoryQueryOptions = <
+  TData = Awaited<ReturnType<typeof listPettyCashRecordHistory>>,
+  TError = ErrorType<void>,
+>(
+  recordId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listPettyCashRecordHistory>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListPettyCashRecordHistoryQueryKey(recordId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listPettyCashRecordHistory>>
+  > = ({ signal }) =>
+    listPettyCashRecordHistory(recordId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!recordId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listPettyCashRecordHistory>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListPettyCashRecordHistoryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listPettyCashRecordHistory>>
+>;
+export type ListPettyCashRecordHistoryQueryError = ErrorType<void>;
+
+/**
+ * @summary List immutable Petty Cash change history
+ */
+
+export function useListPettyCashRecordHistory<
+  TData = Awaited<ReturnType<typeof listPettyCashRecordHistory>>,
+  TError = ErrorType<void>,
+>(
+  recordId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listPettyCashRecordHistory>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListPettyCashRecordHistoryQueryOptions(
+    recordId,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Download a completed reconciliation as formula-safe CSV
+ */
+export const getExportPettyCashRecordCsvUrl = (recordId: number) => {
+  return `/api/operations/petty-cash/${recordId}/export.csv`;
+};
+
+export const exportPettyCashRecordCsv = async (
+  recordId: number,
+  options?: RequestInit,
+): Promise<string> => {
+  return customFetch<string>(getExportPettyCashRecordCsvUrl(recordId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getExportPettyCashRecordCsvQueryKey = (recordId: number) => {
+  return [`/api/operations/petty-cash/${recordId}/export.csv`] as const;
+};
+
+export const getExportPettyCashRecordCsvQueryOptions = <
+  TData = Awaited<ReturnType<typeof exportPettyCashRecordCsv>>,
+  TError = ErrorType<void>,
+>(
+  recordId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof exportPettyCashRecordCsv>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getExportPettyCashRecordCsvQueryKey(recordId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof exportPettyCashRecordCsv>>
+  > = ({ signal }) =>
+    exportPettyCashRecordCsv(recordId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!recordId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof exportPettyCashRecordCsv>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ExportPettyCashRecordCsvQueryResult = NonNullable<
+  Awaited<ReturnType<typeof exportPettyCashRecordCsv>>
+>;
+export type ExportPettyCashRecordCsvQueryError = ErrorType<void>;
+
+/**
+ * @summary Download a completed reconciliation as formula-safe CSV
+ */
+
+export function useExportPettyCashRecordCsv<
+  TData = Awaited<ReturnType<typeof exportPettyCashRecordCsv>>,
+  TError = ErrorType<void>,
+>(
+  recordId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof exportPettyCashRecordCsv>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getExportPettyCashRecordCsvQueryOptions(
+    recordId,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List current and archived Uniform Stock items
+ */
+export const getListUniformStockItemsUrl = () => {
+  return `/api/operations/uniform-stock`;
+};
+
+export const listUniformStockItems = async (
+  options?: RequestInit,
+): Promise<UniformStockItem[]> => {
+  return customFetch<UniformStockItem[]>(getListUniformStockItemsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListUniformStockItemsQueryKey = () => {
+  return [`/api/operations/uniform-stock`] as const;
+};
+
+export const getListUniformStockItemsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listUniformStockItems>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listUniformStockItems>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListUniformStockItemsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listUniformStockItems>>
+  > = ({ signal }) => listUniformStockItems({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listUniformStockItems>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListUniformStockItemsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listUniformStockItems>>
+>;
+export type ListUniformStockItemsQueryError = ErrorType<void>;
+
+/**
+ * @summary List current and archived Uniform Stock items
+ */
+
+export function useListUniformStockItems<
+  TData = Awaited<ReturnType<typeof listUniformStockItems>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listUniformStockItems>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListUniformStockItemsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Add an item with an explicitly manager-entered opening balance
+ */
+export const getCreateUniformStockItemUrl = () => {
+  return `/api/operations/uniform-stock/items`;
+};
+
+export const createUniformStockItem = async (
+  uniformStockItemInput: UniformStockItemInput,
+  options?: RequestInit,
+): Promise<UniformStockItem> => {
+  return customFetch<UniformStockItem>(getCreateUniformStockItemUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(uniformStockItemInput),
+  });
+};
+
+export const getCreateUniformStockItemMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createUniformStockItem>>,
+    TError,
+    { data: BodyType<UniformStockItemInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createUniformStockItem>>,
+  TError,
+  { data: BodyType<UniformStockItemInput> },
+  TContext
+> => {
+  const mutationKey = ["createUniformStockItem"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createUniformStockItem>>,
+    { data: BodyType<UniformStockItemInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createUniformStockItem(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateUniformStockItemMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createUniformStockItem>>
+>;
+export type CreateUniformStockItemMutationBody =
+  BodyType<UniformStockItemInput>;
+export type CreateUniformStockItemMutationError = ErrorType<void>;
+
+/**
+ * @summary Add an item with an explicitly manager-entered opening balance
+ */
+export const useCreateUniformStockItem = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createUniformStockItem>>,
+    TError,
+    { data: BodyType<UniformStockItemInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createUniformStockItem>>,
+  TError,
+  { data: BodyType<UniformStockItemInput> },
+  TContext
+> => {
+  return useMutation(getCreateUniformStockItemMutationOptions(options));
+};
+
+/**
+ * Quantity changes must be recorded as stock transactions; items are archived, never deleted.
+ * @summary Update item details, reorder level or active status
+ */
+export const getUpdateUniformStockItemUrl = (itemId: number) => {
+  return `/api/operations/uniform-stock/items/${itemId}`;
+};
+
+export const updateUniformStockItem = async (
+  itemId: number,
+  uniformStockItemUpdate: UniformStockItemUpdate,
+  options?: RequestInit,
+): Promise<UniformStockItem> => {
+  return customFetch<UniformStockItem>(getUpdateUniformStockItemUrl(itemId), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(uniformStockItemUpdate),
+  });
+};
+
+export const getUpdateUniformStockItemMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateUniformStockItem>>,
+    TError,
+    { itemId: number; data: BodyType<UniformStockItemUpdate> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateUniformStockItem>>,
+  TError,
+  { itemId: number; data: BodyType<UniformStockItemUpdate> },
+  TContext
+> => {
+  const mutationKey = ["updateUniformStockItem"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateUniformStockItem>>,
+    { itemId: number; data: BodyType<UniformStockItemUpdate> }
+  > = (props) => {
+    const { itemId, data } = props ?? {};
+
+    return updateUniformStockItem(itemId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateUniformStockItemMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateUniformStockItem>>
+>;
+export type UpdateUniformStockItemMutationBody =
+  BodyType<UniformStockItemUpdate>;
+export type UpdateUniformStockItemMutationError = ErrorType<void>;
+
+/**
+ * @summary Update item details, reorder level or active status
+ */
+export const useUpdateUniformStockItem = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateUniformStockItem>>,
+    TError,
+    { itemId: number; data: BodyType<UniformStockItemUpdate> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateUniformStockItem>>,
+  TError,
+  { itemId: number; data: BodyType<UniformStockItemUpdate> },
+  TContext
+> => {
+  return useMutation(getUpdateUniformStockItemMutationOptions(options));
+};
+
+/**
+ * @summary List immutable stock receipts, issues, returns and adjustments
+ */
+export const getListUniformStockTransactionsUrl = () => {
+  return `/api/operations/uniform-stock/transactions`;
+};
+
+export const listUniformStockTransactions = async (
+  options?: RequestInit,
+): Promise<UniformStockTransaction[]> => {
+  return customFetch<UniformStockTransaction[]>(
+    getListUniformStockTransactionsUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListUniformStockTransactionsQueryKey = () => {
+  return [`/api/operations/uniform-stock/transactions`] as const;
+};
+
+export const getListUniformStockTransactionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listUniformStockTransactions>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listUniformStockTransactions>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListUniformStockTransactionsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listUniformStockTransactions>>
+  > = ({ signal }) =>
+    listUniformStockTransactions({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listUniformStockTransactions>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListUniformStockTransactionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listUniformStockTransactions>>
+>;
+export type ListUniformStockTransactionsQueryError = ErrorType<void>;
+
+/**
+ * @summary List immutable stock receipts, issues, returns and adjustments
+ */
+
+export function useListUniformStockTransactions<
+  TData = Awaited<ReturnType<typeof listUniformStockTransactions>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listUniformStockTransactions>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListUniformStockTransactionsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * New issues require an active, non-former staff/supervisor/admin. Returns reference an original issue and remain allowed for former or inactive staff.
+ * @summary Record a stock receipt, staff issue, return or adjustment
+ */
+export const getCreateUniformStockTransactionUrl = () => {
+  return `/api/operations/uniform-stock/transactions`;
+};
+
+export const createUniformStockTransaction = async (
+  uniformStockTransactionInput: UniformStockTransactionInput,
+  options?: RequestInit,
+): Promise<UniformStockTransaction> => {
+  return customFetch<UniformStockTransaction>(
+    getCreateUniformStockTransactionUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(uniformStockTransactionInput),
+    },
+  );
+};
+
+export const getCreateUniformStockTransactionMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createUniformStockTransaction>>,
+    TError,
+    { data: BodyType<UniformStockTransactionInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createUniformStockTransaction>>,
+  TError,
+  { data: BodyType<UniformStockTransactionInput> },
+  TContext
+> => {
+  const mutationKey = ["createUniformStockTransaction"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createUniformStockTransaction>>,
+    { data: BodyType<UniformStockTransactionInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createUniformStockTransaction(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateUniformStockTransactionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createUniformStockTransaction>>
+>;
+export type CreateUniformStockTransactionMutationBody =
+  BodyType<UniformStockTransactionInput>;
+export type CreateUniformStockTransactionMutationError = ErrorType<void>;
+
+/**
+ * @summary Record a stock receipt, staff issue, return or adjustment
+ */
+export const useCreateUniformStockTransaction = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createUniformStockTransaction>>,
+    TError,
+    { data: BodyType<UniformStockTransactionInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createUniformStockTransaction>>,
+  TError,
+  { data: BodyType<UniformStockTransactionInput> },
+  TContext
+> => {
+  return useMutation(getCreateUniformStockTransactionMutationOptions(options));
+};
+
+/**
+ * @summary Download a formula-safe stock list or distribution history
+ */
+export const getExportUniformStockCsvUrl = (
+  params: ExportUniformStockCsvParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/operations/uniform-stock/export.csv?${stringifiedParams}`
+    : `/api/operations/uniform-stock/export.csv`;
+};
+
+export const exportUniformStockCsv = async (
+  params: ExportUniformStockCsvParams,
+  options?: RequestInit,
+): Promise<string> => {
+  return customFetch<string>(getExportUniformStockCsvUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getExportUniformStockCsvQueryKey = (
+  params?: ExportUniformStockCsvParams,
+) => {
+  return [
+    `/api/operations/uniform-stock/export.csv`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getExportUniformStockCsvQueryOptions = <
+  TData = Awaited<ReturnType<typeof exportUniformStockCsv>>,
+  TError = ErrorType<void>,
+>(
+  params: ExportUniformStockCsvParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof exportUniformStockCsv>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getExportUniformStockCsvQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof exportUniformStockCsv>>
+  > = ({ signal }) =>
+    exportUniformStockCsv(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof exportUniformStockCsv>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ExportUniformStockCsvQueryResult = NonNullable<
+  Awaited<ReturnType<typeof exportUniformStockCsv>>
+>;
+export type ExportUniformStockCsvQueryError = ErrorType<void>;
+
+/**
+ * @summary Download a formula-safe stock list or distribution history
+ */
+
+export function useExportUniformStockCsv<
+  TData = Awaited<ReturnType<typeof exportUniformStockCsv>>,
+  TError = ErrorType<void>,
+>(
+  params: ExportUniformStockCsvParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof exportUniformStockCsv>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getExportUniformStockCsvQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

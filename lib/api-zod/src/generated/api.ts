@@ -70,6 +70,47 @@ export const LockAdminConfidentialAccessResponse = zod.object({
 });
 
 /**
+ * @summary Verified manager access-code status for protected Operations records
+ */
+export const GetOperationsConfidentialAccessStatusResponse = zod.object({
+  configured: zod.boolean(),
+  unlocked: zod.boolean(),
+  expiresAt: zod.string().nullable(),
+  lockedUntil: zod.string().nullable(),
+  serverTime: zod.string(),
+});
+
+/**
+ * @summary Manager code check for protected Operations records
+ */
+export const unlockOperationsConfidentialAccessBodyCodeRegExp = new RegExp(
+  "^[0-9]{8,12}$",
+);
+
+export const UnlockOperationsConfidentialAccessBody = zod.object({
+  code: zod.string().regex(unlockOperationsConfidentialAccessBodyCodeRegExp),
+});
+
+export const UnlockOperationsConfidentialAccessResponse = zod.object({
+  configured: zod.boolean(),
+  unlocked: zod.boolean(),
+  expiresAt: zod.string().nullable(),
+  lockedUntil: zod.string().nullable(),
+  serverTime: zod.string(),
+});
+
+/**
+ * @summary Revoke this manager browser's Operations unlock immediately
+ */
+export const LockOperationsConfidentialAccessResponse = zod.object({
+  configured: zod.boolean(),
+  unlocked: zod.boolean(),
+  expiresAt: zod.string().nullable(),
+  lockedUntil: zod.string().nullable(),
+  serverTime: zod.string(),
+});
+
+/**
  * @summary Personal contact information for code-unlocked administrators only
  */
 export const ListConfidentialStaffResponseItem = zod.object({
@@ -2400,6 +2441,436 @@ export const ListInspectorAssignmentsResponseItem = zod.object({
 export const ListInspectorAssignmentsResponse = zod.array(
   ListInspectorAssignmentsResponseItem,
 );
+
+/**
+ * @summary List manager Petty Cash reconciliations
+ */
+export const listPettyCashRecordsResponseExpensesItemOneDescriptionMax = 500;
+
+export const ListPettyCashRecordsResponseItem = zod.object({
+  id: zod.number(),
+  location: zod.string(),
+  custodianId: zod.number(),
+  custodianName: zod.string(),
+  recordDate: zod.date(),
+  openingFloatCents: zod.number(),
+  openingFloatApprovedByName: zod.string(),
+  openingFloatApprovedAt: zod.date(),
+  cashOnHandCents: zod.number(),
+  expenses: zod.array(
+    zod
+      .object({
+        expenseDate: zod.date(),
+        description: zod
+          .string()
+          .min(1)
+          .max(listPettyCashRecordsResponseExpensesItemOneDescriptionMax),
+        amountCents: zod.number().min(1),
+        receiptReceived: zod.boolean(),
+      })
+      .and(
+        zod.object({
+          id: zod.number(),
+        }),
+      ),
+  ),
+  totalExpensesCents: zod.number(),
+  expectedBalanceCents: zod.number(),
+  overShortCents: zod.number(),
+  status: zod.enum(["draft", "completed"]),
+  custodianAcknowledgedAt: zod.date().nullable(),
+  custodianAcknowledgedRecordedByName: zod.string().nullable(),
+  managerAcknowledgedByName: zod.string().nullable(),
+  managerAcknowledgedAt: zod.date().nullable(),
+  reimbursementStatus: zod.enum(["not_submitted", "submitted", "paid"]),
+  reimbursementAmountCents: zod.number().nullable(),
+  reimbursementReference: zod.string().nullable(),
+  reimbursementSubmittedOn: zod.date().nullable(),
+  reimbursementPaidOn: zod.date().nullable(),
+  accountingNotes: zod.string().nullable(),
+  version: zod.number(),
+  createdAt: zod.date(),
+  updatedAt: zod.date(),
+});
+export const ListPettyCashRecordsResponse = zod.array(
+  ListPettyCashRecordsResponseItem,
+);
+
+/**
+ * @summary Create a Petty Cash record with an explicitly manager-approved opening float
+ */
+export const createPettyCashRecordBodyLocationMax = 200;
+
+export const createPettyCashRecordBodyOpeningFloatCentsMin = 0;
+
+export const createPettyCashRecordBodyCashOnHandCentsMin = 0;
+
+export const createPettyCashRecordBodyReimbursementAmountCentsMin = 0;
+
+export const createPettyCashRecordBodyReimbursementReferenceMax = 200;
+
+export const createPettyCashRecordBodyAccountingNotesMax = 2000;
+
+export const createPettyCashRecordBodyExpensesItemDescriptionMax = 500;
+
+export const CreatePettyCashRecordBody = zod.object({
+  location: zod.string().min(1).max(createPettyCashRecordBodyLocationMax),
+  custodianId: zod.number().min(1),
+  recordDate: zod.date(),
+  openingFloatCents: zod
+    .number()
+    .min(createPettyCashRecordBodyOpeningFloatCentsMin),
+  cashOnHandCents: zod
+    .number()
+    .min(createPettyCashRecordBodyCashOnHandCentsMin),
+  status: zod.enum(["draft", "completed"]),
+  custodianAcknowledged: zod.boolean(),
+  managerAcknowledged: zod.boolean(),
+  reimbursementStatus: zod.enum(["not_submitted", "submitted", "paid"]),
+  reimbursementAmountCents: zod
+    .number()
+    .min(createPettyCashRecordBodyReimbursementAmountCentsMin)
+    .nullish(),
+  reimbursementReference: zod
+    .string()
+    .max(createPettyCashRecordBodyReimbursementReferenceMax)
+    .nullish(),
+  reimbursementSubmittedOn: zod.date().nullish(),
+  reimbursementPaidOn: zod.date().nullish(),
+  accountingNotes: zod
+    .string()
+    .max(createPettyCashRecordBodyAccountingNotesMax)
+    .nullish(),
+  expenses: zod.array(
+    zod.object({
+      expenseDate: zod.date(),
+      description: zod
+        .string()
+        .min(1)
+        .max(createPettyCashRecordBodyExpensesItemDescriptionMax),
+      amountCents: zod.number().min(1),
+      receiptReceived: zod.boolean(),
+    }),
+  ),
+});
+
+/**
+ * @summary Update a reconciliation with optimistic version checking
+ */
+
+export const UpdatePettyCashRecordParams = zod.object({
+  recordId: zod.coerce.number().min(1),
+});
+
+export const updatePettyCashRecordBodyOneLocationMax = 200;
+
+export const updatePettyCashRecordBodyOneOpeningFloatCentsMin = 0;
+
+export const updatePettyCashRecordBodyOneCashOnHandCentsMin = 0;
+
+export const updatePettyCashRecordBodyOneReimbursementAmountCentsMin = 0;
+
+export const updatePettyCashRecordBodyOneReimbursementReferenceMax = 200;
+
+export const updatePettyCashRecordBodyOneAccountingNotesMax = 2000;
+
+export const updatePettyCashRecordBodyOneExpensesItemDescriptionMax = 500;
+
+export const UpdatePettyCashRecordBody = zod
+  .object({
+    location: zod.string().min(1).max(updatePettyCashRecordBodyOneLocationMax),
+    custodianId: zod.number().min(1),
+    recordDate: zod.date(),
+    openingFloatCents: zod
+      .number()
+      .min(updatePettyCashRecordBodyOneOpeningFloatCentsMin),
+    cashOnHandCents: zod
+      .number()
+      .min(updatePettyCashRecordBodyOneCashOnHandCentsMin),
+    status: zod.enum(["draft", "completed"]),
+    custodianAcknowledged: zod.boolean(),
+    managerAcknowledged: zod.boolean(),
+    reimbursementStatus: zod.enum(["not_submitted", "submitted", "paid"]),
+    reimbursementAmountCents: zod
+      .number()
+      .min(updatePettyCashRecordBodyOneReimbursementAmountCentsMin)
+      .nullish(),
+    reimbursementReference: zod
+      .string()
+      .max(updatePettyCashRecordBodyOneReimbursementReferenceMax)
+      .nullish(),
+    reimbursementSubmittedOn: zod.date().nullish(),
+    reimbursementPaidOn: zod.date().nullish(),
+    accountingNotes: zod
+      .string()
+      .max(updatePettyCashRecordBodyOneAccountingNotesMax)
+      .nullish(),
+    expenses: zod.array(
+      zod.object({
+        expenseDate: zod.date(),
+        description: zod
+          .string()
+          .min(1)
+          .max(updatePettyCashRecordBodyOneExpensesItemDescriptionMax),
+        amountCents: zod.number().min(1),
+        receiptReceived: zod.boolean(),
+      }),
+    ),
+  })
+  .and(
+    zod.object({
+      expectedVersion: zod.number().min(1),
+    }),
+  );
+
+export const updatePettyCashRecordResponseExpensesItemOneDescriptionMax = 500;
+
+export const UpdatePettyCashRecordResponse = zod.object({
+  id: zod.number(),
+  location: zod.string(),
+  custodianId: zod.number(),
+  custodianName: zod.string(),
+  recordDate: zod.date(),
+  openingFloatCents: zod.number(),
+  openingFloatApprovedByName: zod.string(),
+  openingFloatApprovedAt: zod.date(),
+  cashOnHandCents: zod.number(),
+  expenses: zod.array(
+    zod
+      .object({
+        expenseDate: zod.date(),
+        description: zod
+          .string()
+          .min(1)
+          .max(updatePettyCashRecordResponseExpensesItemOneDescriptionMax),
+        amountCents: zod.number().min(1),
+        receiptReceived: zod.boolean(),
+      })
+      .and(
+        zod.object({
+          id: zod.number(),
+        }),
+      ),
+  ),
+  totalExpensesCents: zod.number(),
+  expectedBalanceCents: zod.number(),
+  overShortCents: zod.number(),
+  status: zod.enum(["draft", "completed"]),
+  custodianAcknowledgedAt: zod.date().nullable(),
+  custodianAcknowledgedRecordedByName: zod.string().nullable(),
+  managerAcknowledgedByName: zod.string().nullable(),
+  managerAcknowledgedAt: zod.date().nullable(),
+  reimbursementStatus: zod.enum(["not_submitted", "submitted", "paid"]),
+  reimbursementAmountCents: zod.number().nullable(),
+  reimbursementReference: zod.string().nullable(),
+  reimbursementSubmittedOn: zod.date().nullable(),
+  reimbursementPaidOn: zod.date().nullable(),
+  accountingNotes: zod.string().nullable(),
+  version: zod.number(),
+  createdAt: zod.date(),
+  updatedAt: zod.date(),
+});
+
+/**
+ * @summary List immutable Petty Cash change history
+ */
+
+export const ListPettyCashRecordHistoryParams = zod.object({
+  recordId: zod.coerce.number().min(1),
+});
+
+export const ListPettyCashRecordHistoryResponseItem = zod.object({
+  id: zod.number(),
+  event: zod.enum(["created", "updated", "completed"]),
+  version: zod.number(),
+  actorName: zod.string(),
+  snapshot: zod.record(zod.string(), zod.unknown()),
+  createdAt: zod.date(),
+});
+export const ListPettyCashRecordHistoryResponse = zod.array(
+  ListPettyCashRecordHistoryResponseItem,
+);
+
+/**
+ * @summary Download a completed reconciliation as formula-safe CSV
+ */
+
+export const ExportPettyCashRecordCsvParams = zod.object({
+  recordId: zod.coerce.number().min(1),
+});
+
+/**
+ * @summary List current and archived Uniform Stock items
+ */
+export const ListUniformStockItemsResponseItem = zod.object({
+  id: zod.number(),
+  itemCode: zod.string().nullable(),
+  itemName: zod.string(),
+  description: zod.string().nullable(),
+  size: zod.string(),
+  currentQuantity: zod.number(),
+  outstandingIssued: zod.number(),
+  reorderLevel: zod.number(),
+  lastOrderDate: zod.date().nullable(),
+  active: zod.boolean(),
+  lowStock: zod.boolean(),
+  version: zod.number(),
+  createdAt: zod.date(),
+  updatedAt: zod.date(),
+});
+export const ListUniformStockItemsResponse = zod.array(
+  ListUniformStockItemsResponseItem,
+);
+
+/**
+ * @summary Add an item with an explicitly manager-entered opening balance
+ */
+export const createUniformStockItemBodyItemCodeMax = 100;
+
+export const createUniformStockItemBodyItemNameMax = 200;
+
+export const createUniformStockItemBodyDescriptionMax = 1000;
+
+export const createUniformStockItemBodySizeMax = 80;
+
+export const createUniformStockItemBodyOpeningQuantityMin = 0;
+
+export const createUniformStockItemBodyOpeningReasonMax = 1000;
+
+export const createUniformStockItemBodyReorderLevelMin = 0;
+
+export const CreateUniformStockItemBody = zod.object({
+  itemCode: zod.string().max(createUniformStockItemBodyItemCodeMax).nullish(),
+  itemName: zod.string().min(1).max(createUniformStockItemBodyItemNameMax),
+  description: zod
+    .string()
+    .max(createUniformStockItemBodyDescriptionMax)
+    .nullish(),
+  size: zod.string().min(1).max(createUniformStockItemBodySizeMax),
+  openingQuantity: zod
+    .number()
+    .min(createUniformStockItemBodyOpeningQuantityMin),
+  openingReason: zod
+    .string()
+    .min(1)
+    .max(createUniformStockItemBodyOpeningReasonMax),
+  reorderLevel: zod.number().min(createUniformStockItemBodyReorderLevelMin),
+  lastOrderDate: zod.date().nullish(),
+});
+
+/**
+ * Quantity changes must be recorded as stock transactions; items are archived, never deleted.
+ * @summary Update item details, reorder level or active status
+ */
+
+export const UpdateUniformStockItemParams = zod.object({
+  itemId: zod.coerce.number().min(1),
+});
+
+export const updateUniformStockItemBodyItemCodeMax = 100;
+
+export const updateUniformStockItemBodyItemNameMax = 200;
+
+export const updateUniformStockItemBodyDescriptionMax = 1000;
+
+export const updateUniformStockItemBodySizeMax = 80;
+
+export const updateUniformStockItemBodyReorderLevelMin = 0;
+
+export const UpdateUniformStockItemBody = zod.object({
+  expectedVersion: zod.number().min(1),
+  itemCode: zod.string().max(updateUniformStockItemBodyItemCodeMax).nullish(),
+  itemName: zod.string().min(1).max(updateUniformStockItemBodyItemNameMax),
+  description: zod
+    .string()
+    .max(updateUniformStockItemBodyDescriptionMax)
+    .nullish(),
+  size: zod.string().min(1).max(updateUniformStockItemBodySizeMax),
+  reorderLevel: zod.number().min(updateUniformStockItemBodyReorderLevelMin),
+  lastOrderDate: zod.date().nullish(),
+  active: zod.boolean(),
+});
+
+export const UpdateUniformStockItemResponse = zod.object({
+  id: zod.number(),
+  itemCode: zod.string().nullable(),
+  itemName: zod.string(),
+  description: zod.string().nullable(),
+  size: zod.string(),
+  currentQuantity: zod.number(),
+  outstandingIssued: zod.number(),
+  reorderLevel: zod.number(),
+  lastOrderDate: zod.date().nullable(),
+  active: zod.boolean(),
+  lowStock: zod.boolean(),
+  version: zod.number(),
+  createdAt: zod.date(),
+  updatedAt: zod.date(),
+});
+
+/**
+ * @summary List immutable stock receipts, issues, returns and adjustments
+ */
+export const ListUniformStockTransactionsResponseItem = zod.object({
+  id: zod.number(),
+  itemId: zod.number(),
+  itemName: zod.string(),
+  size: zod.string(),
+  staffId: zod.number().nullable(),
+  staffName: zod.string().nullable(),
+  actorId: zod.number(),
+  actorName: zod.string(),
+  type: zod.enum([
+    "opening_balance",
+    "receipt",
+    "issue",
+    "return",
+    "adjustment",
+  ]),
+  quantity: zod.number(),
+  stockDelta: zod.number(),
+  relatedIssueId: zod.number().nullable(),
+  conditionReturned: zod
+    .union([
+      zod.literal("serviceable"),
+      zod.literal("damaged"),
+      zod.literal(null),
+    ])
+    .nullable(),
+  replacementIssued: zod.boolean(),
+  reason: zod.string(),
+  occurredAt: zod.date(),
+  remainingReturnQuantity: zod.number(),
+});
+export const ListUniformStockTransactionsResponse = zod.array(
+  ListUniformStockTransactionsResponseItem,
+);
+
+/**
+ * New issues require an active, non-former staff/supervisor/admin. Returns reference an original issue and remain allowed for former or inactive staff.
+ * @summary Record a stock receipt, staff issue, return or adjustment
+ */
+
+export const createUniformStockTransactionBodyReasonMax = 1000;
+
+export const CreateUniformStockTransactionBody = zod.object({
+  type: zod.enum(["receipt", "issue", "return", "adjustment"]),
+  itemId: zod.number().min(1).optional(),
+  staffId: zod.number().min(1).optional(),
+  quantity: zod.number().min(1),
+  adjustmentDirection: zod.enum(["increase", "decrease"]).optional(),
+  relatedIssueId: zod.number().min(1).optional(),
+  conditionReturned: zod.enum(["serviceable", "damaged"]).optional(),
+  replacementIssued: zod.boolean().optional(),
+  reason: zod.string().min(1).max(createUniformStockTransactionBodyReasonMax),
+});
+
+/**
+ * @summary Download a formula-safe stock list or distribution history
+ */
+export const ExportUniformStockCsvQueryParams = zod.object({
+  view: zod.enum(["stock", "history"]),
+});
 
 /**
  * Accepts a limited set of diagnostic codes without requiring an authenticated session.

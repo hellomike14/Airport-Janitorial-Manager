@@ -29,6 +29,8 @@ tags:
     description: Task type templates
   - name: Storage
     description: Object storage upload and serving endpoints.
+  - name: operations
+    description: Manager-only Petty Cash and Uniform Stock operations.
 
 paths:
   /confidential-access/status:
@@ -39,6 +41,12 @@ paths:
     $ref: "./confidential-access.yaml#/unlock"
   /confidential-access/lock:
     $ref: "./confidential-access.yaml#/lock"
+  /operations/confidential-access/status:
+    $ref: "./confidential-access.yaml#/operationsStatus"
+  /operations/confidential-access/unlock:
+    $ref: "./confidential-access.yaml#/operationsUnlock"
+  /operations/confidential-access/lock:
+    $ref: "./confidential-access.yaml#/operationsLock"
   /staff/confidential:
     get:
       operationId: listConfidentialStaff
@@ -1834,8 +1842,8 @@ paths:
     get:
       operationId: downloadUniformWorkbook
       tags: [operations]
-      summary: Download the private uniform workbook for managers
-      description: Employee issuance data is streamed only after the authenticated actor is verified as an administrator or supervisor.
+      summary: Download the private uniform workbook for code-unlocked managers
+      description: Employee issuance data is streamed only after an administrator or supervisor is verified and protected Operations access is unlocked.
       responses:
         "200":
           description: Private uniform workbook.
@@ -1844,7 +1852,245 @@ paths:
               schema: { type: string, format: binary }
         "401": { description: Login session required }
         "403": { description: Only administrators and supervisors may download this workbook }
+        "423": { description: Protected Operations access is locked }
         "404": { description: Uniform workbook is unavailable }
+
+  /operations/petty-cash:
+    get:
+      operationId: listPettyCashRecords
+      tags: [operations]
+      summary: List manager Petty Cash reconciliations
+      responses:
+        "200":
+          description: Reconciliations with calculated balances and itemized expenses.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PettyCashRecord" }
+        "401": { description: Login session required }
+        "403": { description: Manager access required }
+        "423": { description: Protected Operations access is locked }
+    post:
+      operationId: createPettyCashRecord
+      tags: [operations]
+      summary: Create a Petty Cash record with an explicitly manager-approved opening float
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PettyCashRecordInput" }
+      responses:
+        "201":
+          description: Saved reconciliation.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PettyCashRecord" }
+        "400": { description: Invalid record or acknowledgement data }
+        "401": { description: Login session required }
+        "403": { description: Manager access required }
+        "423": { description: Protected Operations access is locked }
+
+  /operations/petty-cash/{recordId}:
+    parameters:
+      - name: recordId
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+    patch:
+      operationId: updatePettyCashRecord
+      tags: [operations]
+      summary: Update a reconciliation with optimistic version checking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PettyCashRecordUpdate" }
+      responses:
+        "200":
+          description: Saved reconciliation.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PettyCashRecord" }
+        "400": { description: Invalid record or acknowledgement data }
+        "401": { description: Login session required }
+        "403": { description: Manager access required }
+        "404": { description: Reconciliation not found }
+        "409": { description: Record changed; reload before saving }
+        "423": { description: Protected Operations access is locked }
+
+  /operations/petty-cash/{recordId}/history:
+    get:
+      operationId: listPettyCashRecordHistory
+      tags: [operations]
+      summary: List immutable Petty Cash change history
+      parameters:
+        - name: recordId
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Saved record snapshots, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PettyCashHistoryEntry" }
+        "401": { description: Login session required }
+        "403": { description: Manager access required }
+        "404": { description: Reconciliation not found }
+        "423": { description: Protected Operations access is locked }
+
+  /operations/petty-cash/{recordId}/export.csv:
+    get:
+      operationId: exportPettyCashRecordCsv
+      tags: [operations]
+      summary: Download a completed reconciliation as formula-safe CSV
+      parameters:
+        - name: recordId
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Printable/exportable completed record.
+          content:
+            text/csv:
+              schema: { type: string }
+        "401": { description: Login session required }
+        "403": { description: Manager access required }
+        "404": { description: Reconciliation not found }
+        "409": { description: Reconciliation must be completed before export }
+        "423": { description: Protected Operations access is locked }
+
+  /operations/uniform-stock:
+    get:
+      operationId: listUniformStockItems
+      tags: [operations]
+      summary: List current and archived Uniform Stock items
+      responses:
+        "200":
+          description: Current quantities, reorder levels and outstanding issues.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/UniformStockItem" }
+        "401": { description: Login session required }
+        "403": { description: Manager access required }
+        "423": { description: Protected Operations access is locked }
+
+  /operations/uniform-stock/items:
+    post:
+      operationId: createUniformStockItem
+      tags: [operations]
+      summary: Add an item with an explicitly manager-entered opening balance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UniformStockItemInput" }
+      responses:
+        "201":
+          description: Created item and immutable opening-balance transaction.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UniformStockItem" }
+        "400": { description: Invalid item or opening balance }
+        "401": { description: Login session required }
+        "403": { description: Manager access required }
+        "409": { description: An active item with this name and size already exists }
+        "423": { description: Protected Operations access is locked }
+
+  /operations/uniform-stock/items/{itemId}:
+    parameters:
+      - name: itemId
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+    patch:
+      operationId: updateUniformStockItem
+      tags: [operations]
+      summary: Update item details, reorder level or active status
+      description: Quantity changes must be recorded as stock transactions; items are archived, never deleted.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UniformStockItemUpdate" }
+      responses:
+        "200":
+          description: Updated stock item.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UniformStockItem" }
+        "400": { description: Invalid item details }
+        "401": { description: Login session required }
+        "403": { description: Manager access required }
+        "404": { description: Stock item not found }
+        "409": { description: Item changed; reload before saving }
+        "423": { description: Protected Operations access is locked }
+
+  /operations/uniform-stock/transactions:
+    get:
+      operationId: listUniformStockTransactions
+      tags: [operations]
+      summary: List immutable stock receipts, issues, returns and adjustments
+      responses:
+        "200":
+          description: Transaction history with staff and item names.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/UniformStockTransaction" }
+        "401": { description: Login session required }
+        "403": { description: Manager access required }
+        "423": { description: Protected Operations access is locked }
+    post:
+      operationId: createUniformStockTransaction
+      tags: [operations]
+      summary: Record a stock receipt, staff issue, return or adjustment
+      description: New issues require an active, non-former staff/supervisor/admin. Returns reference an original issue and remain allowed for former or inactive staff.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UniformStockTransactionInput" }
+      responses:
+        "201":
+          description: Stock transaction recorded with the resulting item balance.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UniformStockTransaction" }
+        "400": { description: Invalid transaction or staff is not eligible for a new issue }
+        "401": { description: Login session required }
+        "403": { description: Manager access required }
+        "404": { description: Item or original issue not found }
+        "409": { description: Insufficient stock or an issue was already fully returned }
+        "423": { description: Protected Operations access is locked }
+
+  /operations/uniform-stock/export.csv:
+    get:
+      operationId: exportUniformStockCsv
+      tags: [operations]
+      summary: Download a formula-safe stock list or distribution history
+      parameters:
+        - name: view
+          in: query
+          required: true
+          schema: { type: string, enum: [stock, history] }
+      responses:
+        "200":
+          description: CSV export of the selected view.
+          content:
+            text/csv:
+              schema: { type: string }
+        "400": { description: Unsupported export view }
+        "401": { description: Login session required }
+        "403": { description: Manager access required }
+        "423": { description: Protected Operations access is locked }
 
   /internal/inspector-sla-sweep:
     post:
@@ -4033,3 +4279,295 @@ components:
           type: string
       required:
         - authorizeUrl
+
+    PettyCashExpenseInput:
+      type: object
+      properties:
+        expenseDate:
+          type: string
+          format: date
+        description:
+          type: string
+          minLength: 1
+          maxLength: 500
+        amountCents:
+          type: integer
+          minimum: 1
+        receiptReceived:
+          type: boolean
+      required: [expenseDate, description, amountCents, receiptReceived]
+
+    PettyCashExpense:
+      allOf:
+        - $ref: "#/components/schemas/PettyCashExpenseInput"
+        - type: object
+          properties:
+            id:
+              type: integer
+          required: [id]
+
+    PettyCashRecordInput:
+      type: object
+      properties:
+        location:
+          type: string
+          minLength: 1
+          maxLength: 200
+        custodianId:
+          type: integer
+          minimum: 1
+        recordDate:
+          type: string
+          format: date
+        openingFloatCents:
+          type: integer
+          minimum: 0
+        cashOnHandCents:
+          type: integer
+          minimum: 0
+        status:
+          type: string
+          enum: [draft, completed]
+        custodianAcknowledged:
+          type: boolean
+        managerAcknowledged:
+          type: boolean
+        reimbursementStatus:
+          type: string
+          enum: [not_submitted, submitted, paid]
+        reimbursementAmountCents:
+          type: [integer, "null"]
+          minimum: 0
+        reimbursementReference:
+          type: [string, "null"]
+          maxLength: 200
+        reimbursementSubmittedOn:
+          type: [string, "null"]
+          format: date
+        reimbursementPaidOn:
+          type: [string, "null"]
+          format: date
+        accountingNotes:
+          type: [string, "null"]
+          maxLength: 2000
+        expenses:
+          type: array
+          items: { $ref: "#/components/schemas/PettyCashExpenseInput" }
+      required:
+        - location
+        - custodianId
+        - recordDate
+        - openingFloatCents
+        - cashOnHandCents
+        - status
+        - custodianAcknowledged
+        - managerAcknowledged
+        - reimbursementStatus
+        - expenses
+
+    PettyCashRecordUpdate:
+      allOf:
+        - $ref: "#/components/schemas/PettyCashRecordInput"
+        - type: object
+          properties:
+            expectedVersion:
+              type: integer
+              minimum: 1
+          required: [expectedVersion]
+
+    PettyCashRecord:
+      type: object
+      properties:
+        id: { type: integer }
+        location: { type: string }
+        custodianId: { type: integer }
+        custodianName: { type: string }
+        recordDate: { type: string, format: date }
+        openingFloatCents: { type: integer }
+        openingFloatApprovedByName: { type: string }
+        openingFloatApprovedAt: { type: string, format: date-time }
+        cashOnHandCents: { type: integer }
+        expenses:
+          type: array
+          items: { $ref: "#/components/schemas/PettyCashExpense" }
+        totalExpensesCents: { type: integer }
+        expectedBalanceCents: { type: integer }
+        overShortCents: { type: integer }
+        status: { type: string, enum: [draft, completed] }
+        custodianAcknowledgedAt: { type: [string, "null"], format: date-time }
+        custodianAcknowledgedRecordedByName: { type: [string, "null"] }
+        managerAcknowledgedByName: { type: [string, "null"] }
+        managerAcknowledgedAt: { type: [string, "null"], format: date-time }
+        reimbursementStatus:
+          type: string
+          enum: [not_submitted, submitted, paid]
+        reimbursementAmountCents: { type: [integer, "null"] }
+        reimbursementReference: { type: [string, "null"] }
+        reimbursementSubmittedOn: { type: [string, "null"], format: date }
+        reimbursementPaidOn: { type: [string, "null"], format: date }
+        accountingNotes: { type: [string, "null"] }
+        version: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required:
+        - id
+        - location
+        - custodianId
+        - custodianName
+        - recordDate
+        - openingFloatCents
+        - openingFloatApprovedByName
+        - openingFloatApprovedAt
+        - cashOnHandCents
+        - expenses
+        - totalExpensesCents
+        - expectedBalanceCents
+        - overShortCents
+        - status
+        - custodianAcknowledgedAt
+        - custodianAcknowledgedRecordedByName
+        - managerAcknowledgedByName
+        - managerAcknowledgedAt
+        - reimbursementStatus
+        - reimbursementAmountCents
+        - reimbursementReference
+        - reimbursementSubmittedOn
+        - reimbursementPaidOn
+        - accountingNotes
+        - version
+        - createdAt
+        - updatedAt
+
+    PettyCashHistoryEntry:
+      type: object
+      properties:
+        id: { type: integer }
+        event: { type: string, enum: [created, updated, completed] }
+        version: { type: integer }
+        actorName: { type: string }
+        snapshot:
+          type: object
+          additionalProperties: true
+        createdAt: { type: string, format: date-time }
+      required: [id, event, version, actorName, snapshot, createdAt]
+
+    UniformStockItemInput:
+      type: object
+      properties:
+        itemCode: { type: [string, "null"], maxLength: 100 }
+        itemName: { type: string, minLength: 1, maxLength: 200 }
+        description: { type: [string, "null"], maxLength: 1000 }
+        size: { type: string, minLength: 1, maxLength: 80 }
+        openingQuantity: { type: integer, minimum: 0 }
+        openingReason: { type: string, minLength: 1, maxLength: 1000 }
+        reorderLevel: { type: integer, minimum: 0 }
+        lastOrderDate: { type: [string, "null"], format: date }
+      required: [itemName, size, openingQuantity, openingReason, reorderLevel]
+
+    UniformStockItemUpdate:
+      type: object
+      properties:
+        expectedVersion: { type: integer, minimum: 1 }
+        itemCode: { type: [string, "null"], maxLength: 100 }
+        itemName: { type: string, minLength: 1, maxLength: 200 }
+        description: { type: [string, "null"], maxLength: 1000 }
+        size: { type: string, minLength: 1, maxLength: 80 }
+        reorderLevel: { type: integer, minimum: 0 }
+        lastOrderDate: { type: [string, "null"], format: date }
+        active: { type: boolean }
+      required:
+        - expectedVersion
+        - itemName
+        - size
+        - reorderLevel
+        - active
+
+    UniformStockItem:
+      type: object
+      properties:
+        id: { type: integer }
+        itemCode: { type: [string, "null"] }
+        itemName: { type: string }
+        description: { type: [string, "null"] }
+        size: { type: string }
+        currentQuantity: { type: integer }
+        outstandingIssued: { type: integer }
+        reorderLevel: { type: integer }
+        lastOrderDate: { type: [string, "null"], format: date }
+        active: { type: boolean }
+        lowStock: { type: boolean }
+        version: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required:
+        - id
+        - itemCode
+        - itemName
+        - description
+        - size
+        - currentQuantity
+        - outstandingIssued
+        - reorderLevel
+        - lastOrderDate
+        - active
+        - lowStock
+        - version
+        - createdAt
+        - updatedAt
+
+    UniformStockTransactionInput:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [receipt, issue, return, adjustment]
+        itemId: { type: integer, minimum: 1 }
+        staffId: { type: integer, minimum: 1 }
+        quantity: { type: integer, minimum: 1 }
+        adjustmentDirection: { type: string, enum: [increase, decrease] }
+        relatedIssueId: { type: integer, minimum: 1 }
+        conditionReturned: { type: string, enum: [serviceable, damaged] }
+        replacementIssued: { type: boolean }
+        reason: { type: string, minLength: 1, maxLength: 1000 }
+      required: [type, quantity, reason]
+
+    UniformStockTransaction:
+      type: object
+      properties:
+        id: { type: integer }
+        itemId: { type: integer }
+        itemName: { type: string }
+        size: { type: string }
+        staffId: { type: [integer, "null"] }
+        staffName: { type: [string, "null"] }
+        actorId: { type: integer }
+        actorName: { type: string }
+        type:
+          type: string
+          enum: [opening_balance, receipt, issue, return, adjustment]
+        quantity: { type: integer }
+        stockDelta: { type: integer }
+        relatedIssueId: { type: [integer, "null"] }
+        conditionReturned: { type: [string, "null"], enum: [serviceable, damaged, null] }
+        replacementIssued: { type: boolean }
+        reason: { type: string }
+        occurredAt: { type: string, format: date-time }
+        remainingReturnQuantity: { type: integer }
+      required:
+        - id
+        - itemId
+        - itemName
+        - size
+        - staffId
+        - staffName
+        - actorId
+        - actorName
+        - type
+        - quantity
+        - stockDelta
+        - relatedIssueId
+        - conditionReturned
+        - replacementIssued
+        - reason
+        - occurredAt
+        - remainingReturnQuantity

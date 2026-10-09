@@ -1,4 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
+import {
+  BrandedOperationalPhoto,
+  BrandedOperationalPhotoDownload,
+} from "@/components/BrandedOperationalPhoto";
 import { format } from "date-fns";
 import { useTranslation } from "react-i18next";
 import { getDateLocale } from "@/i18n/dateLocale";
@@ -116,7 +120,12 @@ function ImagePicker({ label, objectPath, onUpload, onRemove, onFileCapture, upl
 
       {displaySrc ? (
         <div className="relative rounded-xl overflow-hidden border border-slate-200 shadow-sm aspect-video bg-slate-50 group cursor-pointer" onClick={() => setLightbox(true)}>
-          <img src={displaySrc} alt={label} className="w-full h-full object-cover" />
+          <BrandedOperationalPhoto
+            src={displaySrc}
+            alt={label}
+            className="h-full w-full object-cover"
+            wrapperClassName="relative block h-full w-full overflow-hidden"
+          />
           {uploading && (
             <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
               <Loader2 className="w-6 h-6 text-white animate-spin" />
@@ -165,7 +174,19 @@ function ImagePicker({ label, objectPath, onUpload, onRemove, onFileCapture, upl
           <button className="absolute top-4 right-4 text-white/70 hover:text-white">
             <X className="w-7 h-7" />
           </button>
-          <img src={displaySrc} alt={label} className="max-w-full max-h-full rounded-xl shadow-2xl object-contain" onClick={(e) => e.stopPropagation()} />
+          <div className="max-h-full max-w-full" onClick={(e) => e.stopPropagation()}>
+            <BrandedOperationalPhoto
+              src={displaySrc}
+              alt={label}
+              className="max-h-full max-w-full rounded-xl object-contain"
+            />
+          </div>
+          <div className="absolute bottom-5 right-5">
+            <BrandedOperationalPhotoDownload
+              src={displaySrc}
+              filename={`issue-photo-${label.toLowerCase()}.jpg`}
+            />
+          </div>
         </div>
       )}
     </div>

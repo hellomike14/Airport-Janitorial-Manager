@@ -1,7 +1,16 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { getAuth } from "@clerk/express";
 import { z } from "zod";
-import { CONFIDENTIAL_COOKIE, UNLOCK_MS, ConfidentialError, assertAdmin, confidentialCookie, confidentialIdentity, confidentialService } from "../lib/confidentialAccess";
+import {
+  CONFIDENTIAL_COOKIE,
+  UNLOCK_MS,
+  ConfidentialError,
+  assertAdmin,
+  assertOperationsManager,
+  confidentialCookie,
+  confidentialIdentity,
+  confidentialService,
+} from "../lib/confidentialAccess";
 const numericCode = z.string().regex(/^\d{8,12}$/);
 const configureBody = z.object({ code: numericCode, confirmation: numericCode, currentCode: numericCode.optional() }).strict()
   .refine(body => body.code === body.confirmation);
@@ -17,7 +26,7 @@ export function confidentialFailure(error: unknown, res: Response) {
 }
 export function confidentialSameOrigin(req: Request) {
   const origin = req.get("origin");
-  if (!origin) return; // server clients must still present verified Admin identity
+  if (!origin) return; // server clients must still present verified manager identity
   const authorizedParty = getAuth(req)?.sessionClaims?.azp;
   let sameHost = false;
   try { sameHost = new URL(origin).host === req.get("host"); } catch { /* denied below */ }
@@ -29,6 +38,7 @@ const cookieOptions = (req: Request) => ({
 });
 const router = Router();
 router.use("/confidential-access", (_req, res, next) => { res.setHeader("Cache-Control", "private, no-store"); res.setHeader("X-Content-Type-Options", "nosniff"); next(); });
+router.use("/operations/confidential-access", (_req, res, next) => { res.setHeader("Cache-Control", "private, no-store"); res.setHeader("X-Content-Type-Options", "nosniff"); next(); });
 const action = (fn: (req: Request, res: Response) => Promise<void>) => async (req: Request, res: Response, _next: NextFunction) => {
   try { await fn(req, res); } catch (error) { confidentialFailure(error, res); }
 };
@@ -55,5 +65,27 @@ router.post("/confidential-access/lock", action(async (req, res) => {
   await confidentialService.lock(identity, confidentialCookie(req));
   res.clearCookie(CONFIDENTIAL_COOKIE, { ...cookieOptions(req), maxAge: undefined });
   res.json(await confidentialService.status(identity, ""));
+}));
+router.get("/operations/confidential-access/status", action(async (req, res) => {
+  const identity = await confidentialIdentity(req);
+  assertOperationsManager(identity);
+  res.json(await confidentialService.status(identity, confidentialCookie(req), true));
+}));
+router.post("/operations/confidential-access/unlock", action(async (req, res) => {
+  const identity = await confidentialIdentity(req);
+  assertOperationsManager(identity);
+  confidentialSameOrigin(req);
+  const { code } = z.object({ code: numericCode }).strict().parse(req.body);
+  const result = await confidentialService.unlock(identity, code, true);
+  res.cookie(CONFIDENTIAL_COOKIE, result.token, cookieOptions(req));
+  res.json(await confidentialService.status(identity, result.token, true));
+}));
+router.post("/operations/confidential-access/lock", action(async (req, res) => {
+  const identity = await confidentialIdentity(req);
+  assertOperationsManager(identity);
+  confidentialSameOrigin(req);
+  await confidentialService.lock(identity, confidentialCookie(req), true);
+  res.clearCookie(CONFIDENTIAL_COOKIE, { ...cookieOptions(req), maxAge: undefined });
+  res.json(await confidentialService.status(identity, "", true));
 }));
 export default router;

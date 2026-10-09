@@ -30,6 +30,28 @@ export function isCurrentEmployee(employee: {
       employee.role === "admin");
 }
 
+export function isEligibleOperationsEmployee(employee: {
+  active?: unknown;
+  formerEmployee?: unknown;
+  role?: unknown;
+}): boolean {
+  return employee.active === true &&
+    employee.formerEmployee !== true &&
+    (employee.role === "staff" ||
+      employee.role === "supervisor" ||
+      employee.role === "admin");
+}
+
+export function eligibleOperationsStaff<
+  T extends {
+    active?: unknown;
+    formerEmployee?: unknown;
+    role?: unknown;
+  },
+>(staff: readonly T[]): T[] {
+  return staff.filter(isEligibleOperationsEmployee);
+}
+
 export function orlandoDate(now = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: ORLANDO_TIME_ZONE,

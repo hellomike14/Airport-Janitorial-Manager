@@ -5,6 +5,10 @@ import { storePhotoBlob } from "@/lib/offlineStore";
 import { useOffline } from "@/contexts/OfflineContext";
 import { useTranslation } from "react-i18next";
 import { requestUploadUrl, type UploadUrlRequest } from "@workspace/api-client-react";
+import {
+  BrandedOperationalPhoto,
+  BrandedOperationalPhotoDownload,
+} from "@/components/BrandedOperationalPhoto";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -88,7 +92,13 @@ function PhotoSlot({
           }`}
           onClick={() => setLightbox(true)}
         >
-          <img src={displaySrc} alt={label} className="w-full h-full object-cover" />
+          <BrandedOperationalPhoto
+            src={displaySrc}
+            alt={label}
+            className="h-full w-full object-cover"
+            wrapperClassName="relative block h-full w-full overflow-hidden"
+            compact={compact}
+          />
           {uploading && (
             <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
               <Loader2 className="w-6 h-6 text-white animate-spin" />
@@ -139,12 +149,19 @@ function PhotoSlot({
           <button className="absolute top-4 right-4 text-white/70 hover:text-white">
             <X className="w-7 h-7" />
           </button>
-          <img
-            src={displaySrc}
-            alt={label}
-            className="max-w-full max-h-full rounded-xl shadow-2xl object-contain"
-            onClick={(e) => e.stopPropagation()}
-          />
+          <div className="max-h-full max-w-full" onClick={(e) => e.stopPropagation()}>
+            <BrandedOperationalPhoto
+              src={displaySrc}
+              alt={label}
+              className="max-h-full max-w-full rounded-xl object-contain"
+            />
+          </div>
+          <div className="absolute bottom-5 right-5">
+            <BrandedOperationalPhotoDownload
+              src={displaySrc}
+              filename={`task-photo-${label.toLowerCase().replace(/\s+/g, "-")}.jpg`}
+            />
+          </div>
         </div>
       )}
     </div>
@@ -301,7 +318,7 @@ export function TaskPhotoThumbnails({
             onClick={(e) => { e.stopPropagation(); setLightbox(imageUrl(beforeImagePath)); }}
             className="flex flex-col items-center gap-0.5 text-[10px] font-semibold text-slate-600"
           >
-            <img src={imageUrl(beforeImagePath)} alt="" className="w-12 h-12 rounded-lg object-cover border border-blue-200 shadow-sm hover:ring-2 hover:ring-blue-300 transition-all" />
+            <BrandedOperationalPhoto src={imageUrl(beforeImagePath)} alt="Before" className="h-12 w-12 rounded-lg border border-blue-200 object-cover shadow-sm transition-all hover:ring-2 hover:ring-blue-300" compact />
             <span>Before</span>
           </button>
         )}
@@ -312,7 +329,7 @@ export function TaskPhotoThumbnails({
             onClick={(e) => { e.stopPropagation(); setLightbox(imageUrl(afterImagePath)); }}
             className="flex flex-col items-center gap-0.5 text-[10px] font-semibold text-slate-600"
           >
-            <img src={imageUrl(afterImagePath)} alt="" className="w-12 h-12 rounded-lg object-cover border border-emerald-200 shadow-sm hover:ring-2 hover:ring-emerald-300 transition-all" />
+            <BrandedOperationalPhoto src={imageUrl(afterImagePath)} alt="After" className="h-12 w-12 rounded-lg border border-emerald-200 object-cover shadow-sm transition-all hover:ring-2 hover:ring-emerald-300" compact />
             <span>After</span>
           </button>
         )}
@@ -325,12 +342,16 @@ export function TaskPhotoThumbnails({
           <button className="absolute top-4 right-4 text-white/70 hover:text-white">
             <X className="w-7 h-7" />
           </button>
-          <img
-            src={lightbox}
-            alt="Photo"
-            className="max-w-full max-h-full rounded-xl shadow-2xl object-contain"
-            onClick={(e) => e.stopPropagation()}
-          />
+          <div className="max-h-full max-w-full" onClick={(e) => e.stopPropagation()}>
+            <BrandedOperationalPhoto
+              src={lightbox}
+              alt="Task evidence"
+              className="max-h-full max-w-full rounded-xl object-contain"
+            />
+          </div>
+          <div className="absolute bottom-5 right-5">
+            <BrandedOperationalPhotoDownload src={lightbox} />
+          </div>
         </div>
       )}
     </>
