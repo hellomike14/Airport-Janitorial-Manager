@@ -20,3 +20,4 @@ export * from "./employeeTraining";
 export * from "./identityDocuments";
 export * from "./employmentFormSubmissions";
 export * from "./digitalOperations";
+export * from "./staffPresence";

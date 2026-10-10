@@ -126,6 +126,7 @@ import type {
   SpecialTask,
   StaffAccessDisabledError,
   StaffMember,
+  StaffPresenceResponse,
   SubmitApplicationRequest,
   Task,
   TaskType,
@@ -845,6 +846,164 @@ export function useListConfidentialStaff<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * Returns only staff ids and last-active timestamps. No sessions, tokens, GPS, page history, IP addresses, or confidential records are exposed.
+ * @summary Read staff app activity for administrators only
+ */
+export const getGetStaffPresenceUrl = () => {
+  return `/api/staff/presence`;
+};
+
+export const getStaffPresence = async (
+  options?: RequestInit,
+): Promise<StaffPresenceResponse> => {
+  return customFetch<StaffPresenceResponse>(getGetStaffPresenceUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetStaffPresenceQueryKey = () => {
+  return [`/api/staff/presence`] as const;
+};
+
+export const getGetStaffPresenceQueryOptions = <
+  TData = Awaited<ReturnType<typeof getStaffPresence>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getStaffPresence>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetStaffPresenceQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getStaffPresence>>
+  > = ({ signal }) => getStaffPresence({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getStaffPresence>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetStaffPresenceQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getStaffPresence>>
+>;
+export type GetStaffPresenceQueryError = ErrorType<void>;
+
+/**
+ * @summary Read staff app activity for administrators only
+ */
+
+export function useGetStaffPresence<
+  TData = Awaited<ReturnType<typeof getStaffPresence>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getStaffPresence>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetStaffPresenceQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Staff identity and timestamp are derived on the server. Client-supplied identity or timestamps are ignored; writes are limited to one per staff member per 30 seconds.
+ * @summary Record the authenticated staff member's recent app activity
+ */
+export const getPostStaffPresenceActivityUrl = () => {
+  return `/api/staff/presence/activity`;
+};
+
+export const postStaffPresenceActivity = async (
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getPostStaffPresenceActivityUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getPostStaffPresenceActivityMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postStaffPresenceActivity>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof postStaffPresenceActivity>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["postStaffPresenceActivity"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof postStaffPresenceActivity>>,
+    void
+  > = () => {
+    return postStaffPresenceActivity(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PostStaffPresenceActivityMutationResult = NonNullable<
+  Awaited<ReturnType<typeof postStaffPresenceActivity>>
+>;
+
+export type PostStaffPresenceActivityMutationError = ErrorType<void>;
+
+/**
+ * @summary Record the authenticated staff member's recent app activity
+ */
+export const usePostStaffPresenceActivity = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postStaffPresenceActivity>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof postStaffPresenceActivity>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getPostStaffPresenceActivityMutationOptions(options));
+};
 
 /**
  * @summary Admin-only linked hire and employee selection

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useListStaff, useListFormerStaff, getListFormerStaffQueryKey, useRehireStaffMember, useCreateStaffMember, useDeleteStaffMember, useUpdateStaffMember } from "@workspace/api-client-react";
+import { useListStaff, useListFormerStaff, getListFormerStaffQueryKey, useRehireStaffMember, useCreateStaffMember, useDeleteStaffMember, useUpdateStaffMember, getStaffPresence, type StaffPresenceResponse } from "@workspace/api-client-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { UserPlus, Shield, User, Trash2, Lock, ArrowUpDown, LogOut, MailWarning, CheckCircle2, Mail, Phone, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getConfidentialStaffMembers } from "@workspace/api-client-react";
 import { ConfidentialBoundary } from "@/components/confidential/ConfidentialBoundary";
 import { AccessHealthSection } from "@/components/AccessHealthSection";
+
+type StaffPresenceEntry = StaffPresenceResponse["staff"][number];
 
 export default function Staff() {
   const { effectiveRole } = useAuth();
@@ -32,6 +34,16 @@ function StaffPage({ confidential }: { confidential: boolean }) {
   const { data: formerStaff } = useListFormerStaff({ query: { queryKey: getListFormerStaffQueryKey(), enabled: effectiveRole === "admin" } });
   const { currentUser, logout } = useAuth();
   const queryClient = useQueryClient();
+  const presence = useQuery<StaffPresenceResponse>({
+    queryKey: ["/api/staff/presence"],
+    enabled: effectiveRole === "admin",
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
+    queryFn: ({ signal }) => getStaffPresence({ signal, credentials: "same-origin", cache: "no-store" }),
+  });
+  const presenceFor = (id: number) => effectiveRole === "admin"
+    ? presence.data?.staff.find(entry => entry.staffId === id)
+    : undefined;
   const refreshStaff = () => { void queryClient.invalidateQueries({ queryKey: ["/api/staff"] }); void queryClient.invalidateQueries({ queryKey: ["/api/staff/confidential"] }); };
   const [isAdding, setIsAdding] = useState(false);
   const [formData, setFormData] = useState({ name: "", role: "staff", phone: "", email: "" });
@@ -152,6 +164,11 @@ function StaffPage({ confidential }: { confidential: boolean }) {
       </div>
 
       {effectiveRole === "admin" && <AccessHealthSection />}
+      {effectiveRole === "admin" && (
+        <p className="text-sm text-slate-500">
+          Active now means a signed-in staff member used the app within the last 2 minutes. Activity refreshes every 30 seconds.
+        </p>
+      )}
 
       {loginDisabledCount > 0 && (
         <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-4">
@@ -246,6 +263,8 @@ function StaffPage({ confidential }: { confidential: boolean }) {
               <StaffCard
                 key={person.id}
                 person={person}
+                presence={presenceFor(person.id)}
+                presenceUnavailable={effectiveRole === "admin" && presence.isError}
                 onDelete={!canAssignRoles ? undefined : () => handleDelete(person.id)}
                 onSetEmail={readOnly ? undefined : () => handleSetEmail(person)}
                 roleType="admin"
@@ -266,6 +285,8 @@ function StaffPage({ confidential }: { confidential: boolean }) {
               <StaffCard
                 key={person.id}
                 person={person}
+                presence={presenceFor(person.id)}
+                presenceUnavailable={effectiveRole === "admin" && presence.isError}
                 onDelete={canAssignRoles ? () => handleDelete(person.id) : undefined}
                 onToggleRole={canAssignRoles ? () => handleSetRole(person, "staff") : undefined}
                 onSetEmail={readOnly ? undefined : () => handleSetEmail(person)}
@@ -285,6 +306,8 @@ function StaffPage({ confidential }: { confidential: boolean }) {
             <StaffCard
               key={person.id}
               person={person}
+              presence={presenceFor(person.id)}
+              presenceUnavailable={effectiveRole === "admin" && presence.isError}
               onDelete={canAssignRoles ? () => handleDelete(person.id) : undefined}
               onToggleRole={canAssignRoles ? () => handleToggleRole(person) : undefined}
               onSetEmail={readOnly ? undefined : () => handleSetEmail(person)}
@@ -304,6 +327,8 @@ function StaffPage({ confidential }: { confidential: boolean }) {
             <StaffCard
               key={person.id}
               person={person}
+              presence={presenceFor(person.id)}
+              presenceUnavailable={effectiveRole === "admin" && presence.isError}
               onDelete={canAssignRoles ? () => handleDelete(person.id) : undefined}
               onToggleRole={canAssignRoles ? () => handleToggleRole(person) : undefined}
               onAssignEmployeeAdministrator={canAssignRoles ? () => handleSetRole(person, "employee_administrator") : undefined}
@@ -362,7 +387,7 @@ const ROLE_STYLES = {
   },
 };
 
-function StaffCard({ person, onDelete, onToggleRole, onAssignEmployeeAdministrator, roleType, onLogout, onSetEmail }: { person: any; onDelete?: () => void; onToggleRole?: () => void; onAssignEmployeeAdministrator?: () => void; roleType: "admin" | "supervisor" | "staff" | "employee_administrator"; onLogout?: () => void; onSetEmail?: () => void }) {
+function StaffCard({ person, presence, presenceUnavailable = false, onDelete, onToggleRole, onAssignEmployeeAdministrator, roleType, onLogout, onSetEmail }: { person: any; presence?: StaffPresenceEntry; presenceUnavailable?: boolean; onDelete?: () => void; onToggleRole?: () => void; onAssignEmployeeAdministrator?: () => void; roleType: "admin" | "supervisor" | "staff" | "employee_administrator"; onLogout?: () => void; onSetEmail?: () => void }) {
   const { t } = useTranslation();
   const style = ROLE_STYLES[roleType];
   const initials = person.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
@@ -416,6 +441,19 @@ function StaffCard({ person, onDelete, onToggleRole, onAssignEmployeeAdministrat
           <div className="flex items-start gap-2" data-testid={`staff-phone-${person.id}`}>
             <Phone aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
             <span className="min-w-0 break-words">{person.phone}</span>
+          </div>
+        )}
+        {(presence || presenceUnavailable) && (
+          <div className="flex items-center gap-2 text-xs font-medium text-slate-600" data-testid={`staff-presence-${person.id}`}>
+            {presenceUnavailable ? (
+              <span>Status unavailable</span>
+            ) : presence?.activeNow ? (
+              <><span aria-hidden="true" className="h-2 w-2 rounded-full bg-emerald-500" /><span>Active now</span></>
+            ) : presence?.lastSeenAt ? (
+              <span>Last active {new Date(presence.lastSeenAt).toLocaleString()}</span>
+            ) : (
+              <span>No activity yet</span>
+            )}
           </div>
         )}
         {canLogIn ? (

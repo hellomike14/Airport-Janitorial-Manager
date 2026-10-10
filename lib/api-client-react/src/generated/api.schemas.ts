@@ -400,6 +400,18 @@ export interface AuthDiagnostics {
   accessChanges: StaffAccessChange[];
 }
 
+export interface StaffPresenceEntry {
+  staffId: number;
+  /** @nullable */
+  lastSeenAt: string | null;
+  activeNow: boolean;
+}
+
+export interface StaffPresenceResponse {
+  serverNow: string;
+  staff: StaffPresenceEntry[];
+}
+
 export type StaffMemberRole =
   (typeof StaffMemberRole)[keyof typeof StaffMemberRole];
 

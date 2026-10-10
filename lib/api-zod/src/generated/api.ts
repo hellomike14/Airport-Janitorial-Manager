@@ -154,6 +154,21 @@ export const ListConfidentialStaffResponse = zod.array(
 );
 
 /**
+ * Returns only staff ids and last-active timestamps. No sessions, tokens, GPS, page history, IP addresses, or confidential records are exposed.
+ * @summary Read staff app activity for administrators only
+ */
+export const GetStaffPresenceResponse = zod.object({
+  serverNow: zod.date(),
+  staff: zod.array(
+    zod.object({
+      staffId: zod.number(),
+      lastSeenAt: zod.date().nullable(),
+      activeNow: zod.boolean(),
+    }),
+  ),
+});
+
+/**
  * @summary Admin-only linked hire and employee selection
  */
 export const GetIdentityDocumentContextResponse = zod.object({
