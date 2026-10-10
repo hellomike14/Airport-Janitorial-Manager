@@ -700,6 +700,23 @@ export default function PettyCashPanel() {
                       }}
                     />
                   </label>
+                  <label className="block space-y-1">
+                    <span>Take receipt photo</span>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      capture="environment"
+                      aria-label={`Take receipt photo for expense ${index + 1}`}
+                      className={`${field} file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1`}
+                      disabled={receiptBusyIndex != null || busy}
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        event.currentTarget.value = "";
+                        void handleReceiptPhoto(index, file);
+                      }}
+                    />
+                    <span className="block text-xs text-slate-500">Use your phone camera, or choose an existing image with Receipt photo above.</span>
+                  </label>
                   {(expense.receiptPreviewUrl || expense.receiptAttachmentId) && (
                     <div className="flex items-start gap-3">
                       <img
