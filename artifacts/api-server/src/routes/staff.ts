@@ -19,8 +19,10 @@ import {
   safeRecordServerDiagnostic,
   type ServerDiagnosticCode,
 } from "../lib/authDiagnostics";
+import staffPresenceRouter from "./staffPresence";
 
 const router: IRouter = Router();
+router.use("/presence", staffPresenceRouter);
 
 function toPublicStaff(staff: typeof staffTable.$inferSelect) {
   return {

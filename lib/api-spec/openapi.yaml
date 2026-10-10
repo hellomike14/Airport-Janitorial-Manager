@@ -65,6 +65,31 @@ paths:
           description: Administrator access code required
         "403":
           description: Administrator role required
+  /staff/presence:
+    get:
+      operationId: getStaffPresence
+      tags: [staff]
+      summary: Read staff app activity for administrators only
+      description: Returns only staff ids and last-active timestamps. No sessions, tokens, GPS, page history, IP addresses, or confidential records are exposed.
+      responses:
+        "200":
+          description: Current activity for active staff; activeNow uses a two-minute server-side window
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffPresenceResponse"
+        "401": { description: Verified staff sign-in required }
+        "403": { description: Administrator role required }
+  /staff/presence/activity:
+    post:
+      operationId: postStaffPresenceActivity
+      tags: [staff]
+      summary: Record the authenticated staff member's recent app activity
+      description: Staff identity and timestamp are derived on the server. Client-supplied identity or timestamps are ignored; writes are limited to one per staff member per 30 seconds.
+      responses:
+        "204": { description: Activity accepted or safely rate-limited }
+        "401": { description: Verified staff sign-in required }
+        "403": { description: "Account is inactive, former, or login-disabled" }
   /identity-documents/context:
     $ref: "./identity-documents.yaml#/context"
   /identity-documents:
@@ -2945,6 +2970,28 @@ components:
           items:
             $ref: "#/components/schemas/StaffAccessChange"
 
+    StaffPresenceEntry:
+      type: object
+      required: [staffId, lastSeenAt, activeNow]
+      properties:
+        staffId:
+          type: integer
+        lastSeenAt:
+          type: ["string", "null"]
+          format: date-time
+        activeNow:
+          type: boolean
+    StaffPresenceResponse:
+      type: object
+      required: [serverNow, staff]
+      properties:
+        serverNow:
+          type: string
+          format: date-time
+        staff:
+          type: array
+          items:
+            $ref: "#/components/schemas/StaffPresenceEntry"
     StaffMember:
       type: object
       properties:

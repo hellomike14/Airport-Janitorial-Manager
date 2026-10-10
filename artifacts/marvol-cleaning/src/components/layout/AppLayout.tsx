@@ -41,6 +41,7 @@ import { getDateLocale } from "@/i18n/dateLocale";
 import { useLocationTracker } from "@/hooks/useLocationTracker";
 import { Button } from "@/components/ui/button";
 import { useAuth, ViewMode } from "@/contexts/AuthContext";
+import { StaffPresenceHeartbeat } from "@/components/StaffPresenceHeartbeat";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import {
   useListNotifications,
@@ -687,6 +688,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-background flex w-full font-sans">
+      <StaffPresenceHeartbeat enabled={!!currentUser} />
       {mobileOpen && (
         <div
           className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
